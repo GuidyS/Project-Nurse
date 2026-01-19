@@ -1,0 +1,131 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap');
+
+@layer base {
+  :root {
+    /* Clean White/Blue Theme */
+    --background: 220 20% 97%;
+    --foreground: 220 25% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 25% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 25% 15%;
+
+    /* Blue Primary */
+    --primary: 217 91% 50%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Light Gray Secondary */
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 220 25% 25%;
+
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 10% 46%;
+
+    /* Orange Accent */
+    --accent: 25 95% 53%;
+    --accent-foreground: 0 0% 100%;
+
+    /* Success Green */
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
+
+    /* Warning Yellow */
+    --warning: 45 93% 47%;
+    --warning-foreground: 0 0% 0%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 217 91% 50%;
+
+    --radius: 0.75rem;
+
+    /* Sidebar */
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 220 10% 40%;
+    --sidebar-primary: 217 91% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 217 91% 97%;
+    --sidebar-accent-foreground: 217 91% 50%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217 91% 50%;
+
+    /* Custom shadows */
+    --shadow-sm: 0 1px 2px 0 hsl(220 25% 15% / 0.05);
+    --shadow-card: 0 1px 3px 0 hsl(220 25% 15% / 0.1), 0 1px 2px -1px hsl(220 25% 15% / 0.1);
+  }
+
+  .dark {
+    --background: 220 25% 8%;
+    --foreground: 220 14% 96%;
+
+    --card: 220 20% 12%;
+    --card-foreground: 220 14% 96%;
+
+    --popover: 220 20% 12%;
+    --popover-foreground: 220 14% 96%;
+
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 20% 18%;
+    --secondary-foreground: 220 14% 90%;
+
+    --muted: 220 20% 18%;
+    --muted-foreground: 220 10% 55%;
+
+    --accent: 25 95% 55%;
+    --accent-foreground: 0 0% 100%;
+
+    --success: 142 70% 45%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 45 93% 50%;
+    --warning-foreground: 0 0% 0%;
+
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 20% 20%;
+    --input: 220 20% 20%;
+    --ring: 217 91% 60%;
+
+    --sidebar-background: 220 20% 10%;
+    --sidebar-foreground: 220 10% 70%;
+    --sidebar-primary: 217 91% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 20% 15%;
+    --sidebar-accent-foreground: 217 91% 60%;
+    --sidebar-border: 220 20% 18%;
+    --sidebar-ring: 217 91% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Sarabun', sans-serif;
+  }
+}
+
+@layer utilities {
+  .shadow-card {
+    box-shadow: var(--shadow-card);
+  }
+}
