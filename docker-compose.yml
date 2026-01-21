@@ -1,0 +1,57 @@
+version: '3.8'
+services:
+
+  # Frontend
+  front:
+    build: 
+      context: ./frontend
+      dockerfile: DockerFile
+    ports:
+      - "5173:5173"  # เข้าผ่าน Browser ด้วย http://localhost:5173
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    stdin_open: true # จำเป็นสำหรับ React Docker
+    tty: true
+
+
+  # Backend
+  backend:
+    container_name: php-apache
+    build: 
+      context: ./backend
+      dockerfile: DockerFile
+    depends_on:
+      - db
+    volumes:
+      - ./backend/src:/var/www/html/
+    ports:
+      - 8080:80
+
+
+  # Database
+  db:
+    container_name: db
+    image: mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: MYSQL_ROOT_PASSWORD
+      MYSQL_DATABASE: MYSQL_DATABASE
+      MYSQL_USER: MYSQL_USER
+      MYSQL_PASSWORD: MYSQL_PASSWORD
+    ports:
+      - "9906:3306"
+    volumes:
+      - ./backend/nurseproject_test.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./mysql-data:/var/lib/mysql
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    ports:
+      - "8081:80"
+    restart: always
+    environment:
+      PMA_HOST: db
+    depends_on:
+      - db
+      
