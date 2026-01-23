@@ -50,10 +50,6 @@ interface StudentGrade {
   id: number;
   studentId: string;
   name: string;
-  midterm: number | null;
-  final: number | null;
-  assignment: number | null;
-  total: number | null;
   grade: string;
 }
 
@@ -64,27 +60,12 @@ const courses: Course[] = [
   { id: 4, code: "CS401", name: "Machine Learning", credits: 3, students: 28, semester: "1/2568", section: "1", cloCount: 5 },
 ];
 
-
-/**
- * CoursesPage Component - หน้ารายวิชาที่สอน
- * 
- * หน้าที่:
- * - แสดงรายการรายวิชาที่สอน
- * - บันทึกและแก้ไขผลการเรียนของนักศึกษา
- * - แสดงสถิติรายวิชาและจำนวนนักศึกษา
- * 
- * Features:
- * - แสดงตารางรายวิชาพร้อมข้อมูล (รหัส, ชื่อ, หน่วยกิต, จำนวนนักศึกษา, CLO)
- * - Dialog สำหรับบันทึก/แก้ไขผลการเรียน (กลางภาค, ปลายภาค, งาน, เกรด)
- * - ค้นหานักศึกษาใน dialog
- * - แก้ไขผลการเรียนแบบ inline editing
- */
 const CoursesPage = () => {
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [isGradeDialogOpen, setIsGradeDialogOpen] = useState(false);
   const [studentGrades, setStudentGrades] = useState<StudentGrade[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [editValues, setEditValues] = useState<Partial<StudentGrade>>({});
+  const [editGrade, setEditGrade] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
 
@@ -98,10 +79,6 @@ const CoursesPage = () => {
             id: Number(student.id),
             studentId: String(student.id),
             name: `${student.title || ''}${student.first_name} ${student.last_name}`.trim(),
-            midterm: null,
-            final: null,
-            assignment: null,
-            total: null,
             grade: "-"
           }));
           setStudentGrades(mappedStudents);
@@ -112,115 +89,42 @@ const CoursesPage = () => {
       });
   }, []);
 
-  /**
-   * openGradeDialog - เปิด dialog สำหรับบันทึก/แก้ไขผลการเรียน
-   * 
-   * หน้าที่:
-   * - ตั้งค่า selectedCourse เป็นรายวิชาที่เลือก
-   * - เปิด dialog
-   * 
-   * @param {Course} course - รายวิชาที่ต้องการบันทึกผลการเรียน
-   */
   const openGradeDialog = (course: Course) => {
     setSelectedCourse(course);
     setIsGradeDialogOpen(true);
   };
 
-  /**
-   * startEditing - เริ่มต้นการแก้ไขผลการเรียนของนักศึกษา
-   * 
-   * หน้าที่:
-   * - ตั้งค่า editingId เป็น ID ของนักศึกษาที่กำลังแก้ไข
-   * - ตั้งค่า editValues จากข้อมูลปัจจุบันของนักศึกษา
-   * 
-   * @param {StudentGrade} student - นักศึกษาที่ต้องการแก้ไข
-   */
   const startEditing = (student: StudentGrade) => {
     setEditingId(student.id);
-    setEditValues({
-      midterm: student.midterm,
-      final: student.final,
-      assignment: student.assignment,
-      grade: student.grade,
-    });
+    setEditGrade(student.grade);
   };
 
-  /**
-   * cancelEditing - ยกเลิกการแก้ไขผลการเรียน
-   * 
-   * หน้าที่:
-   * - รีเซ็ต editingId เป็น null
-   * - ล้าง editValues
-   */
   const cancelEditing = () => {
     setEditingId(null);
-    setEditValues({});
+    setEditGrade("");
   };
 
-  /**
-   * saveGrade - บันทึกผลการเรียนที่แก้ไข
-   * 
-   * หน้าที่:
-   * - คำนวณคะแนนรวม (midterm + final + assignment)
-   * - อัพเดทข้อมูลนักศึกษาใน state
-   * - รีเซ็ต editing state
-   * - แสดง toast notification
-   * 
-   * @param {number} studentId - ID ของนักศึกษาที่ต้องการบันทึก
-   */
   const saveGrade = (studentId: number) => {
-    const midterm = editValues.midterm ?? 0;
-    const final = editValues.final ?? 0;
-    const assignment = editValues.assignment ?? 0;
-    const total = midterm + final + assignment;
-
     setStudentGrades(
       studentGrades.map((s) =>
         s.id === studentId
-          ? {
-              ...s,
-              midterm,
-              final,
-              assignment,
-              total,
-              grade: editValues.grade || s.grade,
-            }
+          ? { ...s, grade: editGrade || s.grade }
           : s
       )
     );
     setEditingId(null);
-    setEditValues({});
+    setEditGrade("");
     toast({
       title: "บันทึกสำเร็จ",
       description: "บันทึกผลการเรียนเรียบร้อยแล้ว",
     });
   };
 
-  /**
-   * filteredStudents - กรองนักศึกษาตาม searchQuery
-   * 
-   * ค้นหาจาก:
-   * - ชื่อนักศึกษา
-   * - รหัสนักศึกษา
-   */
   const filteredStudents = studentGrades.filter(
     (s) =>
       s.name.includes(searchQuery) || s.studentId.includes(searchQuery)
   );
 
-  /**
-   * getGradeBadge - สร้าง Badge component สำหรับแสดงเกรด
-   * 
-   * ใช้สีที่แตกต่างกันตามเกรด:
-   * - A: สีเขียว (success)
-   * - B: สีหลัก (primary)
-   * - C: สีรอง (secondary)
-   * - D: สีเหลือง (warning)
-   * - F: สีแดง (destructive)
-   * 
-   * @param {string} grade - เกรดที่ต้องการแสดง
-   * @returns {JSX.Element} - Badge component
-   */
   const getGradeBadge = (grade: string) => {
     if (grade.startsWith("A")) {
       return <Badge className="bg-success text-success-foreground">{grade}</Badge>;
@@ -234,11 +138,14 @@ const CoursesPage = () => {
     if (grade.startsWith("D")) {
       return <Badge className="bg-warning text-warning-foreground">{grade}</Badge>;
     }
+    if (grade === "-") {
+      return <Badge variant="outline">{grade}</Badge>;
+    }
     return <Badge variant="destructive">{grade}</Badge>;
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -249,7 +156,7 @@ const CoursesPage = () => {
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-card rounded-xl shadow-card p-4">
+        <div className="bg-card rounded-xl shadow-sm border p-4">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-primary/10 rounded-lg">
               <BookOpen className="h-5 w-5 text-primary" />
@@ -260,7 +167,7 @@ const CoursesPage = () => {
             </div>
           </div>
         </div>
-        <div className="bg-card rounded-xl shadow-card p-4">
+        <div className="bg-card rounded-xl shadow-sm border p-4">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-success/10 rounded-lg">
               <Users className="h-5 w-5 text-success" />
@@ -276,7 +183,7 @@ const CoursesPage = () => {
       </div>
 
       {/* Courses Table */}
-      <div className="bg-card rounded-xl shadow-card overflow-hidden">
+      <div className="bg-card rounded-xl shadow-sm border overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
@@ -335,7 +242,7 @@ const CoursesPage = () => {
 
       {/* Grade Dialog */}
       <Dialog open={isGradeDialogOpen} onOpenChange={setIsGradeDialogOpen}>
-        <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>
               บันทึก/แก้ไขผลการเรียน - {selectedCourse?.code} {selectedCourse?.name}
@@ -357,18 +264,14 @@ const CoursesPage = () => {
               />
             </div>
 
-            {/* Grades Table */}
+            {/* Grades Table - Only Grade column */}
             <div className="flex-1 overflow-auto border rounded-lg">
               <Table>
                 <TableHeader className="sticky top-0 bg-card">
                   <TableRow>
-                    <TableHead className="w-[100px]">รหัส นศ.</TableHead>
+                    <TableHead className="w-[120px]">รหัส นศ.</TableHead>
                     <TableHead>ชื่อ-นามสกุล</TableHead>
-                    <TableHead className="text-center w-[80px]">กลางภาค<br />(50)</TableHead>
-                    <TableHead className="text-center w-[80px]">ปลายภาค<br />(50)</TableHead>
-                    <TableHead className="text-center w-[80px]">งาน<br />(20)</TableHead>
-                    <TableHead className="text-center w-[80px]">รวม</TableHead>
-                    <TableHead className="text-center w-[80px]">เกรด</TableHead>
+                    <TableHead className="text-center w-[100px]">เกรด</TableHead>
                     <TableHead className="text-right w-[100px]">จัดการ</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -379,72 +282,15 @@ const CoursesPage = () => {
                       <TableCell className="font-medium">{student.name}</TableCell>
                       <TableCell className="text-center">
                         {editingId === student.id ? (
-                          <Input
-                            type="number"
-                            min="0"
-                            max="50"
-                            value={editValues.midterm ?? ""}
-                            onChange={(e) =>
-                              setEditValues({ ...editValues, midterm: Number(e.target.value) })
-                            }
-                            className="w-16 h-8 text-center mx-auto"
-                          />
-                        ) : (
-                          student.midterm ?? "-"
-                        )}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {editingId === student.id ? (
-                          <Input
-                            type="number"
-                            min="0"
-                            max="50"
-                            value={editValues.final ?? ""}
-                            onChange={(e) =>
-                              setEditValues({ ...editValues, final: Number(e.target.value) })
-                            }
-                            className="w-16 h-8 text-center mx-auto"
-                          />
-                        ) : (
-                          student.final ?? "-"
-                        )}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {editingId === student.id ? (
-                          <Input
-                            type="number"
-                            min="0"
-                            max="20"
-                            value={editValues.assignment ?? ""}
-                            onChange={(e) =>
-                              setEditValues({ ...editValues, assignment: Number(e.target.value) })
-                            }
-                            className="w-16 h-8 text-center mx-auto"
-                          />
-                        ) : (
-                          student.assignment ?? "-"
-                        )}
-                      </TableCell>
-                      <TableCell className="text-center font-semibold">
-                        {editingId === student.id
-                          ? (editValues.midterm ?? 0) +
-                            (editValues.final ?? 0) +
-                            (editValues.assignment ?? 0)
-                          : student.total ?? "-"}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {editingId === student.id ? (
                           <Select
-                            value={editValues.grade}
-                            onValueChange={(value) =>
-                              setEditValues({ ...editValues, grade: value })
-                            }
+                            value={editGrade}
+                            onValueChange={(value) => setEditGrade(value)}
                           >
-                            <SelectTrigger className="w-16 h-8 mx-auto">
+                            <SelectTrigger className="w-20 h-8 mx-auto">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              {["A", "A-", "B+", "B", "B-", "C+", "C", "C-", "D+", "D", "F"].map(
+                              {["A", "B+", "B", "C+", "C", "D+", "D", "F"].map(
                                 (g) => (
                                   <SelectItem key={g} value={g}>
                                     {g}
@@ -463,7 +309,7 @@ const CoursesPage = () => {
                             <Button
                               size="icon"
                               variant="ghost"
-                              className="h-8 w-8 text-success"
+                              className="h-8 w-8 text-success hover:text-success"
                               onClick={() => saveGrade(student.id)}
                             >
                               <Save className="h-4 w-4" />
@@ -471,7 +317,7 @@ const CoursesPage = () => {
                             <Button
                               size="icon"
                               variant="ghost"
-                              className="h-8 w-8 text-destructive"
+                              className="h-8 w-8 text-destructive hover:text-destructive"
                               onClick={cancelEditing}
                             >
                               <X className="h-4 w-4" />

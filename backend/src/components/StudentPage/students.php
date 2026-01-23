@@ -15,7 +15,7 @@ require_once __DIR__ . '/../../config/config.php';
 class API {
     function Select() {
         $db = new Connect;
-        $stmt = $db->prepare("SELECT * FROM student");
+        $stmt = $db->prepare("SELECT * FROM student LIMIT 8");
         $stmt->execute();
         echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
     }
@@ -23,3 +23,4 @@ class API {
 
 $API = new API;
 $API->Select();
+
