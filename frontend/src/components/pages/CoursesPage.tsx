@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { BookOpen, Users, Edit, Eye, MoreVertical, Plus, Save, X, Search } from "lucide-react";
+import api from "@/lib/axios";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -63,16 +64,6 @@ const courses: Course[] = [
   { id: 4, code: "CS401", name: "Machine Learning", credits: 3, students: 28, semester: "1/2568", section: "1", cloCount: 5 },
 ];
 
-const initialStudentGrades: StudentGrade[] = [
-  { id: 1, studentId: "64010001", name: "นายสมชาย รักเรียน", midterm: null, final: null, assignment: null, total: 95, grade: "A" },
-  { id: 2, studentId: "64010002", name: "นางสาวสมหญิง ใจดี", midterm: null, final: null, assignment: null, total: 103, grade: "A" },
-  { id: 3, studentId: "64010003", name: "นายวิชัย เก่งกล้า", midterm: null, final: null, assignment: null, total: 78, grade: "B+" },
-  { id: 4, studentId: "64010004", name: "นางสาวพิมพ์ใจ สวยงาม", midterm: null, final: null, assignment: null, total: 107, grade: "A" },
-  { id: 5, studentId: "64010005", name: "นายกิตติ อดทน", midterm: null, final: null, assignment: null, total: 67, grade: "B" },
-  { id: 6, studentId: "64010006", name: "นางสาวนภา ท้องฟ้า", midterm: null, final: null, assignment: null, total: 87, grade: "A-" },
-  { id: 7, studentId: "64010007", name: "นายธนกฤต มั่นคง", midterm: null, final: null, assignment: null, total: 55, grade: "C+" },
-  { id: 8, studentId: "64010008", name: "นางสาวอรุณี แสงทอง", midterm: null, final: null, assignment: null, total: 82, grade: "B+" },
-];
 
 /**
  * CoursesPage Component - หน้ารายวิชาที่สอน
@@ -91,11 +82,35 @@ const initialStudentGrades: StudentGrade[] = [
 const CoursesPage = () => {
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [isGradeDialogOpen, setIsGradeDialogOpen] = useState(false);
-  const [studentGrades, setStudentGrades] = useState<StudentGrade[]>(initialStudentGrades);
+  const [studentGrades, setStudentGrades] = useState<StudentGrade[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editValues, setEditValues] = useState<Partial<StudentGrade>>({});
   const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
+
+  useEffect(() => {
+    api
+      .get("/components/StudentPage/students.php")
+      .then((res) => {
+        console.log("Data from API:", res.data);
+        if (Array.isArray(res.data)) {
+          const mappedStudents: StudentGrade[] = res.data.map((student: any) => ({
+            id: Number(student.id),
+            studentId: String(student.id),
+            name: `${student.title || ''}${student.first_name} ${student.last_name}`.trim(),
+            midterm: null,
+            final: null,
+            assignment: null,
+            total: null,
+            grade: "-"
+          }));
+          setStudentGrades(mappedStudents);
+        }
+      })
+      .catch((err) => {
+        console.error("Error fetching students:", err);
+      });
+  }, []);
 
   /**
    * openGradeDialog - เปิด dialog สำหรับบันทึก/แก้ไขผลการเรียน
