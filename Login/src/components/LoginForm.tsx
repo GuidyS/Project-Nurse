@@ -45,8 +45,11 @@ const LoginForm = () => {
     toast.success("เข้าสู่ระบบสำเร็จ!", {
       description: `ยินดีต้อนรับ!`
     });
-    
+
     setIsLoading(false);
+
+    // Redirect to frontend index page
+    window.location.href = 'http://localhost:5173';
   };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
