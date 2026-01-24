@@ -1,7 +1,8 @@
+
 <?php
 
     require_once __DIR__ . '/../../config/config.php';
-
+    
     class API {
         // แสดงข้อมูลส่วนตัว user
         function Select() {

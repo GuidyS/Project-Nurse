@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Users,
   FolderKanban,
@@ -32,7 +33,7 @@ const menuSections = [
   {
     title: "อาจารย์ประจำ",
     items: [
-      { id: "students", label: "นักศึกษาในที่ปรึกษา", icon: Users },
+      { id: "students", label: "รายชื่อนักศึกษา", icon: Users },
       { id: "courses", label: "รายวิชาที่สอน", icon: BookOpen },
     ],
   },
@@ -84,6 +85,12 @@ const bottomMenuItems = [
 const AppSidebar = ({ activeItem, onItemClick }: SidebarProps) => {
   const [collapsed, setCollapsed] = useState(false);
   const [user, setUser] = useState<UserData | null>(null);
+  const navigate = useNavigate();
+  // ฟังก์ชันสำหรับ logout และนำทางไปหน้า Login
+  const handleLogout = () => {
+    // ถ้ามีการลบ token หรือ clear state เพิ่มที่นี่
+    navigate("/login");
+  };
 
   /**
    * useEffect Hook - ดึงข้อมูลผู้ใช้จาก API
@@ -214,6 +221,7 @@ const AppSidebar = ({ activeItem, onItemClick }: SidebarProps) => {
             "flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-sidebar-accent/50 cursor-pointer transition-colors",
             collapsed && "justify-center px-0"
           )}
+          onClick={handleLogout}
         >
           <Avatar className="h-9 w-9">
             <AvatarFallback className="bg-accent text-accent-foreground text-sm font-medium">

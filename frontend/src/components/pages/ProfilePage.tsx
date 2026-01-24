@@ -24,9 +24,9 @@ const ProfilePage = () => {
     api.get('/api.php', {
       params: {
         page: 'profile',
-        id: userId // axios จะแปลงเป็น ?id=41172008 ให้เอง
+        id: userId
       }
-    }) 
+    })
       .then((res) => {
           console.log("Data from API:", res.data); // เช็คดูข้อมูลใน Console
           setUser(res.data);

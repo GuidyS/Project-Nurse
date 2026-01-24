@@ -1,5 +1,5 @@
 import Logo from "@/components/Logo";
-import LoginForm from "@/components/LoginForm";
+import LoginForm from "@/components/L.LoginForm";
 
 const Index = () => {
   return (
@@ -22,7 +22,7 @@ const Index = () => {
             {/* Heading */}
             <div className="text-center mb-8">
               <h1 className="text-3xl font-semibold tracking-tight text-foreground mb-2">
-                Welcome back
+                Test
               </h1>
               <p className="text-muted-foreground text-sm">
                 Please enter your details to sign in
