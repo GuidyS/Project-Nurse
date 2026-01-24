@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { BookOpen, Users, Edit, Eye, MoreVertical, Plus, Save, X, Search, Loader2 } from "lucide-react";
-import api from "@/lib/axios";
+import api from "@/lib/axios"; // ใช้ axios ของเพื่อนคุณ
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -10,8 +10,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 
-// กำหนด Path ไปหาไฟล์ API
-const API_PATH = "/components/CoursesPage/api.php";
+// กำหนด Path พื้นฐานสำหรับเรียก API
+const API_BASE = "/components/CoursesPage";
 
 interface Course {
   id: number;
@@ -32,24 +32,24 @@ interface StudentGrade {
 }
 
 const CoursesPage = () => {
+  // State สำหรับเก็บข้อมูล
   const [courses, setCourses] = useState<Course[]>([]);
+  const [studentGrades, setStudentGrades] = useState<StudentGrade[]>([]);
+  
+  // State สำหรับควบคุม UI
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [isGradeDialogOpen, setIsGradeDialogOpen] = useState(false);
-  const [studentGrades, setStudentGrades] = useState<StudentGrade[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editGrade, setEditGrade] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
-  
-  // Loading States
   const [isLoadingCourses, setIsLoadingCourses] = useState(true);
   const [isLoadingStudents, setIsLoadingStudents] = useState(false);
-  
   const { toast } = useToast();
 
-  // 1. ดึงข้อมูล "รายวิชา" ทันทีที่โหลดหน้าเว็บ
+  // 1. ดึงข้อมูลรายวิชา (เรียกไฟล์ get_courses.php)
   useEffect(() => {
     setIsLoadingCourses(true);
-    api.get(`${API_PATH}?action=get_courses`)
+    api.get(`${API_BASE}/get_courses.php`)
       .then((res) => {
         if (res.data.status === "success") {
           setCourses(res.data.data);
@@ -62,14 +62,14 @@ const CoursesPage = () => {
       .finally(() => setIsLoadingCourses(false));
   }, [toast]);
 
-  // 2. ดึงข้อมูล "นักศึกษา" เฉพาะเมื่อกดเลือกรายวิชา
+  // 2. ดึงข้อมูลนักศึกษาเมื่อกดเปิดดู (เรียกไฟล์ get_students.php)
   const openGradeDialog = (course: Course) => {
     setSelectedCourse(course);
     setIsGradeDialogOpen(true);
     setIsLoadingStudents(true);
     setSearchQuery("");
 
-    api.get(`${API_PATH}?action=get_students&course_id=${course.id}`)
+    api.get(`${API_BASE}/get_students.php?course_id=${course.id}`)
       .then((res) => {
         if (res.data.status === "success") {
           setStudentGrades(res.data.data);
@@ -92,9 +92,9 @@ const CoursesPage = () => {
     setEditGrade("");
   };
 
-  // 3. บันทึก "เกรด" ไปยังฐานข้อมูล
+  // 3. บันทึกเกรด (เรียกไฟล์ update_grade.php)
   const saveGrade = (studentId: number) => {
-    api.post(`${API_PATH}?action=update_grade`, { id: studentId, grade: editGrade })
+    api.post(`${API_BASE}/update_grade.php`, { id: studentId, grade: editGrade })
       .then((res) => {
         if (res.data.status === "success") {
           setStudentGrades(
@@ -130,7 +130,7 @@ const CoursesPage = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">รายวิชาที่สอน</h1>
-          <p className="text-muted-foreground mt-1">จัดการรายวิชาและบันทึกผลการเรียน (FR009)</p>
+          <p className="text-muted-foreground mt-1">จัดการรายวิชาและบันทึกผลการเรียน</p>
         </div>
       </div>
 
@@ -292,4 +292,3 @@ const CoursesPage = () => {
 };
 
 export default CoursesPage;
-
