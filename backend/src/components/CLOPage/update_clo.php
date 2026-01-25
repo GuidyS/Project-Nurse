@@ -1,0 +1,32 @@
+<?php
+header("Access-Control-Allow-Origin: *");
+header("Access-Control-Allow-Methods: POST, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type");
+header("Content-Type: application/json; charset=UTF-8");
+
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit(); }
+//"Database Connection String" (สตริงการเชื่อมต่อฐานข้อมูล) = จะเป็นตัวเชื่อมระหว่างโคด PHP กับ MySQL
+$pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
+$input = json_decode(file_get_contents("php://input"), true);
+
+if ($input && isset($input['id'])) {
+    try {
+        // อัปเดตคำอธิบาย หรือเปลี่ยนการจับคู่กับ YLO ใหม่
+        $sql = "UPDATE clo SET description = :description, ylo_id = :ylo_id WHERE clo_id = :id";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([
+            ':id' => $input['id'],
+            ':description' => $input['description'],
+            ':ylo_id' => $input['ylo_id'] ?? null
+        ]);
+
+        echo json_encode(["status" => "success", "message" => "CLO updated successfully"]);
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo json_encode(["status" => "error", "message" => $e->getMessage()]);
+    }
+} else {
+    http_response_code(400);
+    echo json_encode(["status" => "error", "message" => "Missing CLO ID"]);
+}
+?>
