@@ -71,7 +71,7 @@ const CoursesPage = () => {
 
   useEffect(() => {
     api
-      .get("/components/StudentPage/students.php")
+      .get("/components/StudentPage/CouresPage.php")
       .then((res) => {
         console.log("Data from API:", res.data);
         if (Array.isArray(res.data)) {
@@ -104,22 +104,40 @@ const CoursesPage = () => {
     setEditGrade("");
   };
 
-  const saveGrade = (studentId: number) => {
-    setStudentGrades(
-      studentGrades.map((s) =>
-        s.id === studentId
-          ? { ...s, grade: editGrade || s.grade }
-          : s
-      )
-    );
-    setEditingId(null);
-    setEditGrade("");
-    toast({
-      title: "บันทึกสำเร็จ",
-      description: "บันทึกผลการเรียนเรียบร้อยแล้ว",
-    });
-  };
+    const saveGrade = (studentId: number) => {
 
+    // 1. ส่งข้อมูลไปบันทึกที่ Backend
+
+    api.post("/components/StudentPage/Update_grade.php", { id: studentId, grade: editGrade })
+      .then(() => {
+
+        // 2. ถ้าบันทึกสำเร็จ ค่อยอัปเดตหน้าจอ
+
+        setStudentGrades(
+          studentGrades.map((s) =>
+            s.id === studentId
+              ? { ...s, grade: editGrade || s.grade }
+              : s
+          )
+        );
+
+        setEditingId(null);
+        setEditGrade("");
+        toast({
+          title: "บันทึกสำเร็จ",
+          description: "บันทึกผลการเรียนเรียบร้อยแล้ว",
+        });
+      })
+      .catch((err) => {
+        console.error("Error saving grade:", err);
+        toast({
+          title: "บันทึกไม่สำเร็จ",
+          description: "ไม่สามารถเชื่อมต่อฐานข้อมูลได้",
+          variant: "destructive"
+        });
+      });
+  };
+  
   const filteredStudents = studentGrades.filter(
     (s) =>
       s.name.includes(searchQuery) || s.studentId.includes(searchQuery)

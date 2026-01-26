@@ -34,7 +34,6 @@ const menuSections = [
     title: "อาจารย์ประจำ",
     items: [
       { id: "students", label: "รายชื่อนักศึกษา", icon: Users },
-      { id: "courses", label: "รายวิชาที่สอน", icon: BookOpen },
     ],
   },
   {

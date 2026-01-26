@@ -243,7 +243,7 @@ const StudentsPage = () => {
    */
   useEffect(() => {
   api
-    .get("/components/StudentPage/students.php")
+    .get("/components/StudentPage/get_student.php")
     .then((res) => {
       console.log("Data from API:", res.data);
       if (Array.isArray(res.data)) {
@@ -498,9 +498,6 @@ const StudentsPage = () => {
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem className="gap-2" onClick={() => openStudentDetail(student)}>
                         <Eye className="h-4 w-4" /> ดูข้อมูล
-                      </DropdownMenuItem>
-                      <DropdownMenuItem className="gap-2">
-                        <Mail className="h-4 w-4" /> ส่งข้อความ
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
