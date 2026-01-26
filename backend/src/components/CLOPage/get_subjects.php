@@ -5,8 +5,9 @@ header("Content-Type: application/json; charset=UTF-8");
 $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
 
 try {
-    // ดึงรหัสและชื่อวิชา
+    // ดึงรหัสและชื่อวิชา SELECT ชื่อคอลัมน์ FROM ชื่อตาราง WHERE เงื่อนไข
     $sql = "SELECT subject_id AS id, subject_code AS code, subject_name_th AS name FROM subject";
+     //ดึงข้อมูลและส่งกลับ
     $stmt = $pdo->query($sql);
     $subjects = $stmt->fetchAll(PDO::FETCH_ASSOC);
 

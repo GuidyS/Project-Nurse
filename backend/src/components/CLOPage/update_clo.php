@@ -8,7 +8,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit();
 //"Database Connection String" (สตริงการเชื่อมต่อฐานข้อมูล) = จะเป็นตัวเชื่อมระหว่างโคด PHP กับ MySQL
 $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
 $input = json_decode(file_get_contents("php://input"), true);
-
+//เช็กความพร้อมก่อนอัปเดต (isset($input['id']))  เช็กว่าจะมี $input['id'] ส่งมาหรือไม่?
 if ($input && isset($input['id'])) {
     try {
         // อัปเดตคำอธิบาย หรือเปลี่ยนการจับคู่กับ YLO ใหม่

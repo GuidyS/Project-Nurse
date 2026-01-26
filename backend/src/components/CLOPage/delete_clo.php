@@ -11,8 +11,11 @@ $input = json_decode(file_get_contents("php://input"), true);
 
 if ($input && isset($input['id'])) {
     try {
+        //ขียนคำสั่งลบข้อมูล (DELETE) จากตาราง clo ตรงจุดที่ clo_id มีค่าเท่ากับ :id
         $sql = "DELETE FROM clo WHERE clo_id = :id";
+        //(prepare): สั่งให้ฐานข้อมูลเตรียมตัวรับคำสั่งนี้
         $stmt = $pdo->prepare($sql);
+        //(execute): สั่งยิงคำสั่ง! โดยเอาค่า ID จริงๆ ที่รับมาจากหน้าเว็บไปใส่แทนที่คำว่า :id
         $stmt->execute([':id' => $input['id']]);
 
         echo json_encode(["status" => "success", "message" => "CLO deleted successfully"]);
