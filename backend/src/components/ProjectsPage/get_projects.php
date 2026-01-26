@@ -1,7 +1,8 @@
 <?php
-header("Access-Control-Allow-Origin: *");
-// ไฟล์นี้ใช้สำหรับ ดึงข้อมูล (GET) อย่างเดียว
-header("Content-Type: application/json; charset=UTF-8");
+header("Access-Control-Allow-Origin: http://localhost:5173"); 
+header("Access-Control-Allow-Credentials: true"); 
+header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
 
 // "Database Connection String"
 $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
