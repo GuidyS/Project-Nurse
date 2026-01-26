@@ -1,9 +1,10 @@
 <?php
 //เป็นการบอกกฎเกณฑ์การเข้าใช้งาน API นี้
 //(Allow-Origin: *) คือการ "เปิดประตู" ให้อนุญาตให้หน้าเว็บ React จากโดเมนไหนก็ได้เข้ามาเรียกใช้งาน API นี้ได้
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: POST, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type");
+header("Access-Control-Allow-Origin: http://localhost:5173"); 
+header("Access-Control-Allow-Credentials: true"); 
+header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
 //บรรทัดสุดท้ายกำหนดว่าข้อมูลที่จะส่งกลับไปหาหน้าเว็บจะเป็นรูปแบบ JSON และรองรับ UTF-8 (อ่านภาษาไทยได้)
 header("Content-Type: application/json; charset=UTF-8");
 //จัดการคำขอแบบพิเศษที่เรียกว่า OPTIONS    

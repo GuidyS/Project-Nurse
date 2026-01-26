@@ -1,5 +1,11 @@
 <?php
-header("Access-Control-Allow-Origin: *");
+// === เปลี่ยน Header ชุดนี้ให้เหมือนกันทุกไฟล์ ===
+header("Access-Control-Allow-Origin: http://localhost:5173"); 
+header("Access-Control-Allow-Credentials: true"); 
+header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
+
+// ... (โค้ดเดิมที่เหลือปล่อยไว้เหมือนเดิมได้เลยครับ)
 //ทำไมหน้านี้ถึงไม่ต้องมี Allow-Methods: POST, OPTIONS ? เพราะไฟล์นี้ใช้สำหรับ ดึงข้อมูล (GET) อย่างเดียว ไม่ได้ใช้ส่งข้อมูล (POST)"
 //ทำไมหน้านี้ถึงไม่ต้องมี Content-Type  เพราะเราไม่ได้ส่งข้อมูลก้อน JSON "เข้าไป" ในไฟล์นี้ เราแค่ส่งเลข ID ผ่าน URL ไปเฉยๆ
 header("Content-Type: application/json; charset=UTF-8");
