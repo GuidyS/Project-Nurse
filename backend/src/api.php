@@ -23,8 +23,17 @@ switch ($page) {
     case 'profile':
         require_once 'components/ProfilePage/Profilepage.php';
         break;
+    case 'CouresPage':
+        require_once 'components/StudentPage/CouresPage.php';
+        break;
     case 'student':
         require_once 'components/StudentPage/students.php';
+        break;
+    case 'get_student':
+        require_once 'components/StudentPage/get_student.php';
+        break;
+    case 'UpdateGrade':
+        require_once 'components/Update-Grade/UpdateGrade.php';
         break;
     default:
         http_response_code(404);
