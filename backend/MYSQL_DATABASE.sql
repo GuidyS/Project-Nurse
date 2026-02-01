@@ -1,11 +1,11 @@
 -- phpMyAdmin SQL Dump
--- version 5.2.1
+-- version 5.2.3
 -- https://www.phpmyadmin.net/
 --
--- Host: 127.0.0.1
--- Generation Time: Jan 13, 2026 at 03:36 PM
--- Server version: 10.4.32-MariaDB
--- PHP Version: 8.2.12
+-- Host: db
+-- Generation Time: Jan 30, 2026 at 01:26 PM
+-- Server version: 9.5.0
+-- PHP Version: 8.3.26
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
@@ -18,7 +18,7 @@ SET time_zone = "+00:00";
 /*!40101 SET NAMES utf8mb4 */;
 
 --
--- Database: `nurseproject_test`
+-- Database: `MYSQL_DATABASE`
 --
 
 -- --------------------------------------------------------
@@ -28,12 +28,12 @@ SET time_zone = "+00:00";
 --
 
 CREATE TABLE `degree` (
-  `id` int(11) NOT NULL,
-  `degree_name` varchar(100) NOT NULL,
-  `grad_uni` varchar(100) NOT NULL,
-  `grad_faculty` varchar(100) NOT NULL,
-  `grad_year` year(4) NOT NULL,
-  `degree_rank` varchar(100) NOT NULL
+  `id` int NOT NULL,
+  `degree_name` varchar(100) COLLATE utf8mb4_general_ci NOT NULL,
+  `grad_uni` varchar(100) COLLATE utf8mb4_general_ci NOT NULL,
+  `grad_faculty` varchar(100) COLLATE utf8mb4_general_ci NOT NULL,
+  `grad_year` year NOT NULL,
+  `degree_rank` varchar(100) COLLATE utf8mb4_general_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -43,9 +43,9 @@ CREATE TABLE `degree` (
 --
 
 CREATE TABLE `department` (
-  `id` int(10) NOT NULL,
-  `department_name` varchar(255) NOT NULL,
-  `faculty` varchar(255) NOT NULL
+  `id` int NOT NULL,
+  `department_name` varchar(255) COLLATE utf8mb4_general_ci NOT NULL,
+  `faculty` varchar(255) COLLATE utf8mb4_general_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -55,30 +55,30 @@ CREATE TABLE `department` (
 --
 
 CREATE TABLE `faculty` (
-  `id` varchar(100) NOT NULL,
-  `title` varchar(100) NOT NULL,
-  `first_name_th` varchar(100) NOT NULL,
-  `last_name_th` varchar(100) NOT NULL,
-  `first_name_en` varchar(100) NOT NULL,
-  `last_name_en` varchar(100) NOT NULL,
-  `gender` varchar(20) NOT NULL,
-  `birth_date` varchar(100) NOT NULL,
-  `license_no` varchar(100) NOT NULL,
-  `member_no` varchar(100) DEFAULT NULL,
-  `email` varchar(255) NOT NULL,
-  `phone` varchar(20) NOT NULL,
-  `role` enum('admin','user') NOT NULL DEFAULT 'user',
-  `position` varchar(100) NOT NULL,
-  `other_degrees***` varchar(255) DEFAULT NULL,
-  `degrees` varchar(255) NOT NULL,
-  `is_course_leader` tinyint(1) NOT NULL DEFAULT 0,
-  `is_program_leader` tinyint(1) NOT NULL DEFAULT 0,
-  `start_date` varchar(100) NOT NULL,
-  `assign_duration` varchar(100) NOT NULL,
-  `status` enum('Active','Retire','OnLeave') NOT NULL,
-  `description` varchar(100) DEFAULT NULL,
-  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
-  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `id` varchar(100) COLLATE utf8mb4_general_ci NOT NULL,
+  `title` varchar(100) COLLATE utf8mb4_general_ci NOT NULL,
+  `first_name_th` varchar(100) COLLATE utf8mb4_general_ci NOT NULL,
+  `last_name_th` varchar(100) COLLATE utf8mb4_general_ci NOT NULL,
+  `first_name_en` varchar(100) COLLATE utf8mb4_general_ci NOT NULL,
+  `last_name_en` varchar(100) COLLATE utf8mb4_general_ci NOT NULL,
+  `gender` varchar(20) COLLATE utf8mb4_general_ci NOT NULL,
+  `birth_date` varchar(100) COLLATE utf8mb4_general_ci NOT NULL,
+  `license_no` varchar(100) COLLATE utf8mb4_general_ci NOT NULL,
+  `member_no` varchar(100) COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `email` varchar(255) COLLATE utf8mb4_general_ci NOT NULL,
+  `phone` varchar(20) COLLATE utf8mb4_general_ci NOT NULL,
+  `role` enum('admin','user') COLLATE utf8mb4_general_ci NOT NULL DEFAULT 'user',
+  `position` varchar(100) COLLATE utf8mb4_general_ci NOT NULL,
+  `other_degrees***` varchar(255) COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `degrees` varchar(255) COLLATE utf8mb4_general_ci NOT NULL,
+  `is_course_leader` tinyint(1) NOT NULL DEFAULT '0',
+  `is_program_leader` tinyint(1) NOT NULL DEFAULT '0',
+  `start_date` varchar(100) COLLATE utf8mb4_general_ci NOT NULL,
+  `assign_duration` varchar(100) COLLATE utf8mb4_general_ci NOT NULL,
+  `status` enum('Active','Retire','OnLeave') COLLATE utf8mb4_general_ci NOT NULL,
+  `description` varchar(100) COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -137,12 +137,12 @@ INSERT INTO `faculty` (`id`, `title`, `first_name_th`, `last_name_th`, `first_na
 --
 
 CREATE TABLE `other_degree` (
-  `id` int(11) NOT NULL,
-  `degree_name` varchar(100) NOT NULL,
-  `grad_uni` varchar(100) NOT NULL,
-  `grad_faculty` varchar(100) NOT NULL,
-  `grad_year` year(4) NOT NULL,
-  `degree_rank` varchar(100) NOT NULL
+  `id` int NOT NULL,
+  `degree_name` varchar(100) COLLATE utf8mb4_general_ci NOT NULL,
+  `grad_uni` varchar(100) COLLATE utf8mb4_general_ci NOT NULL,
+  `grad_faculty` varchar(100) COLLATE utf8mb4_general_ci NOT NULL,
+  `grad_year` year NOT NULL,
+  `degree_rank` varchar(100) COLLATE utf8mb4_general_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -152,9 +152,9 @@ CREATE TABLE `other_degree` (
 --
 
 CREATE TABLE `plo` (
-  `id` smallint(1) NOT NULL,
-  `description` text NOT NULL,
-  `sub_plo_id` smallint(5) NOT NULL
+  `id` smallint NOT NULL,
+  `description` text COLLATE utf8mb4_general_ci NOT NULL,
+  `sub_plo_id` smallint NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -164,9 +164,9 @@ CREATE TABLE `plo` (
 --
 
 CREATE TABLE `positions` (
-  `id` int(11) NOT NULL,
-  `name` varchar(100) DEFAULT NULL,
-  `description` text DEFAULT NULL
+  `id` int NOT NULL,
+  `name` varchar(100) COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `description` text COLLATE utf8mb4_general_ci
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -192,8 +192,8 @@ INSERT INTO `positions` (`id`, `name`, `description`) VALUES
 --
 
 CREATE TABLE `position_permissions` (
-  `position_id` int(11) DEFAULT NULL,
-  `permission_name` varchar(200) DEFAULT NULL
+  `position_id` int DEFAULT NULL,
+  `permission_name` varchar(200) COLLATE utf8mb4_general_ci DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -259,12 +259,12 @@ INSERT INTO `position_permissions` (`position_id`, `permission_name`) VALUES
 --
 
 CREATE TABLE `program` (
-  `id` bigint(50) NOT NULL,
-  `program_name_th` varchar(255) NOT NULL,
-  `program_name_en` varchar(255) NOT NULL,
-  `program_year` int(4) NOT NULL,
+  `id` bigint NOT NULL,
+  `program_name_th` varchar(255) COLLATE utf8mb4_general_ci NOT NULL,
+  `program_name_en` varchar(255) COLLATE utf8mb4_general_ci NOT NULL,
+  `program_year` int NOT NULL,
   `created_at` date NOT NULL,
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -274,8 +274,8 @@ CREATE TABLE `program` (
 --
 
 CREATE TABLE `roles` (
-  `id` int(11) NOT NULL,
-  `name` varchar(50) DEFAULT NULL
+  `id` int NOT NULL,
+  `name` varchar(50) COLLATE utf8mb4_general_ci DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -295,8 +295,8 @@ INSERT INTO `roles` (`id`, `name`) VALUES
 --
 
 CREATE TABLE `role_permissions` (
-  `role_id` int(11) DEFAULT NULL,
-  `permission_name` varchar(200) DEFAULT NULL
+  `role_id` int DEFAULT NULL,
+  `permission_name` varchar(200) COLLATE utf8mb4_general_ci DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -350,9 +350,9 @@ INSERT INTO `role_permissions` (`role_id`, `permission_name`) VALUES
 --
 
 CREATE TABLE `section` (
-  `id` smallint(1) NOT NULL,
-  `section_name` varchar(100) NOT NULL,
-  `credit` int(10) NOT NULL
+  `id` smallint NOT NULL,
+  `section_name` varchar(100) COLLATE utf8mb4_general_ci NOT NULL,
+  `credit` int NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -371,8 +371,8 @@ INSERT INTO `section` (`id`, `section_name`, `credit`) VALUES
 --
 
 CREATE TABLE `select_subject` (
-  `id` smallint(1) NOT NULL,
-  `select_subject_name` varchar(100) NOT NULL
+  `id` smallint NOT NULL,
+  `select_subject_name` varchar(100) COLLATE utf8mb4_general_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -392,17 +392,17 @@ INSERT INTO `select_subject` (`id`, `select_subject_name`) VALUES
 --
 
 CREATE TABLE `student` (
-  `id` bigint(20) NOT NULL,
-  `title` varchar(100) NOT NULL,
-  `first_name` varchar(100) NOT NULL,
-  `last_name` varchar(100) NOT NULL,
-  `gender` varchar(100) NOT NULL,
-  `role` enum('user','admin') NOT NULL DEFAULT 'user',
-  `position` varchar(100) NOT NULL,
-  `status` enum('Active','Graduated','Withdraw','Dropped') NOT NULL DEFAULT 'Active',
-  `status_date` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  `status_reason` text NOT NULL,
-  `description` varchar(255) NOT NULL
+  `id` bigint NOT NULL,
+  `title` varchar(100) COLLATE utf8mb4_general_ci NOT NULL,
+  `first_name` varchar(100) COLLATE utf8mb4_general_ci NOT NULL,
+  `last_name` varchar(100) COLLATE utf8mb4_general_ci NOT NULL,
+  `gender` varchar(100) COLLATE utf8mb4_general_ci NOT NULL,
+  `role` enum('user','admin') COLLATE utf8mb4_general_ci NOT NULL DEFAULT 'user',
+  `position` varchar(100) COLLATE utf8mb4_general_ci NOT NULL,
+  `status` enum('Active','Graduated','Withdraw','Dropped') COLLATE utf8mb4_general_ci NOT NULL DEFAULT 'Active',
+  `status_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `status_reason` text COLLATE utf8mb4_general_ci NOT NULL,
+  `description` varchar(255) COLLATE utf8mb4_general_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -548,15 +548,15 @@ INSERT INTO `student` (`id`, `title`, `first_name`, `last_name`, `gender`, `role
 --
 
 CREATE TABLE `subject` (
-  `id` bigint(50) NOT NULL,
-  `section_id` smallint(1) NOT NULL,
-  `subject_group_id` smallint(1) NOT NULL,
-  `select_subject_id` smallint(1) NOT NULL,
-  `subject_id` varchar(50) NOT NULL,
-  `subject_name_th` varchar(255) NOT NULL,
-  `subject_name_en` varchar(255) NOT NULL,
-  `credit` int(10) NOT NULL,
-  `detail` varchar(50) NOT NULL
+  `id` bigint NOT NULL,
+  `section_id` smallint NOT NULL,
+  `subject_group_id` smallint NOT NULL,
+  `select_subject_id` smallint NOT NULL,
+  `subject_id` varchar(50) COLLATE utf8mb4_general_ci NOT NULL,
+  `subject_name_th` varchar(255) COLLATE utf8mb4_general_ci NOT NULL,
+  `subject_name_en` varchar(255) COLLATE utf8mb4_general_ci NOT NULL,
+  `credit` int NOT NULL,
+  `detail` varchar(50) COLLATE utf8mb4_general_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -566,9 +566,9 @@ CREATE TABLE `subject` (
 --
 
 CREATE TABLE `subject_group` (
-  `id` smallint(1) NOT NULL,
-  `subject_group_name` varchar(100) NOT NULL,
-  `credit` int(11) NOT NULL
+  `id` smallint NOT NULL,
+  `subject_group_name` varchar(100) COLLATE utf8mb4_general_ci NOT NULL,
+  `credit` int NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -587,9 +587,9 @@ INSERT INTO `subject_group` (`id`, `subject_group_name`, `credit`) VALUES
 --
 
 CREATE TABLE `sub_plo` (
-  `id` smallint(5) NOT NULL,
-  `description` text NOT NULL,
-  `subject_id` varchar(50) NOT NULL
+  `id` smallint NOT NULL,
+  `description` text COLLATE utf8mb4_general_ci NOT NULL,
+  `subject_id` varchar(50) COLLATE utf8mb4_general_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -599,11 +599,11 @@ CREATE TABLE `sub_plo` (
 --
 
 CREATE TABLE `users` (
-  `id` int(11) NOT NULL,
-  `username` varchar(100) DEFAULT NULL,
-  `password_hash` varchar(255) DEFAULT NULL,
-  `role_id` int(11) DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+  `id` int NOT NULL,
+  `username` varchar(100) COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `password_hash` varchar(255) COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `role_id` int DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -734,19 +734,19 @@ ALTER TABLE `users`
 -- AUTO_INCREMENT for table `positions`
 --
 ALTER TABLE `positions`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
 
 --
 -- AUTO_INCREMENT for table `roles`
 --
 ALTER TABLE `roles`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- Constraints for dumped tables

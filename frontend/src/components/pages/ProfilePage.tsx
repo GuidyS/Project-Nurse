@@ -15,16 +15,13 @@ interface UserData {
 
 const ProfilePage = () => {
   // 1. เปลี่ยนจาก [] เป็น null เพราะเรารับข้อมูลแค่ "ก้อนเดียว" ไม่ใช่ "ลิสต์"
-  const userId = 6604800003;
   
   const [user, setUser] = useState<UserData | null>(null);
 
   useEffect(() => {
-    // อย่าลืมใส่ id ต่อท้าย (ตามที่แก้ Backend ไป)
-    api.get('/api.php', {
+    api.get('/index.php', {
       params: {
-        page: 'profile',
-        id: userId // axios จะแปลงเป็น ?id=41172008 ให้เอง
+        page: 'profile'
       }
     }) 
       .then((res) => {

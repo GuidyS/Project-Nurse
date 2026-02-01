@@ -14,6 +14,8 @@ import {
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import api from "@/lib/axios";
+import { toast } from "sonner";
 
 interface SidebarProps {
   activeItem: string;
@@ -57,6 +59,20 @@ const bottomMenuItems = [
 
 const AppSidebar = ({ activeItem, onItemClick }: SidebarProps) => {
   const [collapsed, setCollapsed] = useState(false);
+
+  const handleLogout = async () => {
+    try {
+      const formData = new FormData();
+      formData.append('logout', 'true'); // ส่ง key 'logout' ไปให้ PHP จับได้
+      
+      toast.success("ออกจากระบบสำเร็จ");
+      onItemClick("login"); // เปลี่ยนหน้าไป Login
+    } catch (error) {
+      console.error("Logout failed", error);
+      // ถึง Error ก็ควรเด้งออกไปกันเหนียว
+      onItemClick("login"); 
+    }
+  };
 
   return (
     <aside
@@ -148,6 +164,8 @@ const AppSidebar = ({ activeItem, onItemClick }: SidebarProps) => {
       {/* User Profile */}
       <div className="p-3 border-t border-sidebar-border">
         <div
+          // 4. เพิ่ม onClick ตรง div คลุมนี้
+          onClick={handleLogout} 
           className={cn(
             "flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-sidebar-accent/50 cursor-pointer transition-colors",
             collapsed && "justify-center px-0"

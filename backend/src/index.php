@@ -10,6 +10,12 @@
     $page = isset($_GET['page']) ? $_GET['page'] : '';
 
     switch ($page) {
+        case 'register':
+            require_once 'components/Auth/register.php';
+            break;
+        case 'login':
+            require_once 'components/Auth/login.php';
+            break;
         case 'profile':
             require_once 'components/ProfilePage/api.php';
             break;
@@ -19,7 +25,7 @@
         
         default:
             http_response_code(404);
-            return json_encode(["error" => "API endpoint is not found!"]);
+            echo json_encode(["error" => "API endpoint is not found!"]);
             break;
     }
 

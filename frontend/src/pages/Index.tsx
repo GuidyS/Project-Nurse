@@ -35,12 +35,29 @@ const Index = () => {
     }
   };
 
+  // ---------------------------------------------------------
+  // [จุดสำคัญ] เช็คว่าเป็นหน้า Login/Register หรือเปล่า?
+  // ---------------------------------------------------------
+  const isAuthPage = activeItem === "login" || activeItem === "register";
+
+  if (isAuthPage) {
+    // ถ้าเป็น Auth Page -> แสดงแค่หน้านั้นเพียวๆ เต็มจอ (ไม่มี Sidebar)
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        {renderPage()}
+      </div>
+    );
+  }
+
+  // ถ้าไม่ใช่ Auth Page -> แสดงโครงสร้าง Dashboard ปกติ (มี Sidebar)
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex"> {/* เพิ่ม flex เพื่อให้ Sidebar ชิดซ้าย Content ชิดขวา */}
+      
+      {/* Sidebar ส่ง setActiveItem เข้าไปเพื่อใช้เปลี่ยนหน้า */}
       <AppSidebar activeItem={activeItem} onItemClick={setActiveItem} />
 
-      {/* Main Content */}
-      <main className="ml-[260px] p-6 min-h-screen">
+      {/* Main Content (เว้นระยะซ้ายให้ Sidebar) */}
+      <main className="flex-1 ml-[80px] md:ml-[260px] p-6 min-h-screen transition-all duration-300">
         {renderPage()}
       </main>
     </div>
