@@ -8,12 +8,21 @@ import CLOPage from "@/components/pages/CLOPage";
 import PracticalPage from "@/components/pages/PracticalPage";
 import NotificationsPage from "@/components/pages/NotificationsPage";
 import SettingsPage from "@/components/pages/SettingsPage";
+import LoginPage from "@/components/pages/Auth/LoginPage";
+import RegisterPage from "@/components/pages/Auth/RegisterPage";
 
 const Index = () => {
-  const [activeItem, setActiveItem] = useState("profile");
+  const [activeItem, setActiveItem] = useState("login");
 
   const renderPage = () => {
     switch (activeItem) {
+      case "login":
+      return <LoginPage 
+      onLoginSuccess={() => setActiveItem("profile")}
+      onGoToRegister={() => setActiveItem("register")} 
+      />;
+      case "register":
+      return <RegisterPage onBackToLogin={() => setActiveItem("login")} />;
       case "profile":
         return <ProfilePage />;
       case "students":
