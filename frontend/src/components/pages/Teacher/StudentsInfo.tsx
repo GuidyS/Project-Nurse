@@ -133,7 +133,7 @@ const getInitialMapping = (yearLevel: number, studentId?: string): Record<string
   return mapping;
 };
 
-const StudentsPage = () => {
+const StudentsInfo = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -476,4 +476,4 @@ const StudentsPage = () => {
   );
 };
 
-export default StudentsPage;
+export default StudentsInfo;

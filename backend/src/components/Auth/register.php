@@ -18,10 +18,9 @@ try {
 
     // 2. แปลง Role เป็นตัวเลข
     $role_map = [
-        'super-admin' => 1,
-        'admin'       => 2,
-        'teacher'     => 3,
-        'student'     => 4
+        'admin'       => 1,
+        'teacher'     => 2,
+        'student'     => 3
     ];
     $role = $role_map[$role_input] ?? 0;
 
@@ -37,36 +36,43 @@ try {
     }
 
     // 4. เช็คว่ามีรายชื่อในระบบจริงไหม (Student / Faculty)
-    $table = ($role == 4) ? "student" : "faculty";
-    $stmt = $db->prepare("SELECT id FROM $table WHERE id = :id");
-    $stmt->execute([':id' => $username]);
-    
-    if (!$stmt->fetch()) {
-        throw new Exception("ไม่พบรายชื่อรหัส $username ในฐานข้อมูลฝ่าย $table");
-    }
+    if ($role === 3) {
+            $table = "student";
+            $id_column = "student_id"; // จาก student (1).sql
+        } else {
+            $table = "faculty";
+            $id_column = "faculty_id"; // จาก faculty (2).sql
+        }
 
-    // 5. บันทึกข้อมูล (Password Hash)
-    $password_hash = password_hash($password_raw, PASSWORD_DEFAULT);
-    $sql_insert = "INSERT INTO users (username, password_hash, role_id) VALUES (:username, :password, :role)";
-    $stmt = $db->prepare($sql_insert);
-    
-    if ($stmt->execute([
-        ':username' => $username,
-        ':password' => $password_hash,
-        ':role'     => $role
-    ])) {
-        echo json_encode([
-            "status" => "success",
-            "message" => "สมัครสมาชิกสำเร็จ"
+        // 2. ตรวจสอบว่าตัวแปรมีค่าแน่นอนก่อนสร้าง Query
+        if (empty($id_column) || empty($table)) {
+            throw new Exception("Role ไม่ถูกต้อง ไม่สามารถระบุตารางข้อมูลได้");
+        }
+
+        // 3. เช็ครายชื่อในคณะ (จุดที่เกิด Error เดิม)
+        // ใช้ Variable Interpolation ($id_column) สำหรับชื่อคอลัมน์
+        $stmt = $db->prepare("SELECT $id_column FROM $table WHERE $id_column = :id");
+        $stmt->execute([':id' => $username]);
+
+        if (!$stmt->fetch()) {
+            throw new Exception("ไม่พบรายชื่อรหัส $username ในฐานข้อมูลของ $table");
+        }
+
+        // 4. บันทึกลงตาราง users (เชื่อมโยงผ่าน username)
+        $password_hash = password_hash($data['password'], PASSWORD_DEFAULT);
+        
+        $sql_insert = "INSERT INTO users (username, password_hash, role_id) VALUES (:username, :password, :role)";
+        $stmt_insert = $db->prepare($sql_insert);
+        $stmt_insert->execute([
+            ':username' => $username, // เก็บ ID นักศึกษา/อาจารย์ ลงในช่อง username
+            ':password' => $password_hash,
+            ':role'     => $role
         ]);
-    } else {
-        throw new Exception("ไม่สามารถบันทึกข้อมูลได้");
-    }
+
+    echo json_encode(["status" => "success", "message" => "ลงทะเบียนสำเร็จ"]);
 
 } catch (Exception $e) {
     http_response_code(400);
-    echo json_encode([
-        "status" => "error", 
-        "message" => $e->getMessage()
-    ]);
+    echo json_encode(["status" => "error", "message" => $e->getMessage()]);
 }
+

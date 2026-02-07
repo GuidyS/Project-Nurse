@@ -29,6 +29,9 @@
         case 'student':
             require_once 'components/StudentPage/api.php';
             break;
+        case 'transcript':
+            require_once 'components/Transcript/transcript-api.php';
+            break;
         
         default:
             http_response_code(404);

@@ -1,15 +1,18 @@
 import { useState } from "react";
 import AppSidebar from "@/components/AppSidebar";
 import ProfilePage from "@/components/pages/ProfilePage";
-import StudentsPage from "@/components/pages/StudentsPage";
-import ProjectsPage from "@/components/pages/ProjectsPage";
-import CoursesPage from "@/components/pages/CoursesPage";
-import CLOPage from "@/components/pages/CLOPage";
-import PracticalPage from "@/components/pages/PracticalPage";
+import TeacherPage from "@/components/pages/Teacher/TeacherPage";
+import StudentsInfo from "@/components/pages/Teacher/StudentsInfo";
+import ProjectsPage from "@/components/pages/Teacher/ProjectsPage";
+import CoursesPage from "@/components/pages/Teacher/CoursesPage";
+import CLOPage from "@/components/pages/Teacher/CLOPage";
+import PracticalPage from "@/components/pages/Teacher/PracticalPage";
 import NotificationsPage from "@/components/pages/NotificationsPage";
 import SettingsPage from "@/components/pages/SettingsPage";
 import LoginPage from "@/components/pages/Auth/LoginPage";
 import RegisterPage from "@/components/pages/Auth/RegisterPage";
+import Transcript from "@/components/pages/Student/Transcript";
+import NOJhefjs from "@/components/pages/Student/Transcript";
 
 const Index = () => {
   const [activeItem, setActiveItem] = useState("login");
@@ -18,15 +21,31 @@ const Index = () => {
     switch (activeItem) {
       case "login":
       return <LoginPage 
-      onLoginSuccess={() => setActiveItem("profile")}
+
+      onLoginSuccess={(roleId) => {
+          if(roleId == 1) {
+            setActiveItem("dashboard");
+          } else if(roleId == 2) {
+            setActiveItem("teacher");
+          } else if(roleId == 3) {
+            setActiveItem("transcript");
+          }
+        }
+      }
+
       onGoToRegister={() => setActiveItem("register")} 
+
       />;
       case "register":
       return <RegisterPage onBackToLogin={() => setActiveItem("login")} />;
       case "profile":
         return <ProfilePage />;
-      case "students":
-        return <StudentsPage />;
+      case "teacher":
+        return <TeacherPage />;
+      case "students-info":
+        return <StudentsInfo />;
+      case "transcript":
+        return <Transcript />;
       case "projects":
         return <ProjectsPage />;
       case "courses":
@@ -37,6 +56,8 @@ const Index = () => {
         return <PracticalPage />;
       case "notifications":
         return <NotificationsPage />;
+      case "settings":
+        return <SettingsPage />;
       case "settings":
         return <SettingsPage />;
       default:

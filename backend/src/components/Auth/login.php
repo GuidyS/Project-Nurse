@@ -17,11 +17,11 @@ try {
 
     // ใช้ Prepared Statement เพื่อความปลอดภัย
     $sql = "SELECT users.*, 
-                   student.title AS s_title, student.first_name AS s_fname, student.last_name AS s_lname,
+                   student.title AS s_title, student.first_name_th AS s_fname, student.last_name_th AS s_lname,
                    faculty.title AS f_title, faculty.first_name_th AS f_fname, faculty.last_name_th AS f_lname
             FROM users 
-            LEFT JOIN student ON users.username = student.id
-            LEFT JOIN faculty ON users.username = faculty.id
+            LEFT JOIN student ON users.username = student.student_id
+            LEFT JOIN faculty ON users.username = faculty.faculty_id
             WHERE users.username = :username";
 
     $stmt = $db->prepare($sql);

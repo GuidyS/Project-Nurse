@@ -2,6 +2,13 @@
 
     require_once __DIR__ . '/../../config/config.php';
 
+    
+    // Headers (สำคัญมากสำหรับการทำ API)
+    header("Access-Control-Allow-Origin: http://localhost:5173");
+    header("Content-Type: application/json; charset=UTF-8");
+    header("Access-Control-Allow-Methods: GET, POST");
+    header("Access-Control-Allow-Credentials: true"); // อนุญาตให้ส่ง Cookie/Session
+
     // เริ่ม Session เพื่อให้เข้าถึง $_SESSION['user_id'] ได้
     if (session_status() == PHP_SESSION_NONE) {
         session_start();
@@ -58,12 +65,6 @@
     }
 
     $API = new API;
-
-    // Headers (สำคัญมากสำหรับการทำ API)
-    header("Access-Control-Allow-Origin: http://localhost:5173");
-    header("Content-Type: application/json; charset=UTF-8");
-    header("Access-Control-Allow-Methods: GET, POST");
-    header("Access-Control-Allow-Credentials: true"); // อนุญาตให้ส่ง Cookie/Session
 
     // เรียกใช้ฟังก์ชัน
     echo $API->Select();

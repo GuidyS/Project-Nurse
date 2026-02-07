@@ -4,12 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import PasswordStrengthIndicator from "./PasswordStrengthIndicator";
 import { toast } from "sonner";
 import api from "@/lib/axios";
 
 interface loginPageProps {
-    onLoginSuccess: () => void;
+    onLoginSuccess: (roleId: number) => void;
     onGoToRegister: () => void;
 }
 
@@ -54,7 +53,7 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
       toast.success("เข้าสู่ระบบสำเร็จ!");
       
       // เรียก props เพื่อเปลี่ยนหน้าใน Index.tsx
-      onLoginSuccess(); 
+      onLoginSuccess(response.data.role_id); 
     }
   } catch (error: any) {
     // 3. ถ้าพลาด (เช่น 401 หรือ 400 จาก PHP)
