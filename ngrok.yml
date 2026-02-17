@@ -1,0 +1,9 @@
+version: '2'
+authtoken: 35P9NEFWiEsOIciSTJisRedPcF5_6Dutscod2fD4D8yozkPZo  # นำ Token ของคุณมาใส่ตรงนี้
+tunnels:
+  frontend:
+    proto: http
+    addr: 5173
+  backend:
+    proto: http
+    addr: 8080

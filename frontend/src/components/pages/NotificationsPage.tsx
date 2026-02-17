@@ -36,6 +36,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import HasPermission from "./Auth/HasPermission";
 
 interface Notification {
   id: number;

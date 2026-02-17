@@ -50,10 +50,13 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
 
     // 2. ถ้าสำเร็จ (Status 200 และ backend ตอบ success)
     if (response.data.status === "success") {
-      toast.success("เข้าสู่ระบบสำเร็จ!");
+      // --- ส่วนที่ต้องเพิ่ม/แก้ไข ---
+      // เก็บข้อมูล user และ permissions ลงใน localStorage เพื่อให้ HasPermission นำไปใช้ได้
+      localStorage.setItem("user", JSON.stringify(response.data.user));
       
-      // เรียก props เพื่อเปลี่ยนหน้าใน Index.tsx
-      onLoginSuccess(response.data.role_id); 
+      toast.success("Login successful");
+      onLoginSuccess(response.data.user);
+      // ----------------------------
     }
   } catch (error: any) {
     // 3. ถ้าพลาด (เช่น 401 หรือ 400 จาก PHP)
