@@ -43,9 +43,9 @@ try {
     if ($user && password_verify($password, $user['password_hash'])) {
 
         // --- ส่วนที่เพิ่มกลับเข้ามา: กำหนดค่าชื่อ ($name) ---
-        $name = ($user['role_id'] == 4) 
-            ? $user['s_title'] . $user['s_fname'] . ' ' . $user['s_lname']
-            : $user['f_title'] . $user['f_fname'] . ' ' . $user['f_lname'];
+        $name = ($user['role_id'] == 3) 
+            ? $user['s_fname'] . ' ' . $user['s_lname']
+            : $user['f_fname'] . ' ' . $user['f_lname'];
         // ----------------------------------------------
         
         // ดึงสิทธิ์จากทั้ง Role และ Position มารวมกัน (UNION)
@@ -74,6 +74,7 @@ try {
         echo json_encode([
             "status" => "success",
             "user" => [
+                "user_id" => (int)$user['user_id'],
                 "username" => $user['username'],
                 "name" => $name,
                 "role_id" => (int)$user['role_id'],

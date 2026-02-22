@@ -44,6 +44,7 @@ import RolesManagement from "@/components/pages/Admin/RolesManagement";
 import UsersManagement from "@/components/pages/Admin/UsersManagement";
 import Dashboard from "@/components/pages/Teacher/Dashboard";
 import DeanDashboard from "@/components/pages/Teacher/DeanDashboard";
+import Retention from "@/components/pages/Teacher/Retention";
 
 const Index = () => {
   const [activeItem, setActiveItem] = useState("login");
@@ -106,6 +107,7 @@ const Index = () => {
 
       />;
       
+      // 
       case "register":
         return <RegisterPage onBackToLogin={() => setActiveItem("login")} />;
       case "profile":
@@ -136,6 +138,8 @@ const Index = () => {
       // คณบดี
       case "dean-dashboard":
         return <DeanDashboard />;
+      case "retention":
+        return <Retention />;
 
       // ผู้รับผิดชอบหลักสูตร
       case "five-year-summary":
@@ -205,7 +209,10 @@ const Index = () => {
 
   // ถ้าไม่ใช่ Auth Page -> แสดงโครงสร้าง Dashboard ปกติ (มี Sidebar)
   return (
-    <MainLayout onItemClick={setActiveItem}>
+    <MainLayout 
+      onItemClick={setActiveItem}
+      activeItem={activeItem} // ส่งค่า activeItem ไปที่ Layout
+      >
         {renderPage()}
     </MainLayout>
   );

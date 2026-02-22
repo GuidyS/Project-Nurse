@@ -14,23 +14,39 @@
     $page = isset($_GET['page']) ? $_GET['page'] : '';
 
     switch ($page) {
-        case 'register':
-            require_once 'components/Auth/register.php';
-            break;
-        case 'login':
-            require_once 'components/Auth/login.php';
-            break;
-        case 'reset-password':
-            require_once 'components/Auth/reset-password.php';
-            break;
-        case 'profile':
-            require_once 'components/ProfilePage/api.php';
-            break;
-        case 'student':
-            require_once 'components/StudentPage/api.php';
-            break;
-        case 'transcript':
-            require_once 'components/Transcript/transcript-api.php';
+            case 'register':
+                require_once 'components/Auth/register.php';
+                break;
+            case 'login':
+                require_once 'components/Auth/login.php';
+                break;
+            case 'reset-password':
+                require_once 'components/Auth/reset-password.php';
+                break;
+            case 'profile':
+                require_once 'components/ProfilePage/api.php';
+                break;
+            case 'student':
+                require_once 'components/StudentPage/api.php';
+                break;
+            case 'transcript':
+                require_once 'components/Transcript/transcript-api.php';
+                break;
+
+            case 'sidebar':
+            // 1. ตรวจสอบความปลอดภัย (ตัวอย่างการดึง user_id)
+            // หากระบบคุณใช้ session_start() ไว้ที่หัวไฟล์ index.php อยู่แล้ว 
+            // ก็สามารถใช้ $_SESSION['user_id'] ได้เลย
+            $user_id = isset($_GET['user_id']) ? $_GET['user_id'] : null;
+
+            if ($user_id) {
+                // 2. เรียกใช้ไฟล์ sidebar.php 
+                // Path นี้ต้องตรงกับโฟลเดอร์ที่คุณเก็บไฟล์ sidebar.php ไว้จริง
+                require_once 'components/sidebar.php'; 
+            } else {
+                http_response_code(401);
+                echo json_encode(["message" => "กรุณาระบุ User ID"]);
+            }
             break;
         
         default:
