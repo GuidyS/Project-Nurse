@@ -210,18 +210,6 @@ interface MenuItem {
 //       },
 //     ],
 //   },
-//   {
-//     label: 'อาจารย์สมมติ',
-//     prefix: '/dummy',
-//     sections: [
-//       {
-//         items: [
-//           { title: 'ข้อมูลสาธารณะ', url: '/dummy/public-info', icon: FileText },
-//         ],
-//       },
-//     ],
-//   },
-// ];
 
 export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
 
