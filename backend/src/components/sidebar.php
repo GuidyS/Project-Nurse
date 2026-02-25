@@ -30,6 +30,7 @@ foreach ($menu_items as $item) {
             'items' => []
         ];
     }
+    
     $sections[$sectionName]['items'][] = [
         'title' => $item['title'],
         'url'   => $item['url'],

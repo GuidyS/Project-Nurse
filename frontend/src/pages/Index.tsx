@@ -146,44 +146,52 @@ const Index = () => {
         return <FiveYearSummary />;
       case "clo-management":
         return <CLOManagement />;
-      case "clo-map":
-        return <CLOMap />;
       case "plo-ylo-report":
         return <PLOYLOReport />;
       case "course-report":
         return <CourseReports />;
       case "documents":
         return <Documents />;
-      case "advise-notes":
-        return <AdviseNotes />;
-      case "advisor-notifications":
-        return <AdvisorNotifications />;
-      case "advises":
-        return <Advises />;
       case "assign-instructors":
         return <AssignInstructors />;
+
+      // อจ.ประจำ/ประจำหลักสูตร/ปฏิบัติ
+      case "clo-map":
+        return <CLOMap />;
       case "evidence":
         return <Evidence />;
       case "grades":
         return <Grades />;
       case "my-courses":
         return <MyCourses />;
-      case "my-projects":
-        return <MyProjects />;
       case "performance":
         return <Performance />;
       case "practical-students":
         return <PracticalStudents />;
       case "program-reports":
         return <ProgramReports />;
+      case "schedule-tasks":
+        return <ScheduleTasks />;
+
+      // รับผิดชอบโครงการ
+      case "my-projects":
+        return <MyProjects />;
       case "project-docs":
         return <ProjectDocs />;
       case "project-links":
         return <ProjectLinks />;
       case "project-reports":
         return <ProjectReports />;
-      case "schedule-tasks":
-        return <ScheduleTasks />;
+
+      // ที่ปรึกษา
+      case "advise-notes":
+        return <AdviseNotes />;
+      case "advisor-notifications":
+        return <AdvisorNotifications />;
+      case "advises":
+        return <Advises />;
+
+      // นักศึกษา
       case "students":
         return <Students />;
       case "transfer-requests":

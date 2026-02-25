@@ -54,7 +54,7 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
       // เก็บข้อมูล user และ permissions ลงใน localStorage เพื่อให้ HasPermission นำไปใช้ได้
       localStorage.setItem("user", JSON.stringify(response.data.user));
       
-      toast.success("Login successful");
+      toast.success("เข้าสู่ระบบสำเร็จ");
       onLoginSuccess(response.data.user);
       // ----------------------------
     }
@@ -107,7 +107,7 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
     return (
       <div className="w-full max-w-md space-y-6"> 
       <div className="space-y-2 text-center">
-        <h2 className="text-2xl font-semibold tracking-tight text-foreground">Reset Password</h2>
+        <h2 className="text-2xl font-semibold tracking-tight text-foreground">รีเซ็ตรหัสผ่าน</h2>
       </div>
         <form onSubmit={handleResetPassword} className="space-y-6">
           <div className="space-y-4">
@@ -156,7 +156,7 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
               {isLoading ? (
                 <div className="h-5 w-5 animate-spin rounded-full border-2 border-background border-t-transparent" />
               ) : (
-                "Confirm"
+                "ยืนยัน"
               )}
             </Button>
           </div>
@@ -166,104 +166,110 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
   }
 
   return (
-    <div className="w-full max-w-md space-y-6"> 
-      <div className="space-y-2 text-center">
-        <h2 className="text-2xl font-semibold tracking-tight text-foreground">Sign in</h2>
-        <p className="text-sm text-muted-foreground">
-          Enter your credentials to access your account
-        </p>
-      </div>
-      <form onSubmit={handleLogin} className="space-y-6">
-
-        <div className="space-y-4">
-          {/* username */}
-          <div className="space-y-2">
-            <Label htmlFor="username" className="text-sm font-medium text-foreground">Username</Label>
-            <Input
-              id="username"
-              type="username"
-              placeholder="Your username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="h-12"
+    <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-2xl border border-slate-200 shadow-xl">
+      <div className="w-full max-w-md space-y-6"> 
+        <div className="space-y-4 text-center flex flex-col items-center">
+          <div className="relative h-28 w-28 shrink-0 overflow-hidden rounded-full shadow-md border-4 border-[#8a2be2]/10">
+            <img 
+              src="../../Nurse_logo.jpg" 
+              alt="Logo" 
+              className="object-cover w-full h-full scale-110" // ใช้ scale เพื่อปรับซูมเข้าเล็กน้อยถ้าขอบขาวเยอะ
             />
           </div>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-700">เข้าสู่ระบบ</h1>
+        </div>
+        <form onSubmit={handleLogin} className="space-y-6">
 
-          {/* Password */}
-          <div className="space-y-2">
-            <Label htmlFor="password" className="text-sm font-medium text-foreground">Password</Label>
-            <div className="relative">
+          <div className="space-y-4">
+            {/* username */}
+            <div className="space-y-2">
+              <Label htmlFor="username" className="text-sm font-medium text-slate-700">Username</Label>
               <Input
-                id="password"
-                type={showPassword ? "text" : "password"}
-                placeholder="••••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="h-12 pr-12"
+                id="username"
+                type="username"
+                placeholder="Your username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="h-12"
               />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-              >
-                {showPassword ? (
-                  <Eye className="h-5 w-5" />
-                ) : (
-                  <EyeOff className="h-5 w-5" />
-                )}
-              </button>
+            </div>
+
+            {/* Password */}
+            <div className="space-y-2">
+              <Label htmlFor="password" className="text-sm font-medium text-slate-700">Password</Label>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="h-12 pr-12"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showPassword ? (
+                    <Eye className="h-5 w-5" />
+                  ) : (
+                    <EyeOff className="h-5 w-5" />
+                  )}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Remember & Forgot */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="remember"
-              checked={rememberMe}
-              onCheckedChange={(checked) => setRememberMe(checked as boolean)}
-            />
-            <Label 
-              htmlFor="remember" 
-              className="text-sm font-normal text-muted-foreground cursor-pointer"
+          {/* Remember & Forgot */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="remember"
+                checked={rememberMe}
+                onCheckedChange={(checked) => setRememberMe(checked as boolean)}
+              />
+              <Label 
+                htmlFor="remember" 
+                className="text-sm font-normal text-muted-foreground cursor-pointer"
+              >
+                จดจำ
+              </Label>
+            </div>
+            
+            <button
+              type="button"
+              onClick={() => setShowResetPassword(true)}
+              className="text-sm font-medium text-slate-700 underline hover:text-foreground/80 transition-colors"
             >
-              Remember me
-            </Label>
+              รีเซ็ตรหัสผ่าน?
+            </button>
           </div>
-          
-          <button
-            type="button"
-            onClick={() => setShowResetPassword(true)}
-            className="text-sm font-medium text-foreground underline hover:text-foreground/80 transition-colors"
-          >
-            Reset password?
-          </button>
-        </div>
 
-        {/* Submit */}
-        <Button 
-          type="submit" 
-          className="w-full h-12 font-medium bg-foreground text-background hover:bg-foreground/90 rounded-xl"
-          disabled={isLoading}
-        >
-          {isLoading ? (
-            <div className="h-5 w-5 animate-spin rounded-full border-2 border-background border-t-transparent" />
-          ) : (
-            "Sign in"
-          )}
-        </Button>
-        <p className="text-center text-sm text-muted-foreground">
-          Don't have an account?{" "}
-          <button 
-            onClick={onGoToRegister} // เมื่อคลิกจะไปเรียกฟังก์ชันเปลี่ยนหน้าใน Index.tsx
-            className="text-foreground font-semibold hover:underline underline-offset-4"
+          {/* Submit */}
+          <Button 
+            type="submit" 
+            className="w-full h-12 font-medium bg-[#8a2be2] text-background hover:bg-[#8a2be2]/90 rounded-xl"
+            disabled={isLoading}
           >
-            Sign up
-          </button>
-        </p>
-          
-      </form>
+            {isLoading ? (
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-background border-t-transparent" />
+            ) : (
+              "เข้าสู่ระบบ"
+            )}
+          </Button>
+          <p className="text-center text-sm text-muted-foreground">
+            ยังไม่ได้สมัครสมาชิก?{" "}
+            <button 
+              onClick={onGoToRegister} // เมื่อคลิกจะไปเรียกฟังก์ชันเปลี่ยนหน้าใน Index.tsx
+              className="text-text-slate-700 hover:text-[#8a2be2] font-semibold hover:underline underline-offset-4"
+            >
+              สมัครสมาชิก
+            </button>
+          </p>
+            
+        </form>
+      </div>
     </div>
   );
 };

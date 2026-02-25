@@ -5,13 +5,13 @@ FROM node:18-alpine
 WORKDIR /app
 
 # 3. Copy ไฟล์ package.json เข้าไปก่อน (เพื่อทำ caching layer)
-COPY ./package*.json ./
+COPY package.json ./
 
 # 4. ลง Library ต่างๆ (node_modules)
 RUN npm install
 
 # 5. Copy โค้ดทั้งหมดเข้าไป
-COPY ./ ./
+COPY . .
 
 # 6. เปิด Port 3000 (Port มาตรฐานของ React)
 EXPOSE 5173

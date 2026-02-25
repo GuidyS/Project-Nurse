@@ -1,32 +1,10 @@
 import * as Icons from 'lucide-react';
 import { 
-  Users, 
-  FolderKanban, 
-  BookOpen, 
-  FileText, 
-  Bell, 
-  LayoutDashboard,
-  Upload,
-  Download,
-  Shield,
-  ClipboardList,
-  GraduationCap,
   ChevronLeft,
-  TrendingUp,
-  UserCheck,
-  CalendarDays,
-  MessageSquare,
-  CheckSquare,
-  Home,
-  User,
-  Settings,
   LogOut,
 } from 'lucide-react';
-import { NavLink, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Separator } from '@/components/ui/separator';
 import { 
   Sidebar, 
   SidebarContent, 
@@ -45,24 +23,6 @@ import api from '@/lib/axios';
 interface SidebarProps {
   onItemClick: (item: string) => void;
   activeItem: string;
-}
-
-interface MenuSection {
-  sectionTitle?: string;
-  items: MenuItem[];
-}
-
-interface RoleConfig {
-  label: string;
-  prefix: string;
-  sections: MenuSection[];
-}
-
-interface MenuItem {
-  title: string;
-  url: string;
-  icon: React.ComponentType<{ className?: string }>;
-  permission?: string; // เพิ่มฟิลด์นี้
 }
 
 // const roleConfigs: RoleConfig[] = [
@@ -262,9 +222,6 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
     // 1. ล้างข้อมูล User และ Permissions ออกจากเครื่อง
     localStorage.removeItem('user');
     sessionStorage.clear(); // ล้าง session (ถ้ามี)
-    
-    // 2. แสดงข้อความแจ้งเตือน (Optional)
-    toast.success("ออกจากระบบเรียบร้อยแล้ว");
 
     // 3. ส่งผู้ใช้กลับไปหน้า Login และรีโหลดเพื่อล้าง State ทั้งหมด
     window.location.href = "/"; 
@@ -332,55 +289,58 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
 
       {/* Main Menu with Sections */}
       <SidebarContent>
-        {/* ชั้นที่ 1: วนลูปกลุ่มเมนูที่ได้จาก Backend */}
-        {menuSections.map((section, idx) => (
-          <div key={idx} className="px-4 py-2">
-            {/* แสดงหัวข้อกลุ่ม (ถ้ามี) */}
-            {!collapsed && section.sectionTitle && (
-              <p className="px-4 text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">
-                {section.sectionTitle}
-              </p>
-            )}
+        {menuSections.map((section, idx) => {
+          // 1. กรองรายการเมนูที่ต้องการซ่อนออกก่อนเก็บไว้ในตัวแปร
+          const filteredItems = section.items.filter(
+            (item: any) => !['notifications', 'profile', 'settings'].includes(item.url)
+          );
 
-            <SidebarMenu>
-              {/* ชั้นที่ 2: วนลูปรายการเมนูภายในกลุ่มนั้น (section นี้แหละที่โปรแกรมหาไม่เจอในตอนแรก) */}
-              {/* เพิ่ม .filter เพื่อกรองเมนู 'notifications', 'profile', 'settings' ออกจากส่วนนี้ */}
-              {section.items
-                .filter((item: any) => !['notifications', 'profile', 'settings'].includes(item.url))
-                .map((item: any) => {
-                const Icon = getIcon(item.icon); // ฟังก์ชันแปลงชื่อ String เป็น Component
-                const isActive = activeItem === item.url;
-                return (
-                  <SidebarMenuItem key={item.url}>
-                    <SidebarMenuButton 
-                      tooltip={item.title}
-                      onClick={() => onItemClick(item.url)}
-                      // เพิ่มสไตล์สีที่นี่
-                      className={cn(
-                        "w-full transition-all duration-200 mb-1 group", // เพิ่มระยะห่างระหว่างเมนูเล็กน้อย
-                        isActive 
-                          ? "bg-[#8a2be2]/10 text-[#8a2be2]" // สไตล์ตอน Active เหมือนรูปที่ 1
-                          : "hover:bg-[#8a2be2]/10 hover:text-[#8a2be2]",
-                        "active:bg-[#8a2be2]/10 active:text-[#8a2be2]", // สีขณะกด (Click)
-                        "focus:bg-[#8a2be2]/10 focus:text-[#8a2be2]", // สีขณะโฟกัส
-                        "focus-visible:ring-2 focus-visible:ring-[#8a2be2]/50", // เปลี่ยนสีกรอบเส้นปะตอนใช้คีย์บอร์ดเลือก
-                        "select-none" // ป้องกันการคลุมดำข้อความเวลาคลิกย้ำๆ
-                      )}
-                    >
-                      <Icon className={cn(
-                          "h-4 w-4 shrink-0 transition-colors", 
+          // 2. ถ้ากลุ่มนี้ไม่มีเมนูเหลืออยู่เลย (ความยาวเป็น 0) ให้ส่งค่า null เพื่อไม่เรนเดอร์ทั้ง Section
+          if (filteredItems.length === 0) return null;
+
+          return (
+            <div key={idx} className="px-4 py-2">
+              {/* แสดงหัวข้อกลุ่มเฉพาะตอนที่ไม่หุบ และมีเมนูในกลุ่มนั้นจริงๆ */}
+              {!collapsed && section.sectionTitle && (
+                <p className="px-4 text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">
+                  {section.sectionTitle}
+                </p>
+              )}
+
+              <SidebarMenu>
+                {filteredItems.map((item: any) => {
+                  const Icon = getIcon(item.icon);
+                  const isActive = activeItem === item.url;
+                  return (
+                    <SidebarMenuItem key={item.url}>
+                      <SidebarMenuButton 
+                        tooltip={item.title}
+                        onClick={() => onItemClick(item.url)}
+                        className={cn(
+                          "w-full transition-all duration-200 mb-1 group",
                           isActive 
-                            ? "text-[#8a2be2]"
-                            : "text-slate-600 hover:text-[#8a2be2]" 
-                        )} />
-                      {!collapsed && <span>{item.title}</span>}
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
-          </div>
-        ))}
+                            ? "bg-[#8a2be2]/10 text-[#8a2be2]" 
+                            : "hover:bg-[#8a2be2]/10 hover:text-[#8a2be2]",
+                          "active:bg-[#8a2be2]/10 active:text-[#8a2be2]",
+                          "focus:bg-[#8a2be2]/10 focus:text-[#8a2be2]",
+                          "select-none"
+                        )}
+                      >
+                        <Icon className={cn(
+                            "h-4 w-4 shrink-0 transition-colors", 
+                            isActive 
+                              ? "text-[#8a2be2]"
+                              : "text-slate-600 hover:text-[#8a2be2]" 
+                          )} />
+                        {!collapsed && <span>{item.title}</span>}
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </div>
+          );
+        })}
       </SidebarContent>
 
       {/* --- Bottom Menu Section --- */}
