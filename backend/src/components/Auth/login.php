@@ -69,6 +69,7 @@ try {
 
         // 2. เก็บเข้า Session
         $_SESSION['permissions'] = $permissions;
+        $_SESSION['user_id'] = $user['user_id'];
 
         // 3. ส่งกลับไปยัง Frontend
         echo json_encode([

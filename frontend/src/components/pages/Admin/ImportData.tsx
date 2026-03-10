@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Upload, FileSpreadsheet, Users, BookOpen, FolderKanban, CheckCircle, AlertCircle } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import api from "@/lib/axios";
 
 const importTypes = [
   { value: "students", label: "ข้อมูลนักศึกษา", icon: Users, description: "นำเข้ารายชื่อนักศึกษาใหม่" },
@@ -23,25 +24,26 @@ interface ImportHistory {
   date: string;
 }
 
-const mockImportHistory: ImportHistory[] = [
-  { id: "1", type: "students", fileName: "students_2568.xlsx", recordCount: 150, status: "success", date: "2569-01-20" },
-  { id: "2", type: "courses", fileName: "courses_semester2.csv", recordCount: 45, status: "success", date: "2569-01-18" },
-  { id: "3", type: "teachers", fileName: "new_teachers.xlsx", recordCount: 12, status: "partial", date: "2569-01-15" },
-  { id: "4", type: "projects", fileName: "projects_2568.xlsx", recordCount: 0, status: "failed", date: "2569-01-10" },
-];
-
 export default function ImportData() {
   const [selectedType, setSelectedType] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [importHistory, setImportHistory] = useState<ImportHistory[]>([]);
   const { toast } = useToast();
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
+  const fetchHistory = async () => {
+    try {
+      const response = await api.get("/index.php?page=upload"); // ปรับตาม routing ของคุณ
+      setImportHistory(response.data);
+    } catch (error) {
+      console.error("Failed to fetch history", error);
     }
   };
+
+  useEffect(() => {
+    fetchHistory();
+  }, []);
 
   const handleImport = async () => {
     if (!selectedType || !selectedFile) {
@@ -49,28 +51,39 @@ export default function ImportData() {
       return;
     }
 
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+    formData.append('importType', selectedType);
+    formData.append('userId', user.user_id);
+
     setIsUploading(true);
-    setUploadProgress(0);
-
-    // Simulate upload progress
-    const interval = setInterval(() => {
-      setUploadProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          return 100;
-        }
-        return prev + 10;
+    
+    try {
+      const response = await api.post("/upload.php", formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        onUploadProgress: (p) => setUploadProgress(Math.round((p.loaded * 100) / (p.total || 100)))
       });
-    }, 200);
 
-    setTimeout(() => {
-      clearInterval(interval);
-      setUploadProgress(100);
+      if (response.data.status === "success") {
+        toast({ title: "สำเร็จ", description: response.data.message });
+        setSelectedFile(null);
+        setSelectedType("");
+        fetchHistory(); // <--- ดึงประวัติใหม่ทันทีหลังนำเข้าสำเร็จ
+      }
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || "เกิดข้อผิดพลาดในการเชื่อมต่อ";
+      toast({ title: "ล้มเหลว", description: errorMessage, variant: "destructive" });
+    } finally {
       setIsUploading(false);
-      toast({ title: "นำเข้าข้อมูลสำเร็จ", description: `นำเข้า ${selectedFile.name} เรียบร้อยแล้ว` });
-      setSelectedFile(null);
-      setSelectedType("");
-    }, 2500);
+      setUploadProgress(0);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setSelectedFile(e.target.files[0]);
+    }
   };
 
   const getStatusBadge = (status: ImportHistory["status"]) => {
@@ -167,23 +180,36 @@ export default function ImportData() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {mockImportHistory.map((item) => (
-                <div key={item.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
-                  <div className="flex items-center gap-3">
-                    <FileSpreadsheet className="h-8 w-8 text-primary" />
-                    <div>
-                      <p className="font-medium">{item.fileName}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {importTypes.find((t) => t.value === item.type)?.label} • {item.recordCount} รายการ
+              {/* แก้ไขจาก ImportHistory เป็น importHistory */}
+              {importHistory.length > 0 ? (
+                importHistory.map((item) => (
+                  <div key={item.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                    <div className="flex items-center gap-3">
+                      <FileSpreadsheet className="h-8 w-8 text-primary" />
+                      <div>
+                        <p className="font-medium">{item.fileName}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {importTypes.find((t) => t.value === item.type)?.label} • {item.recordCount} รายการ
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      {getStatusBadge(item.status)}
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {new Date(item.date).toLocaleDateString('th-TH', {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
                       </p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    {getStatusBadge(item.status)}
-                    <p className="text-xs text-muted-foreground mt-1">{item.date}</p>
-                  </div>
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className="text-center text-muted-foreground py-4">ไม่พบประวัติการนำเข้า</p>
+              )}
             </div>
           </CardContent>
         </Card>

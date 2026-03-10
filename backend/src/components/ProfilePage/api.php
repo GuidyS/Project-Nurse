@@ -1,72 +1,50 @@
 <?php
+// เอา Header CORS ออกไปเลย เพราะ index.php จัดการให้แล้ว
 
-    require_once __DIR__ . '/../../config/config.php';
+// 1. เริ่ม Session (สำคัญมากเพื่อให้รู้ว่าใคร Login)
+if (session_status() == PHP_SESSION_NONE) {
+    session_start();
+}
 
-    
-    // Headers (สำคัญมากสำหรับการทำ API)
-    header("Access-Control-Allow-Origin: http://localhost:5173");
-    header("Content-Type: application/json; charset=UTF-8");
-    header("Access-Control-Allow-Methods: GET, POST");
-    header("Access-Control-Allow-Credentials: true"); // อนุญาตให้ส่ง Cookie/Session
+// 2. เรียกไฟล์เชื่อมต่อฐานข้อมูล (ลบที่เรียกซ้ำซ้อนออกเหลืออันเดียว)
+require_once __DIR__ . '/../../config/config.php';
 
-    // เริ่ม Session เพื่อให้เข้าถึง $_SESSION['user_id'] ได้
-    if (session_status() == PHP_SESSION_NONE) {
-        session_start();
-    }
+// 3. ตรวจสอบว่า Login หรือยัง
+if (!isset($_SESSION['user_id'])) {
+    http_response_code(401);
+    echo json_encode(["status" => "error", "message" => "Unauthorized: No session found"]);
+    exit;
+}
 
-    class API {
-        function Select() {
-            // [จุดเปลี่ยนสำคัญ] 
-            // 1. ลองดูว่ามีการส่ง ?id=... มาไหม (กรณี Admin ดูกลุ่มคนอื่น)
-            // 2. ถ้าไม่มี ให้ดูว่า Login อยู่ไหม ($_SESSION['user_id'])
-            // 3. ถ้าไม่มีทั้งคู่ ให้เป็น null
-            
-            $id = null;
+$id = $_SESSION['user_id'];
+$db = new Connect;
 
-            if (isset($_GET['id'])) {
-                $id = $_GET['id']; 
-            } elseif (isset($_SESSION['user_id'])) {
-                $id = $_SESSION['user_id']; // ดึงจากคนที่ Login อยู่
-            }
+// 4. Query ข้อมูลอาจารย์ที่เชื่อมกับ user_id นี้
+$sql = "SELECT f.*, u.username 
+        FROM users u
+        JOIN faculty f ON u.username = f.faculty_id
+        WHERE u.user_id = :id";
 
-            // ถ้าไม่มี ID เลย (ไม่ได้ Login และไม่ส่งค่ามา) ให้จบการทำงาน
-            if (!$id) {
-                return json_encode(["error" => "Unauthorized / No ID provided"]);
-            }
+$stmt = $db->prepare($sql);
+$stmt->execute(['id' => $id]);
+$result = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            $db = new Connect;
-            
-            // Query ข้อมูล
-            // หมายเหตุ: เช็คให้แน่ใจว่าในตาราง faculty คุณเก็บ user_id หรือ faculty_id ตรงกับ $_SESSION
-            // ถ้า $_SESSION เก็บ user_id (จากตาราง users) SQL ควรจะเป็น:
-            // "SELECT * FROM faculty WHERE user_id = :id"
-            // แต่ถ้าเก็บ faculty_id ก็ใช้แบบเดิมได้เลย
-            
-            $sql = "SELECT * FROM faculty WHERE id = :id OR user_id = :id"; 
-            // ใช้ OR เพื่อกันเหนียว เผื่อ Session เก็บค่าไหนมาก็ให้หาเจอ
-            
-            $stmt = $db->prepare($sql);
-            $stmt->execute(['id' => $id]); 
-
-            $result = $stmt->fetch(PDO::FETCH_ASSOC);
-
-            if ($result) {
-                $user = array(
-                    'id' => $result['id'],
-                    'title' => $result['title'],
-                    'first_name' => $result['first_name_th'],
-                    'last_name' => $result['last_name_th'],
-                );
-                return json_encode($user);
-            } else {
-                return json_encode(["error" => "User not found"]); 
-            }
-        }
-    }
-
-    $API = new API;
-
-    // เรียกใช้ฟังก์ชัน
-    echo $API->Select();
-
-?>
+if ($result) {
+    echo json_encode([
+        "status" => "success",
+        "data" => [
+            "id" => $result['faculty_id'],
+            "title" => $result['title'],
+            "first_name" => $result['first_name_th'],
+            "last_name" => $result['last_name_th'],
+            "email" => $result['username'] . "@siam.edu",
+            "phone" => $result['phone_number'] ?? "-",
+            "position" => "อาจารย์พยาบาล",
+            "program" => "-",
+            "faculty" => "พยาบาลศาสตร์"
+        ]
+    ]);
+} else {
+    echo json_encode(["status" => "error", "message" => "ไม่พบข้อมูลอาจารย์สำหรับ User ID: " . $id]);
+}
+exit;

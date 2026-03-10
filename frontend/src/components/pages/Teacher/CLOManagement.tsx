@@ -11,7 +11,7 @@ import { Target, Plus, Edit, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
 // Mock data
-const mockCLOs = [
+const initialCLOs = [
   { id: '1', code: 'CLO1', description: 'อธิบายหลักการพื้นฐานของการพยาบาลได้', plo: 'PLO1', weight: 25, status: 'active' },
   { id: '2', code: 'CLO2', description: 'ปฏิบัติการพยาบาลพื้นฐานได้อย่างถูกต้อง', plo: 'PLO2', weight: 30, status: 'active' },
   { id: '3', code: 'CLO3', description: 'แสดงทักษะการสื่อสารกับผู้ป่วยและทีมสุขภาพ', plo: 'PLO4', weight: 20, status: 'active' },
@@ -22,6 +22,9 @@ const ploOptions = ['PLO1', 'PLO2', 'PLO3', 'PLO4', 'PLO5'];
 
 export default function CLOManagement() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  // stateful CLO list
+  const [clos, setClos] = useState(initialCLOs);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [newCLO, setNewCLO] = useState({
     code: '',
     description: '',
@@ -29,32 +32,69 @@ export default function CLOManagement() {
     weight: '',
   });
 
-  const handleSave = () => {
-    console.log('Saving CLO:', newCLO);
-    setIsDialogOpen(false);
+  const resetForm = () => {
     setNewCLO({ code: '', description: '', plo: '', weight: '' });
+    setEditingId(null);
   };
 
-  const totalWeight = mockCLOs.reduce((acc, c) => acc + c.weight, 0);
+  const handleSave = () => {
+    if (editingId) {
+      // update existing
+      setClos((prev) =>
+        prev.map((c) => (c.id === editingId ? { ...c, ...newCLO, weight: Number(newCLO.weight) } : c))
+      );
+    } else {
+      // add new with generated id
+      const id = Date.now().toString();
+      setClos((prev) => [...prev, { id, ...newCLO, weight: Number(newCLO.weight), status: 'active' }]);
+    }
+    setIsDialogOpen(false);
+    resetForm();
+  };
+
+  const handleEdit = (clo: any) => {
+    setEditingId(clo.id);
+    setNewCLO({
+      code: clo.code,
+      description: clo.description,
+      plo: clo.plo,
+      weight: clo.weight.toString(),
+    });
+    setIsDialogOpen(true);
+  };
+
+  const handleDelete = (id: string) => {
+    setClos((prev) => prev.filter((c) => c.id !== id));
+  };
+
+  // delete confirmation dialog state
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  const handleDeleteConfirm = (id: string) => {
+    setDeleteId(id);
+    setIsDeleteOpen(true);
+  };
+
+  const totalWeight = clos.reduce((acc, c) => acc + c.weight, 0);
 
   return (
-    <>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">กำหนด CLO</h1>
             <p className="text-muted-foreground">กำหนดผลลัพธ์การเรียนรู้ระดับรายวิชา</p>
           </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) resetForm(); }}>
             <DialogTrigger asChild>
               <Button>
                 <Plus className="mr-2 h-4 w-4" />
-                เพิ่ม CLO
+                {editingId ? 'แก้ไข CLO' : 'เพิ่ม CLO'}
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>เพิ่ม CLO ใหม่</DialogTitle>
+                <DialogTitle>{editingId ? 'แก้ไข CLO' : 'เพิ่ม CLO ใหม่'}</DialogTitle>
                 <DialogDescription>
                   กำหนดผลลัพธ์การเรียนรู้ระดับรายวิชา
                 </DialogDescription>
@@ -117,12 +157,12 @@ export default function CLOManagement() {
               <Target className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{mockCLOs.length}</div>
+              <div className="text-2xl font-bold">{clos.length}</div>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">น้ำหนักรวม</CardTitle>
+              <CardTitle className="text-sm font-medium">เปอร์เซ็นรวม</CardTitle>
               <Target className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -138,7 +178,7 @@ export default function CLOManagement() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {new Set(mockCLOs.map(c => c.plo)).size}
+                {new Set(clos.map(c => c.plo)).size}
               </div>
             </CardContent>
           </Card>
@@ -157,13 +197,13 @@ export default function CLOManagement() {
                   <TableHead>รหัส</TableHead>
                   <TableHead>คำอธิบาย</TableHead>
                   <TableHead>PLO</TableHead>
-                  <TableHead className="text-center">น้ำหนัก</TableHead>
+                  <TableHead className="text-center">เปอร์เซ็น</TableHead>
                   <TableHead>สถานะ</TableHead>
                   <TableHead>การดำเนินการ</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {mockCLOs.map((clo) => (
+                {clos.map((clo) => (
                   <TableRow key={clo.id}>
                     <TableCell className="font-medium">{clo.code}</TableCell>
                     <TableCell className="max-w-[300px]">{clo.description}</TableCell>
@@ -174,10 +214,10 @@ export default function CLOManagement() {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-2">
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" onClick={() => handleEdit(clo)}>
                           <Edit className="h-3 w-3" />
                         </Button>
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" onClick={() => handleDeleteConfirm(clo.id)}>
                           <Trash2 className="h-3 w-3" />
                         </Button>
                       </div>
@@ -188,7 +228,33 @@ export default function CLOManagement() {
             </Table>
           </CardContent>
         </Card>
-      </div>
-    </>
+      {/* delete confirmation dialog */}
+      <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>ยืนยันการลบ</DialogTitle>
+            <DialogDescription>
+              คุณแน่ใจหรือไม่ว่าต้องการลบ CLO นี้? การลบจะไม่สามารถย้อนกลับได้
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={() => setIsDeleteOpen(false)}>
+              ยกเลิก
+            </Button>
+
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (deleteId) handleDelete(deleteId);
+                setIsDeleteOpen(false);
+              }}
+            >
+              ลบ
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }
