@@ -1,51 +1,50 @@
 <?php
+// เอา Header CORS ออกไปเลย เพราะ index.php จัดการให้แล้ว
 
-    require_once __DIR__ . '/../../config/config.php';
+// 1. เริ่ม Session (สำคัญมากเพื่อให้รู้ว่าใคร Login)
+if (session_status() == PHP_SESSION_NONE) {
+    session_start();
+}
 
-    class API {
-        // แสดงข้อมูลส่วนตัว user
-        function Select() {
-            
-            // รับค่า id หรือถ้าไม่มีให้ใช้ default (เพื่อการทดสอบ)
-            $id = isset($_GET['id']) ? $_GET['id'] : 6604800003;
+// 2. เรียกไฟล์เชื่อมต่อฐานข้อมูล (ลบที่เรียกซ้ำซ้อนออกเหลืออันเดียว)
+require_once __DIR__ . '/../../config/config.php';
 
-            $db = new Connect;
-            
-            // เตรียม SQL
-            $stmt = $db->prepare("SELECT * FROM student WHERE id = :id");
-            $stmt->execute(['id' => $id]);
+// 3. ตรวจสอบว่า Login หรือยัง
+if (!isset($_SESSION['user_id'])) {
+    http_response_code(401);
+    echo json_encode(["status" => "error", "message" => "Unauthorized: No session found"]);
+    exit;
+}
 
-            // ใช้ fetch ธรรมดา (ไม่ loop) เพราะเอาแค่คนเดียว
-            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+$id = $_SESSION['user_id'];
+$db = new Connect;
 
-            if ($result) {
-                // สร้าง array ก้อนเดียว (ไม่ต้องมี [] ต่อท้าย $user)
-                $user = array(
-                    'id' => $result['id'],
-                    'title' => $result['title'],
-                    'first_name' => $result['first_name'],
-                    'last_name' => $result['last_name'],
-                );
-                
-                return json_encode($user);
-            } else {
-                return json_encode(null); // ถ้าไม่เจอให้ส่ง null
-            }
-        }
+// 4. Query ข้อมูลอาจารย์ที่เชื่อมกับ user_id นี้
+$sql = "SELECT f.*, u.username 
+        FROM users u
+        JOIN faculty f ON u.username = f.faculty_id
+        WHERE u.user_id = :id";
 
-        // แก้ไข profile
-        function Edit() {
-            $id = isset($_GET['id']) ? $_GET['id'] : 41172008;
+$stmt = $db->prepare($sql);
+$stmt->execute(['id' => $id]);
+$result = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            $db = new Connect;
-
-            $stmt = $db->prepare("UPDATE ");
-        }
-    }
-
-    $API = new API;
-
-    // เรียกใช้ฟังก์ชันเปล่าๆ ไม่ต้องส่ง $id เข้าไป
-    echo $API->Select();
-
-?>
+if ($result) {
+    echo json_encode([
+        "status" => "success",
+        "data" => [
+            "id" => $result['faculty_id'],
+            "title" => $result['title'],
+            "first_name" => $result['first_name_th'],
+            "last_name" => $result['last_name_th'],
+            "email" => $result['username'] . "@siam.edu",
+            "phone" => $result['phone_number'] ?? "-",
+            "position" => "อาจารย์พยาบาล",
+            "program" => "-",
+            "faculty" => "พยาบาลศาสตร์"
+        ]
+    ]);
+} else {
+    echo json_encode(["status" => "error", "message" => "ไม่พบข้อมูลอาจารย์สำหรับ User ID: " . $id]);
+}
+exit;
