@@ -32,6 +32,9 @@
             case 'transcript':
                 require_once 'components/Transcript/transcript-api.php';
                 break;
+            case 'performance':
+                require_once 'components/Performance.php';
+                break;
 
             case 'sidebar':
             // 1. ตรวจสอบความปลอดภัย (ตัวอย่างการดึง user_id)
