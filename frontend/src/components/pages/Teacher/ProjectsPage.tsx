@@ -3,6 +3,7 @@ import { Plus, Search, Filter, Eye, Edit, MoreVertical, Upload, Link2, FileText 
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import CreateProjectDialog from "@/components/ui/CreateProjectDialog";
 import { Progress } from "@/components/ui/progress";
 import {
   DropdownMenu,
@@ -11,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-const projects = [
+const initialProjects = [
   {
     id: 1,
     name: "โครงการวิจัย Machine Learning เพื่อการพยากรณ์",
@@ -51,7 +52,24 @@ const projects = [
 ];
 
 const ProjectsPage = () => {
+  const [projects, setProjects] = useState(initialProjects);
   const [searchQuery, setSearchQuery] = useState("");
+  const [createOpen, setCreateOpen] = useState(false);
+
+  const handleCreate = (data: { name: string; categories: string[]; budget: number; deadline: string }) => {
+    setProjects((prev) => [
+      ...prev,
+      {
+        id: Date.now(),
+        name: data.name,
+        type: data.categories[0] ?? "-",
+        status: "รอเริ่ม",
+        progress: 0,
+        deadline: data.deadline,
+        budget: data.budget.toLocaleString(),
+      },
+    ]);
+  };
 
   const filteredProjects = projects.filter((p) =>
     p.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -85,10 +103,16 @@ const ProjectsPage = () => {
           <h1 className="text-2xl font-bold text-foreground">จัดการโครงการ</h1>
           <p className="text-muted-foreground mt-1">สร้าง แก้ไข และติดตามความคืบหน้าโครงการ</p>
         </div>
-        <Button className="gap-2">
+        <Button className="gap-2" onClick={() => setCreateOpen(true)}>
           <Plus className="h-4 w-4" />
           สร้างโครงการใหม่
         </Button>
+
+        <CreateProjectDialog
+          open={createOpen}
+          onOpenChange={setCreateOpen}
+          onCreate={handleCreate}
+        />
       </div>
 
       {/* Search & Filter */}

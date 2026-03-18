@@ -2,6 +2,7 @@ import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { UploadDialog } from '@/components/ui/UploadDialogExcel-PDF';
 import { FileText, Download, BarChart3, DollarSign } from 'lucide-react';
 import { useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend } from 'recharts';
@@ -25,9 +26,10 @@ const progressData = [
 
 export default function ProjectReports() {
   const [selectedProject, setSelectedProject] = useState('1');
+  const [uploadType, setUploadType] = useState<'excel' | 'pdf' | null>(null);
 
-  const handleExport = (format: string) => {
-    console.log('Exporting as:', format);
+  const handleUploadOpen = (format: 'excel' | 'pdf') => {
+    setUploadType(format);
   };
 
   return (
@@ -39,16 +41,26 @@ export default function ProjectReports() {
             <p className="text-muted-foreground">รายงานความคืบหน้าและงบประมาณ</p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => handleExport('excel')}>
+            <Button variant="outline" onClick={() => handleUploadOpen('excel')}>
               <Download className="mr-2 h-4 w-4" />
               Excel
             </Button>
-            <Button variant="outline" onClick={() => handleExport('pdf')}>
+            <Button variant="outline" onClick={() => handleUploadOpen('pdf')}>
               <FileText className="mr-2 h-4 w-4" />
               PDF
             </Button>
           </div>
         </div>
+
+        <UploadDialog
+          open={uploadType !== null}
+          onOpenChange={(open) => {
+            if (!open) {
+              setUploadType(null);
+            }
+          }}
+          type={uploadType ?? 'excel'}
+        />
 
         {/* Project Selection */}
         <Card>

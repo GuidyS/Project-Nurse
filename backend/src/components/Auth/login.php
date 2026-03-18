@@ -28,12 +28,12 @@ try {
     // ใช้ Prepared Statement เพื่อความปลอดภัย
     $sql = "SELECT users.*, 
                    up.position_id AS main_position_id, 
-                   student.title AS s_title, student.first_name_th AS s_fname, student.last_name_th AS s_lname,
-                   faculty.title AS f_title, faculty.first_name_th AS f_fname, faculty.last_name_th AS f_lname
+                   student.prefix AS s_title, student.first_name_th AS s_fname, student.last_name_th AS s_lname,
+                   faculty.prefix AS f_title, faculty.first_name_th AS f_fname, faculty.last_name_th AS f_lname
             FROM users 
             LEFT JOIN user_position up ON users.user_id = up.user_id AND up.is_primary = 1
             LEFT JOIN student ON users.username = student.student_id
-            LEFT JOIN faculty ON users.username = faculty.faculty_id
+            LEFT JOIN faculty ON users.username = faculty.employee_id
             WHERE users.username = :username";
 
     $stmt = $db->prepare($sql);

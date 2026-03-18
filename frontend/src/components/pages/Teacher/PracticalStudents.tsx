@@ -4,9 +4,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
-import { Users, Search, Clock, CheckCircle, AlertTriangle } from 'lucide-react';
-import { useState } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Users, Search, Clock, CheckCircle, AlertTriangle, Upload, X, FileText } from 'lucide-react';
+import { useState, useRef } from 'react';
 
 // Mock data
 const mockStudents = [
@@ -41,6 +43,18 @@ const getProgressColor = (progress: number) => {
 
 export default function PracticalStudents() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
+  const [description, setDescription] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleUpload = () => {
+    if (!file) return;
+    // TODO: เชื่อม API จริง
+    setFile(null);
+    setDescription('');
+    setUploadOpen(false);
+  };
 
   const filteredStudents = mockStudents.filter(
     (student) =>
@@ -59,10 +73,73 @@ export default function PracticalStudents() {
   return (
     <>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">นักศึกษาฝึกปฏิบัติ</h1>
-          <p className="text-muted-foreground">จัดการนักศึกษาฝึกปฏิบัติที่อยู่ในความดูแล (สัดส่วน 1:8)</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">นักศึกษาฝึกปฏิบัติ</h1>
+            <p className="text-muted-foreground">จัดการนักศึกษาฝึกปฏิบัติที่อยู่ในความดูแล (สัดส่วน 1:8)</p>
+          </div>
+          <Button variant="outline" onClick={() => setUploadOpen(true)} className="text-gray-500 border-gray-300 hover:!bg-orange-500 hover:!text-white hover:!border-orange-500">
+            <Upload className="mr-2 h-4 w-4" />
+            อัปโหลดหลักฐาน
+          </Button>
         </div>
+
+        {/* Upload Evidence Dialog */}
+        <Dialog open={uploadOpen} onOpenChange={(v) => { if (!v) { setFile(null); setDescription(''); } setUploadOpen(v); }}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>อัปโหลดหลักฐาน</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <div
+                className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border bg-muted/30 p-8 cursor-pointer"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                {file ? (
+                  <div className="flex items-center gap-3">
+                    <FileText className="h-8 w-8 text-primary" />
+                    <div>
+                      <p className="text-sm font-medium">{file.name}</p>
+                      <p className="text-xs text-muted-foreground">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                    </div>
+                    <button onClick={(e) => { e.stopPropagation(); setFile(null); }} className="ml-2 rounded-full p-1 hover:bg-muted">
+                      <X className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <Upload className="mb-2 h-10 w-10 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">คลิกหรือลากไฟล์มาวางที่นี่</p>
+                    <p className="text-xs text-muted-foreground mt-1">PDF, DOC, DOCX, JPG, PNG (สูงสุด 20MB)</p>
+                  </>
+                )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="hidden"
+                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) setFile(f); }}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="evidence-desc">หมายเหตุ (ไม่บังคับ)</Label>
+                <Input
+                  id="evidence-desc"
+                  placeholder="ระบุรายละเอียดหลักฐาน"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setUploadOpen(false)}>ยกเลิก</Button>
+              <Button onClick={handleUpload} disabled={!file}>
+                <Upload className="mr-1 h-4 w-4" />
+                อัปโหลด
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-4">

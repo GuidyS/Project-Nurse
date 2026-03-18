@@ -22,7 +22,7 @@ $db = new Connect;
 // 4. Query ข้อมูลอาจารย์ที่เชื่อมกับ user_id นี้
 $sql = "SELECT f.*, u.username 
         FROM users u
-        JOIN faculty f ON u.username = f.faculty_id
+        JOIN faculty f ON u.username = f.employee_id
         WHERE u.user_id = :id";
 
 $stmt = $db->prepare($sql);
@@ -33,8 +33,8 @@ if ($result) {
     echo json_encode([
         "status" => "success",
         "data" => [
-            "id" => $result['faculty_id'],
-            "title" => $result['title'],
+            "id" => $result['employee_id'],
+            "title" => $result['prefix'],
             "first_name" => $result['first_name_th'],
             "last_name" => $result['last_name_th'],
             "email" => $result['username'] . "@siam.edu",
