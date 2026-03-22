@@ -1,12 +1,15 @@
+import { useState } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { FileText, Upload, Download, Eye, Plus } from 'lucide-react';
+import UploadDocumentDialog from '@/components/ui/UploadDocumentDialog';
+import CreateDocumentDialog from '@/components/ui/CreateDocumentDialog';
 
-// Mock data
-const mockDocs = [
+// Initial mock data
+const initialDocs = [
   { id: '1', name: 'ข้อเสนอโครงการ', project: 'โครงการพัฒนาทักษะการพยาบาล', type: 'proposal', date: '2024-01-05', status: 'approved' },
   { id: '2', name: 'รายงานความก้าวหน้าครั้งที่ 1', project: 'โครงการพัฒนาทักษะการพยาบาล', type: 'progress', date: '2024-01-15', status: 'approved' },
   { id: '3', name: 'เอกสารการเงิน', project: 'โครงการพัฒนาทักษะการพยาบาล', type: 'financial', date: '2024-01-10', status: 'pending' },
@@ -41,6 +44,34 @@ const getStatusBadge = (status: string) => {
 };
 
 export default function ProjectDocs() {
+  const [docs, setDocs] = useState(initialDocs);
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [createDocumentOpen, setCreateDocumentOpen] = useState(false);
+
+  const handleUpload = (data: { name: string; project: string; type: string; file: File }) => {
+    const newDoc = {
+      id: String(Date.now()),
+      name: data.name,
+      project: data.project,
+      type: data.type,
+      date: new Date().toISOString().slice(0, 10),
+      status: 'pending',
+    };
+    setDocs((prev) => [newDoc, ...prev]);
+  };
+
+  const handleCreate = (data: { name: string; project: string; type: string; description: string }) => {
+    const newDoc = {
+      id: String(Date.now()),
+      name: data.name,
+      project: data.project,
+      type: data.type,
+      date: new Date().toISOString().slice(0, 10),
+      status: 'pending',
+    };
+    setDocs((prev) => [newDoc, ...prev]);
+  };
+
   return (
     <>
       <div className="space-y-6">
@@ -50,16 +81,29 @@ export default function ProjectDocs() {
             <p className="text-muted-foreground">จัดการเอกสารโครงการทั้งหมด</p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline">
+            <Button variant="outline" onClick={() => setUploadOpen(true)}>
               <Upload className="mr-2 h-4 w-4" />
               อัปโหลด
             </Button>
-            <Button>
+            <Button onClick={() => setCreateDocumentOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />
               สร้างเอกสาร
             </Button>
           </div>
         </div>
+
+        <UploadDocumentDialog
+          open={uploadOpen}
+          onOpenChange={setUploadOpen}
+          onUpload={handleUpload}
+          projects={Array.from(new Set(docs.map((doc) => doc.project)))}
+        />
+
+        <CreateDocumentDialog
+          open={createDocumentOpen}
+          onOpenChange={setCreateDocumentOpen}
+          onCreate={handleCreate}
+        />
 
         {/* Stats */}
         <div className="grid gap-4 md:grid-cols-4">
@@ -69,7 +113,7 @@ export default function ProjectDocs() {
               <FileText className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{mockDocs.length}</div>
+              <div className="text-2xl font-bold">{docs.length}</div>
             </CardContent>
           </Card>
           <Card>
@@ -79,7 +123,7 @@ export default function ProjectDocs() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-600">
-                {mockDocs.filter(d => d.status === 'approved').length}
+                {docs.filter(d => d.status === 'approved').length}
               </div>
             </CardContent>
           </Card>
@@ -90,7 +134,7 @@ export default function ProjectDocs() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-yellow-600">
-                {mockDocs.filter(d => d.status === 'pending').length}
+                {docs.filter(d => d.status === 'pending').length}
               </div>
             </CardContent>
           </Card>
@@ -101,7 +145,7 @@ export default function ProjectDocs() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {mockDocs.filter(d => d.type === 'proposal').length}
+                {docs.filter(d => d.type === 'proposal').length}
               </div>
             </CardContent>
           </Card>
@@ -126,7 +170,7 @@ export default function ProjectDocs() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {mockDocs.map((doc) => (
+                {docs.map((doc) => (
                   <TableRow key={doc.id}>
                     <TableCell className="font-medium">{doc.name}</TableCell>
                     <TableCell className="max-w-[200px] truncate">{doc.project}</TableCell>
