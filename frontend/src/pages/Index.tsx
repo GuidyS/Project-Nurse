@@ -172,6 +172,8 @@ const Index = () => {
         return <ProgramReports />;
       case "schedule-tasks":
         return <ScheduleTasks />;
+      case "projectspage":
+        return <ProjectsPage />;
 
       // รับผิดชอบโครงการ
       case "my-projects":

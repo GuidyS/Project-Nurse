@@ -35,6 +35,9 @@
             case 'performance':
                 require_once 'components/Performance.php';
                 break;
+            case 'projectspage':
+                require_once 'components/Teacher/ProjectsPage.php';
+                break;
 
             case 'sidebar':
             // 1. ตรวจสอบความปลอดภัย (ตัวอย่างการดึง user_id)
