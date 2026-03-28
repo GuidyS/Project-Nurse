@@ -1,9 +1,11 @@
-import { MainLayout } from '@/components/layout/MainLayout';
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { BookOpen, Users, Target, TrendingUp } from 'lucide-react';
+import CLOManagePage from '@/components/ui/CLOManagePage';
+import CourseDetailPage from '@/components/ui/CourseDetailPage';
 
 // Mock data
 const mockCourses = [
@@ -13,6 +15,10 @@ const mockCourses = [
 ];
 
 export default function MyCourses() {
+  const [detailCourseCode, setDetailCourseCode] = useState<string | null>(null);
+  const [cloCourseCode, setCloCourseCode] = useState<string | null>(null);
+  const [cloReturnToDetailCode, setCloReturnToDetailCode] = useState<string | null>(null);
+
   return (
     <>
       <div className="space-y-6">
@@ -95,14 +101,55 @@ export default function MyCourses() {
                   <Progress value={course.cloProgress} />
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="outline" className="flex-1">จัดการ CLO</Button>
-                  <Button className="flex-1">ดูรายละเอียด</Button>
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => {
+                      setCloReturnToDetailCode(null);
+                      setCloCourseCode(course.code);
+                    }}
+                  >
+                    จัดการ CLO
+                  </Button>
+                  <Button
+                    className="flex-1"
+                    onClick={() => setDetailCourseCode(course.code)}
+                  >
+                    ดูรายละเอียด
+                  </Button>
                 </div>
               </CardContent>
             </Card>
           ))}
         </div>
       </div>
+
+      <CourseDetailPage
+        courseCode={detailCourseCode || undefined}
+        onBack={() => setDetailCourseCode(null)}
+        onManageCLO={(courseCode) => {
+          setCloReturnToDetailCode(courseCode);
+          setDetailCourseCode(null);
+          setCloCourseCode(courseCode);
+        }}
+      />
+
+      <CLOManagePage
+        courseCode={cloCourseCode || undefined}
+        onBack={() => {
+          setCloCourseCode(null);
+          setCloReturnToDetailCode(null);
+        }}
+        onBackToDetail={
+          cloReturnToDetailCode
+            ? () => {
+                setCloCourseCode(null);
+                setDetailCourseCode(cloReturnToDetailCode);
+                setCloReturnToDetailCode(null);
+              }
+            : undefined
+        }
+      />
     </>
   );
 }

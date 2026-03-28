@@ -46,6 +46,7 @@ import Dashboard from "@/components/pages/Teacher/Dashboard";
 import DeanDashboard from "@/components/pages/Teacher/DeanDashboard";
 import Retention from "@/components/pages/Teacher/Retention";
 
+
 const Index = () => {
   const [activeItem, setActiveItem] = useState("login");
 
@@ -111,11 +112,11 @@ const Index = () => {
       case "register":
         return <RegisterPage onBackToLogin={() => setActiveItem("login")} />;
       case "profile":
-        return <ProfilePage />;
+        return <PracticalStudents />;
       case "notifications":
-        return <NotificationsPage />;
+        return <ScheduleTasks/>;
       case "settings":
-        return <SettingsPage />;
+        return <MyCourses/>;
       case "dashboard":
         return <Dashboard />;
 
