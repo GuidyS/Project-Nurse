@@ -112,11 +112,11 @@ const Index = () => {
       case "register":
         return <RegisterPage onBackToLogin={() => setActiveItem("login")} />;
       case "profile":
-        return <PracticalStudents />;
-      case "notifications":
-        return <ScheduleTasks/>;
-      case "settings":
         return <MyCourses/>;
+      case "notifications":
+        return <NotificationsPage/>;
+      case "settings":
+        return <SettingsPage />;
       case "dashboard":
         return <Dashboard />;
 
