@@ -10,9 +10,23 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CalendarDays, Plus, Clock, CheckCircle, AlertTriangle, Search } from 'lucide-react';
 import { useState } from 'react';
+import ScheduleTaskPage from '@/components/ui/ScheduleTaskPage';
+
+type TaskStatus = 'in_progress' | 'completed' | 'pending' | 'overdue';
+type TaskPriority = 'high' | 'medium' | 'low';
+
+interface Task {
+  id: string;
+  studentId: string;
+  studentName: string;
+  task: string;
+  dueDate: string;
+  status: TaskStatus;
+  priority: TaskPriority;
+}
 
 // Mock data
-const mockTasks = [
+const mockTasks: Task[] = [
   { id: '1', studentId: '64010001', studentName: 'สมชาย ใจดี', task: 'ฝึกตรวจสัญญาณชีพ', dueDate: '2024-01-20', status: 'in_progress', priority: 'high' },
   { id: '2', studentId: '64010002', studentName: 'สมหญิง รักเรียน', task: 'เขียนรายงานการฝึก', dueDate: '2024-01-18', status: 'completed', priority: 'medium' },
   { id: '3', studentId: '64010003', studentName: 'มานะ ตั้งใจ', task: 'นำเสนอกรณีศึกษา', dueDate: '2024-01-25', status: 'pending', priority: 'high' },
@@ -58,18 +72,77 @@ const getPriorityBadge = (priority: string) => {
   }
 };
 
+const toThaiPriority = (priority: TaskPriority): "สูง" | "กลาง" | "ต่ำ" => {
+  switch (priority) {
+    case 'high':
+      return 'สูง';
+    case 'medium':
+      return 'กลาง';
+    default:
+      return 'ต่ำ';
+  }
+};
+
+const toThaiStatus = (status: TaskStatus): "กำลังทำ" | "เสร็จสิ้น" | "รอดำเนินการ" | "เลยกำหนด" => {
+  switch (status) {
+    case 'in_progress':
+      return 'กำลังทำ';
+    case 'completed':
+      return 'เสร็จสิ้น';
+    case 'overdue':
+      return 'เลยกำหนด';
+    default:
+      return 'รอดำเนินการ';
+  }
+};
+
+const fromThaiPriority = (priority: "สูง" | "กลาง" | "ต่ำ"): TaskPriority => {
+  switch (priority) {
+    case 'สูง':
+      return 'high';
+    case 'กลาง':
+      return 'medium';
+    default:
+      return 'low';
+  }
+};
+
+const fromThaiStatus = (status: "กำลังทำ" | "เสร็จสิ้น" | "รอดำเนินการ" | "เลยกำหนด"): TaskStatus => {
+  switch (status) {
+    case 'กำลังทำ':
+      return 'in_progress';
+    case 'เสร็จสิ้น':
+      return 'completed';
+    case 'เลยกำหนด':
+      return 'overdue';
+    default:
+      return 'pending';
+  }
+};
+
 export default function ScheduleTasks() {
+  const [tasks, setTasks] = useState<Task[]>(mockTasks);
   const [searchTerm, setSearchTerm] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [newTask, setNewTask] = useState({
     studentId: '',
     task: '',
     dueDate: '',
-    priority: 'medium',
+    priority: 'medium' as TaskPriority,
     description: '',
   });
+  const [editTask, setEditTask] = useState({
+    studentId: '',
+    studentName: '',
+    task: '',
+    dueDate: '',
+    priority: 'medium' as TaskPriority,
+    status: 'pending' as TaskStatus,
+  });
 
-  const filteredTasks = mockTasks.filter(
+  const filteredTasks = tasks.filter(
     (task) =>
       task.studentName.includes(searchTerm) ||
       task.studentId.includes(searchTerm) ||
@@ -77,16 +150,29 @@ export default function ScheduleTasks() {
   );
 
   const stats = {
-    total: mockTasks.length,
-    completed: mockTasks.filter(t => t.status === 'completed').length,
-    inProgress: mockTasks.filter(t => t.status === 'in_progress').length,
-    overdue: mockTasks.filter(t => t.status === 'overdue').length,
+    total: tasks.length,
+    completed: tasks.filter(t => t.status === 'completed').length,
+    inProgress: tasks.filter(t => t.status === 'in_progress').length,
+    overdue: tasks.filter(t => t.status === 'overdue').length,
   };
 
   const handleSave = () => {
     console.log('Creating task:', newTask);
     setIsDialogOpen(false);
     setNewTask({ studentId: '', task: '', dueDate: '', priority: 'medium', description: '' });
+  };
+
+  const openEditDialog = (task: Task) => {
+    setEditingTaskId(task.id);
+    setEditTask({
+      studentId: task.studentId,
+      studentName: task.studentName,
+      task: task.task,
+      dueDate: task.dueDate,
+      priority: task.priority,
+      status: task.status,
+    });
+    setIsEditDialogOpen(true);
   };
 
   return (
@@ -150,7 +236,7 @@ export default function ScheduleTasks() {
                   <Label>ความสำคัญ</Label>
                   <Select
                     value={newTask.priority}
-                    onValueChange={(value) => setNewTask({ ...newTask, priority: value })}
+                    onValueChange={(value: TaskPriority) => setNewTask({ ...newTask, priority: value })}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -261,9 +347,9 @@ export default function ScheduleTasks() {
                     <TableCell>{getStatusBadge(task.status)}</TableCell>
                     <TableCell>
                       <div className="flex gap-2">
-                        <Button variant="outline" size="sm">แก้ไข</Button>
+                        <Button variant="outline" size="sm" onClick={() => openEditDialog(task)}>แก้ไข</Button>
                         {task.status !== 'completed' && (
-                          <Button size="sm">เสร็จสิ้น</Button>
+                          <Button size="sm" onClick={() => setTasks((prev) => prev.map((item) => item.id === task.id ? { ...item, status: 'completed' } : item))}>เสร็จสิ้น</Button>
                         )}
                       </div>
                     </TableCell>
@@ -273,6 +359,41 @@ export default function ScheduleTasks() {
             </Table>
           </CardContent>
         </Card>
+
+        <ScheduleTaskPage
+          mode="edit-only"
+          open={isEditDialogOpen}
+          onBack={() => {
+            setIsEditDialogOpen(false);
+            setEditingTaskId(null);
+          }}
+          editInitialTask={{
+            studentId: editTask.studentId,
+            studentName: editTask.studentName,
+            task: editTask.task,
+            dueDate: editTask.dueDate,
+            priority: toThaiPriority(editTask.priority),
+            status: toThaiStatus(editTask.status),
+          }}
+          onSaveEdit={(updated) => {
+            if (!editingTaskId) return;
+            setTasks((prev) =>
+              prev.map((task) =>
+                task.id === editingTaskId
+                  ? {
+                      ...task,
+                      studentId: updated.studentId,
+                      studentName: updated.studentName,
+                      task: updated.task,
+                      dueDate: updated.dueDate,
+                      priority: fromThaiPriority(updated.priority),
+                      status: fromThaiStatus(updated.status),
+                    }
+                  : task
+              )
+            );
+          }}
+        />
       </div>
     </>
   );

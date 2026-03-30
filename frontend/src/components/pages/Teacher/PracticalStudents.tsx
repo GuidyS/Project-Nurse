@@ -9,29 +9,44 @@ import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Users, Search, Clock, CheckCircle, AlertTriangle, Upload, X, FileText } from 'lucide-react';
 import { useState, useRef } from 'react';
+import AssessmentPage from '@/components/ui/AssessmentPage';
+import StudentsPage from '@/components/ui/StudentsPage';
 
 // Mock data
 const mockStudents = [
-  { id: '1', studentId: '64010001', name: 'สมชาย ใจดี', workplace: 'โรงพยาบาลกรุงเทพ', progress: 85, tasksCompleted: 17, tasksPending: 3, status: 'active' },
-  { id: '2', studentId: '64010002', name: 'สมหญิง รักเรียน', workplace: 'โรงพยาบาลศิริราช', progress: 70, tasksCompleted: 14, tasksPending: 6, status: 'active' },
-  { id: '3', studentId: '64010003', name: 'มานะ ตั้งใจ', workplace: 'คลินิกชุมชน สุขภาพดี', progress: 95, tasksCompleted: 19, tasksPending: 1, status: 'active' },
-  { id: '4', studentId: '64010004', name: 'มานี ขยัน', workplace: 'โรงพยาบาลรามาธิบดี', progress: 45, tasksCompleted: 9, tasksPending: 11, status: 'warning' },
-  { id: '5', studentId: '64010005', name: 'ปิติ สุขใจ', workplace: 'สถานีอนามัย ตำบลสุข', progress: 60, tasksCompleted: 12, tasksPending: 8, status: 'active' },
-  { id: '6', studentId: '64010006', name: 'ปิยะ มุ่งมั่น', workplace: 'โรงพยาบาลจุฬาลงกรณ์', progress: 30, tasksCompleted: 6, tasksPending: 14, status: 'critical' },
-  { id: '7', studentId: '64010007', name: 'วิชัย สร้างสรรค์', workplace: 'โรงพยาบาลธรรมศาสตร์', progress: 75, tasksCompleted: 15, tasksPending: 5, status: 'active' },
-  { id: '8', studentId: '64010008', name: 'วิไล พัฒนา', workplace: 'คลินิกเอกชน สุขภาพดี', progress: 55, tasksCompleted: 11, tasksPending: 9, status: 'warning' },
+  { id: '1', studentId: '64010001', name: 'สมชาย ใจดี', workplace: 'โรงพยาบาลกรุงเทพ', progress: 85, tasksCompleted: 17, tasksPending: 3, status: 'active', phone: '081-234-5678', email: 'somchai@student.ac.th', advisor: 'ดร. ศิวิษต์ สำเร็จ', startDate: '1 พ.ค. 2566', endDate: '28 กพ. 2567' },
+  { id: '2', studentId: '64010002', name: 'สมหญิง รักเรียน', workplace: 'โรงพยาบาลศิริราช', progress: 70, tasksCompleted: 14, tasksPending: 6, status: 'active', phone: '081-234-5679', email: 'somying@student.ac.th', advisor: 'ดร. ศิวิษต์ สำเร็จ', startDate: '1 พ.ค. 2566', endDate: '28 กพ. 2567' },
+  { id: '3', studentId: '64010003', name: 'มานะ ตั้งใจ', workplace: 'คลินิกชุมชน สุขภาพดี', progress: 95, tasksCompleted: 19, tasksPending: 1, status: 'active', phone: '081-234-5680', email: 'mana@student.ac.th', advisor: 'ดร. ศิวิษต์ สำเร็จ', startDate: '1 พ.ค. 2566', endDate: '28 กพ. 2567' },
+  { id: '4', studentId: '64010004', name: 'มานี ขยัน', workplace: 'โรงพยาบาลรามาธิบดี', progress: 45, tasksCompleted: 9, tasksPending: 11, status: 'warning', phone: '081-234-5681', email: 'mani@student.ac.th', advisor: 'ดร. ศิวิษต์ สำเร็จ', startDate: '1 พ.ค. 2566', endDate: '28 กพ. 2567' },
+  { id: '5', studentId: '64010005', name: 'ปิติ สุขใจ', workplace: 'สถานีอนามัย ตำบลสุข', progress: 60, tasksCompleted: 12, tasksPending: 8, status: 'active', phone: '081-234-5682', email: 'piti@student.ac.th', advisor: 'ดร. ศิวิษต์ สำเร็จ', startDate: '1 พ.ค. 2566', endDate: '28 กพ. 2567' },
+  { id: '6', studentId: '64010006', name: 'ปิยะ มุ่งมั่น', workplace: 'โรงพยาบาลจุฬาลงกรณ์', progress: 30, tasksCompleted: 6, tasksPending: 14, status: 'critical', phone: '081-234-5683', email: 'piya@student.ac.th', advisor: 'ดร. ศิวิษต์ สำเร็จ', startDate: '1 พ.ค. 2566', endDate: '28 กพ. 2567' },
+  { id: '7', studentId: '64010007', name: 'วรรณา ศรีสุข', workplace: 'โรงพยาบาลธรรมศาสตร์', progress: 78, tasksCompleted: 15, tasksPending: 5, status: 'active', phone: '081-234-5684', email: 'wannana@student.ac.th', advisor: 'ดร. ศิวิษต์ สำเร็จ', startDate: '1 พ.ค. 2566', endDate: '28 กพ. 2567' },
+  { id: '8', studentId: '64010008', name: 'สุดา แก้วใส', workplace: 'โรงพยาบาลมหาราช', progress: 40, tasksCompleted: 8, tasksPending: 12, status: 'warning', phone: '081-234-5685', email: 'suda@student.ac.th', advisor: 'ดร. ศิวิษต์ สำเร็จ', startDate: '1 พ.ค. 2566', endDate: '28 กพ. 2567' },
 ];
 
 const getStatusBadge = (status: string) => {
   switch (status) {
     case 'active':
-      return <Badge className="bg-green-500">ปกติ</Badge>;
+      return <Badge className="bg-green-100 text-green-700 hover:bg-green-100">ปกติ</Badge>;
     case 'warning':
-      return <Badge className="bg-yellow-500">ต้องติดตาม</Badge>;
+      return <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100">ต้องติดตาม</Badge>;
     case 'critical':
-      return <Badge variant="destructive">ล่าช้า</Badge>;
+      return <Badge className="bg-red-100 text-red-700 hover:bg-red-100">ล่าช้า</Badge>;
     default:
       return <Badge variant="secondary">{status}</Badge>;
+  }
+};
+
+const getStatusLabel = (status: string) => {
+  switch (status) {
+    case 'active':
+      return 'ผ่าน';
+    case 'warning':
+      return 'ต้องติดตาม';
+    case 'critical':
+      return 'ไม่ผ่าน';
+    default:
+      return status;
   }
 };
 
@@ -46,6 +61,8 @@ export default function PracticalStudents() {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [description, setDescription] = useState('');
+  const [detailStudent, setDetailStudent] = useState<any | null>(null);
+  const [assessmentStudent, setAssessmentStudent] = useState<any | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleUpload = () => {
@@ -234,8 +251,8 @@ export default function PracticalStudents() {
                     <TableCell>{getStatusBadge(student.status)}</TableCell>
                     <TableCell>
                       <div className="flex gap-2">
-                        <Button variant="outline" size="sm">ดูรายละเอียด</Button>
-                        <Button size="sm">ประเมิน</Button>
+                        <Button variant="outline" size="sm" onClick={() => setDetailStudent(student)}>ดูรายละเอียด</Button>
+                        <Button size="sm" onClick={() => setAssessmentStudent(student)}>ประเมิน</Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -245,6 +262,34 @@ export default function PracticalStudents() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Assessment Dialog */}
+      <AssessmentPage 
+        student={assessmentStudent ? { 
+          studentId: assessmentStudent.studentId, 
+          name: assessmentStudent.name, 
+          workplace: assessmentStudent.workplace 
+        } : null} 
+        onBack={() => setAssessmentStudent(null)} 
+      />
+      {/* Student Detail Dialog */}
+      <StudentsPage
+        student={detailStudent ? {
+          id: detailStudent.studentId,
+          name: detailStudent.name,
+          practicePlace: detailStudent.workplace,
+          status: getStatusLabel(detailStudent.status),
+          progress: detailStudent.progress,
+          tasksCompleted: detailStudent.tasksCompleted,
+          totalTasks: detailStudent.tasksCompleted + detailStudent.tasksPending,
+          phone: detailStudent.phone,
+          email: detailStudent.email,
+          advisor: detailStudent.advisor,
+          startDate: detailStudent.startDate,
+          endDate: detailStudent.endDate,
+        } : null}
+        onBack={() => setDetailStudent(null)}
+      />
     </>
   );
 }
