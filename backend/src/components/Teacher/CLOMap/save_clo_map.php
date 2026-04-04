@@ -7,7 +7,8 @@ header("Access-Control-Allow-Headers: Content-Type, Authorization");
 header("Content-Type: application/json; charset=UTF-8");
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit(); }
-
+require_once 'auth_middleware.php'; // เปลี่ยน Path ให้ตรงกับที่คุณเก็บไฟล์นี้ไว้
+requireLogin(); // เรียกฟังก์ชันตรวจ Cookie
 $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
 
 // รับก้อน Object cloMap จาก React

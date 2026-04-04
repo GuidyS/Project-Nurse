@@ -1,13 +1,14 @@
 <?php
 session_start();
-header("Access-Control-Allow-Origin: http://localhost:5173");
-header("Access-Control-Allow-Credentials: true");
+header("Access-Control-Allow-Origin: http://localhost:5173");  // อนุญาตให้ React เข้าถึง
+header("Access-Control-Allow-Credentials: true");    // อนุญาตให้ส่ง Cookie/Session
 header("Access-Control-Allow-Methods: POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
 header("Content-Type: application/json; charset=UTF-8");
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit(); }
-
+require_once 'auth_middleware.php'; // เปลี่ยน Path ให้ตรงกับที่คุณเก็บไฟล์นี้ไว้
+requireLogin(); // เรียกฟังก์ชันตรวจ Cookie
 $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
 
 // รับก้อน JSON ที่ React ส่งมา (ผ่าน Axios หรือ Fetch POST)
