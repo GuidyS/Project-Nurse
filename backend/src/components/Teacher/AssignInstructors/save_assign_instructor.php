@@ -31,7 +31,7 @@ try {
             if (!isset($data['subject_mappings'])) $data['subject_mappings'] = [];
             if (!isset($data['subject_mappings'][$subject_code])) $data['subject_mappings'][$subject_code] = [];
 
-            // 💥 อัปเดตข้อมูลอาจารย์ผู้สอนลงใน JSON ของวิชานี้
+            //  อัปเดตข้อมูลอาจารย์ผู้สอนลงใน JSON ของวิชานี้
             $data['subject_mappings'][$subject_code]['instructor_id'] = $faculty_id;
 
             $new_json = json_encode($data, JSON_UNESCAPED_UNICODE);
