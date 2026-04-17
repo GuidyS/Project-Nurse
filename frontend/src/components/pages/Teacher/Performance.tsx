@@ -100,6 +100,10 @@ export default function Performance() {
   };
 
   const handleSave = () => {
+    if (!selectedStudent) {
+      alert('กรุณาเลือกนักศึกษาก่อน');
+      return;
+    }
     console.log('Saving evaluation:', {
       selectedStudent,
       scores,
@@ -156,7 +160,7 @@ export default function Performance() {
                   </Select>
                 </div>
 
-                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'evidence' | 'evaluation')} className="space-y-4">
+                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'evidence' | 'evaluation')} className={`space-y-4 ${!selectedStudent ? 'pointer-events-none opacity-50' : ''}`}>
                   <TabsList className="grid w-full grid-cols-2">
                     <TabsTrigger value="evidence">หลักฐาน</TabsTrigger>
                     <TabsTrigger value="evaluation">ประเมิน</TabsTrigger>
@@ -272,7 +276,9 @@ export default function Performance() {
                 <Button variant="outline" onClick={() => handleDialogOpenChange(false)}>
                   ยกเลิก
                 </Button>
-                <Button onClick={handleSave}>บันทึกประเมิน</Button>
+                <Button onClick={handleSave} disabled={!selectedStudent}>
+                  บันทึกประเมิน
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
