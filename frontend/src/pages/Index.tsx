@@ -112,7 +112,7 @@ const Index = () => {
       case "register":
         return <RegisterPage onBackToLogin={() => setActiveItem("login")} />;
       case "profile":
-        return <MyCourses/>;
+        return <Performance />;
       case "notifications":
         return <NotificationsPage/>;
       case "settings":
