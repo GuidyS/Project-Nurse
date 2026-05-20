@@ -6,10 +6,14 @@ import { componentTagger } from "lovable-tagger";
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
-    host: "true",
+    host: true,
     port: 5173,
+    allowedHosts: [
+      ".ngrok-free.dev" // เพิ่มบรรทัดนี้เพื่อให้ยอมรับทุก url จาก ngrok
+    ],
     watch: {
-      usePolling: true // (Optional) ช่วยแก้ปัญหา Hot Reload บน Windows
+      usePolling: true, // (Optional) ช่วยแก้ปัญหา Hot Reload บน Windows
+      interval: 100
     },
     hmr: {
       overlay: false,
