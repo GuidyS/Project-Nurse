@@ -1,0 +1,7 @@
+interface:
+  display_name: "HTML Layout"
+  short_description: "Create responsive web page layouts."
+  default_prompt: "Use $html-layout to create a clean responsive HTML layout for the requested screen."
+
+policy:
+  allow_implicit_invocation: true
