@@ -30,6 +30,15 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
     confirmNewPassword?: string;
   }>({});
 
+  const handleBackToLogin = () => {
+    setShowResetPassword(false);
+    setForgotusername("");
+    setNewPassword("");
+    setConfirmNewPassword("");
+    setResetErrors({});
+    setIsLoading(false);
+  };
+
     const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -230,6 +239,15 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
               ) : (
                 "ยืนยัน"
               )}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full h-12 rounded-xl"
+              onClick={handleBackToLogin}
+              disabled={isLoading}
+            >
+              กลับไปหน้า Login
             </Button>
           </div>
         </form>
