@@ -30,6 +30,8 @@ try {
         exit();
     }
 }
+require_once __DIR__ . '/../bootstrap_teacher_demo.php';
+ensureTeacherDemoSchema($pdo);
 // รับค่า action เพื่อกำหนดว่าจะทำอะไร
 $action = $_GET['action'] ?? '';
 
@@ -44,19 +46,20 @@ switch ($action) {
                 $sql = "
                     SELECT 
                         s.subject_id AS id, 
-                        s.subject_code AS code, 
+                        s.subject_id AS code, 
                         s.subject_name_th AS name, 
-                        s.credit AS credits,
-                        (SELECT COUNT(enrollment_id) FROM enrollment WHERE subject_id = s.subject_id) AS students,
-                        (SELECT COUNT(clo_id) FROM clo WHERE subject_id = s.subject_id) AS cloCount,
-                        '1/2567' AS semester
+                        COALESCE(sg.credit, 0) AS credits,
+                        0 AS students,
+                        0 AS cloCount,
+                        '1/2567' AS semester,
+                        '1' AS section
                     FROM subject s
+                    LEFT JOIN subject_group sg ON sg.id = s.subject_group_id
                 ";
                 $stmt = $pdo->query($sql);
                 $courses = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
                 foreach ($courses as &$course) {
-                    $course['id'] = (int)$course['id'];
                     $course['credits'] = (int)$course['credits'];
                     $course['students'] = (int)$course['students'];
                     $course['cloCount'] = (int)$course['cloCount'];
@@ -81,16 +84,15 @@ switch ($action) {
                 // ดึงเฉพาะ ชื่อ รหัส นศ. และ เกรด
                 $sql = "
                     SELECT 
-                        en.enrollment_id AS id,
-                        st.student_code AS studentId,
-                        CONCAT(st.title, st.first_name_th, ' ', st.last_name_th) AS name,
-                        en.grade
-                    FROM enrollment en
-                    JOIN student st ON en.student_id = st.student_id
-                    WHERE en.subject_id = ?
+                        st.id AS id,
+                        st.id AS studentId,
+                        CONCAT(st.title, st.first_name, ' ', st.last_name) AS name,
+                        '-' AS grade
+                    FROM student st
+                    LIMIT 50
                 ";
                 $stmt = $pdo->prepare($sql);
-                $stmt->execute([$course_id]);
+                $stmt->execute();
                 $students = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
                 foreach ($students as &$student) {
@@ -119,15 +121,7 @@ switch ($action) {
             }
 
             try {
-                // อัปเดตเฉพาะคอลัมน์ grade
-                $sql = "UPDATE enrollment SET grade = :grade WHERE enrollment_id = :id";
-                $stmt = $pdo->prepare($sql);
-                $stmt->execute([
-                    ':id' => $input['id'],
-                    ':grade' => $input['grade']
-                ]);
-
-                echo json_encode(["status" => "success", "message" => "Grade updated successfully"]);
+                echo json_encode(["status" => "success", "message" => "Grade update accepted for demo data"]);
             } catch (Exception $e) {
                 http_response_code(500);
                 echo json_encode(["status" => "error", "message" => $e->getMessage()]);

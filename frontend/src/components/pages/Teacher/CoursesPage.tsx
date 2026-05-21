@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { BookOpen, Users, Edit, Eye, MoreVertical, Plus, Save, X, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -33,9 +33,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import api from "@/lib/axios";
 
 interface Course {
-  id: number;
+  id: string | number;
   code: string;
   name: string;
   credits: number;
@@ -56,7 +57,7 @@ interface StudentGrade {
   grade: string;
 }
 
-const courses: Course[] = [
+const initialCourses: Course[] = [
   { id: 1, code: "CS101", name: "การเขียนโปรแกรมเบื้องต้น", credits: 3, students: 45, semester: "1/2568", section: "1", cloCount: 5 },
   { id: 2, code: "CS201", name: "โครงสร้างข้อมูลและอัลกอริทึม", credits: 3, students: 38, semester: "1/2568", section: "1", cloCount: 6 },
   { id: 3, code: "CS301", name: "ปัญญาประดิษฐ์", credits: 3, students: 32, semester: "1/2568", section: "1", cloCount: 4 },
@@ -75,17 +76,49 @@ const initialStudentGrades: StudentGrade[] = [
 ];
 
 const CoursesPage = () => {
+  const [courses, setCourses] = useState<Course[]>([]);
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [isGradeDialogOpen, setIsGradeDialogOpen] = useState(false);
-  const [studentGrades, setStudentGrades] = useState<StudentGrade[]>(initialStudentGrades);
+  const [studentGrades, setStudentGrades] = useState<StudentGrade[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editValues, setEditValues] = useState<Partial<StudentGrade>>({});
   const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
 
-  const openGradeDialog = (course: Course) => {
+  useEffect(() => {
+    const loadCourses = async () => {
+      try {
+        const { data } = await api.get("?page=teacher-courses&action=get_courses");
+        if (data.status === "success") {
+          setCourses(data.data);
+        }
+      } catch (error) {
+        console.error("Error loading teacher courses:", error);
+      }
+    };
+
+    loadCourses();
+  }, []);
+
+  const openGradeDialog = async (course: Course) => {
     setSelectedCourse(course);
     setIsGradeDialogOpen(true);
+    try {
+      const { data } = await api.get(`?page=teacher-courses&action=get_students&course_id=${course.id}`);
+      if (data.status === "success") {
+        setStudentGrades(
+          data.data.map((student: any) => ({
+            ...student,
+            midterm: null,
+            final: null,
+            assignment: null,
+            total: null,
+          }))
+        );
+      }
+    } catch (error) {
+      console.error("Error loading course students:", error);
+    }
   };
 
   const startEditing = (student: StudentGrade) => {
@@ -103,7 +136,7 @@ const CoursesPage = () => {
     setEditValues({});
   };
 
-  const saveGrade = (studentId: number) => {
+  const saveGrade = async (studentId: number) => {
     const midterm = editValues.midterm ?? 0;
     const final = editValues.final ?? 0;
     const assignment = editValues.assignment ?? 0;
@@ -125,6 +158,14 @@ const CoursesPage = () => {
     );
     setEditingId(null);
     setEditValues({});
+    try {
+      await api.post("?page=teacher-courses&action=update_grade", {
+        id: studentId,
+        grade: editValues.grade,
+      });
+    } catch (error) {
+      console.error("Error saving grade:", error);
+    }
     toast({
       title: "บันทึกสำเร็จ",
       description: "บันทึกผลการเรียนเรียบร้อยแล้ว",

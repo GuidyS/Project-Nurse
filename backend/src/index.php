@@ -38,6 +38,12 @@
             case 'projectspage':
                 require_once 'components/Teacher/ProjectsPage.php';
                 break;
+            case 'teacher-dashboard':
+                require_once 'components/Teacher/Dashboard/get_dashboard_stats.php';
+                break;
+            case 'teacher-courses':
+                require_once 'components/Teacher/CoursesPage/api.php';
+                break;
 
             case 'sidebar':
             // 1. ตรวจสอบความปลอดภัย (ตัวอย่างการดึง user_id)

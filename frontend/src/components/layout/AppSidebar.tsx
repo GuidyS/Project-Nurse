@@ -175,6 +175,19 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
 
   const [menuSections, setMenuSections] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const { state } = useSidebar();
+
+  const defaultMenuSections = [
+    {
+      sectionTitle: "Teacher",
+      items: [
+        { title: "Dashboard", url: "dashboard", icon: "LayoutDashboard" },
+        { title: "รายวิชาที่สอน", url: "courses", icon: "BookOpen" },
+        { title: "รายวิชาที่รับผิดชอบ", url: "my-courses", icon: "BookOpenCheck" },
+        { title: "จัดการโครงการ", url: "projectspage", icon: "FolderKanban" },
+      ],
+    },
+  ];
 
   useEffect(() => {
     const fetchMenus = async () => {
@@ -182,12 +195,15 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
         const user = JSON.parse(localStorage.getItem('user') || '{}');
 
         // เรียก API (ตรวจสอบ Path ให้ตรงกับที่วาง index.php ไว้)
-        const res = await api.get(`/index.php?page=sidebar&user_id=${user.user_id}`);
+        const res = user.user_id
+          ? await api.get(`?page=sidebar&user_id=${user.user_id}`)
+          : { data: defaultMenuSections };
         
         console.log("Menu Data:", res.data); // ลองเปิด console ดูว่าข้อมูลมาไหม
-        setMenuSections(res.data);
+        setMenuSections(Array.isArray(res.data) ? res.data : defaultMenuSections);
       } catch (error) {
         console.error("Failed to fetch menus:", error);
+        setMenuSections(defaultMenuSections);
         toast.error("โหลดเมนูไม่สำเร็จ");
       } finally {
         setIsLoading(false); // มั่นใจว่า Loading จะหายไปแน่นอน
@@ -205,7 +221,6 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
     return IconComponent || Icons.HelpCircle; // ถ้าหาไม่เจอให้ใช้ HelpCircle แทน
   };
 
-  const { state } = useSidebar();
   const collapsed = state === 'collapsed';
 
   const user = JSON.parse(localStorage.getItem('user') || '{}');

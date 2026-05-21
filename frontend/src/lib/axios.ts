@@ -1,13 +1,13 @@
 import axios from 'axios';
 
 const api = axios.create({
-    baseURL: import.meta.env.VITE_API_BASE_URL,
+    baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/index.php',
     headers: {
         'Content-Type': 'application/json',
         'ngrok-skip-browser-warning': 'true'
         // 'Authorization': `Bearer ${token}` // ถ้ามีระบบ login
     },
-    withCredentials: true
+    withCredentials: false
 });
 
 api.interceptors.response.use(

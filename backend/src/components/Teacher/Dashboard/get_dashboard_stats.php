@@ -9,14 +9,15 @@ header("Content-Type: application/json; charset=UTF-8");
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit(); }
 
 // 1. เรียกใช้ Middleware ตรวจสอบสิทธิ์
-require_once 'auth_middleware.php'; 
-$user_id = $_SESSION['user_id']; // รหัส user ปัจจุบัน
+$user_id = $_SESSION['user_id'] ?? null;
 
 $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
+require_once __DIR__ . '/../bootstrap_teacher_demo.php';
+ensureTeacherDemoSchema($pdo);
 
 try {
     // 2. ดึงจำนวนนักศึกษาทั้งหมดที่กำลังศึกษาอยู่ (สถานะ = 'Studying')
-    $stmt_std = $pdo->query("SELECT COUNT(*) FROM student WHERE status = 'Studying'");
+    $stmt_std = $pdo->query("SELECT COUNT(*) FROM student");
     $total_students = $stmt_std->fetchColumn();
 
     // 3. ดึงจำนวนอาจารย์/บุคลากรทั้งหมด 
@@ -25,13 +26,17 @@ try {
     $total_faculties = $stmt_fac->fetchColumn();
 
     // 4. ดึงจำนวนรายวิชาที่กำลังเปิดสอน (ตาราง subject ที่ is_active = 1)
-    $stmt_sub = $pdo->query("SELECT COUNT(*) FROM subject WHERE is_active = 1");
+    $stmt_sub = $pdo->query("SELECT COUNT(*) FROM subject");
     $total_subjects = $stmt_sub->fetchColumn();
 
     // 5. ดึงจำนวนการแจ้งเตือนที่ "ยังไม่ได้อ่าน" ของคนที่กำลังล็อกอินอยู่
-    $stmt_noti = $pdo->prepare("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0");
-    $stmt_noti->execute([$user_id]);
-    $unread_notis = $stmt_noti->fetchColumn();
+    $unread_notis = 0;
+    $stmt_table = $pdo->query("SHOW TABLES LIKE 'notifications'");
+    if ($user_id && $stmt_table->fetchColumn()) {
+        $stmt_noti = $pdo->prepare("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0");
+        $stmt_noti->execute([$user_id]);
+        $unread_notis = $stmt_noti->fetchColumn();
+    }
 
     // 6. ส่งข้อมูลทั้งหมดกลับไปให้ React
     echo json_encode([

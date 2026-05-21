@@ -47,7 +47,9 @@ import DeanDashboard from "@/components/pages/Teacher/DeanDashboard";
 import Retention from "@/components/pages/Teacher/Retention";
 
 const Index = () => {
-  const [activeItem, setActiveItem] = useState("login");
+  const [activeItem, setActiveItem] = useState(
+    () => new URLSearchParams(window.location.search).get("page") || "login"
+  );
 
   const renderPage = () => {
     switch (activeItem) {
@@ -118,6 +120,8 @@ const Index = () => {
         return <SettingsPage />;
       case "dashboard":
         return <Dashboard />;
+      case "courses":
+        return <CoursesPage />;
 
       // Admin
       case "approvals":

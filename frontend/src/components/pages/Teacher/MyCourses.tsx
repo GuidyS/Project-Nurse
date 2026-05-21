@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import { Progress } from '@/components/ui/progress';
 import { BookOpen, Users, Target, TrendingUp,Plus } from 'lucide-react';
 import CLOManagePage from '@/components/ui/CLOManagePage';
 import CourseDetailPage from '@/components/ui/CourseDetailPage';
+import api from '@/lib/axios';
 
 const initialCourses = [
   { id: '1', code: 'NUR101', name: 'พื้นฐานการพยาบาล', students: 45, credits: 3, semester: '2/2566', cloProgress: 75, status: 'active' },
@@ -16,12 +17,34 @@ const initialCourses = [
 ];
 
 export default function MyCourses() {
-  const [courses, setCourses] = useState(initialCourses);
+  const [courses, setCourses] = useState<any[]>([]);
   const [detailCourseCode, setDetailCourseCode] = useState<string | null>(null);
   const [cloCourseCode, setCloCourseCode] = useState<string | null>(null);
   const [cloReturnToDetailCode, setCloReturnToDetailCode] = useState<string | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingCourse, setEditingCourse] = useState<any>(null);
+
+  useEffect(() => {
+    const loadCourses = async () => {
+      try {
+        const { data } = await api.get("?page=teacher-courses&action=get_courses");
+        if (data.status === "success") {
+          setCourses(
+            data.data.map((course: any) => ({
+              ...course,
+              id: String(course.id),
+              cloProgress: course.cloProgress ?? 0,
+              status: course.status ?? "active",
+            }))
+          );
+        }
+      } catch (error) {
+        console.error("Error loading my courses:", error);
+      }
+    };
+
+    loadCourses();
+  }, []);
   // Handler to update a course
   const handleEditCourse = (updated: any) => {
     setCourses((prev) => prev.map((c) => c.id === updated.id ? { ...c, ...updated } : c));

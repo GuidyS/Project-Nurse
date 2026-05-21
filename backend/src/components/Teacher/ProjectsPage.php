@@ -26,6 +26,13 @@ if (!isset($_SESSION['user_id'])) {
 // เชื่อมต่อ Database
 $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+$pdo->exec("CREATE TABLE IF NOT EXISTS project (
+    project_id INT AUTO_INCREMENT PRIMARY KEY,
+    project_name_th VARCHAR(255) NOT NULL,
+    project_name_en VARCHAR(255) DEFAULT '',
+    description TEXT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
 // ดึงข้อมูล HTTP Method และ Request Body
 $method = $_SERVER['REQUEST_METHOD'];

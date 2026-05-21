@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import CreateProjectDialog from "@/components/ui/CreateProjectDialog";
 import EditProjectDialog from "@/components/ui/EditProjectDialog";
+import api from "@/lib/axios";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,7 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-const API_URL = "http://localhost/path-to-your-api/project_api.php"; 
+const PROJECTS_PAGE = "?page=projectspage";
 
 const ProjectsPage = () => {
   // 1. ใส่ Mockup Data เป็นค่าเริ่มต้น
@@ -86,8 +87,7 @@ const [projects, setProjects] = useState<any[]>([
   const fetchProjects = async () => {
     try {
       setLoading(true);
-      const res = await fetch(API_URL, { method: "GET", credentials: "include" });
-      const data = await res.json();
+      const { data } = await api.get(PROJECTS_PAGE);
       if (data.status === "success") {
         const mappedProjects = data.data.map((p: any) => ({
           id: p.project_id,
@@ -112,7 +112,7 @@ const [projects, setProjects] = useState<any[]>([
 
   useEffect(() => {
     // ปิดการดึงข้อมูลจาก API ชั่วคราว หน้าเว็บจะได้โชว์ Mockup 5 อันนั้น
-    // fetchProjects();
+    fetchProjects();
   }, []);
 
   // [POST] จำลองการสร้างโครงการใหม่
@@ -133,17 +133,12 @@ const [projects, setProjects] = useState<any[]>([
     setCreateOpen(false); // ปิด Dialog (ถ้า Dialog ไม่ได้ปิดเอง)
 
     try {
-      const res = await fetch(API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          project_name_th: data.name,
-          project_name_en: "", 
-          description: `Budget: ${data.budget}, Deadline: ${data.deadline}`, 
-        }),
+      const res = await api.post(PROJECTS_PAGE, {
+        project_name_th: data.name,
+        project_name_en: "", 
+        description: `Budget: ${data.budget}, Deadline: ${data.deadline}`, 
       });
-      const result = await res.json();
+      const result = res.data;
       if (result.status === "success") fetchProjects();
       else alert("Error: " + result.message);
     } catch (error) {
@@ -163,13 +158,8 @@ const [projects, setProjects] = useState<any[]>([
 
 
     try {
-      const res = await fetch(API_URL, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(updateData),
-      });
-      const result = await res.json();
+      const res = await api.put(PROJECTS_PAGE, updateData);
+      const result = res.data;
       if (result.status === "success") {
         fetchProjects(); 
       } else {
@@ -188,13 +178,8 @@ const [projects, setProjects] = useState<any[]>([
     setProjects(projects.filter(p => p.id !== id));
 
     try {
-      const res = await fetch(API_URL, {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ project_id: id }),
-      });
-      const result = await res.json();
+      const res = await api.delete(PROJECTS_PAGE, { data: { project_id: id } });
+      const result = res.data;
       if (result.status === "success") fetchProjects();
       else alert("ไม่สามารถลบได้: " + result.message);
     } catch (error) {
