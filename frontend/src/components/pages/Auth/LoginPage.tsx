@@ -240,17 +240,19 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
                 "ยืนยัน"
               )}
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full h-12 rounded-xl"
-              onClick={handleBackToLogin}
-              disabled={isLoading}
-            >
-              กลับไปหน้า Login
-            </Button>
           </div>
         </form>
+        <p className="text-center text-sm text-muted-foreground">
+          จำรหัสผ่านได้แล้ว?{" "}
+          <button
+            type="button"
+            onClick={handleBackToLogin}
+            disabled={isLoading}
+            className="font-semibold text-slate-700 transition-colors hover:text-[#8a2be2] hover:underline underline-offset-4 disabled:pointer-events-none disabled:opacity-50"
+          >
+            เข้าสู่ระบบ
+          </button>
+        </p>
       </div>
     );
   }
