@@ -15,6 +15,7 @@ type RegisterErrors = {
   username?: string;
   password?: string;
   confirmPassword?: string;
+  form?: string;
 };
 
 const RegisterPage = ({ onBackToLogin }: RegisterPageProps) => {
@@ -25,6 +26,7 @@ const RegisterPage = ({ onBackToLogin }: RegisterPageProps) => {
   const [showPassword, setShowPassword] = useState(false);
   const [role, setRole] = useState("student");
   const [isLoading, setIsLoading] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const clearError = (field: keyof RegisterErrors) => {
     if (errors[field]) {
@@ -32,11 +34,15 @@ const RegisterPage = ({ onBackToLogin }: RegisterPageProps) => {
     }
   };
 
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleRegister = async () => {
+    if (isLoading) return;
 
     const nextErrors: RegisterErrors = {};
-    if (!username.trim()) {
+    const trimmedUsername = username.trim();
+
+    setStatusMessage(null);
+
+    if (!trimmedUsername) {
       nextErrors.username = "กรุณากรอก Username";
     }
     if (!password.trim()) {
@@ -59,19 +65,28 @@ const RegisterPage = ({ onBackToLogin }: RegisterPageProps) => {
 
     try {
       const response = await api.post("/index.php?page=register", {
-        username,
+        username: trimmedUsername,
         password,
         role,
       });
 
       if (response.data.status === "success") {
+        setStatusMessage({ type: "success", text: response.data.message || "ลงทะเบียนสำเร็จ" });
         toast.success("ลงทะเบียนสำเร็จ!", {
           description: "คุณสามารถเข้าสู่ระบบได้ทันที",
         });
         onBackToLogin();
+        return;
       }
+
+      const message = response.data.message || "ลงทะเบียนไม่สำเร็จ";
+      setErrors({ form: message });
+      setStatusMessage({ type: "error", text: message });
+      toast.error(message);
     } catch (error: any) {
       const message = error.response?.data?.message || "เกิดข้อผิดพลาดในการลงทะเบียน";
+      setErrors({ form: message });
+      setStatusMessage({ type: "error", text: message });
       toast.error(message);
     } finally {
       setIsLoading(false);
@@ -96,7 +111,14 @@ const RegisterPage = ({ onBackToLogin }: RegisterPageProps) => {
         </div>
       </div>
 
-      <form onSubmit={handleRegister} className="space-y-6" noValidate>
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          void handleRegister();
+        }}
+        className="space-y-6"
+        noValidate
+      >
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <button
@@ -212,8 +234,26 @@ const RegisterPage = ({ onBackToLogin }: RegisterPageProps) => {
           </div>
         </div>
 
+        {(statusMessage || errors.form) && (
+          <div
+            className={cn(
+              "rounded-lg border px-4 py-3 text-sm font-medium",
+              statusMessage?.type === "success"
+                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                : "border-red-200 bg-red-50 text-red-700",
+            )}
+            role="status"
+          >
+            {statusMessage?.text || errors.form}
+          </div>
+        )}
+
         <Button
           type="submit"
+          onClick={(event) => {
+            event.preventDefault();
+            void handleRegister();
+          }}
           className="w-full h-12 font-medium bg-[#8a2be2] text-background hover:bg-[#8a2be2]/90 rounded-xl"
           disabled={isLoading}
         >

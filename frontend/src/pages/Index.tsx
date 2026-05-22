@@ -76,7 +76,7 @@ const Index = () => {
               setActiveItem("users-management"); // หรือ "dashboard" ของ Admin
               break;
 
-            case 2: // กลุ่มอาจารย์ (Teacher)
+            case 3: // Teacher
               // ใช้ Position ID ในการแยกหน้า Dashboard เฉพาะทาง
               switch (positionId) {
                 case 1: // คณบดี (อ้างอิงจาก position.sql)
@@ -94,7 +94,7 @@ const Index = () => {
               }
               break;
 
-            case 3: // Student
+            case 4: // Student
               setActiveItem("transcript");
               break;
 

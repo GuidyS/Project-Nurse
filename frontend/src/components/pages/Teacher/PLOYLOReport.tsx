@@ -2,7 +2,7 @@ import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { TrendingUp, Download, BarChart3, Target } from 'lucide-react';
+import { TrendingUp, Download, BarChart3, Target, CheckCircle2, XCircle } from 'lucide-react';
 import { useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Legend } from 'recharts';
 
@@ -134,8 +134,18 @@ export default function PLOYLOReport() {
                       เป้าหมาย: {plo.target}% | ผลลัพธ์: {plo.achieved}%
                     </p>
                   </div>
-                  <div className={`text-lg font-bold ${plo.achieved >= plo.target ? 'text-green-600' : 'text-destructive'}`}>
-                    {plo.achieved >= plo.target ? '✓ บรรลุ' : '✗ ไม่บรรลุ'}
+                  <div className={`flex items-center gap-2 text-base font-semibold ${plo.achieved >= plo.target ? 'text-green-600' : 'text-destructive'}`}>
+                    {plo.achieved >= plo.target ? (
+                      <>
+                        <CheckCircle2 className="h-5 w-5 shrink-0" />
+                        <span>บรรลุ</span>
+                      </>
+                    ) : (
+                      <>
+                        <XCircle className="h-5 w-5 shrink-0" />
+                        <span>ไม่บรรลุ</span>
+                      </>
+                    )}
                   </div>
                 </div>
               ))}

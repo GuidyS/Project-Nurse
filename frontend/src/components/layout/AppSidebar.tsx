@@ -16,7 +16,6 @@ import {
   SidebarTrigger,
   useSidebar
 } from '@/components/ui/sidebar';
-import { toast } from 'sonner';
 import { useState, useEffect } from 'react';
 import api from '@/lib/axios';
 
@@ -181,30 +180,48 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
     {
       sectionTitle: "Teacher",
       items: [
-        { title: "Dashboard", url: "dashboard", icon: "LayoutDashboard" },
-        { title: "รายวิชาที่สอน", url: "courses", icon: "BookOpen" },
-        { title: "รายวิชาที่รับผิดชอบ", url: "my-courses", icon: "BookOpenCheck" },
-        { title: "จัดการโครงการ", url: "projectspage", icon: "FolderKanban" },
-      ],
-    },
+          { title: "Dashboard", url: "dashboard", icon: "LayoutDashboard" },
+          { title: "รายวิชาที่สอน", url: "courses", icon: "BookOpen" },
+          { title: "รายวิชาที่รับผิดชอบ", url: "my-courses", icon: "BookOpenCheck" },
+          { title: "รายงาน PLO/YLO", url: "plo-ylo-report", icon: "BarChart3" },
+          { title: "จัดการโครงการ", url: "projectspage", icon: "FolderKanban" },
+        ],
+      },
   ];
+
+  const getFallbackMenuSections = (roleId?: number) => {
+    if (roleId === 4) {
+      return [
+        {
+          sectionTitle: "Student",
+          items: [
+            { title: "Transcript", url: "transcript", icon: "FileText" },
+            { title: "ข้อมูลส่วนตัว", url: "profile", icon: "User" },
+          ],
+        },
+      ];
+    }
+
+    return defaultMenuSections;
+  };
 
   useEffect(() => {
     const fetchMenus = async () => {
       try {
         const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const fallbackMenuSections = getFallbackMenuSections(Number(user.role_id));
 
         // เรียก API (ตรวจสอบ Path ให้ตรงกับที่วาง index.php ไว้)
         const res = user.user_id
           ? await api.get(`?page=sidebar&user_id=${user.user_id}`)
-          : { data: defaultMenuSections };
+          : { data: fallbackMenuSections };
         
         console.log("Menu Data:", res.data); // ลองเปิด console ดูว่าข้อมูลมาไหม
-        setMenuSections(Array.isArray(res.data) ? res.data : defaultMenuSections);
+        setMenuSections(Array.isArray(res.data) && res.data.length > 0 ? res.data : fallbackMenuSections);
       } catch (error) {
         console.error("Failed to fetch menus:", error);
-        setMenuSections(defaultMenuSections);
-        toast.error("โหลดเมนูไม่สำเร็จ");
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        setMenuSections(getFallbackMenuSections(Number(user.role_id)));
       } finally {
         setIsLoading(false); // มั่นใจว่า Loading จะหายไปแน่นอน
       }
@@ -224,7 +241,9 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
   const collapsed = state === 'collapsed';
 
   const user = JSON.parse(localStorage.getItem('user') || '{}');
-  const userName = user.name || "ไม่ระบุชื่อ";
+  const rawUserName = typeof user.name === "string" ? user.name : "";
+  const isBrokenEncoding = /(?:Ã|Â|à¸|à¹)/.test(rawUserName);
+  const userName = rawUserName && !isBrokenEncoding ? rawUserName : user.username || "ไม่ระบุชื่อ";
 
   // ดึงตัวอักษรตัวแรกจากชื่อ (เช่น 'สมชาย' จะได้ 'ส') 
   // หากไม่มีชื่อจะใช้ 'U' เป็นค่าเริ่มต้น
@@ -252,6 +271,8 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
     { title: "ข้อมูลส่วนตัว", url: "profile", icon: "User", permission: "PROFILE_VIEW" },
     { title: "การตั้งค่า", url: "settings", icon: "Settings", permission: "SETTINGS" },
   ];
+
+  const visibleBottomMenuItems = bottomMenuItems;
 
   return (
     <Sidebar 
@@ -359,11 +380,10 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
       </SidebarContent>
 
       {/* --- Bottom Menu Section --- */}
+      {visibleBottomMenuItems.length > 0 && (
       <div className="mt-auto border-t border-sidebar-border p-4">
         <SidebarMenu>
-          {bottomMenuItems
-            .filter(item => hasPermission(item.permission)) // เช็คสิทธิ์ก่อนแสดงผลเหมือนเมนูหลัก
-            .map((item) => {
+          {visibleBottomMenuItems.map((item) => {
               const Icon = getIcon(item.icon); // ใช้ฟังก์ชันแปลงไอคอนเดียวกัน
               const isActive = activeItem === item.url; // เช็คสถานะ Active เดียวกัน
 
@@ -397,6 +417,7 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
             })}
         </SidebarMenu>
       </div>
+      )}
 
       {/* --- User Profile & Logout --- */}
       <SidebarFooter className="border-t border-sidebar-border p-4">
