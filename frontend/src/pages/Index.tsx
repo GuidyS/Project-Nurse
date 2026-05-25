@@ -47,7 +47,33 @@ import DeanDashboard from "@/components/pages/Teacher/DeanDashboard";
 import Retention from "@/components/pages/Teacher/Retention";
 
 const Index = () => {
-  const [activeItem, setActiveItem] = useState("login");
+  const [activeItem, setActiveItem] = useState(() => {
+    // 1. เช็ค URL Param เผื่อมีการส่ง Link ให้กัน
+    const urlPage = new URLSearchParams(window.location.search).get("page");
+    if (urlPage) return urlPage;
+
+    // 2. เช็คว่าในเครื่องเคยล็อกอินไว้ไหม
+    const savedUser = localStorage.getItem('user');
+    if (savedUser) {
+      // ดึงข้อมูล Role มาเช็คเพื่อพาไปหน้าแรกที่ถูกต้องเมื่อรีเฟรช
+      const userObj = JSON.parse(savedUser);
+      const roleId = Number(userObj.role_id);
+      const positionId = Number(userObj.position_id);
+
+      if (roleId === 1) return "users-management";
+      if (roleId === 2) {
+        if (positionId === 1) return "dean-dashboard";
+        if (positionId === 3) return "advises";
+        return "plo-ylo-report"; // หน้า Default อาจารย์
+      }
+      if (roleId === 3) return "transcript";
+      
+      return "profile"; // ถ้าไม่ตรงเงื่อนไขเลยให้ไปหน้า Profile
+    }
+
+    // 3. ถ้าไม่มีพารามิเตอร์ และไม่เคยล็อกอิน ค่อยกลับไปหน้า Login
+    return "login";
+  });
 
   const renderPage = () => {
     switch (activeItem) {
@@ -116,12 +142,14 @@ const Index = () => {
         return <NotificationsPage />;
       case "settings":
         return <SettingsPage />;
-      case "dashboard":
+      case "teacher-dashboard":
         return <Dashboard />;
+      case "courses":
+        return <CoursesPage />;
 
       // Admin
       case "approvals":
-        return <Approvals />;
+        return <FiveYearSummary />;
       case "audit-log":
         return <AuditLog />;
       case "export-data":
@@ -172,6 +200,8 @@ const Index = () => {
         return <ProgramReports />;
       case "schedule-tasks":
         return <ScheduleTasks />;
+      case "projectspage":
+        return <ProjectsPage />;
 
       // รับผิดชอบโครงการ
       case "my-projects":
@@ -194,6 +224,8 @@ const Index = () => {
       // นักศึกษา
       case "students":
         return <Students />;
+      case "transcript":
+        return <Transcript />;
       case "transfer-requests":
         return <TransferRequests />;
       default:

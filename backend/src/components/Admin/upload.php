@@ -3,41 +3,69 @@
 require_once __DIR__ . '/../../config/config.php';
 header("Content-Type: application/json");
 
+require_once __DIR__ . '/../../vendor/autoload.php';
+use PhpOffice\PhpSpreadsheet\IOFactory;
+
 /**
  * ฟังก์ชันหลักในการอ่านไฟล์และบันทึกลงฐานข้อมูล
  */
-function processExcelToDatabase($filePath, $importType, $db) {
+function processExcelToDatabase($filePath, $importType, $db, $fileExt) {
     $rowCount = 0;
-    // ปัจจุบันรองรับ CSV เป็นหลักตาม fgetcsv
-    if (($handle = fopen($filePath, "r")) !== FALSE) {
-        fgetcsv($handle, 1000, ","); // ข้าม Header
 
+    // 🌟 กรณีอ่านไฟล์ CSV
+    if ($fileExt === 'csv') {
+        if (($handle = fopen($filePath, "r")) !== FALSE) {
+            fgetcsv($handle, 1000, ","); // ข้าม Header
+            $db->beginTransaction();
+            try {
+                while (($data = fgetcsv($handle, 1000, ",")) !== FALSE) {
+                    // ... คำสั่ง SQL เหมือนเดิม ...
+                    $sql = ($importType === 'students') 
+                        ? "INSERT INTO student (student_id, title, first_name_th, last_name_th) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE first_name_th=VALUES(first_name_th), last_name_th=VALUES(last_name_th)"
+                        : "INSERT INTO faculty (faculty_id, title, first_name_th, last_name_th) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE first_name_th=VALUES(first_name_th), last_name_th=VALUES(last_name_th)";
+                    
+                    $stmt = $db->prepare($sql);
+                    $stmt->execute([$data[0], $data[1], $data[2], $data[3]]);
+                    $rowCount++;
+                }
+                $db->commit();
+                fclose($handle);
+                return $rowCount;
+            } catch (Exception $e) {
+                $db->rollBack();
+                fclose($handle);
+                throw $e;
+            }
+        }
+    } 
+    // 🌟 กรณีอ่านไฟล์ Excel (.xlsx, .xls)
+    else {
+        // ใช้ PhpSpreadsheet อ่านไฟล์ทั้งหมดเป็น Array
+        $spreadsheet = IOFactory::load($filePath);
+        $sheetData = $spreadsheet->getActiveSheet()->toArray(null, true, true, true);
+        
         $db->beginTransaction();
         try {
-            while (($data = fgetcsv($handle, 1000, ",")) !== FALSE) {
-                if ($importType === 'students') {
-                    $sql = "INSERT INTO student (student_id, title, first_name_th, last_name_th) 
-                            VALUES (?, ?, ?, ?)
-                            ON DUPLICATE KEY UPDATE first_name_th=VALUES(first_name_th), last_name_th=VALUES(last_name_th)";
-                } else if ($importType === 'teachers') {
-                    $sql = "INSERT INTO faculty (faculty_id, title, first_name_th, last_name_th) 
-                            VALUES (?, ?, ?, ?)
-                            ON DUPLICATE KEY UPDATE first_name_th=VALUES(first_name_th), last_name_th=VALUES(last_name_th)";
-                } else {
-                    continue;
-                }
+            $isHeader = true;
+            foreach ($sheetData as $row) {
+                if ($isHeader) { $isHeader = false; continue; } // ข้ามบรรทัดแรก (หัวตาราง)
+                
+                // ตรวจสอบว่าคอลัมน์ A (รหัส) มีข้อมูลหรือไม่
+                if (empty($row['A'])) continue;
 
+                $sql = ($importType === 'students') 
+                    ? "INSERT INTO student (student_id, title, first_name_th, last_name_th) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE first_name_th=VALUES(first_name_th), last_name_th=VALUES(last_name_th)"
+                    : "INSERT INTO faculty (faculty_id, title, first_name_th, last_name_th) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE first_name_th=VALUES(first_name_th), last_name_th=VALUES(last_name_th)";
+                
                 $stmt = $db->prepare($sql);
-                // ตรวจสอบว่ามีข้อมูลใน $data ครบตามจำนวน column หรือไม่
-                $stmt->execute([$data[0], $data[1], $data[2], $data[3]]);
+                // ดึงจากคอลัมน์ A, B, C, D ของ Excel
+                $stmt->execute([$row['A'], $row['B'], $row['C'], $row['D']]);
                 $rowCount++;
             }
             $db->commit();
-            fclose($handle);
             return $rowCount;
         } catch (Exception $e) {
             $db->rollBack();
-            fclose($handle);
             throw $e;
         }
     }
@@ -85,7 +113,7 @@ try {
 
         // 2. รันกระบวนการอ่านไฟล์
         try {
-            $finalCount = processExcelToDatabase($uploadPath, $importType, $db);
+            $finalCount = processExcelToDatabase($uploadPath, $importType, $db, $fileExt);
 
             if ($finalCount !== false) {
                 // 3. ถ้าสำเร็จ: UPDATE เป็น 'success'

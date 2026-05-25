@@ -14,6 +14,8 @@
     $page = isset($_GET['page']) ? $_GET['page'] : '';
 
     switch ($page) {
+
+            // Auth
             case 'register':
                 require_once 'components/Auth/register.php';
                 break;
@@ -26,32 +28,87 @@
             case 'profile':
                 require_once 'components/ProfilePage/api.php';
                 break;
-            case 'student':
-                require_once 'components/StudentPage/api.php';
-                break;
-            case 'transcript':
-                require_once 'components/Transcript/transcript-api.php';
-                break;
+            
+            /* -------- Admin -------- */
+
             case 'upload':
                 require_once 'components/Admin/get-import-history.php';
                 break;
+            case 'get-users':
+                require_once 'components/Admin/get-users.php';
+                break;
+            case 'manage-user':
+                require_once 'components/Admin/manage-user.php';
+                break;
+            case 'manage-role':
+                require_once 'components/Admin/manage-role.php';
+                break;
+            case 'get-audit-logs':
+                require_once 'components/Admin/get-audit-logs.php';
+                break;
+            case 'export-data':
+                require_once 'components/Admin/export-data.php'; 
+                break;
+            case 'get-import-history':
+                require_once 'components/Admin/get_import_history.php'; // ชื่อไฟล์จากที่คุณส่งมา
+                break;
 
+            /* -------- Teacher -------- */
+
+            // CLOManagement
+            case 'get_clo_management':
+                require_once 'components/Teacher/CLOManagement/get_clo_management.php';
+                break;
+            case 'save_clo_management':
+                require_once 'components/Teacher/CLOManagement/save_clo_management.php';
+                break;
+
+            // CLOMap
+            case 'get-clo-map':
+                require_once 'components/Teacher/CLOMap/get_clo_map.php';
+                break;
+            case 'save-clo-map':
+                require_once 'components/Teacher/CLOMap/save_clo_map.php';
+                break;
+
+            // MyCourses                
+            case 'get_teacher_courses_overview':
+                require_once 'components/Teacher/MyCourses/get_teacher_courses_overview.php';
+                break;
+
+            // CLOPage
+            case 'get-subjects':
+                require_once 'components/Teacher/CLOPage/get_subjects.php';
+                break;
+            case 'get-clos':
+                require_once 'components/Teacher/CLOPage/get_clos.php';
+                break;
+            case 'add-clo':
+                require_once 'components/Teacher/CLOPage/addclo.php';
+                break;
+            case 'update-clo':
+                require_once 'components/Teacher/CLOPage/update_clo.php';
+                break;
+            case 'delete-clo':
+                require_once 'components/Teacher/CLOPage/delete_clo.php';
+                break;
+
+            // Document
+            case 'get-documents':
+                require_once 'components/Teacher/Documents/get_documents.php';
+                break;
+            case 'upload-document':
+                require_once 'components/Teacher/Documents/upload_document.php';
+                break;
+            case 'delete-document':
+                require_once 'components/Teacher/Documents/delete_document.php';
+                break;
+
+                
             case 'sidebar':
-            // 1. ตรวจสอบความปลอดภัย (ตัวอย่างการดึง user_id)
-            // หากระบบคุณใช้ session_start() ไว้ที่หัวไฟล์ index.php อยู่แล้ว 
-            // ก็สามารถใช้ $_SESSION['user_id'] ได้เลย
-            $user_id = isset($_GET['user_id']) ? $_GET['user_id'] : null;
+                require_once 'components/sidebar.php';
+                break;
 
-            if ($user_id) {
-                // 2. เรียกใช้ไฟล์ sidebar.php 
-                // Path นี้ต้องตรงกับโฟลเดอร์ที่คุณเก็บไฟล์ sidebar.php ไว้จริง
-                require_once 'components/sidebar.php'; 
-            } else {
-                http_response_code(401);
-                echo json_encode(["message" => "กรุณาระบุ User ID"]);
-            }
-            break;
-        
         default:
             http_response_code(404);
             echo json_encode(["error" => "API endpoint is not found!"]);

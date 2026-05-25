@@ -34,10 +34,20 @@ export default function ImportData() {
 
   const fetchHistory = async () => {
     try {
-      const response = await api.get("/index.php?page=upload"); // ปรับตาม routing ของคุณ
-      setImportHistory(response.data);
+      // 1. ตรวจสอบให้แน่ใจว่าเรียก page=get-import-history
+      const response = await api.get("/index.php?page=get-import-history"); 
+      
+      // 2. เช็คก่อนว่าข้อมูลที่ได้มาเป็น Array จริงๆ ค่อย set ลง State
+      if (Array.isArray(response.data)) {
+        setImportHistory(response.data);
+      } else {
+        // ถ้าไม่ใช่ Array (เช่น เป็น Error Object) ให้เซ็ตเป็น Array ว่างๆ ไว้เว็บจะได้ไม่พัง
+        console.error("API Error or Not an Array:", response.data);
+        setImportHistory([]); 
+      }
     } catch (error) {
       console.error("Failed to fetch history", error);
+      setImportHistory([]); // ป้องกันแครชกรณีเรียก API ไม่สำเร็จ
     }
   };
 
@@ -60,7 +70,7 @@ export default function ImportData() {
     setIsUploading(true);
     
     try {
-      const response = await api.post("/upload.php", formData, {
+      const response = await api.post("/index.php?page=upload", formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
         onUploadProgress: (p) => setUploadProgress(Math.round((p.loaded * 100) / (p.total || 100)))
       });

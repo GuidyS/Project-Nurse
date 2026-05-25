@@ -182,7 +182,7 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
         const user = JSON.parse(localStorage.getItem('user') || '{}');
 
         // เรียก API (ตรวจสอบ Path ให้ตรงกับที่วาง index.php ไว้)
-        const res = await api.get(`/index.php?page=sidebar&user_id=${user.user_id}`);
+        const res = await api.get(`/index.php?page=sidebar`);
         
         console.log("Menu Data:", res.data); // ลองเปิด console ดูว่าข้อมูลมาไหม
         setMenuSections(res.data);
@@ -234,8 +234,8 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
 
   const bottomMenuItems = [
     { title: "การแจ้งเตือน", url: "notifications", icon: "Bell", permission: "NOTIFICATION_VIEW" },
-    { title: "ข้อมูลส่วนตัว", url: "profile", icon: "User", permission: "PROFILE_VIEW" },
-    { title: "การตั้งค่า", url: "settings", icon: "Settings", permission: "SETTINGS" },
+    { title: "ข้อมูลส่วนตัว", url: "profile", icon: "User", permission: "PROFILE_VIEW_SELF" },
+    { title: "การตั้งค่า", url: "settings", icon: "Settings", permission: "SYSTEM_SETTINGS" },
   ];
 
   return (

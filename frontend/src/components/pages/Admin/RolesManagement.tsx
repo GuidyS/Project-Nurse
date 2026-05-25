@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Shield, Search, UserCog } from "lucide-react";
+import api from "@/lib/axios";
 
 interface UserWithRole {
   id: string;
@@ -71,27 +72,48 @@ export default function RolesManagement() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { toast } = useToast();
 
+// ดึงข้อมูลผู้ใช้จาก API ตัวเดียวกัน
+  const fetchUsers = async () => {
+    try {
+      const response = await api.get("/index.php?page=get-users");
+      // Map ให้ตรงกับ Interface UserWithRole
+      setUsers(response.data.map((u: any) => ({
+        id: u.id, email: u.email, fullName: u.fullName, 
+        currentRole: u.role, teacherSubRole: u.teacherSubRole
+      })));
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const handleAssignRole = async () => {
+    if (!selectedUser || !newRole) return;
+    
+    try {
+      await api.post("/index.php?page=manage-role", {
+        userId: selectedUser.id,
+        newRole: newRole,
+        newSubRole: newSubRole
+      });
+
+      toast({ title: "มอบหมาย Role สำเร็จ" });
+      setIsDialogOpen(false);
+      fetchUsers(); // โหลดข้อมูลใหม่เพื่อให้ UI อัปเดต
+    } catch (error) {
+      toast({ title: "เกิดข้อผิดพลาด", variant: "destructive" });
+    }
+  };
+
   const filteredUsers = users.filter(
     (user) =>
       user.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       user.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleAssignRole = () => {
-    if (!selectedUser || !newRole) return;
-    
-    setUsers(users.map((u) =>
-      u.id === selectedUser.id
-        ? { ...u, currentRole: newRole, teacherSubRole: newRole === "teacher" ? newSubRole : undefined }
-        : u
-    ));
-    
-    setIsDialogOpen(false);
-    setSelectedUser(null);
-    setNewRole("");
-    setNewSubRole("");
-    toast({ title: "มอบหมาย Role สำเร็จ", description: `อัปเดต Role ของ ${selectedUser.fullName} เรียบร้อยแล้ว` });
-  };
 
   const openAssignDialog = (user: UserWithRole) => {
     setSelectedUser(user);
