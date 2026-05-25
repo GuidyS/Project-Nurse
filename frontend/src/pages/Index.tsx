@@ -241,7 +241,7 @@ const Index = () => {
   if (isAuthPage) {
     // ถ้าเป็น Auth Page -> แสดงแค่หน้านั้นเพียวๆ เต็มจอ (ไม่มี Sidebar)
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
         {renderPage()}
       </div>
     );

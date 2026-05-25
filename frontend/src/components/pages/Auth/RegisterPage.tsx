@@ -79,7 +79,7 @@ const RegisterPage = ({ onBackToLogin }: RegisterPageProps) => {
   };
 
   return (
-    <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-2xl border border-slate-200 shadow-xl">
+    <div className="w-full max-w-md p-8 space-y-6 bg-card text-card-foreground rounded-2xl border border-border shadow-xl">
       <div className="space-y-4 text-center flex flex-col items-center">
         <div className="relative h-28 w-28 shrink-0 overflow-hidden rounded-full shadow-md border-4 border-[#8a2be2]/10">
           <img
@@ -89,7 +89,7 @@ const RegisterPage = ({ onBackToLogin }: RegisterPageProps) => {
           />
         </div>
         <div className="space-y-2">
-          <h2 className="text-2xl font-semibold tracking-tight text-slate-700">Create New Account</h2>
+          <h2 className="text-2xl font-semibold tracking-tight text-foreground">Create New Account</h2>
           <p className="text-sm text-muted-foreground">
             Enter your ID and set a password to register
           </p>
@@ -106,7 +106,7 @@ const RegisterPage = ({ onBackToLogin }: RegisterPageProps) => {
                 "h-16 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all",
                 role === "student"
                   ? "bg-[#8a2be2] text-white border-[#8a2be2] shadow-sm"
-                  : "bg-white text-slate-600 border-slate-200 hover:border-[#8a2be2]/50 hover:text-[#8a2be2]",
+                  : "bg-background text-foreground border-border hover:border-[#8a2be2]/50 hover:text-[#8a2be2]",
               )}
             >
               <GraduationCap size={18} />
@@ -119,7 +119,7 @@ const RegisterPage = ({ onBackToLogin }: RegisterPageProps) => {
                 "h-16 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all",
                 role === "teacher"
                   ? "bg-[#8a2be2] text-white border-[#8a2be2] shadow-sm"
-                  : "bg-white text-slate-600 border-slate-200 hover:border-[#8a2be2]/50 hover:text-[#8a2be2]",
+                  : "bg-background text-foreground border-border hover:border-[#8a2be2]/50 hover:text-[#8a2be2]",
               )}
             >
               <Briefcase size={18} />
@@ -130,7 +130,7 @@ const RegisterPage = ({ onBackToLogin }: RegisterPageProps) => {
           <div className="space-y-2">
             <Label
               htmlFor="reg-username"
-              className={cn("text-sm font-medium text-slate-700", errors.username && "text-red-600")}
+              className={cn("text-sm font-medium text-foreground", errors.username && "text-red-600")}
             >
               Username (ID)
             </Label>
@@ -154,7 +154,7 @@ const RegisterPage = ({ onBackToLogin }: RegisterPageProps) => {
           <div className="space-y-2">
             <Label
               htmlFor="reg-password"
-              className={cn("text-sm font-medium text-slate-700", errors.password && "text-red-600")}
+              className={cn("text-sm font-medium text-foreground", errors.password && "text-red-600")}
             >
               Password
             </Label>
@@ -189,7 +189,7 @@ const RegisterPage = ({ onBackToLogin }: RegisterPageProps) => {
           <div className="space-y-2">
             <Label
               htmlFor="confirm-password"
-              className={cn("text-sm font-medium text-slate-700", errors.confirmPassword && "text-red-600")}
+              className={cn("text-sm font-medium text-foreground", errors.confirmPassword && "text-red-600")}
             >
               Confirm Password
             </Label>
@@ -230,7 +230,7 @@ const RegisterPage = ({ onBackToLogin }: RegisterPageProps) => {
         <button
           type="button"
           onClick={onBackToLogin}
-          className="font-semibold text-slate-700 hover:text-[#8a2be2] hover:underline underline-offset-4"
+          className="font-semibold text-foreground hover:text-[#8a2be2] hover:underline underline-offset-4"
         >
           Sign in
         </button>

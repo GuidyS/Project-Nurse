@@ -274,12 +274,12 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
           {!collapsed && (
             <>
               <div className="flex-1 min-w-0">
-                <h1 className="text-base font-bold text-slate-700 leading-relaxed">Nursing</h1>
-                <p className="text-[10px] text-slate-500 font-medium whitespace-nowrap uppercase tracking-tighter">Management System</p>
+                <h1 className="text-base font-bold text-sidebar-foreground leading-relaxed">Nursing</h1>
+                <p className="text-[10px] text-sidebar-foreground/70 font-medium whitespace-nowrap uppercase tracking-tighter">Management System</p>
               </div>
               
               {/* ปุ่ม Trigger กลับไปอยู่ที่เดิม (ขวาบน) เมื่อเปิดแถบ */}
-              <SidebarTrigger className="text-slate-500 hover:bg-[#8a2be2]/10 hover:text-[#8a2be2]">
+              <SidebarTrigger className="text-sidebar-foreground/70 hover:bg-[#8a2be2]/10 hover:text-[#8a2be2]">
                 <ChevronLeft className="h-4 w-4" />
               </SidebarTrigger>
             </>
@@ -330,7 +330,7 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
                             "h-4 w-4 shrink-0 transition-colors", 
                             isActive 
                               ? "text-[#8a2be2]"
-                              : "text-slate-600 hover:text-[#8a2be2]" 
+                              : "text-sidebar-foreground/80 hover:text-[#8a2be2]" 
                           )} />
                         {!collapsed && <span>{item.title}</span>}
                       </SidebarMenuButton>
@@ -362,7 +362,7 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
                       "w-full transition-all duration-200 mb-1 group",
                       isActive 
                         ? "bg-[#8a2be2]/10 text-[#8a2be2]" 
-                        : "text-slate-600 hover:bg-[#8a2be2]/5 hover:text-[#8a2be2]",
+                        : "text-sidebar-foreground/80 hover:bg-[#8a2be2]/5 hover:text-[#8a2be2]",
                       "active:bg-[#8a2be2]/10 active:text-[#8a2be2]",
                       "focus:bg-[#8a2be2]/10 focus:text-[#8a2be2]",
                       "focus-visible:ring-2 focus-visible:ring-[#8a2be2]/50",
@@ -373,7 +373,7 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
                       "h-4 w-4 shrink-0 transition-colors", 
                       isActive 
                         ? "text-[#8a2be2]"
-                        : "text-slate-600 hover:text-[#8a2be2]" 
+                        : "text-sidebar-foreground/80 hover:text-[#8a2be2]" 
                     )} />
                     {!collapsed && <span>{item.title}</span>}
                   </SidebarMenuButton>
@@ -411,11 +411,11 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
           {!collapsed && (
             <>
               <div className="flex-1 min-w-0 ml-2">
-                <p className="text-sm font-bold text-slate-700 truncate">{ userName }</p>
+                <p className="text-sm font-bold text-sidebar-foreground truncate">{ userName }</p>
               </div>
               <button 
                 onClick={handleLogout}
-                className="p-1 text-slate-500 hover:text-red-600 hover:bg-[#dd1d1d]/10 rounded-lg transition-colors"
+                className="p-1 text-sidebar-foreground/70 hover:text-red-500 hover:bg-[#dd1d1d]/10 rounded-lg transition-colors"
               >
                 <LogOut className="h-4 w-4" />
               </button>

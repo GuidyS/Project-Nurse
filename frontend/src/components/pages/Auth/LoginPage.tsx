@@ -137,7 +137,7 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
 
   if (showResetPassword) {
     return (
-      <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-2xl border border-slate-200 shadow-xl">
+      <div className="w-full max-w-md p-8 space-y-6 bg-card text-card-foreground rounded-2xl border border-border shadow-xl">
         <div className="space-y-4 text-center flex flex-col items-center">
           <div className="relative h-28 w-28 shrink-0 overflow-hidden rounded-full shadow-md border-4 border-[#8a2be2]/10">
             <img
@@ -146,14 +146,14 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
               className="object-cover w-full h-full scale-110"
             />
           </div>
-          <h2 className="text-2xl font-semibold tracking-tight text-slate-700">รีเซ็ตรหัสผ่าน</h2>
+          <h2 className="text-2xl font-semibold tracking-tight text-foreground">รีเซ็ตรหัสผ่าน</h2>
         </div>
         <form onSubmit={handleResetPassword} className="space-y-6" noValidate>
           <div className="space-y-4">
             <div className="space-y-2">
               <Label
                 htmlFor="reset-username"
-                className={cn("text-sm font-medium text-slate-700", resetErrors.username && "text-red-600")}
+                className={cn("text-sm font-medium text-foreground", resetErrors.username && "text-red-600")}
               >
                 Username (ID)
               </Label>
@@ -179,7 +179,7 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
             <div className="space-y-2">
               <Label
                 htmlFor="new-password"
-                className={cn("text-sm font-medium text-slate-700", resetErrors.newPassword && "text-red-600")}
+                className={cn("text-sm font-medium text-foreground", resetErrors.newPassword && "text-red-600")}
               >
                 New Password
               </Label>
@@ -206,7 +206,7 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
             <div className="space-y-2">
               <Label
                 htmlFor="confirm-new-password"
-                className={cn("text-sm font-medium text-slate-700", resetErrors.confirmNewPassword && "text-red-600")}
+                className={cn("text-sm font-medium text-foreground", resetErrors.confirmNewPassword && "text-red-600")}
               >
                 Confirm New Password
               </Label>
@@ -248,7 +248,7 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
             type="button"
             onClick={handleBackToLogin}
             disabled={isLoading}
-            className="font-semibold text-slate-700 transition-colors hover:text-[#8a2be2] hover:underline underline-offset-4 disabled:pointer-events-none disabled:opacity-50"
+            className="font-semibold text-foreground transition-colors hover:text-[#8a2be2] hover:underline underline-offset-4 disabled:pointer-events-none disabled:opacity-50"
           >
             เข้าสู่ระบบ
           </button>
@@ -258,7 +258,7 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
   }
 
   return (
-    <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-2xl border border-slate-200 shadow-xl">
+    <div className="w-full max-w-md p-8 space-y-6 bg-card text-card-foreground rounded-2xl border border-border shadow-xl">
       <div className="w-full max-w-md space-y-6"> 
         <div className="space-y-4 text-center flex flex-col items-center">
           <div className="relative h-28 w-28 shrink-0 overflow-hidden rounded-full shadow-md border-4 border-[#8a2be2]/10">
@@ -268,7 +268,7 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
               className="object-cover w-full h-full scale-110" // ใช้ scale เพื่อปรับซูมเข้าเล็กน้อยถ้าขอบขาวเยอะ
             />
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-700">เข้าสู่ระบบ</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">เข้าสู่ระบบ</h1>
         </div>
         <form onSubmit={handleLogin} className="space-y-6">
 
@@ -277,7 +277,7 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
             <div className="space-y-2">
               <Label
                 htmlFor="username"
-                className={cn("text-sm font-medium text-slate-700", loginErrors.username && "text-red-600")}
+                className={cn("text-sm font-medium text-foreground", loginErrors.username && "text-red-600")}
               >
                 Username
               </Label>
@@ -305,7 +305,7 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
             <div className="space-y-2">
               <Label
                 htmlFor="password"
-                className={cn("text-sm font-medium text-slate-700", loginErrors.password && "text-red-600")}
+                className={cn("text-sm font-medium text-foreground", loginErrors.password && "text-red-600")}
               >
                 Password
               </Label>
@@ -362,7 +362,7 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
             <button
               type="button"
               onClick={() => setShowResetPassword(true)}
-              className="text-sm font-medium text-slate-700 underline hover:text-foreground/80 transition-colors"
+              className="text-sm font-medium text-foreground underline hover:text-[#8a2be2] transition-colors"
             >
               รีเซ็ตรหัสผ่าน?
             </button>
@@ -384,7 +384,7 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
             ยังไม่ได้สมัครสมาชิก?{" "}
             <button 
               onClick={onGoToRegister} // เมื่อคลิกจะไปเรียกฟังก์ชันเปลี่ยนหน้าใน Index.tsx
-              className="text-text-slate-700 hover:text-[#8a2be2] font-semibold hover:underline underline-offset-4"
+              className="text-foreground hover:text-[#8a2be2] font-semibold hover:underline underline-offset-4"
             >
               สมัครสมาชิก
             </button>
