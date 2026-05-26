@@ -22,7 +22,6 @@ import {
 import { useState, useEffect } from "react";
 import api from "@/lib/axios";
 
-
 interface UserData {
   id: string | number;
   title?: string;
@@ -32,9 +31,9 @@ interface UserData {
   phone?: string;
   position?: string;
   faculty?: string | null;
-  programe?: string | null;
+  // แก้ไขจาก programe เป็น program ให้ตรงกับ Backend
+  program?: string | null; 
 }
-
 
 const ProfilePage = () => {
   const [user, setUser] = useState<UserData | null>(null);
@@ -45,8 +44,10 @@ const ProfilePage = () => {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const res = await api.get("/index.php", {
-          params: { page: "profile" }
+        const res = await api.get("/index.php?page=statcard", {
+          params: { page: "profile" },
+          // สำคัญมาก: ต้องแนบ withCredentials เพื่อให้ Axios ส่ง Session Cookie ไปให้ PHP
+          withCredentials: true 
         });
 
         if (res.data?.status === "success") {
@@ -55,7 +56,7 @@ const ProfilePage = () => {
           console.warn("Profile API error:", res.data);
         }
       } catch (err) {
-        console.error(err);
+        console.error("Fetch profile failed:", err);
       } finally {
         setLoading(false);
       }
@@ -74,7 +75,7 @@ const ProfilePage = () => {
       phone: user.phone,
       position: user.position,
       faculty: user.faculty,
-      programe: user.programe
+      program: user.program // แก้ให้ตรงกับ Interface
     });
 
     setEditing(true);
@@ -83,22 +84,16 @@ const ProfilePage = () => {
   const handleSave = () => {
     if (!user) return;
 
-    // ตอนนี้ update frontend อย่างเดียว
     setUser({ ...user, ...formData } as UserData);
-
-    // 🔥 ถ้าจะยิง API update ในอนาคต
-    // await api.post('/index.php?page=update_profile', formData)
-
     setEditing(false);
   };
 
-
   if (loading) {
-    return <div className="p-10 text-center">กำลังโหลด...</div>;
+    return <div className="p-10 text-center flex items-center justify-center min-h-[50vh]">กำลังโหลดข้อมูล...</div>;
   }
 
   if (!user) {
-    return <div className="p-10 text-center">ไม่พบข้อมูล</div>;
+    return <div className="p-10 text-center text-red-500">ไม่พบข้อมูล หรือคุณยังไม่ได้เข้าสู่ระบบ</div>;
   }
 
   return (
@@ -123,9 +118,7 @@ const ProfilePage = () => {
               </DialogHeader>
 
               <div className="space-y-4 py-2">
-
                 <div className="grid md:grid-cols-2 gap-4">
-
                   <div>
                     <label className="block text-sm mb-1">ชื่อ</label>
                     <input
@@ -154,19 +147,19 @@ const ProfilePage = () => {
                     />
                   </div>
 
-                  <div> <label className="block text-sm">เบอร์โทรศัพท์</label>
-                  <input 
-                    className="w-full border rounded p-2" 
-                    value={formData.phone || ''} 
-                    onChange={e => 
-                      setFormData(prev => ({ 
-                        ...prev, 
-                        phone: e.target.value 
+                  <div>
+                    <label className="block text-sm mb-1">เบอร์โทรศัพท์</label>
+                    <input 
+                      className="w-full border rounded p-2 focus:ring-2 focus:ring-primary" 
+                      value={formData.phone || ''} 
+                      onChange={e => 
+                        setFormData(prev => ({ 
+                          ...prev, 
+                          phone: e.target.value 
                         }))
-                       } 
+                      } 
                     /> 
                   </div>
-
                 </div>
               </div>
 
@@ -186,7 +179,6 @@ const ProfilePage = () => {
         </div>
 
         <div className="flex flex-col md:flex-row items-center gap-8">
-
           <Avatar className="h-32 w-32 ring-4 ring-primary/20 shadow-md">
             <AvatarFallback className="bg-primary text-primary-foreground text-4xl font-bold">
               {user.first_name?.charAt(0) || "U"}
@@ -195,11 +187,11 @@ const ProfilePage = () => {
 
           <div className="flex-1 text-center md:text-left">
             <h1 className="text-2xl font-bold">
-              {user.title} {user.first_name} {user.last_name}
+              {user.title || ""} {user.first_name} {user.last_name}
             </h1>
 
             <p className="text-muted-foreground mt-1">
-              รหัสผู้ใช้: {user.id}
+              รหัสประจำตัว: {user.id}
             </p>
 
             {user.position && (
@@ -210,10 +202,9 @@ const ProfilePage = () => {
           </div>
         </div>
 
-        <div className="border-t my-8" />
+        <div className="border-t border-border my-8" />
 
         <div className="grid md:grid-cols-2 gap-6 text-sm">
-
           {user.email && (
             <InfoRow icon={<Mail className="h-4 w-4 text-primary" />} label="อีเมล" value={user.email} />
           )}
@@ -226,16 +217,14 @@ const ProfilePage = () => {
             <InfoRow icon={<MapPin className="h-4 w-4 text-primary" />} label="คณะ" value={user.faculty} />
           )}
 
-          {user.programe && (
-            <InfoRow icon={<GraduationCap className="h-4 w-4 text-primary" />} label="หลักสูตร" value={user.programe} />
+          {user.program && ( // เปลี่ยนเป็น user.program ตรงนี้
+            <InfoRow icon={<GraduationCap className="h-4 w-4 text-primary" />} label="หลักสูตร" value={user.program} />
           )}
-
         </div>
       </div>
     </div>
   );
 };
-
 
 const InfoRow = ({
   icon,
@@ -247,10 +236,12 @@ const InfoRow = ({
   value: string;
 }) => (
   <div className="flex items-center gap-3">
-    {icon}
+    <div className="bg-primary/10 p-2 rounded-full flex items-center justify-center">
+      {icon}
+    </div>
     <div>
-      <p className="text-muted-foreground">{label}</p>
-      <p>{value}</p>
+      <p className="text-muted-foreground text-xs">{label}</p>
+      <p className="font-medium text-foreground">{value}</p>
     </div>
   </div>
 );

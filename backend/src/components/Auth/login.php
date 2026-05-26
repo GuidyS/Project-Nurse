@@ -43,40 +43,46 @@ try {
     if ($user && password_verify($password, $user['password_hash'])) {
 
         // --- ส่วนที่เพิ่มกลับเข้ามา: กำหนดค่าชื่อ ($name) ---
-        $name = ($user['role_id'] == 4) 
-            ? $user['s_title'] . $user['s_fname'] . ' ' . $user['s_lname']
-            : $user['f_title'] . $user['f_fname'] . ' ' . $user['f_lname'];
+        $name = ($user['role_id'] == 3) 
+            ? $user['s_fname'] . ' ' . $user['s_lname']
+            : $user['f_fname'] . ' ' . $user['f_lname'];
         // ----------------------------------------------
         
         // ดึงสิทธิ์จากทั้ง Role และ Position มารวมกัน (UNION)
-        $perm_sql = "SELECT p.name 
+        $perm_sql = "SELECT DISTINCT p.permission_name 
                     FROM permissions p
-                    JOIN role_permission rp ON p.permissions_id = rp.permission_id
-                    WHERE rp.role_id = :role_id
-                    UNION
-                    SELECT p.name 
-                    FROM permissions p
-                    JOIN position_permission pp ON p.permissions_id = pp.permission_id
+                    JOIN position_permission pp ON p.permission_id = pp.permission_id
                     JOIN user_position up ON pp.position_id = up.position_id
                     WHERE up.user_id = :user_id";
 
         $perm_stmt = $db->prepare($perm_sql);
         $perm_stmt->execute([
-            ':role_id' => $user['role_id'],
             ':user_id' => $user['user_id']
         ]);
+        
         $permissions = $perm_stmt->fetchAll(PDO::FETCH_COLUMN);
 
         // 2. เก็บเข้า Session
         $_SESSION['permissions'] = $permissions;
-        // เก็บค่า username/ID ไว้ใช้งาน API ต่างๆ
-        $_SESSION['username'] = $user['username'];
         $_SESSION['user_id'] = $user['user_id'];
+
+        // ==========================================
+        // 🔴 เพิ่มโค้ดบันทึก Audit Log (ล็อกอิน)
+        // ==========================================
+        $ip_address = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
+        $log_sql = "INSERT INTO audit_log (user_id, action_type, resource, details, ip_address) 
+                    VALUES (:uid, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', :ip)";
+        $db->prepare($log_sql)->execute([
+            ':uid' => $user['user_id'],
+            ':ip' => $ip_address
+        ]);
+        // ==========================================
 
         // 3. ส่งกลับไปยัง Frontend
         echo json_encode([
             "status" => "success",
             "user" => [
+                "user_id" => (int)$user['user_id'],
                 "username" => $user['username'],
                 "name" => $name,
                 "role_id" => (int)$user['role_id'],

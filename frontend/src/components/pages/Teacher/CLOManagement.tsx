@@ -8,23 +8,23 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Target, Plus, Edit, Trash2 } from 'lucide-react';
-import { useState } from 'react';
-
-// Mock data
-const initialCLOs = [
-  { id: '1', code: 'CLO1', description: 'อธิบายหลักการพื้นฐานของการพยาบาลได้', plo: 'PLO1', weight: 25, status: 'active' },
-  { id: '2', code: 'CLO2', description: 'ปฏิบัติการพยาบาลพื้นฐานได้อย่างถูกต้อง', plo: 'PLO2', weight: 30, status: 'active' },
-  { id: '3', code: 'CLO3', description: 'แสดงทักษะการสื่อสารกับผู้ป่วยและทีมสุขภาพ', plo: 'PLO4', weight: 20, status: 'active' },
-  { id: '4', code: 'CLO4', description: 'ประยุกต์ใช้เทคโนโลยีในการดูแลผู้ป่วย', plo: 'PLO5', weight: 25, status: 'active' },
-];
-
-const ploOptions = ['PLO1', 'PLO2', 'PLO3', 'PLO4', 'PLO5'];
+import { useState, useEffect } from 'react';
+import { useToast } from "@/hooks/use-toast";
+import api from "@/lib/axios";
 
 export default function CLOManagement() {
+  const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  // stateful CLO list
-  const [clos, setClos] = useState(initialCLOs);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  
+  // 🌟 1. เพิ่ม State สำหรับรหัสวิชา และ ข้อมูล PLO ที่ได้จาก Backend
+  const [subjectCode, setSubjectCode] = useState("103-111"); // ตัวอย่างรหัสวิชา (สามารถทำเป็น Dropdown เลือกวิชาภายหลังได้)
+  const [ploOptions, setPloOptions] = useState<any[]>([]);
+
+  const [clos, setClos] = useState<any[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  
   const [newCLO, setNewCLO] = useState({
     code: '',
     description: '',
@@ -32,24 +32,63 @@ export default function CLOManagement() {
     weight: '',
   });
 
+  // 🌟 2. ดึงข้อมูลจากฐานข้อมูลตอนเปิดหน้าเว็บ
+  const fetchCLOData = async () => {
+    try {
+      const response = await api.get(`/index.php?page=get_clo_management&subject_code=${subjectCode}`);
+      if (response.data.status === "success") {
+        setClos(response.data.data.clos || []); // เซ็ตรายการ CLO
+        setPloOptions(response.data.data.plos || []); // เซ็ตรายการ PLO Options
+      }
+    } catch (error) {
+      toast({ title: "เกิดข้อผิดพลาด", description: "ไม่สามารถดึงข้อมูลได้", variant: "destructive" });
+    }
+  };
+
+  useEffect(() => {
+    if (subjectCode) {
+      fetchCLOData();
+    }
+  }, [subjectCode]);
+
+  // 🌟 3. ฟังก์ชันหลักสำหรับส่ง Array ก้อนใหม่ไปทับใน Database
+  const syncToDatabase = async (updatedClos: any[]) => {
+    try {
+      const response = await api.post("/index.php?page=save_clo_management", {
+        subject_code: subjectCode,
+        clos: updatedClos
+      });
+      
+      if (response.data.status === "success") {
+        toast({ title: "สำเร็จ", description: "บันทึกข้อมูล CLO เรียบร้อยแล้ว" });
+        setClos(updatedClos); // อัปเดตหน้าจอเมื่อบันทึกผ่าน
+      } else {
+        throw new Error(response.data.message);
+      }
+    } catch (error: any) {
+      toast({ title: "ล้มเหลว", description: error.message || "ไม่สามารถบันทึกข้อมูลได้", variant: "destructive" });
+      fetchCLOData(); // ถ้ายิง API พลาด ให้ดึงข้อมูลเดิมกลับมา (Rollback)
+    }
+  };
+
   const resetForm = () => {
     setNewCLO({ code: '', description: '', plo: '', weight: '' });
     setEditingId(null);
   };
 
+  // 🌟 4. ปรับปรุง handleSave ให้เรียก syncToDatabase
   const handleSave = () => {
+    let updatedClos;
     if (editingId) {
-      // update existing
-      setClos((prev) =>
-        prev.map((c) => (c.id === editingId ? { ...c, ...newCLO, weight: Number(newCLO.weight) } : c))
-      );
+      updatedClos = clos.map((c) => (c.id === editingId ? { ...c, ...newCLO, weight: Number(newCLO.weight) } : c));
     } else {
-      // add new with generated id
       const id = Date.now().toString();
-      setClos((prev) => [...prev, { id, ...newCLO, weight: Number(newCLO.weight), status: 'active' }]);
+      updatedClos = [...clos, { id, ...newCLO, weight: Number(newCLO.weight), status: 'active' }];
     }
+    
     setIsDialogOpen(false);
     resetForm();
+    syncToDatabase(updatedClos); // 👈 ส่งไปบันทึก
   };
 
   const handleEdit = (clo: any) => {
@@ -63,17 +102,19 @@ export default function CLOManagement() {
     setIsDialogOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    setClos((prev) => prev.filter((c) => c.id !== id));
-  };
-
-  // delete confirmation dialog state
-  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
-
   const handleDeleteConfirm = (id: string) => {
     setDeleteId(id);
     setIsDeleteOpen(true);
+  };
+
+  // 🌟 5. ปรับปรุง handleDelete ให้เรียก syncToDatabase
+  const handleDelete = () => {
+    if (deleteId) {
+      const updatedClos = clos.filter((c) => c.id !== deleteId);
+      setIsDeleteOpen(false);
+      setDeleteId(null);
+      syncToDatabase(updatedClos); // 👈 ส่งไปบันทึกการลบ
+    }
   };
 
   const totalWeight = clos.reduce((acc, c) => acc + c.weight, 0);
@@ -124,7 +165,7 @@ export default function CLOManagement() {
                     </SelectTrigger>
                     <SelectContent>
                       {ploOptions.map((plo) => (
-                        <SelectItem key={plo} value={plo}>{plo}</SelectItem>
+                        <SelectItem key={plo.id} value={plo.id}>{plo.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -237,21 +278,9 @@ export default function CLOManagement() {
               คุณแน่ใจหรือไม่ว่าต้องการลบ CLO นี้? การลบจะไม่สามารถย้อนกลับได้
             </DialogDescription>
           </DialogHeader>
-
           <div className="flex justify-end gap-2 mt-4">
-            <Button variant="outline" onClick={() => setIsDeleteOpen(false)}>
-              ยกเลิก
-            </Button>
-
-            <Button
-              variant="destructive"
-              onClick={() => {
-                if (deleteId) handleDelete(deleteId);
-                setIsDeleteOpen(false);
-              }}
-            >
-              ลบ
-            </Button>
+            <Button variant="outline" onClick={() => setIsDeleteOpen(false)}>ยกเลิก</Button>
+            <Button variant="destructive" onClick={handleDelete}>ลบ</Button>
           </div>
         </DialogContent>
       </Dialog>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Search, Edit, Trash2, MoreHorizontal, UserPlus } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import api from "@/lib/axios";
 
 interface User {
   id: string;
@@ -50,60 +51,47 @@ const subRoleLabels: Record<string, string> = {
 };
 
 export default function UsersManagement() {
-  const [users, setUsers] = useState<User[]>(mockUsers);
+  const [users, setUsers] = useState<User[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState<User | null>(null);
   const [newUser, setNewUser] = useState<{ email: string; fullName: string; role: "admin" | "student" | "teacher" }>({ email: "", fullName: "", role: "student" });
   const { toast } = useToast();
+
+  // ดึงข้อมูลผู้ใช้จาก API
+  const fetchUsers = async () => {
+    try {
+      const response = await api.get("/index.php?page=get-users");
+      setUsers(response.data);
+    } catch (error) {
+      toast({ title: "โหลดข้อมูลล้มเหลว", variant: "destructive" });
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const handleAddUser = () => {
+    // แนะนำให้นำไปเปิดหน้า Register หรือเรียก API register.php แทนครับ
+    toast({ title: "แนะนำ", description: "กรุณาใช้หน้าสมัครสมาชิกเพื่อเพิ่มผู้ใช้ใหม่" });
+    setIsAddDialogOpen(false);
+  };
+
+  const handleDeleteUser = async (id: string) => {
+    try {
+      await api.delete(`/index.php?page=manage-user&id=${id}`);
+      setUsers(users.filter((u) => u.id !== id));
+      toast({ title: "ลบผู้ใช้สำเร็จ" });
+    } catch (error) {
+      toast({ title: "ลบผู้ใช้ล้มเหลว", variant: "destructive" });
+    }
+  };
 
   const filteredUsers = users.filter(
     (user) =>
       user.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       user.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
-
-  const handleSaveUser = () => {
-    if (editingUser) {
-      // update existing user
-      setUsers(users.map((u) => (u.id === editingUser.id ? { ...u, ...newUser } as User : u)));
-      toast({ title: "แก้ไขผู้ใช้สำเร็จ", description: `อัปเดต ${newUser.fullName} เรียบร้อยแล้ว` });
-    } else {
-      const user: User = {
-        id: Date.now().toString(),
-        ...newUser,
-        status: "active",
-        createdAt: new Date().toISOString().split("T")[0],
-      };
-      setUsers([...users, user]);
-      toast({ title: "เพิ่มผู้ใช้สำเร็จ", description: `เพิ่ม ${user.fullName} เรียบร้อยแล้ว` });
-    }
-    setIsAddDialogOpen(false);
-    setNewUser({ email: "", fullName: "", role: "student" });
-    setEditingUser(null);
-  };
-
-  const handleDeleteUser = (id: string) => {
-    setUsers(users.filter((u) => u.id !== id));
-    toast({ title: "ลบผู้ใช้สำเร็จ", description: "ลบผู้ใช้ออกจากระบบแล้ว" });
-  };
-
-  // dialog states for confirm actions
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
-  const [pendingId, setPendingId] = useState<string | null>(null);
-  const [pendingStatusAction, setPendingStatusAction] = useState<"activate" | "deactivate" | null>(null);
-
-  const handleDeleteUserConfirm = (id: string) => {
-    setPendingId(id);
-    setIsDeleteDialogOpen(true);
-  };
-
-  const handleStatusToggleConfirm = (id: string, action: "activate" | "deactivate") => {
-    setPendingId(id);
-    setPendingStatusAction(action);
-    setIsStatusDialogOpen(true);
-  };
 
   const handleToggleStatus = (id: string) => {
     setUsers(users.map((u) => 
@@ -120,7 +108,7 @@ export default function UsersManagement() {
             <h1 className="text-2xl font-bold text-foreground">จัดการผู้ใช้</h1>
             <p className="text-muted-foreground">เพิ่ม แก้ไข ลบ ผู้ใช้ในระบบ</p>
           </div>
-          <Dialog open={isAddDialogOpen} onOpenChange={(open) => { setIsAddDialogOpen(open); if (!open) setEditingUser(null); }}>
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
               <Button className="gap-2">
                 <UserPlus className="h-4 w-4" />
@@ -129,8 +117,8 @@ export default function UsersManagement() {
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>{editingUser ? 'แก้ไขผู้ใช้' : 'เพิ่มผู้ใช้ใหม่'}</DialogTitle>
-                <DialogDescription>{editingUser ? 'แก้ไขข้อมูลผู้ใช้' : 'กรอกข้อมูลเพื่อสร้างบัญชีผู้ใช้ใหม่'}</DialogDescription>
+                <DialogTitle>เพิ่มผู้ใช้ใหม่</DialogTitle>
+                <DialogDescription>กรอกข้อมูลเพื่อสร้างบัญชีผู้ใช้ใหม่</DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
@@ -168,7 +156,7 @@ export default function UsersManagement() {
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>ยกเลิก</Button>
-                <Button onClick={handleSaveUser}>{editingUser ? 'บันทึก' : 'เพิ่มผู้ใช้'}</Button>
+                <Button onClick={handleAddUser}>เพิ่มผู้ใช้</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -240,19 +228,13 @@ export default function UsersManagement() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem className="gap-2" onClick={() => {
-                              setEditingUser(user);
-                              setNewUser({ email: user.email, fullName: user.fullName, role: user.role });
-                              setIsAddDialogOpen(true);
-                            }}>
+                          <DropdownMenuItem className="gap-2">
                             <Edit className="h-4 w-4" /> แก้ไข
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => {
-                              handleStatusToggleConfirm(user.id, user.status === "active" ? "deactivate" : "activate");
-                            }} className="gap-2">
+                          <DropdownMenuItem onClick={() => handleToggleStatus(user.id)} className="gap-2">
                             {user.status === "active" ? "ระงับการใช้งาน" : "เปิดใช้งาน"}
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDeleteUserConfirm(user.id)} className="gap-2 text-destructive">
+                          <DropdownMenuItem onClick={() => handleDeleteUser(user.id)} className="gap-2 text-destructive">
                             <Trash2 className="h-4 w-4" /> ลบ
                           </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -265,67 +247,6 @@ export default function UsersManagement() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Delete confirmation dialog */}
-      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>ยืนยันการลบ</DialogTitle>
-            <DialogDescription>
-              คุณแน่ใจหรือไม่ว่าจะลบผู้ใช้นี้? การกระทำนี้จะไม่สามารถย้อนกลับได้
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex justify-end gap-2 mt-4">
-            <Button variant="secondary" className="border border-gray-300" onClick={() => setIsDeleteDialogOpen(false)}>
-              ยกเลิก
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => {
-                if (pendingId) {
-                  handleDeleteUser(pendingId);
-                  setPendingId(null);
-                }
-                setIsDeleteDialogOpen(false);
-              }}
-            >
-              ลบ
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Status toggle confirmation dialog */}
-      <Dialog open={isStatusDialogOpen} onOpenChange={setIsStatusDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>ยืนยันการเปลี่ยนสถานะ</DialogTitle>
-            <DialogDescription>
-              {pendingStatusAction === 'deactivate'
-                ? 'คุณต้องการระงับการใช้งานผู้ใช้นี้หรือไม่?'
-                : 'คุณต้องการเปิดใช้งานผู้ใช้นี้หรือไม่?'}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex justify-end gap-2 mt-4">
-            <Button variant="secondary" className="border border-gray-300" onClick={() => setIsStatusDialogOpen(false)}>
-              ยกเลิก
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => {
-                if (pendingId) {
-                  handleToggleStatus(pendingId);
-                  setPendingId(null);
-                  setPendingStatusAction(null);
-                }
-                setIsStatusDialogOpen(false);
-              }}
-            >
-              ตกลง
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </>
   );
 }

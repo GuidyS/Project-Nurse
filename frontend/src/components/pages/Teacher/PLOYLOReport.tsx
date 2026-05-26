@@ -135,7 +135,7 @@ export default function PLOYLOReport() {
                     </p>
                   </div>
                   <div className={`text-lg font-bold ${plo.achieved >= plo.target ? 'text-green-600' : 'text-destructive'}`}>
-                    {plo.achieved >= plo.target ? ' บรรลุ' : ' ไม่บรรลุ'}
+                    {plo.achieved >= plo.target ? '✓ บรรลุ' : '✗ ไม่บรรลุ'}
                   </div>
                 </div>
               ))}

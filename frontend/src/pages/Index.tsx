@@ -44,9 +44,36 @@ import RolesManagement from "@/components/pages/Admin/RolesManagement";
 import UsersManagement from "@/components/pages/Admin/UsersManagement";
 import Dashboard from "@/components/pages/Teacher/Dashboard";
 import DeanDashboard from "@/components/pages/Teacher/DeanDashboard";
+import Retention from "@/components/pages/Teacher/Retention";
 
 const Index = () => {
-  const [activeItem, setActiveItem] = useState("login");
+  const [activeItem, setActiveItem] = useState(() => {
+    // 1. เช็ค URL Param เผื่อมีการส่ง Link ให้กัน
+    const urlPage = new URLSearchParams(window.location.search).get("page");
+    if (urlPage) return urlPage;
+
+    // 2. เช็คว่าในเครื่องเคยล็อกอินไว้ไหม
+    const savedUser = localStorage.getItem('user');
+    if (savedUser) {
+      // ดึงข้อมูล Role มาเช็คเพื่อพาไปหน้าแรกที่ถูกต้องเมื่อรีเฟรช
+      const userObj = JSON.parse(savedUser);
+      const roleId = Number(userObj.role_id);
+      const positionId = Number(userObj.position_id);
+
+      if (roleId === 1) return "users-management";
+      if (roleId === 2) {
+        if (positionId === 1) return "dean-dashboard";
+        if (positionId === 3) return "advises";
+        return "plo-ylo-report"; // หน้า Default อาจารย์
+      }
+      if (roleId === 3) return "transcript";
+      
+      return "profile"; // ถ้าไม่ตรงเงื่อนไขเลยให้ไปหน้า Profile
+    }
+
+    // 3. ถ้าไม่มีพารามิเตอร์ และไม่เคยล็อกอิน ค่อยกลับไปหน้า Login
+    return "login";
+  });
 
   const renderPage = () => {
     switch (activeItem) {
@@ -106,6 +133,7 @@ const Index = () => {
 
       />;
       
+      // 
       case "register":
         return <RegisterPage onBackToLogin={() => setActiveItem("login")} />;
       case "profile":
@@ -114,12 +142,14 @@ const Index = () => {
         return <NotificationsPage />;
       case "settings":
         return <SettingsPage />;
-      case "dashboard":
+      case "teacher-dashboard":
         return <Dashboard />;
+      case "courses":
+        return <CoursesPage />;
 
       // Admin
       case "approvals":
-        return <Approvals />;
+        return <FiveYearSummary />;
       case "audit-log":
         return <AuditLog />;
       case "export-data":
@@ -136,52 +166,66 @@ const Index = () => {
       // คณบดี
       case "dean-dashboard":
         return <DeanDashboard />;
+      case "retention":
+        return <Retention />;
 
       // ผู้รับผิดชอบหลักสูตร
       case "five-year-summary":
         return <FiveYearSummary />;
       case "clo-management":
         return <CLOManagement />;
-      case "clo-map":
-        return <CLOMap />;
       case "plo-ylo-report":
         return <PLOYLOReport />;
       case "course-report":
         return <CourseReports />;
       case "documents":
         return <Documents />;
-      case "advise-notes":
-        return <AdviseNotes />;
-      case "advisor-notifications":
-        return <AdvisorNotifications />;
-      case "advises":
-        return <Advises />;
       case "assign-instructors":
         return <AssignInstructors />;
+
+      // อจ.ประจำ/ประจำหลักสูตร/ปฏิบัติ
+      case "clo-map":
+        return <CLOMap />;
       case "evidence":
         return <Evidence />;
       case "grades":
         return <Grades />;
       case "my-courses":
         return <MyCourses />;
-      case "my-projects":
-        return <MyProjects />;
       case "performance":
         return <Performance />;
       case "practical-students":
         return <PracticalStudents />;
       case "program-reports":
         return <ProgramReports />;
+      case "schedule-tasks":
+        return <ScheduleTasks />;
+      case "projectspage":
+        return <ProjectsPage />;
+
+      // รับผิดชอบโครงการ
+      case "my-projects":
+        return <MyProjects />;
       case "project-docs":
         return <ProjectDocs />;
       case "project-links":
         return <ProjectLinks />;
       case "project-reports":
         return <ProjectReports />;
-      case "schedule-tasks":
-        return <ScheduleTasks />;
+
+      // ที่ปรึกษา
+      case "advise-notes":
+        return <AdviseNotes />;
+      case "advisor-notifications":
+        return <AdvisorNotifications />;
+      case "advises":
+        return <Advises />;
+
+      // นักศึกษา
       case "students":
         return <Students />;
+      case "transcript":
+        return <Transcript />;
       case "transfer-requests":
         return <TransferRequests />;
       default:
@@ -205,7 +249,10 @@ const Index = () => {
 
   // ถ้าไม่ใช่ Auth Page -> แสดงโครงสร้าง Dashboard ปกติ (มี Sidebar)
   return (
-    <MainLayout onItemClick={setActiveItem}>
+    <MainLayout 
+      onItemClick={setActiveItem}
+      activeItem={activeItem} // ส่งค่า activeItem ไปที่ Layout
+      >
         {renderPage()}
     </MainLayout>
   );

@@ -3,8 +3,8 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: db
--- Generation Time: Feb 28, 2026 at 06:23 AM
--- Server version: 9.5.0
+-- Generation Time: May 25, 2026 at 01:48 PM
+-- Server version: 9.7.0
 -- PHP Version: 8.3.26
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
@@ -57,64 +57,47 @@ CREATE TABLE `assessments` (
 CREATE TABLE `audit_log` (
   `audit_log_id` bigint NOT NULL,
   `user_id` bigint NOT NULL COMMENT 'ใครทำรายการ',
-  `action` text COMMENT 'ทำอะไร (เช่น แก้ไขเกรด, ลบข้อมูล)',
+  `action_type` enum('create','update','delete','login','logout','role_change') DEFAULT 'update',
+  `resource` varchar(100) DEFAULT 'ระบบ',
+  `details` text COMMENT 'รายละเอียดการกระทำ',
+  `ip_address` varchar(45) DEFAULT '127.0.0.1',
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'ทำเมื่อไหร่'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
--- --------------------------------------------------------
-
 --
--- Table structure for table `clo`
+-- Dumping data for table `audit_log`
 --
 
-CREATE TABLE `clo` (
-  `clo_id` bigint NOT NULL,
-  `subject_id` bigint NOT NULL COMMENT 'เป็น CLO ของวิชาไหน',
-  `description` text COMMENT 'รายละเอียดสิ่งที่นักศึกษาต้องทำได้',
-  `ylo_id` bigint DEFAULT NULL COMMENT 'เชื่อมกับ YLO'
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-
---
--- Dumping data for table `clo`
---
-
-INSERT INTO `clo` (`clo_id`, `subject_id`, `description`, `ylo_id`) VALUES
-(2, 1, 'ปฏิบัติทักษะทางการพยาบาลพื้นฐานในห้องปฏิบัติการได้ตามมาตรฐาน', 2),
-(3, 1, 'ประยุกต์ใช้ความรู้เพื่อวางแผนการพยาบาลผู้ป่วยเบื้องต้นได้', 3),
-(4, 2, 'อธิบายโครงสร้างและหน้าที่ของระบบต่างๆ ในร่างกายมนุษย์ได้', 1),
-(5, 2, 'อธิบายโครงสร้างและหน้าที่ของระบบต่างๆ ในร่างกายมนุษย์ได้', NULL);
+INSERT INTO `audit_log` (`audit_log_id`, `user_id`, `action_type`, `resource`, `details`, `ip_address`, `created_at`) VALUES
+(1, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-05-23 16:56:10'),
+(2, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-05-24 11:52:16'),
+(3, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-05-24 19:26:04'),
+(4, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-05-24 19:31:43'),
+(5, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-05-24 19:43:19'),
+(6, 8, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-05-24 19:52:26'),
+(7, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-05-24 19:53:02');
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `degree`
+-- Table structure for table `curriculum_framework`
 --
 
-CREATE TABLE `degree` (
-  `degree_id` bigint NOT NULL,
-  `degree_name` varchar(255) DEFAULT NULL COMMENT 'ชื่อวุฒิ เช่น วท.บ.',
-  `grad_uni` varchar(255) DEFAULT NULL COMMENT 'มหาวิทยาลัยที่จบ',
-  `grad_faculty` varchar(255) DEFAULT NULL COMMENT 'คณะที่จบ',
-  `grad_year` int DEFAULT NULL COMMENT 'ปีที่จบการศึกษา',
-  `grad_rank` varchar(50) DEFAULT NULL COMMENT 'เกียรตินิยม (ถ้ามี)',
-  `degree_files` varchar(255) DEFAULT NULL COMMENT 'เก็บ Path ไฟล์เอกสารแนบ'
+CREATE TABLE `curriculum_framework` (
+  `id` int NOT NULL,
+  `curriculum_year` int DEFAULT NULL,
+  `program_name` varchar(255) DEFAULT NULL,
+  `mapping_json` text,
+  `is_active` tinyint DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
--- --------------------------------------------------------
-
 --
--- Table structure for table `enrollment`
+-- Dumping data for table `curriculum_framework`
 --
 
-CREATE TABLE `enrollment` (
-  `enrollment_id` bigint NOT NULL,
-  `student_id` bigint NOT NULL,
-  `subject_id` bigint NOT NULL,
-  `academic_year` int DEFAULT NULL COMMENT 'ปีการศึกษา เช่น 2567',
-  `semester` int DEFAULT NULL COMMENT 'ภาคการศึกษา (1, 2, 3)',
-  `section` int DEFAULT NULL COMMENT 'ตอนเรียน (Sec)',
-  `grade` varchar(5) DEFAULT NULL COMMENT 'เกรดที่ได้ (A, B+, ...)'
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+INSERT INTO `curriculum_framework` (`id`, `curriculum_year`, `program_name`, `mapping_json`, `is_active`, `created_at`) VALUES
+(1, 2567, 'หลักสูตรพยาบาลศาสตรบัณฑิต', '{\"clos\": [{\"plo_mappings\": [{\"weight\": 1, \"sub_plo_id\": 5.2}], \"subject_code\": \"103-111\", \"subject_name\": \"ภาษาอังกฤษพื้นฐาน\"}, {\"plo_mappings\": [{\"weight\": 1, \"sub_plo_id\": 5.2}], \"subject_code\": \"103-112\", \"subject_name\": \"การสื่อสารภาษาอังกฤษในชีวิตประจำวัน\"}, {\"plo_mappings\": [{\"weight\": 1, \"sub_plo_id\": \"7.1\"}, {\"weight\": 1, \"sub_plo_id\": 7.2}], \"subject_code\": \"103-201\", \"subject_name\": \"ทักษะดิจิทัลสำหรับศตวรรษที่ 21\"}, {\"plo_mappings\": [{\"weight\": 1, \"sub_plo_id\": \"4.1\"}, {\"weight\": 1, \"sub_plo_id\": \"5.1\"}], \"subject_code\": \"103-202\", \"subject_name\": \"การวิเคราะห์ข้อมูลและการเรียนรู้ของเครื่องจักรเบื้องต้น\"}, {\"plo_mappings\": [{\"weight\": 1, \"sub_plo_id\": \"1.3\"}], \"subject_code\": \"103-301\", \"subject_name\": \"หลักปรัชญาของเศรษฐกิจพอเพียงเพื่อการพัฒนาที่ยั่งยืน\"}, {\"plo_mappings\": [{\"weight\": 1, \"sub_plo_id\": \"1.3\"}, {\"weight\": 1, \"sub_plo_id\": 7.2}, {\"weight\": 1, \"sub_plo_id\": \"8.1\"}, {\"weight\": 1, \"sub_plo_id\": 8.2}, {\"weight\": 1, \"sub_plo_id\": 8.3}], \"subject_code\": \"103-302\", \"subject_name\": \"การออกแบบการคิดเพื่อสร้างนวัตกรรมฯ\"}, {\"plo_mappings\": [], \"subject_code\": \"103-302\", \"subject_name\": \"การออกแบบการคิดเพื่อสร้างนวัตกรรมและธุรกิจใหม่\"}, {\"plo_mappings\": [{\"weight\": 1, \"sub_plo_id\": \"1.1\"}, {\"weight\": 1, \"sub_plo_id\": \"1.2\"}, {\"weight\": 1, \"sub_plo_id\": \"1.3\"}], \"subject_code\": \"170-108\", \"subject_name\": \"ชีวเคมี\"}, {\"plo_mappings\": [{\"weight\": 1, \"sub_plo_id\": \"1.1\"}, {\"weight\": 1, \"sub_plo_id\": \"1.3\"}, {\"weight\": 1, \"sub_plo_id\": \"5.1\"}, {\"weight\": 1, \"sub_plo_id\": 5.2}, {\"weight\": 1, \"sub_plo_id\": \"6.1\"}], \"subject_code\": \"170-112\", \"subject_name\": \"กายวิภาคศาสตร์และสรีรวิทยาฯ 1\"}, {\"plo_mappings\": [{\"weight\": 1, \"sub_plo_id\": \"1.1\"}, {\"weight\": 1, \"sub_plo_id\": \"1.3\"}, {\"weight\": 1, \"sub_plo_id\": \"5.1\"}, {\"weight\": 1, \"sub_plo_id\": 5.2}, {\"weight\": 1, \"sub_plo_id\": \"6.1\"}], \"subject_code\": \"170-113\", \"subject_name\": \"กายวิภาคศาสตร์และสรีรวิทยาฯ 2\"}, {\"plo_mappings\": [{\"weight\": 1, \"sub_plo_id\": \"1.1\"}, {\"weight\": 1, \"sub_plo_id\": \"1.2\"}, {\"weight\": 1, \"sub_plo_id\": \"1.3\"}, {\"weight\": 1, \"sub_plo_id\": 6.3}], \"subject_code\": \"170-201\", \"subject_name\": \"พยาธิสรีรวิทยาของมนุษย์\"}, {\"plo_mappings\": [{\"weight\": 1, \"sub_plo_id\": \"1.1\"}, {\"weight\": 1, \"sub_plo_id\": \"1.3\"}, {\"weight\": 1, \"sub_plo_id\": 6.3}], \"subject_code\": \"170-208\", \"subject_name\": \"จุลชีววิทยาและปรสิตวิทยาของมนุษย์\"}, {\"plo_mappings\": [{\"weight\": 1, \"sub_plo_id\": \"1.1\"}, {\"weight\": 1, \"sub_plo_id\": \"2.1\"}, {\"weight\": 1, \"sub_plo_id\": 6.3}, {\"weight\": 1, \"sub_plo_id\": 7.2}, {\"weight\": 1, \"sub_plo_id\": 8.2}], \"subject_code\": \"170-216\", \"subject_name\": \"เภสัชวิทยาทางการพยาบาล\"}, {\"plo_mappings\": [{\"weight\": 1, \"sub_plo_id\": \"1.3\"}], \"subject_code\": \"170-224\", \"subject_name\": \"ชีวสถิติทางสุขภาพ\"}, {\"plo_mappings\": [{\"weight\": 1, \"sub_plo_id\": \"2.1\"}, {\"weight\": 1, \"sub_plo_id\": \"6.1\"}, {\"weight\": 1, \"sub_plo_id\": \"7.1\"}, {\"weight\": 1, \"sub_plo_id\": \"8.1\"}, {\"weight\": 1, \"sub_plo_id\": 8.2}], \"subject_code\": \"170-228\", \"subject_name\": \"พัฒนาการมนุษย์และการสร้างเสริมสุขภาพ\"}, {\"plo_mappings\": [{\"weight\": 1, \"sub_plo_id\": \"1.1\"}, {\"weight\": 1, \"sub_plo_id\": \"1.2\"}, {\"weight\": 1, \"sub_plo_id\": 6.3}, {\"weight\": 1, \"sub_plo_id\": 7.2}, {\"weight\": 1, \"sub_plo_id\": 8.2}, {\"weight\": 1, \"sub_plo_id\": 8.3}], \"subject_code\": \"170-229\", \"subject_name\": \"โภชนบำบัด\"}, {\"plo_mappings\": [{\"weight\": 1, \"sub_plo_id\": \"1.1\"}, {\"weight\": 1, \"sub_plo_id\": \"4.1\"}, {\"weight\": 1, \"sub_plo_id\": \"7.1\"}, {\"weight\": 1, \"sub_plo_id\": 7.2}], \"subject_code\": \"170-211\", \"subject_name\": \"การพยาบาลพื้นฐาน 1\"}, {\"plo_mappings\": [{\"weight\": 1, \"sub_plo_id\": \"1.1\"}, {\"weight\": 1, \"sub_plo_id\": \"4.1\"}, {\"weight\": 1, \"sub_plo_id\": \"7.1\"}, {\"weight\": 1, \"sub_plo_id\": 7.2}], \"subject_code\": \"170-212\", \"subject_name\": \"การพยาบาลพื้นฐาน 2\"}, {\"plo_mappings\": [{\"weight\": 1, \"sub_plo_id\": \"1.3\"}, {\"weight\": 1, \"sub_plo_id\": 2.2}, {\"weight\": 1, \"sub_plo_id\": 5.2}], \"subject_code\": \"170-222\", \"subject_name\": \"จรรยาบรรณวิชาชีพการพยาบาลและกฎหมายที่เกี่ยวข้อง\"}, {\"plo_mappings\": [{\"weight\": 1, \"sub_plo_id\": \"1.1\"}, {\"weight\": 1, \"sub_plo_id\": \"1.3\"}, {\"weight\": 1, \"sub_plo_id\": 6.3}, {\"weight\": 1, \"sub_plo_id\": \"7.1\"}, {\"weight\": 1, \"sub_plo_id\": 7.2}], \"subject_code\": \"170-226\", \"subject_name\": \"การพยาบาลผู้ใหญ่\"}, {\"plo_mappings\": [{\"weight\": 1, \"sub_plo_id\": \"1.1\"}, {\"weight\": 1, \"sub_plo_id\": 5.2}, {\"weight\": 1, \"sub_plo_id\": 6.2}, {\"weight\": 1, \"sub_plo_id\": 8.2}, {\"weight\": 1, \"sub_plo_id\": 8.3}], \"subject_code\": \"170-227\", \"subject_name\": \"มโนมติ ทฤษฎีฯ และบริการด้วยหัวใจ\"}, {\"plo_mappings\": [{\"weight\": 1, \"sub_plo_id\": \"1.1\"}, {\"weight\": 1, \"sub_plo_id\": \"1.3\"}, {\"weight\": 1, \"sub_plo_id\": \"7.1\"}], \"subject_code\": \"170-230\", \"subject_name\": \"กระบวนการพยาบาลและการประเมินภาวะสุขภาพ\"}, {\"plo_mappings\": [{\"weight\": 1, \"sub_plo_id\": \"1.3\"}, {\"weight\": 1, \"sub_plo_id\": 3.2}, {\"weight\": 1, \"sub_plo_id\": \"4.1\"}, {\"weight\": 1, \"sub_plo_id\": \"7.1\"}], \"subject_code\": \"170-231\", \"subject_name\": \"การประยุกต์ใช้ AI และเทคโนโลยีดิจิทัล\"}, {\"plo_mappings\": [{\"weight\": 1, \"sub_plo_id\": \"1.1\"}, {\"weight\": 1, \"sub_plo_id\": \"1.3\"}, {\"weight\": 1, \"sub_plo_id\": 6.3}, {\"weight\": 1, \"sub_plo_id\": \"7.1\"}, {\"weight\": 1, \"sub_plo_id\": 7.2}, {\"weight\": 1, \"sub_plo_id\": \"8.1\"}, {\"weight\": 1, \"sub_plo_id\": 8.2}], \"subject_code\": \"170-324\", \"subject_name\": \"การพยาบาลผู้สูงอายุ\"}, {\"plo_mappings\": [{\"weight\": 1, \"sub_plo_id\": \"1.1\"}, {\"weight\": 1, \"sub_plo_id\": \"1.3\"}, {\"weight\": 1, \"sub_plo_id\": \"3.1\"}, {\"weight\": 1, \"sub_plo_id\": 6.3}, {\"weight\": 1, \"sub_plo_id\": 7.2}, {\"weight\": 1, \"sub_plo_id\": 8.2}], \"subject_code\": \"170-348\", \"subject_name\": \"การพยาบาลเด็กและวัยรุ่น\"}, {\"plo_mappings\": [{\"weight\": 1, \"sub_plo_id\": \"1.1\"}, {\"weight\": 1, \"sub_plo_id\": \"1.2\"}, {\"weight\": 1, \"sub_plo_id\": \"1.3\"}, {\"weight\": 1, \"sub_plo_id\": 2.2}, {\"weight\": 1, \"sub_plo_id\": \"3.1\"}, {\"weight\": 1, \"sub_plo_id\": \"7.1\"}, {\"weight\": 1, \"sub_plo_id\": 8.2}], \"subject_code\": \"170-349\", \"subject_name\": \"การพยาบาลวิกฤตและฉุกเฉิน\"}, {\"plo_mappings\": [{\"weight\": 1, \"sub_plo_id\": \"1.1\"}, {\"weight\": 1, \"sub_plo_id\": \"1.3\"}, {\"weight\": 1, \"sub_plo_id\": 2.2}, {\"weight\": 1, \"sub_plo_id\": \"4.1\"}, {\"weight\": 1, \"sub_plo_id\": 6.3}, {\"weight\": 1, \"sub_plo_id\": \"7.1\"}, {\"weight\": 1, \"sub_plo_id\": 7.2}, {\"weight\": 1, \"sub_plo_id\": \"8.1\"}, {\"weight\": 1, \"sub_plo_id\": 8.2}], \"subject_code\": \"170-350\", \"subject_name\": \"การพยาบาลสุขภาพจิตและจิตเวชศาสตร์\"}, {\"plo_mappings\": [{\"weight\": 1, \"sub_plo_id\": \"1.1\"}, {\"weight\": 1, \"sub_plo_id\": \"1.3\"}, {\"weight\": 1, \"sub_plo_id\": 2.2}, {\"weight\": 1, \"sub_plo_id\": \"4.1\"}, {\"weight\": 1, \"sub_plo_id\": 6.3}, {\"weight\": 1, \"sub_plo_id\": \"7.1\"}, {\"weight\": 1, \"sub_plo_id\": 7.2}, {\"weight\": 1, \"sub_plo_id\": \"8.1\"}, {\"weight\": 1, \"sub_plo_id\": 8.2}], \"subject_code\": \"170-351\", \"subject_name\": \"การพยาบาลมารดาและทารก\"}, {\"plo_mappings\": [{\"weight\": 1, \"sub_plo_id\": \"1.1\"}, {\"weight\": 1, \"sub_plo_id\": \"1.3\"}, {\"weight\": 1, \"sub_plo_id\": 2.2}, {\"weight\": 1, \"sub_plo_id\": \"4.1\"}, {\"weight\": 1, \"sub_plo_id\": 6.3}, {\"weight\": 1, \"sub_plo_id\": \"7.1\"}, {\"weight\": 1, \"sub_plo_id\": 7.2}, {\"weight\": 1, \"sub_plo_id\": \"8.1\"}, {\"weight\": 1, \"sub_plo_id\": 8.2}], \"subject_code\": \"170-352\", \"subject_name\": \"การผดุงครรภ์\"}, {\"plo_mappings\": [{\"weight\": 1, \"sub_plo_id\": \"1.1\"}, {\"weight\": 1, \"sub_plo_id\": \"1.3\"}, {\"weight\": 1, \"sub_plo_id\": 2.2}, {\"weight\": 1, \"sub_plo_id\": \"4.1\"}, {\"weight\": 1, \"sub_plo_id\": 6.3}, {\"weight\": 1, \"sub_plo_id\": \"7.1\"}, {\"weight\": 1, \"sub_plo_id\": 7.2}, {\"weight\": 1, \"sub_plo_id\": \"8.1\"}, {\"weight\": 1, \"sub_plo_id\": 8.2}], \"subject_code\": \"170-353\", \"subject_name\": \"การพยาบาลอนามัยชุมชน\"}, {\"plo_mappings\": [{\"weight\": 1, \"sub_plo_id\": \"1.3\"}, {\"weight\": 1, \"sub_plo_id\": \"3.1\"}, {\"weight\": 1, \"sub_plo_id\": 3.2}, {\"weight\": 1, \"sub_plo_id\": 6.2}], \"subject_code\": \"170-354\", \"subject_name\": \"กระบวนการวิจัยทางวิชาชีพ\"}, {\"plo_mappings\": [{\"weight\": 1, \"sub_plo_id\": \"1.1\"}, {\"weight\": 1, \"sub_plo_id\": \"1.3\"}, {\"weight\": 1, \"sub_plo_id\": \"5.1\"}, {\"weight\": 1, \"sub_plo_id\": \"7.1\"}, {\"weight\": 1, \"sub_plo_id\": 7.2}, {\"weight\": 1, \"sub_plo_id\": \"8.1\"}], \"subject_code\": \"170-448\", \"subject_name\": \"การรักษาพยาบาลเบื้องต้น\"}, {\"plo_mappings\": [{\"weight\": 1, \"sub_plo_id\": \"1.1\"}, {\"weight\": 1, \"sub_plo_id\": \"1.3\"}, {\"weight\": 1, \"sub_plo_id\": \"3.1\"}, {\"weight\": 1, \"sub_plo_id\": 3.2}, {\"weight\": 1, \"sub_plo_id\": \"4.1\"}, {\"weight\": 1, \"sub_plo_id\": \"5.1\"}, {\"weight\": 1, \"sub_plo_id\": 5.2}, {\"weight\": 1, \"sub_plo_id\": \"7.1\"}, {\"weight\": 1, \"sub_plo_id\": \"8.1\"}, {\"weight\": 1, \"sub_plo_id\": 8.3}], \"subject_code\": \"170-457\", \"subject_name\": \"ภาวะผู้นำและการบริหารทางการพยาบาล\"}, {\"plo_mappings\": [{\"weight\": 1, \"sub_plo_id\": \"2.1\"}, {\"weight\": 1, \"sub_plo_id\": 2.3}, {\"weight\": 1, \"sub_plo_id\": 3.2}, {\"weight\": 1, \"sub_plo_id\": 6.2}, {\"weight\": 1, \"sub_plo_id\": \"7.1\"}], \"subject_code\": \"170-232\", \"subject_name\": \"ปฏิบัติการพยาบาลพื้นฐาน\"}, {\"plo_mappings\": [{\"weight\": 1, \"sub_plo_id\": \"1.1\"}, {\"weight\": 1, \"sub_plo_id\": \"1.3\"}, {\"weight\": 1, \"sub_plo_id\": \"2.1\"}, {\"weight\": 1, \"sub_plo_id\": 2.2}, {\"weight\": 1, \"sub_plo_id\": 2.3}, {\"weight\": 1, \"sub_plo_id\": \"5.1\"}, {\"weight\": 1, \"sub_plo_id\": 5.2}], \"subject_code\": \"170-327\", \"subject_name\": \"ปฏิบัติการสุขภาพจิตและจิตเวชศาสตร์\"}, {\"plo_mappings\": [{\"weight\": 1, \"sub_plo_id\": \"1.1\"}, {\"weight\": 1, \"sub_plo_id\": \"1.3\"}, {\"weight\": 1, \"sub_plo_id\": \"2.1\"}, {\"weight\": 1, \"sub_plo_id\": 2.2}, {\"weight\": 1, \"sub_plo_id\": 2.3}, {\"weight\": 1, \"sub_plo_id\": 3.2}, {\"weight\": 1, \"sub_plo_id\": 7.2}, {\"weight\": 1, \"sub_plo_id\": 8.3}], \"subject_code\": \"170-331\", \"subject_name\": \"ปฏิบัติการพยาบาลเด็กและวัยรุ่น\"}, {\"plo_mappings\": [{\"weight\": 1, \"sub_plo_id\": \"1.1\"}, {\"weight\": 1, \"sub_plo_id\": \"1.3\"}, {\"weight\": 1, \"sub_plo_id\": \"2.1\"}, {\"weight\": 1, \"sub_plo_id\": 2.3}, {\"weight\": 1, \"sub_plo_id\": \"6.1\"}, {\"weight\": 1, \"sub_plo_id\": 6.2}, {\"weight\": 1, \"sub_plo_id\": 6.3}, {\"weight\": 1, \"sub_plo_id\": 8.2}], \"subject_code\": \"170-337\", \"subject_name\": \"ปฏิบัติการพยาบาลมารดาและทารก\"}, {\"plo_mappings\": [{\"weight\": 1, \"sub_plo_id\": \"1.1\"}, {\"weight\": 1, \"sub_plo_id\": \"1.3\"}, {\"weight\": 1, \"sub_plo_id\": \"2.1\"}, {\"weight\": 1, \"sub_plo_id\": 2.3}, {\"weight\": 1, \"sub_plo_id\": \"6.1\"}, {\"weight\": 1, \"sub_plo_id\": 6.2}, {\"weight\": 1, \"sub_plo_id\": 6.3}, {\"weight\": 1, \"sub_plo_id\": 8.2}], \"subject_code\": \"170-338\", \"subject_name\": \"ปฏิบัติการผดุงครรภ์ 1\"}, {\"plo_mappings\": [{\"weight\": 1, \"sub_plo_id\": \"1.1\"}, {\"weight\": 1, \"sub_plo_id\": \"1.3\"}, {\"weight\": 1, \"sub_plo_id\": \"2.1\"}, {\"weight\": 1, \"sub_plo_id\": 2.2}, {\"weight\": 1, \"sub_plo_id\": 2.3}, {\"weight\": 1, \"sub_plo_id\": 3.2}, {\"weight\": 1, \"sub_plo_id\": 7.2}, {\"weight\": 1, \"sub_plo_id\": 8.3}], \"subject_code\": \"170-339\", \"subject_name\": \"ปฏิบัติการพยาบาลผู้ใหญ่และผู้สูงอายุ\"}, {\"plo_mappings\": [{\"weight\": 1, \"sub_plo_id\": \"1.1\"}, {\"weight\": 1, \"sub_plo_id\": \"1.2\"}, {\"weight\": 1, \"sub_plo_id\": \"1.3\"}, {\"weight\": 1, \"sub_plo_id\": \"2.1\"}, {\"weight\": 1, \"sub_plo_id\": 2.2}, {\"weight\": 1, \"sub_plo_id\": 2.3}, {\"weight\": 1, \"sub_plo_id\": \"6.1\"}, {\"weight\": 1, \"sub_plo_id\": 6.2}, {\"weight\": 1, \"sub_plo_id\": 6.3}, {\"weight\": 1, \"sub_plo_id\": 8.2}], \"subject_code\": \"170-340\", \"subject_name\": \"ปฏิบัติการพยาบาลผู้ป่วยวิกฤตและฉุกเฉิน\"}, {\"plo_mappings\": [{\"weight\": 1, \"sub_plo_id\": \"1.1\"}, {\"weight\": 1, \"sub_plo_id\": \"1.3\"}, {\"weight\": 1, \"sub_plo_id\": \"2.1\"}, {\"weight\": 1, \"sub_plo_id\": 2.3}, {\"weight\": 1, \"sub_plo_id\": \"6.1\"}, {\"weight\": 1, \"sub_plo_id\": 6.2}, {\"weight\": 1, \"sub_plo_id\": 6.3}, {\"weight\": 1, \"sub_plo_id\": 8.2}], \"subject_code\": \"170-355\", \"subject_name\": \"ปฏิบัติการพยาบาลอนามัยชุมชน\"}, {\"plo_mappings\": [{\"weight\": 1, \"sub_plo_id\": \"1.1\"}, {\"weight\": 1, \"sub_plo_id\": \"1.3\"}, {\"weight\": 1, \"sub_plo_id\": \"2.1\"}, {\"weight\": 1, \"sub_plo_id\": 2.3}, {\"weight\": 1, \"sub_plo_id\": \"5.1\"}, {\"weight\": 1, \"sub_plo_id\": 5.2}], \"subject_code\": \"170-431\", \"subject_name\": \"ปฏิบัติการผดุงครรภ์ 2\"}, {\"plo_mappings\": [{\"weight\": 1, \"sub_plo_id\": \"1.1\"}, {\"weight\": 1, \"sub_plo_id\": \"1.3\"}, {\"weight\": 1, \"sub_plo_id\": \"6.1\"}, {\"weight\": 1, \"sub_plo_id\": 6.2}, {\"weight\": 1, \"sub_plo_id\": 6.3}, {\"weight\": 1, \"sub_plo_id\": 8.2}], \"subject_code\": \"170-449\", \"subject_name\": \"ปฏิบัติการรักษาพยาบาลเบื้องต้น\"}, {\"plo_mappings\": [{\"weight\": 1, \"sub_plo_id\": \"1.1\"}, {\"weight\": 1, \"sub_plo_id\": \"1.2\"}, {\"weight\": 1, \"sub_plo_id\": \"1.3\"}, {\"weight\": 1, \"sub_plo_id\": \"4.1\"}, {\"weight\": 1, \"sub_plo_id\": \"5.1\"}, {\"weight\": 1, \"sub_plo_id\": 5.2}, {\"weight\": 1, \"sub_plo_id\": \"6.1\"}, {\"weight\": 1, \"sub_plo_id\": 6.2}, {\"weight\": 1, \"sub_plo_id\": 6.3}, {\"weight\": 1, \"sub_plo_id\": \"8.1\"}, {\"weight\": 1, \"sub_plo_id\": 8.2}, {\"weight\": 1, \"sub_plo_id\": 8.3}], \"subject_code\": \"170-458\", \"subject_name\": \"ปฏิบัติการจัดการพยาบาล\"}, {\"plo_mappings\": [{\"weight\": 1, \"sub_plo_id\": \"1.1\"}, {\"weight\": 1, \"sub_plo_id\": \"1.2\"}, {\"weight\": 1, \"sub_plo_id\": \"1.3\"}, {\"weight\": 1, \"sub_plo_id\": \"4.1\"}, {\"weight\": 1, \"sub_plo_id\": \"5.1\"}, {\"weight\": 1, \"sub_plo_id\": 5.2}, {\"weight\": 1, \"sub_plo_id\": \"6.1\"}, {\"weight\": 1, \"sub_plo_id\": 6.2}, {\"weight\": 1, \"sub_plo_id\": 6.3}, {\"weight\": 1, \"sub_plo_id\": \"8.1\"}, {\"weight\": 1, \"sub_plo_id\": 8.2}, {\"weight\": 1, \"sub_plo_id\": 8.3}], \"subject_code\": \"170-459\", \"subject_name\": \"ปฏิบัติการพยาบาลรวบยอดวิกฤตและฉุกเฉิน\"}, {\"plo_mappings\": [{\"weight\": 1, \"sub_plo_id\": \"1.3\"}, {\"weight\": 1, \"sub_plo_id\": \"7.1\"}, {\"weight\": 1, \"sub_plo_id\": 7.2}], \"subject_code\": \"170-116\", \"subject_name\": \"การดูแลสุขภาพแบบผสมผสาน\"}, {\"plo_mappings\": [{\"weight\": 1, \"sub_plo_id\": \"1.3\"}, {\"weight\": 1, \"sub_plo_id\": \"6.1\"}, {\"weight\": 1, \"sub_plo_id\": \"7.1\"}, {\"weight\": 1, \"sub_plo_id\": 7.2}, {\"weight\": 1, \"sub_plo_id\": \"8.1\"}], \"subject_code\": \"170-117\", \"subject_name\": \"การดูแลสุขภาพความงามแบบองค์รวม\"}, {\"plo_mappings\": [{\"weight\": 1, \"sub_plo_id\": \"1.1\"}, {\"weight\": 1, \"sub_plo_id\": \"1.3\"}, {\"weight\": 1, \"sub_plo_id\": 6.3}, {\"weight\": 1, \"sub_plo_id\": \"7.1\"}, {\"weight\": 1, \"sub_plo_id\": 7.2}, {\"weight\": 1, \"sub_plo_id\": \"8.1\"}, {\"weight\": 1, \"sub_plo_id\": 8.2}], \"subject_code\": \"170-233\", \"subject_name\": \"การดูแลสุขภาวะผู้สูงอายุกลุ่มเปราะบาง\"}, {\"plo_mappings\": [{\"weight\": 1, \"sub_plo_id\": \"1.3\"}, {\"weight\": 1, \"sub_plo_id\": 6.3}, {\"weight\": 1, \"sub_plo_id\": 7.2}, {\"weight\": 1, \"sub_plo_id\": \"8.1\"}, {\"weight\": 1, \"sub_plo_id\": 8.2}], \"subject_code\": \"170-234\", \"subject_name\": \"นันทนาการเพื่อส่งเสริมพัฒนาการเด็กฯ\"}, {\"plo_mappings\": [{\"weight\": 1, \"sub_plo_id\": \"1.1\"}, {\"weight\": 1, \"sub_plo_id\": \"1.3\"}, {\"weight\": 1, \"sub_plo_id\": \"3.1\"}, {\"weight\": 1, \"sub_plo_id\": 3.2}, {\"weight\": 1, \"sub_plo_id\": \"4.1\"}], \"subject_code\": \"170-346\", \"subject_name\": \"นวัตกรรมทางสุขภาพ\"}, {\"plo_mappings\": [{\"weight\": 1, \"sub_plo_id\": \"1.1\"}, {\"weight\": 1, \"sub_plo_id\": 2.2}, {\"weight\": 1, \"sub_plo_id\": \"3.1\"}], \"subject_code\": \"170-347\", \"subject_name\": \"การปฐมพยาบาลและการช่วยฟื้นคืนชีพ\"}], \"plos\": [{\"plo_id\": \"PLO1\", \"plo_name\": \"PLO 1: ประยุกต์ความรู้และสาระสำคัญของศาสตร์ทางวิชาชีพการพยาบาลและการผดุงครรภ์ และศาสตร์ที่เกี่ยวข้องในการดูแลบุคคลที่สุขภาพดี เจ็บป่วย และวิกฤต แบบองค์รวมทุกช่วงวัย\", \"sub_plos\": [{\"id\": \"1.1\", \"desc\": \"มีความรู้ความเข้าใจศาสตร์ทางการพยาบาลและการผดุงครรภ์และศาสตร์ที่เกี่ยวข้องในการดูแลบุคคลที่สุขภาพดี การดูแลบุคคลทั้งในภาวะปกติ ภาวะเจ็บป่วยทุกช่วงวัย\"}, {\"id\": \"1.2\", \"desc\": \"มีความรู้ความเข้าใจในสาระสำคัญของศาสตร์ทางการพยาบาลและการผดุงครรภ์ในการดูแลผู้สูงอายุและผู้ป่วยวิกฤต\"}, {\"id\": \"1.3\", \"desc\": \"ประยุกต์ศาสตร์ทางการพยาบาลและการผดุงครรภ์และศาสตร์ที่เกี่ยวข้องในการดูแลบุคคลทั้งในภาวะปกติ ภาวะเจ็บป่วยทุกช่วงวัย ผู้สูงอายุและผู้ป่วยวิกฤต\"}], \"ylo_descriptions\": {\"year_1\": \"ใช้ความรู้ศาสตร์ที่เกี่ยวข้องพัฒนาการมนุษย์ทุกช่วงวัย\", \"year_2\": \"พื้นฐานทางวิชาชีพ ทางเลือกในการดูแลสุขภาพ, ใช้ศาสตร์พื้นฐานทางวิชาชีพในการดูแลสุขภาพ \", \"year_3\": \"ใช้ศาสตร์ทางการพยาบาลและการผดุงครรภ์ในการดูแลผู้ป่วยทั่วไป\", \"year_4\": \"ใช้ศาสตร์ทางการพยาบาลและการผดุงครรภ์ในการดูแลผู้ป่วยวิกฤตและบูรณาการศาสตร์ทางการพยาบาลทุกระดับ\"}}, {\"plo_id\": \"PLO2\", \"plo_name\": \"PLO 2: ปฏิบัติการพยาบาลและการผดุงครรภ์อย่างเป็นองค์รวมในการดูแลบุคคลที่สุขภาพดี เจ็บป่วย และวิกฤต แบบองค์รวมทุกช่วงวัยเพื่อความปลอดภัยของผู้รับบริการ\", \"sub_plos\": [{\"id\": \"2.1\", \"desc\": \"ปฏิบัติการพยาบาลและการผดุงครรภ์อย่างเป็นองค์รวมในการดูแลบุคคลที่สุขภาพดี เจ็บป่วย และวิกฤต แบบองค์รวมทุกช่วงวัย\"}, {\"id\": \"2.2\", \"desc\": \"จัดการปัญหาและข้อขัดแย้งทางการพยาบาลได้อย่างเหมาะสม\"}, {\"id\": \"2.3\", \"desc\": \"ประสานงานกับทีมสหสาขาวิชาชีพในการดูแลบุคคลที่สุขภาพดี เจ็บป่วย และวิกฤต แบบองค์รวมทุกช่วงวัยได้\"}], \"ylo_descriptions\": {\"year_1\": \"ไม่มี\", \"year_2\": \"ปฏิบัติการพยาบาลพื้นฐานในการดูแลผู้ป่วยทั่วไปโดยใช้กระบวนการพยาบาลภายใต้กฎหมายและจรรยาบรรณวิชาชีพ\", \"year_3\": \"ปฏิบัติการพยาบาลและการผดุงครรภ์แบบองค์รวมในการดูแลผู้ป่วยทั่วไปและผู้ป่วยซับซ้อนโดยใช้กระบวนการพยาบาล\", \"year_4\": \"ปฏิบัติการพยาบาลและการผดุงครรภ์แบบองค์รวมในการดูแลผู้ป่วยทั่วไปและผู้ป่วยวิกฤตโดยใช้กระบวนการพยาบาล\"}}, {\"plo_id\": \"PLO3\", \"plo_name\": \"PLO 3: พัฒนานวัตกรรมทางสุขภาพโดยประยุกต์กระบวนการวิจัยและเทคโนโลยีสารสนเทศทางการพยาบาลได้อย่างเหมาะสม\", \"sub_plos\": [{\"id\": \"3.1\", \"desc\": \"นำกระบวนการวิจัยมาใช้ในการพัฒนานวัตกรรมทางสุขภาพได้\"}, {\"id\": \"3.2\", \"desc\": \"ใช้เทคโนโลยีสารสนเทศทางการพยาบาลได้อย่างเหมาะสม\"}], \"ylo_descriptions\": {\"year_1\": \"มีความรู้พื้นฐานทางเทคโนโลยีและสารสนเทศ\", \"year_2\": \"มีความรู้ในการสร้างนวัตกรรมเบื้องต้น\", \"year_3\": \"สามารถสืบค้นข้อมูล วิเคราะห์แหล่งข้อมูลที่น่าเชื่อถือ และออกแบบการสร้างนวัตกรรมทางสุขภาพในแต่ละสาขาวิชา\", \"year_4\": \"บูรณาการการวิจัยและนวัตกรรมและส่งผลงานเข้าร่วมนำเสนอ\"}}, {\"plo_id\": \"PLO4\", \"plo_name\": \"PLO 4: ประยุกต์ใช้ดิจิทัลในการจัดการพยาบาลได้อย่างเหมาะสม\", \"sub_plos\": [{\"id\": \"4.1\", \"desc\": \"สามารถใช้ระบบดิจิทัลทางการพยาบาลเพื่อการติดต่อประสานงานและการให้บริการผู้ป่วยได้อย่างถูกต้อง\"}], \"ylo_descriptions\": {\"year_1\": \"ไม่มี\", \"year_2\": \"มีความรู้พื้นฐานดิจิทัล\", \"year_3\": \"มีความรู้ด้านดิจิทัลทางการพยาบาล\", \"year_4\": \"ประยุกต์ดิจิทัลทางการพยาบาลมาใช้ในการดูแลผู้ป่วย\"}}, {\"plo_id\": \"PLO5\", \"plo_name\": \"PLO 5: สื่อสารด้วยภาษาไทยและภาษาอังกฤษได้อย่างมีประสิทธิภาพ\", \"sub_plos\": [{\"id\": \"5.1\", \"desc\": \"ใช้ภาษาไทยในการสื่อสาร การบันทึกรายงานทางการพยาบาล การประสานงานกับทีมสุขภาพและผู้รับบริการได้อย่างมีประสิทธิภาพ\"}, {\"id\": \"5.2\", \"desc\": \"ใช้ภาษาอังกฤษในการสื่อสารกับทีมสุขภาพและผู้รับบริการได้\"}], \"ylo_descriptions\": {\"year_1\": \"สามารถสื่อสารภาษาไทยภาษาอังกฤษได้\", \"year_2\": \"-ใช้ภาษาไทยในการสื่อสารทางวิชาการ บันทึกทางการพยาบาล -เข้าใจศัพท์พื้นฐานทางการแพทย์\", \"year_3\": \"-ใช้ภาษาไทยในการสื่อสารทางวิชาการ บันทึกทางการพยาบาล การรับส่งข้อมูลกับทีมสุขภาพ  และหน่วยงานที่เกี่ยวข้อง -สามารถใช้ศัพท์ทางการแพทย์ในการสื่อสาร รับส่งข้อมูลและบันทึกทางการพยาบาล\", \"year_4\": \"ใช้ภาษาไทยในการสื่อสารทางวิชาการ บันทึกทางการพยาบาล การรับส่งข้อมูลกับทีมสุขภาพ และหน่วยงานที่เกี่ยวข้อง สามารถใช้ศัพท์ทางการแพทย์ในการสื่อสาร รับส่งข้อมูลและบันทึกทางการพยาบาล\"}}, {\"plo_id\": \"PLO6\", \"plo_name\": \"PLO 6: แสดงออกถึงการมีจริยธรรมและทัศนคติที่ดีต่อวิชาชีพ มีจิตสาธารณะ และมีพฤติกรรมบริการที่เป็นที่ยอมรับ\", \"sub_plos\": [{\"id\": \"6.1\", \"desc\": \"แสดงออกถึงการมีบุคลิกภาพและการวางตัวได้อย่างเหมาะสมในความเป็นวิชาชีพ\"}, {\"id\": \"6.2\", \"desc\": \"ปฏิบัติงานด้วยความซื่อสัตย์ เสียสละ ตรงต่อเวลา มีความรับผิดชอบ มีความรัก และศรัทธาในวิชาชีพ\"}, {\"id\": \"6.3\", \"desc\": \"สามารถปรับตัวเข้ากับสถานการณ์ที่หลากหลาย\"}], \"ylo_descriptions\": {\"year_1\": \"-มีจิตสาธารณะบำเพ็ญประโยชน์เพื่อสังคม -สามารถปรับตัวเข้ากับสังคมและสิ่งแวดล้อมใหม่\", \"year_2\": \"-มีบุคลิกภาพและการวางตัวได้อย่างเหมาะสม -ปฏิบัติงานด้วยตรงต่อเวลา มีความรับผิดชอบ -สามารถปรับตัวเข้าสู่วิชาชีพได้\", \"year_3\": \"-มีบุคลิกภาพและการวางตัวได้อย่างเหมาะสมในความเป็นวิชาชีพ -ปฏิบัติงานด้วยความซื่อสัตย์ เสียสละ ตรงต่อเวลา มีความรับผิดชอบ มีความรักและศรัทธาในวิชาชีพ -สามารถปรับตัวเข้ากับสถานการณ์ที่หลากหลาย\", \"year_4\": \"-มีบุคลิกภาพและการวางตัวได้อย่างเหมาะสมในความเป็นวิชาชีพ -ปฏิบัติงานด้วยความซื่อสัตย์ เสียสละ ตรงต่อเวลา มีความรับผิดชอบ และมีความรักและศรัทธาในวิชาชีพ -สามารถปรับตัวเข้ากับสถานการณ์ที่ซับซ้อน -มีพฤติกรรมบริการเป็น-ที่ยอมรับของผู้รับ\"}}, {\"plo_id\": \"PLO7\", \"plo_name\": \"PLO 7: แสดงออกถึงการเรียนรู้ด้วยตนเองอย่างต่อเนื่อง\", \"sub_plos\": [{\"id\": \"7.1\", \"desc\": \"แสดงออกถึงการแสวงหาความรู้เพิ่มเติมอย่างต่อเนื่อง\"}, {\"id\": \"7.2\", \"desc\": \"สามารถสืบค้นและวิเคราะห์ความน่าเชื่อถือของข้อมูลได้อย่างเหมาะสม\"}], \"ylo_descriptions\": {\"year_1\": \"สามารถศึกษาค้นคว้าข้อมูลจากแหล่งข้อมูลต่าง ๆ\", \"year_2\": \"สามารถศึกษาค้นคว้าข้อมูลทางการพยาบาลจากแหล่งข้อมูลต่าง ๆ และวิเคราะห์ข้อมูลเบื้องต้น\", \"year_3\": \"สามารถนำข้อมูลทางการพยาบาลมาวางแผนการพยาบาล\", \"year_4\": \"สามารถเลือกและประยุกต์องค์ความรู้ทางการพยาบาลมาใช้วางแผนการพยาบาลตามสถานการณ์ที่หลากหลาย\"}}, {\"plo_id\": \"PLO8\", \"plo_name\": \"PLO 8: เข้าใจหลักการ การดำเนินการ การเป็นผู้ประกอบการที่เกี่ยวกับการพยาบาลและการผดุงครรภ์ได้\", \"sub_plos\": [{\"id\": \"8.1\", \"desc\": \"ประเมินความต้องการบริการสุขภาพสอดคล้องกับสถานการณ์ปัจจุบัน\"}, {\"id\": \"8.2\", \"desc\": \"ออกแบบบริการการพยาบาลและการผดุงครรภ์ได้\"}, {\"id\": \"8.3\", \"desc\": \"สามารถจัดการในการเป็นผู้ประกอบการด้านการดูแลสุขภาพได้\"}], \"ylo_descriptions\": {\"year_1\": \"-\", \"year_2\": \"-\", \"year_3\": \"ประเมินความต้องการบริการสุขภาพของบุคคลและครอบครัวได้\", \"year_4\": \"-ประเมินความต้องการบริการสุขภาพของบุคคล ครอบครัว และชุมชนได้ -ออกแบบบริการการพยาบาลและการผดุงครรภ์ในการเป็นผู้ประกอบการได้\"}}], \"program_name\": \"หลักสูตรพยาบาลศาสตรบัณฑิต (ฉบับปรับปรุง)\", \"curriculum_year\": 2567}', 1, '2026-02-09 13:44:39');
 
 -- --------------------------------------------------------
 
@@ -124,6 +107,7 @@ CREATE TABLE `enrollment` (
 
 CREATE TABLE `faculty` (
   `faculty_id` bigint NOT NULL,
+  `user_id` bigint DEFAULT NULL,
   `title` varchar(50) DEFAULT NULL COMMENT 'คำนำหน้าชื่อ (นาย/นาง/ดร./ผศ.)',
   `first_name_th` varchar(100) DEFAULT NULL,
   `last_name_th` varchar(100) DEFAULT NULL,
@@ -145,50 +129,51 @@ CREATE TABLE `faculty` (
 -- Dumping data for table `faculty`
 --
 
-INSERT INTO `faculty` (`faculty_id`, `title`, `first_name_th`, `last_name_th`, `first_name_en`, `last_name_en`, `gender`, `birth_date`, `license_no`, `member_no`, `email`, `phone`, `start_date`, `status`, `description`, `created_at`) VALUES
-(41172008, 'นาง', 'จรัสดาว', 'เรโนลด์', 'Jaratdao', NULL, 'female', '1968-04-15', '4511059407', NULL, NULL, NULL, '1998-03-15', NULL, 'มี 2 นามสกุล', NULL),
-(41172011, 'นางสาว', 'พิชาภรณ์ ', 'จันทนกุล', 'Pichaporn', 'Janthanakul', 'female', '1972-07-27', '4511036515', '50436', NULL, NULL, '1998-06-01', NULL, NULL, NULL),
-(41172017, 'นางสาว', 'อรทิพา', 'ส่องศิริ', 'Orntipa', 'Songsiri', 'female', '1951-07-22', '4511016150', NULL, NULL, NULL, '1994-10-01', NULL, NULL, NULL),
-(42172021, 'นาง', 'วัฒนีย์ ', 'ปานจินดา', 'Wattanee', 'Panjinda', 'female', '1955-08-17', '4511077074', 'อ.1/1710', NULL, NULL, '1999-01-01', NULL, NULL, NULL),
-(42172025, 'นาง', 'ปรียธิดา', 'ชลศึกเสนีย์', NULL, NULL, 'female', '1966-07-31', '4511055442', NULL, NULL, NULL, '1999-07-01', NULL, NULL, NULL),
-(44172033, 'นางสาว', 'ภัทรพร', 'อรัณยภาค', NULL, 'Arunyaphaga', 'female', '1953-02-16', '4511016607', NULL, NULL, NULL, '2001-10-16', NULL, 'ชื่อภัทรา หรือ ภัทรพร', NULL),
-(45172037, 'นาง', 'สุสารี', 'ประคินกิจ', 'Susaree', 'Prakhinkit', 'female', '1975-01-25', '4511005639', NULL, NULL, NULL, '2002-11-01', NULL, NULL, NULL),
-(46172038, 'นางสาว', 'สมฤดี', 'ชื่นกิติญานนท์', NULL, NULL, 'female', '1975-05-09', '4611093778', NULL, NULL, NULL, '2002-12-01', NULL, NULL, NULL),
-(46172040, 'พ.จ.อ.', 'ภูมเดชา', 'ชาญเบญจพิภู', NULL, NULL, 'male', '1964-04-07', '4521050682', NULL, NULL, NULL, '2003-03-01', NULL, NULL, NULL),
-(47172044, 'นาง', 'สุวรรณา', 'เชียงขุนทด', 'Suwanna', NULL, 'female', '1973-02-01', '4511007784', NULL, NULL, NULL, '2004-05-01', NULL, 'เปลี่ยนนามสกุล', NULL),
-(47172046, 'นาง', 'วารุณี', 'เพไร', 'Warunee', NULL, 'female', '1976-08-06', '4711186486', '47789', NULL, NULL, '2004-06-01', NULL, 'เปลี่ยนนามสกุล', NULL),
-(47172047, 'นางสาว', 'ชนิดา', 'มัททวางกูร', 'Chanida', 'Mattavangkul', 'female', '1971-09-21', '4511069513', NULL, NULL, NULL, '2004-07-01', NULL, NULL, NULL),
-(47172049, 'นางสาว', 'ศนิกานต์', 'ศรีมณี', NULL, NULL, 'female', '1975-03-01', '4511078893', NULL, NULL, NULL, '2004-10-01', NULL, NULL, NULL),
-(49172053, 'นาง', 'พรพิมล', 'ภูมิฤทธิกุล', NULL, NULL, 'female', '1959-04-20', '5511168672', NULL, NULL, NULL, '2006-03-16', NULL, NULL, NULL),
-(49172054, 'นางสาว', 'สุนันทา', 'บุญรักษา', NULL, NULL, 'female', '1975-05-10', '5311108587', NULL, NULL, NULL, '2006-08-01', NULL, NULL, NULL),
-(51172062, 'นางสาว', 'เพ็ญรุ่ง', 'นวลแจ่ม', NULL, NULL, 'female', '1973-01-20', '6611103761', '76117', NULL, NULL, '2008-08-01', NULL, NULL, NULL),
-(52172066, 'นาง', 'ธารทิพย์', 'จิรกัญจนะ', 'Tharnthip', 'Jirakanjana', 'female', '1975-02-15', '4511034476', NULL, NULL, NULL, '2009-11-01', NULL, NULL, NULL),
-(54172071, 'นางสาว', 'วราภรณ์', 'คำรศ', 'Waraporn', 'Khamros', 'female', '1983-08-09', '6411198208', '115533', NULL, NULL, '2010-12-01', NULL, NULL, NULL),
-(54172075, 'นางสาว', 'สิริณัฐ', 'สินวรรณกุล', 'Sirinut', 'Sinvonnagul', 'female', '1969-09-11', '4511070793', NULL, NULL, NULL, '2010-09-01', NULL, NULL, NULL),
-(54172078, 'รอ.หญิง', 'วิภานันท์', 'ม่วงสกุล', 'Wipanun', 'Muangsakul', 'female', '1977-04-27', '4711178169', NULL, NULL, NULL, '2011-05-01', NULL, NULL, NULL),
-(54172084, 'นางสาว', 'ธัญลักษณ์วดี', 'ก้อนทองถม', NULL, NULL, 'female', '1986-09-15', '5211209369', '137583', NULL, NULL, '2011-10-01', NULL, NULL, NULL),
-(54172085, 'นางสาว', 'อัมพร', 'คงจีระ', 'Amporn', 'Kongjeera', 'female', '1951-04-16', '4511002485', NULL, NULL, NULL, '2011-12-01', NULL, NULL, NULL),
-(56172088, 'นาง', 'วิวรรณา', 'คล้ายคลึง', NULL, NULL, 'female', '1973-10-07', '4511013331', '55314', NULL, NULL, '2013-03-01', NULL, NULL, NULL),
-(56172089, 'นางสาว', 'สุจิตราภรณ์', 'ทับครอง', NULL, NULL, 'female', '1965-10-02', '4511050062', NULL, NULL, NULL, '2013-05-01', NULL, NULL, NULL),
-(56172103, 'นางสาว', 'รัฐกานต์', 'ขำเขียว', NULL, NULL, 'female', '1984-12-10', '5111205212', NULL, NULL, NULL, '2013-07-01', NULL, NULL, NULL),
-(56172104, 'นางสาว', 'ณิชมล', 'ขวัญเมือง', NULL, NULL, 'female', '1972-03-19', '5011200055', '47562', NULL, NULL, '2013-07-01', NULL, NULL, NULL),
-(57172108, 'นางสาว', 'นฤมล', 'อังศิริศักดิ์', NULL, NULL, 'female', '1985-02-04', '5011200055', '126375', NULL, NULL, '2014-04-01', NULL, NULL, NULL),
-(57172109, 'นางสาว', 'ดวงกมล', 'วิรุฬห์อุดมผล', NULL, NULL, 'female', '1966-04-22', '5711254926', NULL, NULL, NULL, '2014-06-01', NULL, NULL, NULL),
-(58172110, 'นางสาว', 'สุกฤตา', 'ตะการีย์', NULL, NULL, 'female', '1980-01-26', '4811193884', '115510', NULL, NULL, '2015-01-15', NULL, NULL, NULL),
-(58172114, 'นางสาว', 'ศิริพร', 'สามสี', 'Siriporn', 'Samsri', 'female', '1969-03-13', '4511075055', NULL, NULL, NULL, '2015-10-01', NULL, NULL, NULL),
-(59172119, 'นาย', 'ชัยสิทธิ์', 'ทันศึก', NULL, NULL, 'male', '1972-04-30', '4311158065', NULL, NULL, NULL, '2016-10-01', NULL, NULL, NULL),
-(59172120, 'นาง', 'พิไลพรรณ', 'แก้วแก่นตา', NULL, NULL, 'female', '1976-01-13', '4511032299', '74109', NULL, NULL, '2016-05-01', NULL, NULL, NULL),
-(59172121, 'พ.ต.อ.หญิง', 'ระชี', 'ดิษฐจร', 'Rachee', 'Ditachorn', 'female', '1955-11-16', '4511012136', NULL, NULL, NULL, '2016-11-01', NULL, NULL, NULL),
-(60172123, 'นางสาว', 'ขวัญเรือน', 'ก๋าวิตู', NULL, NULL, 'female', '1985-06-19', '5111207345', '129959', NULL, NULL, '2017-02-01', NULL, NULL, NULL),
-(63172128, 'นาย', 'เรวัต', 'แย้มสุดา', 'Raywat', 'Yaemsuda', 'male', '1959-04-28', '4521023170', 'อ.1/21510', NULL, NULL, '2020-01-02', NULL, NULL, NULL),
-(63172129, 'นางสาว', 'รัตนาภรณ์', 'นิวาศานนท์', NULL, NULL, 'female', '1992-03-24', '5811261753', NULL, NULL, NULL, '2019-02-01', NULL, 'เปลี่ยนนามสกุล', NULL),
-(63172131, 'นางสาว', 'พาจนา', 'ดวงจันทร์', NULL, NULL, 'female', '1967-04-29', '4511050318', NULL, NULL, NULL, '2005-02-01', NULL, NULL, NULL),
-(63172132, 'นาง', 'บัวทิพย์', 'เพ็งศรี', 'Buatip', 'Phengsri', 'female', '1970-10-17', '4511048575', NULL, NULL, NULL, '2015-10-01', NULL, NULL, NULL),
-(63172133, 'นางสาว', 'พรรณี', 'ตรังคสันต์', NULL, NULL, 'female', '1968-02-27', '4511050332', NULL, NULL, NULL, '2015-10-10', NULL, NULL, NULL),
-(64172139, 'นางสาว', 'สุภาภรณ์', 'ศรีฟ้า', 'Supaporn', 'Srifa', 'female', '1985-11-12', '5111207470', NULL, NULL, NULL, '2021-03-01', NULL, NULL, NULL),
-(65172142, 'นาง', 'อัจรา', 'ฐิตวัฒนกุล', NULL, NULL, 'female', '1987-09-13', '5311218207', NULL, NULL, NULL, '2022-08-01', NULL, NULL, NULL),
-(66172148, 'นาง', 'รุ่งนภา', 'พรหมแย้ม', NULL, NULL, 'female', '1963-05-03', '4511053132', NULL, NULL, NULL, '2023-12-01', NULL, NULL, NULL),
-(66712147, 'นางสาว', 'เกวลี', 'เชียรวิชัย', NULL, NULL, 'female', '1990-09-06', '5611243227', '164439', NULL, NULL, '2023-11-01', NULL, NULL, NULL);
+INSERT INTO `faculty` (`faculty_id`, `user_id`, `title`, `first_name_th`, `last_name_th`, `first_name_en`, `last_name_en`, `gender`, `birth_date`, `license_no`, `member_no`, `email`, `phone`, `start_date`, `status`, `description`, `created_at`) VALUES
+(41172008, 2, 'นาง', 'จรัสดาว', 'เรโนลด์', 'Jaratdao', NULL, 'female', '1968-04-15', '4511059407', NULL, NULL, NULL, '1998-03-15', NULL, 'มี 2 นามสกุล', NULL),
+(41172011, 4, 'นางสาว', 'พิชาภรณ์ ', 'จันทนกุล', 'Pichaporn', 'Janthanakul', 'female', '1972-07-27', '4511036515', '50436', NULL, NULL, '1998-06-01', NULL, NULL, NULL),
+(41172017, 6, 'นางสาว', 'อรทิพา', 'ส่องศิริ', 'Orntipa', 'Songsiri', 'female', '1951-07-22', '4511016150', NULL, NULL, NULL, '1994-10-01', NULL, NULL, NULL),
+(42172021, 3, 'นาง', 'วัฒนีย์ ', 'ปานจินดา', 'Wattanee', 'Panjinda', 'female', '1955-08-17', '4511077074', 'อ.1/1710', NULL, NULL, '1999-01-01', NULL, NULL, NULL),
+(42172025, NULL, 'นาง', 'ปรียธิดา', 'ชลศึกเสนีย์', NULL, NULL, 'female', '1966-07-31', '4511055442', NULL, NULL, NULL, '1999-07-01', NULL, NULL, NULL),
+(44172033, NULL, 'นางสาว', 'ภัทรพร', 'อรัณยภาค', NULL, 'Arunyaphaga', 'female', '1953-02-16', '4511016607', NULL, NULL, NULL, '2001-10-16', NULL, 'ชื่อภัทรา หรือ ภัทรพร', NULL),
+(45172037, NULL, 'นาง', 'สุสารี', 'ประคินกิจ', 'Susaree', 'Prakhinkit', 'female', '1975-01-25', '4511005639', NULL, NULL, NULL, '2002-11-01', NULL, NULL, NULL),
+(46172038, NULL, 'นางสาว', 'สมฤดี', 'ชื่นกิติญานนท์', NULL, NULL, 'female', '1975-05-09', '4611093778', NULL, NULL, NULL, '2002-12-01', NULL, NULL, NULL),
+(46172040, 5, 'พ.จ.อ.', 'ภูมเดชา', 'ชาญเบญจพิภู', NULL, NULL, 'male', '1964-04-07', '4521050682', NULL, NULL, NULL, '2003-03-01', NULL, NULL, NULL),
+(47172044, NULL, 'นาง', 'สุวรรณา', 'เชียงขุนทด', 'Suwanna', NULL, 'female', '1973-02-01', '4511007784', NULL, NULL, NULL, '2004-05-01', NULL, 'เปลี่ยนนามสกุล', NULL),
+(47172046, NULL, 'นาง', 'วารุณี', 'เพไร', 'Warunee', NULL, 'female', '1976-08-06', '4711186486', '47789', NULL, NULL, '2004-06-01', NULL, 'เปลี่ยนนามสกุล', NULL),
+(47172047, NULL, 'นางสาว', 'ชนิดา', 'มัททวางกูร', 'Chanida', 'Mattavangkul', 'female', '1971-09-21', '4511069513', NULL, NULL, NULL, '2004-07-01', NULL, NULL, NULL),
+(47172049, NULL, 'นางสาว', 'ศนิกานต์', 'ศรีมณี', NULL, NULL, 'female', '1975-03-01', '4511078893', NULL, NULL, NULL, '2004-10-01', NULL, NULL, NULL),
+(49172053, NULL, 'นาง', 'พรพิมล', 'ภูมิฤทธิกุล', NULL, NULL, 'female', '1959-04-20', '5511168672', NULL, NULL, NULL, '2006-03-16', NULL, NULL, NULL),
+(49172054, NULL, 'นางสาว', 'สุนันทา', 'บุญรักษา', NULL, NULL, 'female', '1975-05-10', '5311108587', NULL, NULL, NULL, '2006-08-01', NULL, NULL, NULL),
+(51172062, NULL, 'นางสาว', 'เพ็ญรุ่ง', 'นวลแจ่ม', NULL, NULL, 'female', '1973-01-20', '6611103761', '76117', NULL, NULL, '2008-08-01', NULL, NULL, NULL),
+(52172066, NULL, 'นาง', 'ธารทิพย์', 'จิรกัญจนะ', 'Tharnthip', 'Jirakanjana', 'female', '1975-02-15', '4511034476', NULL, NULL, NULL, '2009-11-01', NULL, NULL, NULL),
+(54172071, NULL, 'นางสาว', 'วราภรณ์', 'คำรศ', 'Waraporn', 'Khamros', 'female', '1983-08-09', '6411198208', '115533', NULL, NULL, '2010-12-01', NULL, NULL, NULL),
+(54172075, NULL, 'นางสาว', 'สิริณัฐ', 'สินวรรณกุล', 'Sirinut', 'Sinvonnagul', 'female', '1969-09-11', '4511070793', NULL, NULL, NULL, '2010-09-01', NULL, NULL, NULL),
+(54172078, NULL, 'รอ.หญิง', 'วิภานันท์', 'ม่วงสกุล', 'Wipanun', 'Muangsakul', 'female', '1977-04-27', '4711178169', NULL, NULL, NULL, '2011-05-01', NULL, NULL, NULL),
+(54172084, NULL, 'นางสาว', 'ธัญลักษณ์วดี', 'ก้อนทองถม', NULL, NULL, 'female', '1986-09-15', '5211209369', '137583', NULL, NULL, '2011-10-01', NULL, NULL, NULL),
+(54172085, NULL, 'นางสาว', 'อัมพร', 'คงจีระ', 'Amporn', 'Kongjeera', 'female', '1951-04-16', '4511002485', NULL, NULL, NULL, '2011-12-01', NULL, NULL, NULL),
+(56172088, NULL, 'นาง', 'วิวรรณา', 'คล้ายคลึง', NULL, NULL, 'female', '1973-10-07', '4511013331', '55314', NULL, NULL, '2013-03-01', NULL, NULL, NULL),
+(56172089, NULL, 'นางสาว', 'สุจิตราภรณ์', 'ทับครอง', NULL, NULL, 'female', '1965-10-02', '4511050062', NULL, NULL, NULL, '2013-05-01', NULL, NULL, NULL),
+(56172103, NULL, 'นางสาว', 'รัฐกานต์', 'ขำเขียว', NULL, NULL, 'female', '1984-12-10', '5111205212', NULL, NULL, NULL, '2013-07-01', NULL, NULL, NULL),
+(56172104, NULL, 'นางสาว', 'ณิชมล', 'ขวัญเมือง', NULL, NULL, 'female', '1972-03-19', '5011200055', '47562', NULL, NULL, '2013-07-01', NULL, NULL, NULL),
+(57172108, NULL, 'นางสาว', 'นฤมล', 'อังศิริศักดิ์', NULL, NULL, 'female', '1985-02-04', '5011200055', '126375', NULL, NULL, '2014-04-01', NULL, NULL, NULL),
+(57172109, NULL, 'นางสาว', 'ดวงกมล', 'วิรุฬห์อุดมผล', NULL, NULL, 'female', '1966-04-22', '5711254926', NULL, NULL, NULL, '2014-06-01', NULL, NULL, NULL),
+(58172110, NULL, 'นางสาว', 'สุกฤตา', 'ตะการีย์', NULL, NULL, 'female', '1980-01-26', '4811193884', '115510', NULL, NULL, '2015-01-15', NULL, NULL, NULL),
+(58172114, NULL, 'นางสาว', 'ศิริพร', 'สามสี', 'Siriporn', 'Samsri', 'female', '1969-03-13', '4511075055', NULL, NULL, NULL, '2015-10-01', NULL, NULL, NULL),
+(59172119, NULL, 'นาย', 'ชัยสิทธิ์', 'ทันศึก', NULL, NULL, 'male', '1972-04-30', '4311158065', NULL, NULL, NULL, '2016-10-01', NULL, NULL, NULL),
+(59172120, NULL, 'นาง', 'พิไลพรรณ', 'แก้วแก่นตา', NULL, NULL, 'female', '1976-01-13', '4511032299', '74109', NULL, NULL, '2016-05-01', NULL, NULL, NULL),
+(59172121, NULL, 'พ.ต.อ.หญิง', 'ระชี', 'ดิษฐจร', 'Rachee', 'Ditachorn', 'female', '1955-11-16', '4511012136', NULL, NULL, NULL, '2016-11-01', NULL, NULL, NULL),
+(60172123, NULL, 'นางสาว', 'ขวัญเรือน', 'ก๋าวิตู', NULL, NULL, 'female', '1985-06-19', '5111207345', '129959', NULL, NULL, '2017-02-01', NULL, NULL, NULL),
+(63172128, NULL, 'นาย', 'เรวัต', 'แย้มสุดา', 'Raywat', 'Yaemsuda', 'male', '1959-04-28', '4521023170', 'อ.1/21510', NULL, NULL, '2020-01-02', NULL, NULL, NULL),
+(63172129, NULL, 'นางสาว', 'รัตนาภรณ์', 'นิวาศานนท์', NULL, NULL, 'female', '1992-03-24', '5811261753', NULL, NULL, NULL, '2019-02-01', NULL, 'เปลี่ยนนามสกุล', NULL),
+(63172131, NULL, 'นางสาว', 'พาจนา', 'ดวงจันทร์', NULL, NULL, 'female', '1967-04-29', '4511050318', NULL, NULL, NULL, '2005-02-01', NULL, NULL, NULL),
+(63172132, NULL, 'นาง', 'บัวทิพย์', 'เพ็งศรี', 'Buatip', 'Phengsri', 'female', '1970-10-17', '4511048575', NULL, NULL, NULL, '2015-10-01', NULL, NULL, NULL),
+(63172133, NULL, 'นางสาว', 'พรรณี', 'ตรังคสันต์', NULL, NULL, 'female', '1968-02-27', '4511050332', NULL, NULL, NULL, '2015-10-10', NULL, NULL, NULL),
+(64172139, NULL, 'นางสาว', 'สุภาภรณ์', 'ศรีฟ้า', 'Supaporn', 'Srifa', 'female', '1985-11-12', '5111207470', NULL, NULL, NULL, '2021-03-01', NULL, NULL, NULL),
+(65172142, NULL, 'นาง', 'อัจรา', 'ฐิตวัฒนกุล', NULL, NULL, 'female', '1987-09-13', '5311218207', NULL, NULL, NULL, '2022-08-01', NULL, NULL, NULL),
+(66172148, NULL, 'นาง', 'รุ่งนภา', 'พรหมแย้ม', NULL, NULL, 'female', '1963-05-03', '4511053132', NULL, NULL, NULL, '2023-12-01', NULL, NULL, NULL),
+(66712147, NULL, 'นางสาว', 'เกวลี', 'เชียรวิชัย', NULL, NULL, 'female', '1990-09-06', '5611243227', '164439', NULL, NULL, '2023-11-01', NULL, NULL, NULL),
+(6604800008, NULL, 'นางสาว', 'อาภัสรา', 'เนตรสัก', 'Arpatsara', 'Netsak', 'female', '2004-01-01', '1', '1', 'example@gmail.com', '0123456789', NULL, NULL, NULL, '2026-05-21 17:16:07');
 
 -- --------------------------------------------------------
 
@@ -258,108 +243,49 @@ INSERT INTO `notifications` (`notification_id`, `user_id`, `title`, `message`, `
 -- --------------------------------------------------------
 
 --
--- Table structure for table `other_degree`
---
-
-CREATE TABLE `other_degree` (
-  `degree_id` bigint NOT NULL,
-  `degree_name` varchar(255) DEFAULT NULL,
-  `grad_uni` varchar(255) DEFAULT NULL,
-  `grad_faculty` varchar(255) DEFAULT NULL,
-  `grad_year` int DEFAULT NULL,
-  `grad_rank` varchar(50) DEFAULT NULL,
-  `degree_files` varchar(255) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-
--- --------------------------------------------------------
-
---
 -- Table structure for table `permissions`
 --
 
 CREATE TABLE `permissions` (
-  `permissions_id` bigint NOT NULL,
-  `name` varchar(100) NOT NULL COMMENT 'ชื่อสิทธิ์ (ควรเป็นภาษาอังกฤษ)',
-  `description_en` text CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci,
-  `description_th` text CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci COMMENT 'คำอธิบายเพิ่มเติมเกี่ยวกับสิทธิ์นี้',
-  `role_description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci,
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP
+  `permission_id` bigint NOT NULL,
+  `permission_name` varchar(100) NOT NULL COMMENT 'ชื่อสิทธิ์อ้างอิงใน Code (ห้ามซ้ำ)',
+  `module_group` varchar(50) DEFAULT NULL COMMENT 'กลุ่มของฟังก์ชัน',
+  `description_th` text COMMENT 'คำอธิบายสิทธิ์ภาษาไทย'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
 -- Dumping data for table `permissions`
 --
 
-INSERT INTO `permissions` (`permissions_id`, `name`, `description_en`, `description_th`, `role_description`, `created_at`) VALUES
-(1, 'PROFILE_VIEW', 'View Profile', 'ดูข้อมูลส่วนตัว', 'ทุกคน', '2026-02-13 18:26:30'),
-(2, 'RESEARCH_UPLOAD', 'Upload Research', 'อัปโหลดงานวิจัย', 'ทุกคน', '2026-02-13 18:26:30'),
-(3, 'NOTIFICATION_VIEW', 'View Notification', 'รับแจ้งเตือน', 'ทุกคน', '2026-02-13 18:26:30'),
-(4, 'COURSE_EXPORT_5YEAR', 'Export 5-Year Report', 'Export ผลย้อนหลัง 5 ปี', 'ทุกคน ยกเว้นคณบดี', '2026-02-13 18:26:30'),
-(5, 'VIEW_DEAN_DASHBOARD', 'View Dashboard KPI', 'ดู Dashboard ภาพรวม KPI ระดับคณะ', 'คณบดี', '2026-02-13 18:26:30'),
-(6, 'FINANCIAL_VIEW', 'View Financial Report', 'ดูรายงานการเงินและข้อมูลเชิงบริหาร', 'คณบดี', '2026-02-13 18:26:30'),
-(7, 'DASHBOARD_EXPORT', 'Export KPI Report', 'Export รายงาน KPI', 'คณบดี', '2026-02-13 18:26:30'),
-(8, 'PROJECT_VIEW', 'View Project', 'ดูข้อมูลโครงการที่อาจารย์ดูแล', 'คณบดี', '2026-02-13 18:26:30'),
-(9, 'CURRICULUM_REPORT_VIEW', 'View PLO/YLO/CLO Report', 'ดูรายงานผลลัพธ์หลักสูตรทุกชั้นปี', 'คณบดี', '2026-02-13 18:26:30'),
-(10, 'COURSE_EXPORT_5YEAR', 'Export 5-Year Report', 'Export ข้อมูลผลสรุป 5 ปี', 'คณบดี', '2026-02-13 18:26:30'),
-(11, 'EXEC_REPORT_CREATE', 'Create Executive Report', 'สร้างรายงานระดับบริหาร', 'คณบดี', '2026-02-13 18:26:30'),
-(12, 'PROFILE_VIEW_ALL', 'View Other Profile', 'ดูข้อมูลส่วนตัวอาจารย์ท่านอื่น', 'คณบดี', '2026-02-13 18:26:30'),
-(13, 'STUDENT_VIEW_COURSE', 'View Course Students', 'ดูนักศึกษาที่สอน', 'อ.ประจำ/ประจำหลักสูตร', '2026-02-13 18:26:30'),
-(14, 'STUDENT_EXPORT_COURSE', 'Export Course Students', 'Export รายชื่อนักศึกษา', 'อ.ประจำ/ประจำหลักสูตร', '2026-02-13 18:26:30'),
-(15, 'PLO_REPORT_READ', 'Read PLO/YLO Report', 'อ่านรายงาน PLO/YLO ของวิชา', 'อ.ประจำ/ประจำหลักสูตร', '2026-02-13 18:26:30'),
-(16, 'PROJECT_VIEW', 'View Project', 'ดูโครงการที่รับผิดชอบ', 'อ.ประจำ/ประจำหลักสูตร', '2026-02-13 18:26:30'),
-(17, 'PROJECT_UPLOAD_DOC', 'Upload Project Doc', 'อัปโหลดเอกสารโครงการ', 'อ.ประจำ/ประจำหลักสูตร', '2026-02-13 18:26:30'),
-(18, 'PROJECT_LINK_LO', 'Link Project LO', 'เชื่อมโยง PLO/YLO/CLO', 'อ.ประจำ/ประจำหลักสูตร', '2026-02-13 18:26:30'),
-(19, 'GRADE_DEFINE', 'Define Grade', 'กำหนดเกรดตาม CLO', 'อ.ประจำ/ประจำหลักสูตร', '2026-02-13 18:26:30'),
-(20, 'GRADE_UPDATE', 'Update Grade', 'แก้ไขเกรดตาม CLO', 'อ.ประจำ/ประจำหลักสูตร', '2026-02-13 18:26:30'),
-(21, 'CURRICULUM_REPORT_VIEW', 'View Curriculum Report', 'ดูรายงานหลักสูตร', 'อ.ประจำ/ประจำหลักสูตร', '2026-02-13 18:26:30'),
-(22, 'STUDENT_UPLOAD_EVIDENCE', 'Upload Student Evidence', 'แนบหลักฐาน นศ.', 'อ.ประจำ/ประจำหลักสูตร', '2026-02-13 18:26:30'),
-(23, 'STUDENT_ASSIGN_COURSE', 'Assign Student', 'เพิ่ม นศ. เข้ารายวิชา', 'อ.ประจำ/ประจำหลักสูตร', '2026-02-13 18:26:30'),
-(24, 'STUDENT_VIEW_ADVISOR', 'View Advisor Students', 'ดูนักศึกษา 1:12', 'อ.ที่ปรึกษา', '2026-02-13 18:26:30'),
-(25, 'STUDENT_UPLOAD_LIST', 'Upload Student List', 'อัปโหลดรายชื่อนักศึกษา', 'อ.ที่ปรึกษา', '2026-02-13 18:26:30'),
-(26, 'PROJECT_VIEW', 'View Project', 'ดูโครงการ', 'อ.ที่ปรึกษา', '2026-02-13 18:26:30'),
-(27, 'STUDENT_UPLOAD_EVIDENCE', 'Upload Evidence', 'แนบหลักฐาน นศ.', 'อ.ที่ปรึกษา', '2026-02-13 18:26:30'),
-(28, 'EXAM_UPLOAD_8SUBJ', 'Upload 8-Subject', 'อัปโหลดเอกสารสอบ 8 วิชา', 'อ.ที่ปรึกษา', '2026-02-13 18:26:30'),
-(29, 'EXAM_UPLOAD_LICENSE', 'Upload License', 'อัปโหลดใบประกอบ', 'อ.ที่ปรึกษา', '2026-02-13 18:26:30'),
-(30, 'STUDENT_GRAD_CHECK', 'Check Graduation', 'ตรวจสอบจบการศึกษา', 'อ.ที่ปรึกษา', '2026-02-13 18:26:30'),
-(31, 'EXAM_REPORT_8SUBJ', 'Report 8-Subject', 'สร้างรายงานสอบ 8 วิชา', 'อ.ที่ปรึกษา', '2026-02-13 18:26:30'),
-(32, 'EXAM_REPORT_LICENSE', 'Report License', 'สร้างรายงานใบประกอบ', 'อ.ที่ปรึกษา', '2026-02-13 18:26:30'),
-(33, 'STUDENT_ASSIGN_COURSE', 'Assign Student', 'เพิ่ม นศ.', 'อ.ที่ปรึกษา', '2026-02-13 18:26:30'),
-(34, 'PROJECT_VIEW', 'View Project', 'ดูโครงการ', 'รับผิดชอบโครงการ', '2026-02-13 18:26:30'),
-(35, 'PROJECT_UPLOAD_DOC', 'Upload Project', 'อัปโหลดเอกสารโครงการ', 'รับผิดชอบโครงการ', '2026-02-13 18:26:30'),
-(36, 'PROJECT_LINK_LO', 'Link LO', 'เชื่อมโยง Learning Outcome', 'รับผิดชอบโครงการ', '2026-02-13 18:26:30'),
-(37, 'PROJECT_ASSIGN_STUDENT', 'Assign Student to Project', 'เพิ่ม นศ. เข้าโครงการ', 'รับผิดชอบโครงการ', '2026-02-13 18:26:30'),
-(38, 'CLO_DEFINE', 'Define CLO', 'กำหนด CLO', 'รับผิดชอบหลักสูตร', '2026-02-13 18:26:30'),
-(39, 'CLO_UPDATE', 'Update CLO', 'แก้ไข CLO', 'รับผิดชอบหลักสูตร', '2026-02-13 18:26:30'),
-(40, 'COURSE_REPORT_CREATE', 'Create Course Report', 'สร้างรายงานรายวิชา', 'รับผิดชอบหลักสูตร', '2026-02-13 18:26:30'),
-(41, 'CURRICULUM_REPORT_VIEW', 'View Curriculum Report', 'ดูรายงานหลักสูตร', 'รับผิดชอบหลักสูตร', '2026-02-13 18:26:30'),
-(42, 'STUDENT_VIEW_COURSE', 'View Course Students', 'ดูนักศึกษาที่สอน', 'ปฏิบัติ', '2026-02-13 18:26:30'),
-(43, 'STUDENT_EXPORT_COURSE', 'Export Course Students', 'Export รายชื่อนักศึกษา', 'ปฏิบัติ', '2026-02-13 18:26:30'),
-(44, 'PLO_REPORT_READ', 'Read PLO/YLO Report', 'อ่านรายงาน PLO/YLO ของวิชา', 'ปฏิบัติ', '2026-02-13 18:26:30'),
-(45, 'STUDENT_UPLOAD_LIST', 'Upload Student List', 'อัปโหลดรายชื่อนักศึกษา', 'ปฏิบัติ', '2026-02-13 18:26:30'),
-(46, 'PROJECT_VIEW', 'View Project', 'ดูโครงการ', 'ปฏิบัติ', '2026-02-13 18:26:30'),
-(47, 'PROJECT_UPLOAD_DOC', 'Upload Project', 'อัปโหลดเอกสารโครงการ', 'ปฏิบัติ', '2026-02-13 18:26:30'),
-(48, 'PROJECT_LINK_LO', 'Link Project LO', 'เชื่อมโยง PLO/YLO/CLO', 'ปฏิบัติ', '2026-02-13 18:26:30'),
-(49, 'GRADE_DEFINE', 'Define Grade', 'กำหนดเกรดตาม CLO', 'ปฏิบัติ', '2026-02-13 18:26:30'),
-(50, 'GRADE_UPDATE', 'Update Grade', 'แก้ไขเกรดตาม CLO', 'ปฏิบัติ', '2026-02-13 18:26:30'),
-(51, 'STUDENT_VIEW_CLINICAL', 'View Advisor Students', 'ดูนักศึกษา 1:8', 'ปฏิบัติ', '2026-02-13 18:26:30'),
-(52, 'STUDENT_UPLOAD_EVIDENCE', 'Upload Student Evidence', 'แนบหลักฐาน นศ.', 'ปฏิบัติ', '2026-02-13 18:26:30'),
-(53, 'EXAM_UPLOAD_8SUBJ', 'Upload 8-Subject', 'อัปโหลดเอกสารสอบ 8 วิชา', 'ปฏิบัติ', '2026-02-13 18:26:30'),
-(54, 'EXAM_UPLOAD_LICENSE', 'Upload License', 'อัปโหลดใบประกอบ', 'ปฏิบัติ', '2026-02-13 18:26:30'),
-(55, 'STUDENT_GRAD_CHECK', 'Check Graduation', 'ตรวจสอบจบการศึกษา', 'ปฏิบัติ', '2026-02-13 18:26:30'),
-(56, 'EXAM_REPORT_8SUBJ', 'Report 8-Subject', 'สร้างรายงานสอบ 8 วิชา', 'ปฏิบัติ', '2026-02-13 18:26:30'),
-(57, 'EXAM_REPORT_LICENSE', 'Report License', 'สร้างรายงานใบประกอบ', 'ปฏิบัติ', '2026-02-13 18:26:30'),
-(58, 'STUDENT_ASSIGN_COURSE', 'Assign Student', 'เพิ่ม นศ.', 'ปฏิบัติ', '2026-02-13 18:26:30'),
-(59, 'VIEW_ADMIN_DASHBOARD', NULL, NULL, 'เลขา', '2026-02-14 16:35:11'),
-(60, 'USERS_MANAGEMENT', NULL, NULL, 'เลขา', '2026-02-14 16:35:11'),
-(61, 'ROLES_MANAGEMENT', NULL, NULL, 'เลขา', '2026-02-14 16:35:11'),
-(62, 'IMPORT_DATA', NULL, NULL, 'เลขา', '2026-02-14 16:35:11'),
-(63, 'EXPORT_DATA', NULL, NULL, 'เลขา', '2026-02-14 16:35:11'),
-(64, 'AUDIT_LOG', NULL, NULL, 'เลขา', '2026-02-14 16:35:11'),
-(65, 'ADMIN_REPORTS', NULL, NULL, 'เลขา', '2026-02-14 16:35:48'),
-(66, 'ADMIN_APPROVALS', NULL, NULL, 'เลขา', '2026-02-14 16:35:48'),
-(67, 'SETTINGS', NULL, 'การตั้งค่า', 'ทุกคน', '2026-02-14 17:48:48'),
-(68, 'VIEW_RETENTION', NULL, 'ดูอัตราการคงอยู่ต่างๆ', 'คณบดี', '2026-02-21 10:58:48'),
-(69, 'ASSIGN_INSTRUCTORS', 'assign course to instructors', 'จัดการมอบหมายอาจารย์ผู้สอน', 'ผู้รับผิดชอบหลักสูตร', '2026-02-23 11:36:58');
+INSERT INTO `permissions` (`permission_id`, `permission_name`, `module_group`, `description_th`) VALUES
+(1, 'PROFILE_VIEW_SELF', 'General', 'ดูข้อมูลส่วนตัวของตนเอง'),
+(2, 'PROFILE_VIEW_ALL', 'General', 'ดูข้อมูลส่วนตัวของบุคลากรคนอื่น'),
+(3, 'NOTIFICATION_VIEW', 'General', 'รับและดูการแจ้งเตือน'),
+(4, 'SYSTEM_SETTINGS', 'General', 'เข้าถึงการตั้งค่าระบบ'),
+(5, 'RESEARCH_UPLOAD', 'Project', 'อัปโหลดงานวิจัย'),
+(6, 'PROJECT_VIEW', 'Project', 'ดูข้อมูลโครงการ'),
+(7, 'PROJECT_MANAGE', 'Project', 'จัดการข้อมูลและเอกสารโครงการ'),
+(8, 'PROJECT_ASSIGN_STUDENT', 'Project', 'เพิ่มนักศึกษาเข้าโครงการ'),
+(9, 'PROJECT_LINK_LO', 'Project', 'เชื่อมโยงโครงการกับ Learning Outcome'),
+(10, 'STUDENT_VIEW_COURSE', 'Academic', 'ดูรายชื่อนักศึกษาในรายวิชาที่สอน'),
+(11, 'STUDENT_EXPORT_COURSE', 'Academic', 'ส่งออกรายชื่อนักศึกษาในรายวิชา'),
+(12, 'COURSE_REPORT_VIEW', 'Academic', 'ดูรายงานผลลัพธ์หลักสูตรและรายวิชา'),
+(13, 'COURSE_REPORT_EXPORT', 'Academic', 'ส่งออกรายงานหลักสูตร รายงาน 5 ปี หรือ KPI'),
+(14, 'GRADE_MANAGE', 'Academic', 'กำหนดและแก้ไขเกรดตาม CLO'),
+(15, 'CLO_MANAGE', 'Academic', 'กำหนดและแก้ไข CLO ของหลักสูตร'),
+(16, 'ASSIGN_INSTRUCTORS', 'Academic', 'มอบหมายอาจารย์ผู้สอนในรายวิชา'),
+(17, 'ADVISOR_STUDENT_VIEW', 'Advisor', 'ดูข้อมูลนักศึกษาในความดูแล'),
+(18, 'STUDENT_MANAGE_ALL', 'Advisor', 'จัดการรายชื่อและหลักฐานนักศึกษาทั้งหมด'),
+(19, 'EXAM_REPORT_MANAGE', 'Advisor', 'จัดการรายงานสอบ 8 วิชาและใบประกอบวิชาชีพ'),
+(20, 'VIEW_DEAN_DASHBOARD', 'Executive', 'ดู Dashboard ภาพรวม KPI ระดับคณะ'),
+(21, 'VIEW_RETENTION', 'Executive', 'ดูอัตราการคงอยู่ต่างๆ ของนักศึกษา'),
+(22, 'FINANCIAL_VIEW', 'Executive', 'ดูรายงานการเงินและข้อมูลเชิงบริหาร'),
+(23, 'VIEW_ADMIN_DASHBOARD', 'Admin', 'ดูแดชบอร์ดของผู้ดูแลระบบ'),
+(24, 'USER_ROLE_MANAGE', 'Admin', 'จัดการผู้ใช้งานและบทบาท/ตำแหน่ง'),
+(25, 'DATA_IMPORT_EXPORT', 'Admin', 'นำเข้าและส่งออกข้อมูลระบบ'),
+(26, 'AUDIT_LOG_VIEW', 'Admin', 'ดูประวัติการใช้งานระบบ (Audit Log)'),
+(27, 'ADMIN_APPROVALS', 'Admin', 'อนุมัติคำขอต่างๆ ในระบบ'),
+(28, 'ADMIN_REPORTS', 'Admin', 'จัดการรายงานระดับระบบ');
 
 -- --------------------------------------------------------
 
@@ -432,7 +358,6 @@ INSERT INTO `position` (`position_id`, `position_name`) VALUES
 --
 
 CREATE TABLE `position_permission` (
-  `position_permission_id` bigint NOT NULL,
   `position_id` bigint NOT NULL,
   `permission_id` bigint NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
@@ -441,104 +366,68 @@ CREATE TABLE `position_permission` (
 -- Dumping data for table `position_permission`
 --
 
-INSERT INTO `position_permission` (`position_permission_id`, `position_id`, `permission_id`) VALUES
-(1, 1, 1),
-(2, 1, 2),
-(3, 1, 3),
-(4, 1, 4),
-(5, 1, 5),
-(6, 1, 6),
-(7, 1, 7),
-(8, 1, 8),
-(9, 1, 9),
-(10, 1, 10),
-(11, 1, 11),
-(12, 1, 12),
-(13, 2, 1),
-(14, 2, 2),
-(15, 2, 3),
-(16, 2, 4),
-(17, 2, 13),
-(18, 2, 14),
-(19, 2, 15),
-(20, 2, 16),
-(21, 2, 17),
-(22, 2, 18),
-(23, 2, 19),
-(24, 2, 20),
-(25, 2, 21),
-(26, 2, 22),
-(27, 2, 23),
-(28, 3, 1),
-(29, 3, 2),
-(30, 3, 3),
-(31, 3, 4),
-(32, 3, 24),
-(33, 3, 25),
-(34, 3, 26),
-(35, 3, 27),
-(36, 3, 28),
-(37, 3, 29),
-(38, 3, 30),
-(39, 3, 31),
-(40, 3, 32),
-(41, 3, 33),
-(42, 4, 1),
-(43, 4, 2),
-(44, 4, 3),
-(45, 4, 4),
-(46, 4, 42),
-(47, 4, 43),
-(48, 4, 44),
-(49, 4, 45),
-(50, 4, 46),
-(51, 4, 47),
-(52, 4, 48),
-(53, 4, 49),
-(54, 4, 50),
-(55, 4, 51),
-(56, 4, 52),
-(57, 4, 53),
-(58, 4, 54),
-(59, 4, 55),
-(60, 4, 56),
-(61, 4, 57),
-(62, 4, 58),
-(63, 5, 1),
-(64, 5, 2),
-(65, 5, 3),
-(66, 5, 4),
-(67, 5, 38),
-(68, 5, 39),
-(69, 5, 40),
-(70, 5, 41),
-(71, 6, 1),
-(72, 6, 2),
-(73, 6, 3),
-(74, 6, 4),
-(75, 6, 34),
-(76, 6, 35),
-(77, 6, 36),
-(78, 6, 37),
-(79, 7, 59),
-(80, 7, 60),
-(81, 7, 61),
-(82, 7, 62),
-(83, 7, 63),
-(84, 7, 64),
-(85, 7, 65),
-(86, 7, 66),
-(90, 7, 1),
-(91, 7, 3),
-(92, 1, 67),
-(93, 2, 67),
-(94, 3, 67),
-(95, 4, 67),
-(96, 5, 67),
-(97, 6, 67),
-(98, 7, 67),
-(99, 1, 68),
-(100, 5, 69);
+INSERT INTO `position_permission` (`position_id`, `permission_id`) VALUES
+(1, 1),
+(2, 1),
+(3, 1),
+(4, 1),
+(5, 1),
+(6, 1),
+(7, 1),
+(1, 2),
+(1, 3),
+(2, 3),
+(3, 3),
+(4, 3),
+(5, 3),
+(6, 3),
+(7, 3),
+(1, 4),
+(2, 4),
+(3, 4),
+(4, 4),
+(5, 4),
+(6, 4),
+(7, 4),
+(1, 5),
+(2, 5),
+(3, 5),
+(4, 5),
+(1, 6),
+(2, 6),
+(3, 6),
+(4, 6),
+(6, 6),
+(2, 7),
+(4, 7),
+(6, 7),
+(6, 8),
+(6, 9),
+(2, 10),
+(4, 10),
+(2, 11),
+(4, 11),
+(2, 12),
+(4, 12),
+(5, 12),
+(1, 13),
+(2, 14),
+(4, 14),
+(5, 15),
+(5, 16),
+(3, 17),
+(4, 17),
+(3, 18),
+(3, 19),
+(1, 20),
+(1, 21),
+(1, 22),
+(7, 23),
+(7, 24),
+(7, 25),
+(7, 26),
+(7, 27),
+(7, 28);
 
 -- --------------------------------------------------------
 
@@ -609,102 +498,6 @@ INSERT INTO `role` (`role_id`, `role_name`) VALUES
 (1, 'Admin'),
 (2, 'Teacher'),
 (3, 'Student');
-
--- --------------------------------------------------------
-
---
--- Table structure for table `role_permission`
---
-
-CREATE TABLE `role_permission` (
-  `role_permission_id` bigint NOT NULL,
-  `role_id` bigint NOT NULL,
-  `permission_id` bigint NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-
---
--- Dumping data for table `role_permission`
---
-
-INSERT INTO `role_permission` (`role_permission_id`, `role_id`, `permission_id`) VALUES
-(1, 1, 1),
-(2, 1, 3),
-(3, 1, 59),
-(4, 1, 60),
-(5, 1, 61),
-(6, 1, 62),
-(7, 1, 63),
-(8, 1, 64),
-(9, 1, 65),
-(10, 1, 66),
-(11, 1, 67),
-(12, 2, 1),
-(13, 2, 2),
-(14, 2, 3),
-(15, 2, 4),
-(16, 2, 5),
-(17, 2, 6),
-(18, 2, 7),
-(19, 2, 8),
-(20, 2, 9),
-(21, 2, 10),
-(22, 2, 11),
-(23, 2, 12),
-(24, 2, 13),
-(25, 2, 14),
-(26, 2, 15),
-(27, 2, 16),
-(28, 2, 17),
-(29, 2, 18),
-(30, 2, 19),
-(31, 2, 20),
-(32, 2, 21),
-(33, 2, 22),
-(34, 2, 23),
-(35, 2, 24),
-(36, 2, 25),
-(37, 2, 26),
-(38, 2, 27),
-(39, 2, 28),
-(40, 2, 29),
-(41, 2, 30),
-(42, 2, 31),
-(43, 2, 32),
-(44, 2, 33),
-(45, 2, 34),
-(46, 2, 35),
-(47, 2, 36),
-(48, 2, 37),
-(49, 2, 38),
-(50, 2, 39),
-(51, 2, 40),
-(52, 2, 41),
-(53, 2, 42),
-(54, 2, 43),
-(55, 2, 44),
-(56, 2, 45),
-(57, 2, 46),
-(58, 2, 47),
-(59, 2, 48),
-(60, 2, 49),
-(61, 2, 50),
-(62, 2, 51),
-(63, 2, 52),
-(64, 2, 53),
-(65, 2, 54),
-(66, 2, 55),
-(67, 2, 56),
-(68, 2, 57),
-(69, 2, 58),
-(70, 2, 59),
-(71, 2, 60),
-(72, 2, 61),
-(73, 2, 62),
-(74, 2, 63),
-(75, 2, 64),
-(76, 2, 65),
-(77, 2, 66),
-(78, 2, 67);
 
 -- --------------------------------------------------------
 
@@ -908,25 +701,99 @@ CREATE TABLE `Student_License_Attempts` (
 --
 
 CREATE TABLE `subject` (
-  `subject_id` bigint NOT NULL,
-  `subject_code` varchar(50) DEFAULT NULL COMMENT 'รหัสวิชา เช่น CS101',
+  `subject_id` int NOT NULL,
+  `subject_code` varchar(50) DEFAULT NULL,
   `subject_name_th` varchar(255) DEFAULT NULL,
   `subject_name_en` varchar(255) DEFAULT NULL,
-  `credit` int DEFAULT NULL COMMENT 'หน่วยกิต',
-  `program_id` bigint DEFAULT NULL COMMENT 'สังกัดหลักสูตรไหน',
-  `department` varchar(100) DEFAULT NULL COMMENT 'ภาควิชา',
-  `section_id` int DEFAULT NULL,
-  `subject_group_id` int DEFAULT NULL,
-  `select_subject_id` int DEFAULT NULL
+  `credit` int DEFAULT NULL,
+  `credit_desc` varchar(50) DEFAULT NULL,
+  `description` text,
+  `is_active` int DEFAULT NULL,
+  `program_id` int DEFAULT NULL,
+  `department` varchar(255) DEFAULT NULL,
+  `subject_type` varchar(100) DEFAULT NULL,
+  `year_level` int DEFAULT NULL,
+  `semester` int DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
 -- Dumping data for table `subject`
 --
 
-INSERT INTO `subject` (`subject_id`, `subject_code`, `subject_name_th`, `subject_name_en`, `credit`, `program_id`, `department`, `section_id`, `subject_group_id`, `select_subject_id`) VALUES
-(1, 'NS101', 'การพยาบาลพื้นฐาน', 'Fundamental of Nursing', 3, 1, NULL, NULL, NULL, NULL),
-(2, 'NS102', 'กายวิภาคศาสตร์และสรีรวิทยา', 'Anatomy and Physiology', 3, 1, NULL, NULL, NULL, NULL);
+INSERT INTO `subject` (`subject_id`, `subject_code`, `subject_name_th`, `subject_name_en`, `credit`, `credit_desc`, `description`, `is_active`, `program_id`, `department`, `subject_type`, `year_level`, `semester`) VALUES
+(1, '103-111', 'ภาษาอังกฤษพื้นฐาน', 'English Fundamentals', 3, '3(2-2-5)', 'การอ่านข้อความที่สั้นและง่าย การฝึกใช้คำศัพท์และสำนวนพื้นฐานในการสนทนา การทำตามคำแนะนำ ความเข้าใจข้อมูลในโฆษณา โปรแกรม และโบรชัวร์ การสร้างวลีและประโยคอย่างง่ายในงานเขียน การอธิบายตนเองและชีวิตประจำวัน การเขียนข้อความสั้นๆ การโพสต์ออนไลน์ การมีส่วนร่วมอย่างแข่งขันในการถามและตอบคำถาม การมีส่วนร่วมในการสนทนาในหัวข้อที่ไม่ซับซ้อน', 1, 1, NULL, 'หมวดวิชาศึกษาทั่วไป', 1, 1),
+(2, '103-112', 'การสื่อสารภาษาอังกฤษในชีวิตประจำวัน', 'English Communication in Everyday Life', 3, '3(2-2-5)', 'การสื่อสารอย่างมั่นใจในสถานการณ์ที่กำหนดไว้ การแลกเปลี่ยนความคิดเห็น การถามและตอบคำถามในหัวข้อที่คุ้นเคย การมีส่วนร่วมในการสนทนาที่เกี่ยวข้องกับความสนใจและสาขาวิชาชีพ การอธิบายและชี้แจง การสื่อสารกับผู้อื่น เช่น การขอความช่วยเหลือ การเสนอแนะ และการปฏิบัติตามคำแนะนำ การเขียนจดหมายโต้ตอบเพื่อการสื่อสาร การใช้แพลตฟอร์มออนไลน์เพื่อการสื่อสาร', 1, 1, NULL, 'หมวดวิชาศึกษาทั่วไป', 1, 2),
+(3, '103-113', 'ภาษาอังกฤษเพื่อการศึกษาทางวิชาการ', 'English for Academic Study', 3, '3(2-2-5)', 'การฝึกทักษะภาษาอังกฤษทั้ง 4 ด้านเพื่อการศึกษาทางวิชาการ การฟัง และตอบคำถามทางวิชาการ การนำเสนอด้วยปากเปล่า การพัฒนาความเข้าใจในการอ่านและทักษะการอ่านอย่างมีวิจารณญาณ คำศัพท์ และโครงสร้างประโยคที่ใช้ในการเขียนทางวิชาการ การเขียนย่อหน้าประเภทต่างๆ', 1, 1, NULL, 'หมวดวิชาศึกษาทั่วไป', 0, 0),
+(4, '103-114', 'ภาษาอังกฤษเพื่อการนำเสนอแบบมืออาชีพ', 'English for Professional Presentation', 3, '3(2-2-5)', 'หลักการพูด การเลือกใช้คำ ประโยค คำเชื่อมและสำนวน การพูดในสถานการณ์ต่างๆ การแสดงความคิดเห็นและการนำเสนอเชิงวิชาการ การนำเสนอทางธุรกิจ การสัมภาษณ์งาน', 1, 1, NULL, 'หมวดวิชาศึกษาทั่วไป', 0, 0),
+(5, '103-121', 'ภาษาไทยเพื่อการสื่อสาร', 'Thai Language for Communication', 3, '3(2-2-5)', 'ภาษาไทยเพื่อการสื่อสารในสถานการณ์ต่างๆ หลักการใช้ภาษาสื่อสารที่ถูกต้องทั้งการรับสารและส่งสาร การจับประเด็นและการวิเคราะห์สารจากเรื่องที่ฟังหรืออ่านอย่างมีวิจารณญาณและนำเสนอความคิดผ่านการพูดการเขียนในรูปแบบที่เหมาะสมได้อย่างมีประสิทธิภาพ', 1, 1, NULL, 'หมวดวิชาศึกษาทั่วไป', 0, 0),
+(6, '103-122', 'ภาษาไทยเพื่อการนำเสนอ', 'Thai Language for Presentation', 3, '3(2-2-5)', 'การใช้ภาษาไทยนําเสนอข้อมูลในสถานการณ์ต่างๆ อาทิ การนําเสนอข้อมูลทางวิชาการ การนําเสนอข้อมูลทางธุรกิจ การแสดงความคิดเห็น วิเคราะห์และวิจารณ์ การนําเสนอข้อมูลที่มีความน่าเชื่อถือ การเลือกใช้ช่องทางการสื่อสารอย่างเหมาะสม และมีประสิทธิภาพเป็นประโยชน์ต่อการศึกษาและการทํางาน', 1, 1, NULL, 'หมวดวิชาศึกษาทั่วไป', 0, 0),
+(7, '103-123', 'ภาษาไทยเพื่อผู้ประกอบการ', 'Thai Language for Entrepreneurs', 3, '3(2-2-5)', 'ภาษาไทยเพื่อการทำงานในสถานประกอบการ ทักษะการสื่อสารภาษาไทยที่มีประสิทธิภาพและจำเป็นต่อการทำงานในองค์กรทั้งการฟัง การพูด การอ่าน และการเขียน การจัดทำเอกสารการประชุมหรือเอกสารที่เกี่ยวข้องกับการทำงาน', 1, 1, NULL, 'หมวดวิชาศึกษาทั่วไป', 0, 0),
+(8, '103-131', 'ภาษาจีนเพื่อการสื่อสารในชีวิตประจำวัน', 'Chinese for Daily Communication', 3, '3(2-2-5)', 'การฝึกทักษะฟัง พูด อ่าน และเขียน วิธีการอ่านสัทอักษรการถอดเสียงพินอิน Pinyin ภาษาจีนกลางที่ถูกต้อง โครงสร้างไวยากรณ์ คำศัพท์ประมาณ 150-300 คำ และสำนวนพื้นฐานที่ใช้ในชีวิตประจำวัน บทสนทนาขั้นพื้นฐาน ได้แก่ การพูดสนทนาทักทาย การแนะนำตนเอง การนับ และการใช้ตัวเลขแสดงจำนวน การสอบถามสถานที่และตำแหน่งทิศทาง การบอกเวลา และการบอกชื่อสิ่งของ', 1, 1, NULL, 'หมวดวิชาศึกษาทั่วไป', 0, 0),
+(9, '103-141', 'ภาษาญี่ปุ่นในชีวิตประจำวัน', 'Daily Life Japanese', 3, '3(2-2-5)', 'คำศัพท์ สำนวน วัฒนธรรม และทักษะในการสื่อสาร การตั้งคำถามและการตอบอย่างสั้น บทสนทนาอย่างง่ายในระดับวลี และประโยคสั้นๆโดยเน้นหัวข้อที่สามารถประยุกต์ใช้ในชีวิตประจำวัน', 1, 1, NULL, 'หมวดวิชาศึกษาทั่วไป', 0, 0),
+(10, '103-151', 'การเขียนโค้ดคอมพิวเตอร์สำหรับทุกคน', 'Computer Coding for Everyone', 3, '3(2-2-5)', 'ความรู้พื้นฐานการเขียนโปรแกรมด้วยภาษาไพธอน เครื่องมือที่ใช้ในการเขียนโปรแกรมภาษาไพธอน ชนิดของข้อมูลและตัวแปร การรับข้อมูลเข้าและการแสดงผลลัพธ์ การใช้งานคำสั่งทางเลือก การใช้งานคำสั่งวนลูป การสร้างฟังก์ชัน การวิเคราะห์ข้อมูลและการนำเสนอข้อมูล', 1, 1, NULL, 'หมวดวิชาศึกษาทั่วไป', 0, 0),
+(11, '103-201', 'ทักษะดิจิทัลสำหรับศตวรรษที่ 21', 'Digital Literacy for 21st Century', 3, '3(2-2-5)', 'การใช้เทคโนโลยีดิจิทัลเพื่อการสืบค้นสารสนเทศ การสื่อสาร และการรู้เท่าทันการเปลี่ยนแปลงด้านเทคโนโลยีดิจิทัล หลักการการเป็นพลเมืองดิจิทัล ความปลอดภัยด้านสารสนเทศ จริยธรรมและกฎหมายที่เกี่ยวข้อง การนำเทคโนโลยีมาใช้เพื่อการจัดการสมัยใหม่ การวิเคราะห์และสังเคราะห์สารสนเทศ การเขียนรายงาน การเลือกเครื่องมือดิจิทัลที่สอดคล้องกับการทำงานเพื่อให้เกิดประสิทธิภาพ', 1, 1, NULL, 'หมวดวิชาศึกษาทั่วไป', 1, 1),
+(12, '103-202', 'การวิเคราะห์ข้อมูลและการเรียนรู้ของเครื่องจักรเบื้องต้น', 'Introduction to Data Analytics and Machine Learning', 3, '3(2-2-5)', 'พื้นฐานของการทำงานอัตโนมัติ การวิเคราะห์ข้อมูลและการเรียนรู้ของเครื่อง เช่น การรวบรวมข้อมูล การระบุแหล่งข้อมูล การทำความสะอาดข้อมูล การวิเคราะห์ การสื่อสารข้อมูลเชิงลึกด้วยการใช้แดชบอร์ด การแสดงภาพเพื่อเพิ่มมูลค่าให้กับการตัดสินใจ การเรียนรู้ของเครื่องจักร เครื่องมือต่างๆและการประยุกต์ใช้ การอภิปรายสถานการณ์จริงของการเรียนรู้เครื่องมือหรือตัวอย่างของการใช้ปัญญาประดิษฐ์เชิงกำเนิด', 1, 1, NULL, 'หมวดวิชาศึกษาทั่วไป', 1, 2),
+(13, '103-203', 'ความเป็นพลเมืองในสังคมไทยและสังคมโลก', 'Civic Literacy in Thai and Global Context', 3, '3(3-0-6)', 'สภาพการณ์ทางการเมือง เศรษฐกิจ สังคม และวัฒนธรรมของกลุ่มประเทศต่างๆ ประเด็นปัญหาร่วมสมัยในสังคมโลก ประเทศไทยในสังคมโลก ความหลากหลายทางวัฒนธรรมและกระบวนการทางความคิดที่เป็นสากล ความรับผิดชอบต่อสังคม การรู้หน้าที่ของพลเมืองและรับผิดชอบต่อสังคมในการต่อต้านการทุจริต ความสัมพันธ์ระหว่างความเป็นพลเมืองกับสถานะการพัฒนาของประเทศภายใต้กฎหมายในชีวิตประจำวันและกติกาสากลของสังคมประชาธิปไตย บทบาทและหน้าที่ของบุคคลในฐานะพลเมืองไทยและพลเมืองโลก', 1, 1, NULL, 'หมวดวิชาศึกษาทั่วไป', 0, 0),
+(14, '103-204', 'มนุษยสัมพันธ์และการพัฒนาบุคลิกภาพ', 'Human Relations and Personality Development', 3, '3(3-0-6)', 'การสร้างความสัมพันธ์ระหว่างบุคคล การรู้จักตนเองและผู้อื่น เสริมสร้างการเห็นคุณค่าในตนเอง กำหนดเป้าหมายในการเรียนการทำงานและการมีบุคลิกภาพที่เหมาะสม สามารถทำงานร่วมกับผู้อื่นได้', 1, 1, NULL, 'หมวดวิชาศึกษาทั่วไป', 0, 0),
+(15, '103-205', 'จิตวิทยาในชีวิตประจำวัน', 'Psychology in Daily Life', 3, '3(3-0-6)', 'แนวคิดทางจิตวิทยาที่สำคัญ พัฒนาการวัยต่างๆ การรับรู้ การจูงใจ บุคลิกภาพและความแตกต่างระหว่างบุคคล ความหลากหลายทางเพศ อิทธิพลทางสังคมและพฤติกรรมทางสังคม การวิเคราะห์ปฏิสัมพันธ์ระหว่างบุคคล ความสัมพันธ์ที่ดี การจัดการความเครียด ความผิดปกติทางจิตและการบำบัด', 1, 1, NULL, 'หมวดวิชาศึกษาทั่วไป', 0, 0),
+(16, '103-206', 'อาหาร การดูแลสุขภาพ และการออกกำลังกาย', 'Diet, Health Care and Exercise', 3, '3(2-2-5)', 'สุขภาวะด้านร่างกาย จิตใจ อารมณ์ และสังคม อาหารและโภชนาการ การป้องกันและการบำบัดโรค ด้วยอาหาร ความปลอดภัยของอาหาร ฉลากโภชนาการ ผลิตภัณฑ์เสริมอาหารและการเลือกใช้ การออกกำลังกายเพื่อเสริมสร้างสมรรถภาพของร่างกาย ผลของการออกกำลังกายที่มีต่อระบบต่างๆในร่างกาย นวัตกรรมอาหารเพื่อสุขภาพ และเทคโนโลยีดิจิทัลเพื่อการออกกำลังกาย', 1, 1, NULL, 'หมวดวิชาศึกษาทั่วไป', 0, 0),
+(17, '103-207', 'สารเคมีในชีวิตประจำวัน', 'Chemicals in Daily Life', 3, '3(3-0-6)', 'สารเคมีที่ใช้ในชีวิตประจำวัน องค์ประกอบของสารเคมี สารเคมีประเภทธรรมชาติและสารสังเคราะห์ ที่เกี่ยวข้องกับชีวิตประจำวัน น้ำและเครื่องดื่ม สารปรุงแต่งอาหาร ความหมาย ประเภทและสารประกอบของเครื่อง สมอาง ความหมาย ประเภทและสมบัติของสารทำความสะอาด การป้องกันและการแก้พิษจากสารเคมี', 1, 1, NULL, 'หมวดวิชาศึกษาทั่วไป', 0, 0),
+(18, '103-208', 'คณิตศาสตร์และสถิติในชีวิตประจำวัน', 'Mathematics and Statistics in Daily Life', 3, '3(3-0-6)', 'คณิตศาสตร์และสถิติเบื้องต้น เพื่อนำไปใช้ในชีวิตประจำวัน โดยใช้ความรู้เรื่อง เรขาคณิต อัตราส่วน ร้อยละ ฟังก์ชัน ความรู้เบื้องต้นเกี่ยวกับสถิติ การเก็บรวบรวมข้อมูล การวิเคราะห์ข้อมูลด้วยสถิติแบบบรรยาย ความน่าจะเป็นกับการตัดสินใจอย่างง่าย', 1, 1, NULL, 'หมวดวิชาศึกษาทั่วไป', 0, 0),
+(19, '103-209', 'ศิลปะและดนตรีเพื่อสุนทรียภาพแห่งชีวิต', 'Art and Music Appreciation', 3, '3(3-0-6)', 'ความรู้เกี่ยวกับสุนทรียศาสตร์ ศิลปะในรูปแบบของสถาปัตยกรรม จิตรกรรม ประติมากรรม นาฎศิลป์ และดุริยางคศิลป์ ยุคสมัยต่างๆของศิลปะ แรงบันดาลใจเบื้องหลังผลงานศิลปะ ความซาบซึ้งในศิลปะ การประเมินคุณค่าทางสุนทรียะ ความสัมพันธ์ระหว่างศิลปะ ดนตรี กับชีวิต ศิลปะในชีวิตประจำวัน และคุณค่าความงามในงานศิลปะแขนงต่างๆ ในฐานะเป็นเครื่องมือจรรโลงจิตใจและสร้างสุนทรียภาพต่อชีวิตของมนุษย์', 1, 1, NULL, 'หมวดวิชาศึกษาทั่วไป', 0, 0),
+(20, '103-210', 'นิยมไทยและอัศจรรย์ในสยาม', 'Thai Appreciation and Unseen in Siam', 3, '3(3-0-6)', 'ศิลปะและวัฒนธรรม ขนบธรรมเนียมประเพณี เอกลักษณ์ความเป็นไทย มรดกทางภูมิปัญญาที่มีคุณค่า และน่าภาคภูมิใจ คติความเชื่อ ค่านิยม วิถีชีวิต แนวทางการอนุรักษ์ สืบทอดและเผยแพร่ความเป็นไทย', 1, 1, NULL, 'หมวดวิชาศึกษาทั่วไป', 0, 0),
+(21, '103-211', 'การคิดเชิงสร้างสรรค์และการแก้ปัญหา', 'Creative Thinking and Problem Solving', 3, '3(2-2-5)', 'กระบวนการคิดและเทคนิคการคิดสร้างสรรค์ในรูปแบบต่างๆ การค้นหาแนวทางหรือทางเลือกใหม่ๆในการทำงาน การวิเคราะห์ปัญหาและการใช้เครื่องมือช่วยในการตัดสินใจเลือกทางเลือกที่มีประสิทธิภาพสูงสุด', 1, 1, NULL, 'หมวดวิชาศึกษาทั่วไป', 0, 0),
+(22, '103-212', 'การเป็นผู้ประกอบการและการสร้างธุรกิจใหม่', 'Entrepreneurship and New Business Creation', 3, '3(2-2-5)', 'คุณลักษณะและแนวคิดการเป็นผู้ประกอบการ โอกาสทางธุรกิจ การวิเคราะห์สภาพแวดล้อมทางธุรกิจ การวางแผนกลยุทธ์ การตลาด การเงิน และการจัดการสําหรับธุรกิจใหม่ การจัดทำแผนธุรกิจเบื้องต้น', 1, 1, NULL, 'หมวดวิชาศึกษาทั่วไป', 0, 0),
+(23, '103-301', 'หลักปรัชญาของเศรษฐกิจพอเพียงเพื่อการพัฒนาที่ยั่งยืน', 'Philosophy of Sufficiency Economy for Sustainable Development', 3, '3(3-0-6)', 'ความเป็นมาและความหมายของปรัชญาของเศรษฐกิจพอเพียงตามแนวพระราชดำริ การประยุกต์ใช้ในระดับบุคคล ครอบครัว และชุมชน การขับเคลื่อนเศรษฐกิจพอเพียงในภาคส่วนต่างๆของสังคมและการเชื่อมโยงสู่การพัฒนาที่ยั่งยืน', 1, 1, NULL, 'หมวดวิชาศึกษาทั่วไป', 0, 0),
+(24, '103-302', 'การออกแบบการคิดเพื่อสร้างนวัตกรรมและธุรกิจใหม่', 'Design Thinking for Innovation and New Business Creation', 3, '3(2-2-5)', 'กระบวนการคิดเชิงออกแบบและการนำมาประยุกต์ใช้ในการระบุปัญหาและสร้างสรรค์นวัตกรรมด้านผลิตภัณฑ์ บริการ หรือโมเดลธุรกิจใหม่ๆ การทดสอบแนวคิดกับกลุ่มเป้าหมายและการพัฒนาเป็นต้นแบบธุรกิจ', 1, 1, NULL, 'หมวดวิชาศึกษาทั่วไป', 0, 0),
+(25, '170-108', 'ชีวเคมี', 'Biochemistry', 2, '2(2-0-4)', 'โครงสร้างและหน้าที่ของสารชีวโมเลกุลในร่างกายมนุษย์ เอนไซม์และฮอร์โมนที่ควบคุมเมแทบอลิซึม การสลายสารอาหารและการเก็บสะสมพลังงานในระดับเซลล์ ความพยาธิสภาพที่เกิดจากความผิดปกติทางชีวเคมี', 1, 1, NULL, 'หมวดวิชาเฉพาะ', 1, 1),
+(26, '170-112', 'กายวิภาคศาสตร์และสรีรวิทยาของมนุษย์ 1', 'Human Anatomy and Physiology 1', 3, '3(2-2-5)', 'โครงสร้างและหน้าที่ของร่างกายมนุษย์ในระดับเซลล์และเนื้อเยื่อ ระบบปกคลุมร่างกาย ระบบโครงร่าง ระบบกล้ามเนื้อ ระบบประสาท และระบบรับความรู้สึก กลไกการรักษาดุลยภาพของร่างกายและการฝึกปฏิบัติการที่เกี่ยวข้อง', 1, 1, NULL, 'หมวดวิชาเฉพาะ', 1, 1),
+(27, '170-113', 'กายวิภาคศาสตร์และสรีรวิทยาของมนุษย์ 2', 'Human Anatomy and Physiology 2', 3, '3(2-2-5)', 'โครงสร้างและหน้าที่ของระบบอวัยวะต่างๆ ต่อเนื่องจากภาค 1 ได้แก่ ระบบไหลเวียนโลหิต ระบบภูมิคุ้มกัน ระบบหายใจ ระบบย่อยอาหาร ระบบขับถ่ายปัสสาวะ ระบบต่อมไร้ท่อ และระบบสืบพันธุ์ รวมถึงการฝึกปฏิบัติการ', 1, 1, NULL, 'หมวดวิชาเฉพาะ', 1, 2),
+(28, '170-116', 'การดูแลสุขภาพแบบผสมผสาน', 'Alternative and Complementary Health Care', 2, '2(2-0-4)', 'แนวคิดและขอบเขตของการแพทย์ทางเลือกและการแพทย์ผสมผสาน สมาธิบำบัด วารีบำบัด การนวดไทย และศาสตร์ทางเลือกอื่นๆ เพื่อนำมาใช้ในการส่งเสริมสุขภาพและบรรเทาอาการเจ็บป่วยร่วมกับการแพทย์แผนปัจจุบัน', 1, 1, NULL, 'หมวดวิชาเฉพาะเลือก', 1, 2),
+(29, '170-117', 'การดูแลสุขภาพความงามแบบองค์รวม', 'Holistic Beauty and Wellness Care', 2, '2(2-0-4)', 'แนวคิดและหลักการดูแลสุขภาพความงามจากภายในสู่ภายนอก โภชนาการเพื่อความงาม สารต้านอนุมูลอิสระ การดูแลผิวพรรณ รูปร่าง และการชะลอวัยด้วยวิธีธรรมชาติและการแพทย์สมัยใหม่อย่างปลอดภัย', 1, 1, NULL, 'หมวดวิชาเฉพาะเลือก', 1, 2),
+(30, '170-201', 'พยาธิสรีรวิทยาของมนุษย์', 'Human Pathophysiology', 2, '2(2-0-4)', 'กลไกการเกิดโรคและความเปลี่ยนแปลงทางสรีรวิทยาในภาวะเจ็บป่วย พยาธิสภาพของโรคที่พบบ่อยในระบบอวัยวะต่างๆ การตอบสนองของเซลล์ต่อการบาดเจ็บ การอักเสบ และกลไกการปรับตัวของร่างกาย', 1, 1, NULL, 'หมวดวิชาเฉพาะ', 2, 1),
+(31, '170-208', 'จุลชีววิทยาและปรสิตวิทยาของมนุษย์', 'Human Microbiology and Parasitology', 2, '2(1-2-3)', 'คุณลักษณะ กลไกการก่อโรค และการแพร่กระจายของเชื้อแบคทีเรีย ไวรัส เชื้อรา และปรสิตที่ก่อโรคในมนุษย์ ปฏิกิริยาภูมิคุ้มกันของร่างกาย หลักการควบคุมเชื้อและการทำลายเชื้อและการฝึกปฏิบัติการ', 1, 1, NULL, 'หมวดวิชาเฉพาะ', 2, 1),
+(32, '170-211', 'การพยาบาลพื้นฐาน 1', 'Fundamentals of Nursing 1', 3, '3(2-2-5)', 'แนวคิดพื้นฐานทางการพยาบาล กระบวนการพยาบาล หลักการตอบสนองความต้องการขั้นพื้นฐานด้านความสุขสบาย สุขอนามัย และความปลอดภัยของผู้ป่วย การควบคุมการติดเชื้อในโรงพยาบาล และการฝึกปฏิบัติในห้องปฏิบัติการ', 1, 1, NULL, 'หมวดวิชาเฉพาะ', 2, 1),
+(33, '170-212', 'การพยาบาลพื้นฐาน 2', 'Fundamentals of Nursing 2', 2, '2(1-2-3)', 'หลักการและเทคนิคการทำหัตถการทางการพยาบาลที่ซับซ้อนขึ้น การวัดสัญญาณชีพ การเก็บสิ่งส่งตรวจ การให้ออกซิเจน การดูดเสมหะ การแต่งแผล หลักเกณฑ์ความปลอดภัยในการบริหารยา และการฝึกปฏิบัติในห้องปฏิบัติการ', 1, 1, NULL, 'หมวดวิชาเฉพาะ', 2, 2),
+(34, '170-216', 'เภสัชวิทยาทางการพยาบาล', 'Pharmacology in Nursing', 2, '2(2-0-4)', 'กลไกการออกฤทธิ์ เภสัชจลนศาสตร์ ข้อบ่งใช้ ผลข้างเคียง และข้อควรระวังของยาในกลุ่มต่างๆ บทบาทหน้าที่ของพยาบาลในการบริหารยาอย่างปลอดภัย การคำนวณขนาดยา และการพยาบาลผู้ป่วยที่ได้รับยา', 1, 1, NULL, 'หมวดวิชาเฉพาะ', 2, 1),
+(35, '170-222', 'จรรยาบรรณวิชาชีพการพยาบาลและกฎหมายที่เกี่ยวข้อง', 'Nursing Ethics and Related Laws', 2, '2(2-0-4)', 'แนวคิดทางจริยธรรม จรรยาบรรณวิชาชีพพยาบาล สิทธิผู้ป่วย กฎหมายวิชาชีพการพยาบาลและผดุงครรภ์ และกฎหมายสาธารณสุขที่เกี่ยวข้องกับการปฏิบัติการพยาบาล การตัดสินใจเชิงจริยธรรมในสถานการณ์ปัญหาขัดแย้ง', 1, 1, NULL, 'หมวดวิชาเฉพาะ', 2, 2),
+(36, '170-224', 'ชีวสถิติทางสุขภาพ', 'Biostatistics for Health', 2, '2(2-0-4)', 'สถิติพรรณนาและสถิติอ้างอิงที่ประยุกต์ใช้ในงานวิทยาศาสตร์สุขภาพ การทดสอบสมมติฐาน การเลือกใช้สถิติที่เหมาะสมในการวิเคราะห์ข้อมูล และการใช้โปรแกรมคอมพิวเตอร์สำเร็จรูปเพื่อการวิเคราะห์และแปลผล', 1, 1, NULL, 'หมวดวิชาเฉพาะ', 2, 1),
+(37, '170-228', 'พัฒนาการมนุษย์และการสร้างเสริมสุขภาพ', 'Human Development and Health Promotion', 2, '2(2-0-4)', 'ทฤษฎีและพัฒนาการของมนุษย์ในทุกช่วงวัย ปัจจัยที่มีผลต่อการเจริญเติบโต แนวคิดและแนวทางการสร้างเสริมสุขภาพ การป้องกันโรค และการประเมินภาวะสุขภาพตามกลุ่มวัย พฤติกรรมสุขภาพและแบบแผนการดำเนินชีวิต', 1, 1, NULL, 'หมวดวิชาเฉพาะ', 2, 1),
+(38, '170-229', 'โภชนบำบัด', 'Diet Therapy', 2, '2(2-0-4)', 'หลักโภชนาการปกติและความต้องการสารอาหารในแต่ละวัย หลักการจัดอาหารบำบัดโรคสำหรับผู้ป่วยที่มีพยาธิสภาพต่างๆ เช่น เบาหวาน ความดันโลหิตสูง โรคไต โรคหัวใจ บทบาทพยาบาลในการดูแลและให้คำแนะนำด้านอาหาร', 1, 1, NULL, 'หมวดวิชาเฉพาะ', 2, 1),
+(39, '170-226', 'การพยาบาลผู้ใหญ่', 'Adult Nursing', 3, '3(3-0-6)', 'การพยาบาลแบบองค์รวมสำหรับผู้ป่วยวัยผู้ใหญ่ที่มีปัญหาสุขภาพในระยะเฉียบพลัน กึ่งเฉียบพลัน และเรื้อรัง ของระบบทางเดินหายใจ ไหลเวียนโลหิต ทางเดินอาหาร ทางเดินปัสสาวะ ต่อมไร้ท่อ และระบบประสาท โดยใช้กระบวนการพยาบาล', 1, 1, NULL, 'หมวดวิชาเฉพาะ', 2, 2),
+(40, '170-227', 'มโนมติ ทฤษฎีการพยาบาล และบริการด้วยหัวใจความเป็นมนุษย์', 'Concepts, Nursing Theories, and Humanized Care Service', 2, '2(2-0-4)', 'มโนมติหลักทางการพยาบาล วิวัฒนาการของวิชาชีพ ทฤษฎีการพยาบาลที่สำคัญและการนำไปประยุกต์ใช้ในการปฏิบัติ แนวคิดและค่านิยมการบริการด้วยหัวใจความเป็นมนุษย์ ความเอื้ออาทร และการเคารพศักดิ์ศรีความเป็นมนุษย์', 1, 1, NULL, 'หมวดวิชาเฉพาะ', 2, 2),
+(41, '170-230', 'กระบวนการพยาบาลและการประเมินภาวะสุขภาพ', 'Nursing Process and Health Assessment', 2, '2(1-2-3)', 'ขั้นตอนและองค์ประกอบของกระบวนการพยาบาล หลักการและเทคนิคการประเมินภาวะสุขภาพทางกาย จิต สังคม จิตวิญญาณ การซักประวัติ การตรวจร่างกายทุกระบบ การบันทึกข้อมูลสุขภาพ และการฝึกทักษะการตรวจร่างกาย', 1, 1, NULL, 'หมวดวิชาเฉพาะ', 2, 2),
+(42, '170-231', 'การประยุกต์ใช้ AI และเทคโนโลยีดิจิทัลทางการพยาบาล', 'Application of AI and Digital Technology in Nursing', 2, '2(1-2-3)', 'แนวคิดและการประยุกต์ใช้ปัญญาประดิษฐ์ (AI) เทคโนโลยีดิจิทัล และสารสนเทศในการจัดการข้อมูลสุขภาพ ระบบบันทึกทางการพยาบาลอิเล็กทรอนิกส์ การพยาบาลทางไกล (Telenursing) และจริยธรรมความปลอดภัยของข้อมูล', 1, 1, NULL, 'หมวดวิชาเฉพาะ', 2, 2),
+(43, '170-324', 'การพยาบาลผู้สูงอายุ', 'Gerontological Nursing', 2, '2(2-0-4)', 'กระบวนการชราภาพและการเปลี่ยนแปลงในผู้สูงอายุ กลุ่มอาการที่พบบ่อยในผู้สูงอายุ การประเมินภาวะสุขภาพผู้สูงอายุแบบองค์รวม การพยาบาลผู้สูงอายุที่มีปัญหาสุขภาพเฉียบพลันและเรื้อรัง และการดูแลในระยะท้าย', 1, 1, NULL, 'หมวดวิชาเฉพาะ', 3, 1),
+(44, '170-348', 'การพยาบาลเด็กและวัยรุ่น', 'Pediatric and Adolescent Nursing', 3, '3(3-0-6)', 'การเจริญเติบโต พัฒนาการ และพยาธิสภาพของโรคที่พบบ่อยในทารก เด็ก และวัยรุ่น การประยุกต์ใช้กระบวนการพยาบาลในการดูแลเด็กที่มีภาวะเจ็บป่วยเฉียบพลัน เรื้อรัง และวิกฤต โดยเน้นครอบครัวเป็นศูนย์กลาง', 1, 1, NULL, 'หมวดวิชาเฉพาะ', 3, 1),
+(45, '170-349', 'การพยาบาลวิกฤตและฉุกเฉิน', 'Critical Care and Emergency Nursing', 2, '2(2-0-4)', 'หลักการพยาบาลในภาวะฉุกเฉินและวิกฤตคุกคามต่อชีวิต การคัดแยกผู้ป่วย การประเมินและเฝ้าระวังอาการอย่างรวดเร็วต่อเนื่อง พยาธิสภาพของผู้ป่วยภาวะช็อก บาดเจ็บรุนแรงหลายระบบ และหลักการช่วยฟื้นคืนชีพขั้นสูง', 1, 1, NULL, 'หมวดวิชาเฉพาะ', 3, 1),
+(46, '170-350', 'การพยาบาลสุขภาพจิตและจิตเวชศาสตร์', 'Psychiatric and Mental Health Nursing', 3, '3(3-0-6)', 'แนวคิด ทฤษฎี และลักษณะทางคลินิกของโรคทางจิตเวชที่พบบ่อย ปัจจัยที่มีผลต่อสุขภาพจิต การประยุกต์ใช้กระบวนการพยาบาลในการดูแลแบบองค์รวมแก่ผู้รับบริการที่มีปัญหาสุขภาพจิต การบำบัดทางการพยาบาลจิตเวช', 1, 1, NULL, 'หมวดวิชาเฉพาะ', 3, 1),
+(47, '170-351', 'การพยาบาลมารดาและทารก', 'Maternal and Newborn Nursing', 3, '3(3-0-6)', 'แนวคิดและทฤษฎีการพยาบาลในการดูแลสตรีในระยะตั้งครรภ์ ระยะคลอด และระยะหลังคลอดปกติ พยาธิสรีรวิทยาและการเปลี่ยนแปลงตามธรรมชาติ การประเมินสุขภาพมารดาและทารกในครรภ์ กลไกการคลอด และการบริบาลทารกแรกเกิด', 1, 1, NULL, 'หมวดวิชาเฉพาะ', 3, 1),
+(48, '170-352', 'การผดุงครรภ์', 'Midwifery', 3, '3(3-0-6)', 'กฎหมายและขอบเขตวิชาชีพผดุงครรภ์ การพยาบาลและการผดุงครรภ์ในสตรีที่มีภาวะแทรกซ้อนในระยะตั้งครรภ์ ระยะคลอด และระยะหลังคลอด ทารกแรกเกิดที่มีภาวะเสี่ยงหรือพยาธิสภาพ การเฝ้าระวังและการพยาบาลในภาวะฉุกเฉิน', 1, 1, NULL, 'หมวดวิชาเฉพาะ', 3, 2),
+(49, '170-353', 'การพยาบาลอนามัยชุมชน', 'Community Health Nursing', 3, '3(3-0-6)', 'หลักการสาธารณสุขและการพยาบาลอนามัยชุมชน ระบบบริการสุขภาพปฐมภูมิ เครื่องมือศึกษาชุมชน การประเมินและการวางแผนแก้ปัญหาอนามัยชุมชน การประยุกต์ใช้กระบวนการพยาบาลในการดูแลครอบครัวและกลุ่มเฉพาะ', 1, 1, NULL, 'หมวดวิชาเฉพาะ', 3, 1),
+(50, '170-354', 'กระบวนการวิจัยทางวิชาชีพ', 'Professional Research Process', 2, '2(2-0-4)', 'ความสำคัญของการวิจัยทางการพยาบาล จริยธรรมการวิจัยในมนุษย์ ขั้นตอนกระบวนการวิจัย ตั้งแต่การกำหนดปัญหาวิจัย การทบทวนวรรณกรรม รูปแบบการวิจัย เครื่องมือ การเก็บรวบรวมข้อมูล และการวิเคราะห์แปลผลข้อมูล', 1, 1, NULL, 'หมวดวิชาเฉพาะ', 3, 1),
+(51, '170-448', 'การรักษาพยาบาลเบื้องต้น', 'Primary Medical Care', 2, '2(2-0-4)', 'หลักการและขอบเขตการรักษาพยาบาลเบื้องต้นโดยพยาบาลตามกฎหมาย การซักประวัติ ตรวจร่างกาย และใช้เหตุผลทางคลินิกเพื่อวินิจฉัยแยกโรค อาการเจ็บป่วยและโรคที่พบบ่อย การสั่งใช้ยาตามขอบเขตวิชาชีพ และการส่งต่อ', 1, 1, NULL, 'หมวดวิชาเฉพาะ', 4, 1),
+(52, '170-457', 'ภาวะผู้นำและการบริหารทางการพยาบาล', 'Leadership and Nursing Management', 2, '2(2-0-4)', 'แนวคิดทฤษฎีภาวะผู้นำ การจัดการองค์กรพยาบาล กระบวนการบริหารจัดการทางการพยาบาล (วางแผน จัดองค์กร บริหารงานบุคคล อำนวยการ ควบคุม) การประกันคุณภาพการพยาบาล การบริหารความเสี่ยงและความขัดแย้ง', 1, 1, NULL, 'หมวดวิชาเฉพาะ', 4, 1),
+(53, '170-232', 'ปฏิบัติการพยาบาลพื้นฐาน', 'Practicum in Fundamentals of Nursing', 2, '2(0-8-0)', 'การฝึกปฏิบัติการพยาบาลบนหอผู้ป่วยในการดูแลผู้ป่วยที่มีความต้องการขั้นพื้นฐาน โดยใช้กระบวนการพยาบาลและทักษะหัตถการพื้นฐาน การสื่อสารเพื่อการบำบัด ความปลอดภัย การบริหารยา และการบันทึกรายงาน', 1, 1, NULL, 'หมวดวิชาเฉพาะ', 2, 2),
+(54, '170-327', 'ปฏิบัติการสุขภาพจิตและจิตเวชศาสตร์', 'Practicum in Psychiatric and Mental Health Nursing', 2, '2(0-8-0)', 'การฝึกปฏิบัติการพยาบาลในการดูแลผู้รับบริการที่มีปัญหาสุขภาพจิตและโรคทางจิตเวช การสร้างสัมพันธภาพและการสื่อสารเพื่อการบำบัดรายบุคคลและกลุ่ม กิจกรรมบำบัด การบริหารยาจิตเวช และการคุ้มครองสิทธิผู้ป่วย', 1, 1, NULL, 'หมวดวิชาเฉพาะ', 3, 1),
+(55, '170-331', 'ปฏิบัติการพยาบาลเด็กและวัยรุ่น', 'Practicum in Pediatric Nursing', 2, '2(0-8-0)', 'การฝึกปฏิบัติการพยาบาลในการดูแลทารก เด็ก และวัยรุ่น ที่มีภาวะเจ็บป่วยเฉียบพลัน เรื้อรัง และวิกฤต ในหอผู้ป่วยเด็ก โดยใช้กระบวนการพยาบาล การประเมินภาวะสุขภาพและพัฒนาการ และการบริหารยาอย่างปลอดภัย', 1, 1, NULL, 'หมวดวิชาเฉพาะ', 3, 2),
+(56, '170-337', 'ปฏิบัติการพยาบาลมารดาและทารก', 'Practicum in Maternal and Newborn Nursing', 2, '2(0-8-0)', 'การฝึกปฏิบัติการพยาบาลในการดูแลสตรีในระยะตั้งครรภ์ ระยะคลอด ระยะหลังคลอดปกติและมีความเสี่ยง และการดูแลทารกแรกเกิดในแผนกฝากครรภ์ ห้องคลอด และหอผู้ป่วยหลังคลอด โดยใช้กระบวนการพยาบาลและการทำคลอดปกติ', 1, 1, NULL, 'หมวดวิชาเฉพาะ', 3, 2),
+(57, '170-338', 'ปฏิบัติการผดุงครรภ์ 1', 'Practicum in Midwifery 1', 2, '2(0-8-0)', 'การฝึกปฏิบัติการผดุงครรภ์ในการตรวจครรภ์ การทำคลอดปกติ การดูแลทารกแรกเกิดทันทีหลังคลอด การเย็บแผลฝีเย็บ และการดูแลมารดาและทารกในระยะหลังคลอดปกติ ตามขอบเขตมาตรฐานวิชาชีพ', 1, 1, NULL, 'หมวดวิชาเฉพาะ', 3, 2),
+(58, '170-339', 'ปฏิบัติการพยาบาลผู้ใหญ่และผู้สูงอายุ', 'Practicum in Adult and Gerontological Nursing', 4, '4(0-16-0)', 'การฝึกปฏิบัติการพยาบาลในการดูแลผู้ป่วยวัยผู้ใหญ่และผู้สูงอายุที่มีปัญหาสุขภาพเฉียบพลันและเรื้อรัง โดยประยุกต์ใช้กระบวนการพยาบาลแบบองค์รวม ทักษะหัตถการที่ซับซ้อนอย่างปลอดภัย และการเฝ้าระวังอาการ', 1, 1, NULL, 'หมวดวิชาเฉพาะ', 3, 1),
+(59, '170-340', 'ปฏิบัติการพยาบาลผู้ป่วยวิกฤตและฉุกเฉิน', 'Practicum in Critical Care and Emergency Nursing', 2, '2(0-8-0)', 'การฝึกปฏิบัติการพยาบาลใน ICU หรือ ER ในการดูแลผู้ป่วยภาวะวิกฤตหรือฉุกเฉินคุกคามต่อชีวิต การประเมินและเฝ้าระวังอาการอย่างรวดเร็วต่อเนื่อง การกู้ชีพขั้นสูง และการใช้เทคโนโลยีขั้นสูงในการดูแลผู้ป่วย', 1, 1, NULL, 'หมวดวิชาเฉพาะ', 3, 1),
+(60, '170-355', 'ปฏิบัติการพยาบาลอนามัยชุมชน', 'Practicum in Community Health Nursing', 2, '2(0-8-0)', 'การฝึกปฏิบัติการพยาบาลอนามัยชุมชน การใช้เครื่องมือและกระบวนการศึกษาชุมชน การจัดทำโครงการพัฒนาสุขภาพร่วมกับชุมชน การจัดกิจกรรมสร้างเสริมสุขภาพ การป้องกันโรค และการฝึกปฏิบัติการพยาบาลที่บ้าน', 1, 1, NULL, 'หมวดวิชาเฉพาะ', 3, 2),
+(61, '170-431', 'ปฏิบัติการผดุงครรภ์ 2', 'Practicum in Midwifery 2', 2, '2(0-8-0)', 'การฝึกปฏิบัติการผดุงครรภ์ในการดูแลมารดาและทารกในระยะตั้งครรภ์ ระยะคลอด และระยะหลังคลอดที่มีภาวะแทรกซ้อนหรือความเสี่ยงสูง การช่วยเหลือเบื้องต้นในภาวะฉุกเฉินทางสูติศาสตร์อย่างถูกต้องปลอดภัย', 1, 1, NULL, 'หมวดวิชาเฉพาะ', 4, 1),
+(62, '170-449', 'ปฏิบัติการรักษาพยาบาลเบื้องต้น', 'Practicum in Primary Medical Care', 2, '2(0-8-0)', 'การฝึกปฏิบัติการรักษาพยาบาลเบื้องต้นในหน่วยบริการปฐมภูมิหรือ ER/OPD ทักษะการซักประวัติ ตรวจร่างกาย วินิจฉัยแยกโรคเบื้องต้น สั่งใช้ยาตามขอบเขต การทำหัตถการเย็บแผล ล้างแผล ถอดเล็บ และการส่งต่อผู้ป่วย', 1, 1, NULL, 'หมวดวิชาเฉพาะ', 4, 1),
+(63, '170-458', 'ปฏิบัติการจัดการพยาบาล', 'Practicum in Nursing Management', 2, '2(0-8-0)', 'การฝึกปฏิบัติการบริหารจัดการทางการพยาบาลบนหอผู้ป่วยในฐานะหัวหน้าเวร ทักษะภาวะผู้นำ การมอบหมายงาน การนิเทศการพยาบาล การบริหารความเสี่ยง คุมคุณภาพการพยาบาล และการทำงานร่วมกับสหสาขาวิชาชีพ', 1, 1, NULL, 'หมวดวิชาเฉพาะ', 4, 2),
+(64, '170-459', 'ปฏิบัติการพยาบาลรวบยอดวิกฤตและฉุกเฉิน', 'Comprehensive Practicum in Critical Care and Emergency Nursing', 3, '3(0-12-0)', 'การฝึกปฏิบัติการพยาบาลรวบยอดในสภาวะวิกฤตและฉุกเฉิน บูรณาการองค์ความรู้ ทฤษฎี และงานวิจัยเชิงประจักษ์ในการดูแลผู้ป่วยวิกฤตและฉุกเฉินที่มีความซับซ้อนสูง เพื่อเตรียมความพร้อมสู่การเป็นพยาบาลวิชาชีพ', 1, 1, NULL, 'หมวดวิชาเฉพาะ', 4, 2),
+(65, '170-114', 'เคมีอินทรีย์พื้นฐาน', 'Basic Organic Chemistry', 2, '2(2-0-4)', 'โครงสร้าง การเรียกชื่อ ไอโซเมอริซึม และปฏิกิริยาเคมีของสารประกอบอินทรีย์กลุ่มต่างๆ ที่มีความสำคัญทางชีวภาพและทางการแพทย์', 1, 1, NULL, 'หมวดวิชาเฉพาะ', 1, 1),
+(66, '170-115', 'ฟิสิกส์การแพทย์เบื้องต้น', 'Introduction to Medical Physics', 2, '2(2-0-4)', 'หลักการทางฟิสิกส์ที่ประยุกต์ใช้ในทางการแพทย์ เช่น กลศาสตร์ของของไหลในระบบหมุนเวียน คลื่นเสียงและอัลตราซาวด์ รังสีและการป้องกันรังสี', 1, 1, NULL, 'หมวดวิชาเฉพาะ', 1, 2),
+(67, '170-235', 'พันธุศาสตร์ทางการแพทย์และจีโนมิกส์', 'Medical Genetics and Genomics', 2, '2(2-0-4)', 'การถ่ายทอดลักษณะทางพันธุกรรม โครงสร้างดีเอ็นเอ ความผิดปกติของโครโมโซม โรคทางพันธุกรรมที่พบบ่อย และแนวคิดจีโนมิกส์ในการรักษาแบบแม่นยำ', 1, 1, NULL, 'หมวดวิชาเฉพาะ', 2, 1),
+(68, '170-236', 'วิทยาภูมิคุ้มกันพื้นฐาน', 'Basic Immunology', 2, '2(2-0-4)', 'กลไกการตอบสนองทางภูมิคุ้มกันของร่างกาย ทั้งแบบจำเพาะและไม่จำเพาะ อวัยวะและเซลล์ในระบบภูมิคุ้มกัน ความผิดปกติของระบบภูมิคุ้มกันและการแพ้ยา', 1, 1, NULL, 'หมวดวิชาเฉพาะ', 2, 2),
+(69, '170-356', 'การพยาบาลบรรเทาอาการและดูแลระยะท้าย', 'Palliative and End-of-Life Care', 2, '2(2-0-4)', 'หลักการดูแลแบบประคับประคอง การจัดการความปวดและอาการทุกข์ทรมาน การสนับสนุนทางจิตสังคมและจิตวิญญาณแก่ผู้ป่วยระยะท้ายและครอบครัว', 1, 1, NULL, 'หมวดวิชาเฉพาะ', 3, 2),
+(70, '170-357', 'สารสนเทศศาสตร์สุขภาพ', 'Health Informatics', 2, '2(1-2-3)', 'ระบบข้อมูลสารสนเทศในโรงพยาบาล มาตรฐานรหัสทางการแพทย์ การจัดการฐานข้อมูลสุขภาพ และแนวโน้มเทคโนโลยีสารสนเทศสุขภาพในอนาคต', 1, 1, NULL, 'หมวดวิชาเฉพาะ', 3, 1),
+(71, '170-460', 'การเตรียมความพร้อมเพื่อการทำงานในอนาคต', 'Preparation for Future Career', 1, '1(0-2-1)', 'การพัฒนาบุคลิกภาพ เทคนิคการสมัครงานและการสัมภาษณ์ ภาษาอังกฤษเพื่อการทำงาน จริยธรรมในการทำงาน และการวางแผนเส้นทางอาชีพในอนาคต', 1, 1, NULL, 'หมวดวิชาเฉพาะ', 4, 1),
+(72, '170-461', 'การประมวลความรู้ทางวิชาชีพการพยาบาล', 'Comprehensive Review of Professional Nursing', 2, '2(2-0-4)', 'การทบทวนและประมวลความรู้รวบยอดในศาสตร์ทางการพยาบาลทุกสาขาวิชา เพื่อเตรียมความพร้อมในการสอบขึ้นทะเบียนรับใบอนุญาตประกอบวิชาชีพ', 1, 1, NULL, 'หมวดวิชาเฉพาะ', 4, 2),
+(73, '170-462', 'การฝึกปฏิบัติการพยาบาลเลือกสรร', 'Elective Practicum in Nursing', 2, '2(0-8-0)', 'การเลือกฝึกปฏิบัติงานในหอผู้ป่วยหรือสาขาวิชาที่นักศึกษาสนใจเป็นพิเศษ เพื่อเพิ่มพูนทักษะและความมั่นใจก่อนจบการศึกษาเป็นพยาบาลวิชาชีพ', 1, 1, NULL, 'หมวดวิชาเฉพาะเลือก', 4, 2);
 
 -- --------------------------------------------------------
 
@@ -1231,24 +1098,25 @@ CREATE TABLE `system_sidebar_menus` (
 
 INSERT INTO `system_sidebar_menus` (`menu_id`, `title`, `url`, `icon`, `permission_required`, `section_title`, `is_active`) VALUES
 (1, 'แดชบอร์ด Admin', 'dashboard', 'AdminDashboard', 'VIEW_ADMIN_DASHBOARD', 'จัดการระบบ', 1),
-(2, 'จัดการข้อมูลระบบ', 'roles-management', 'Shield', 'USERS_MANAGEMENT', 'จัดการระบบ', 1),
-(3, 'จัดการข้อมูลระบบ', 'users-management', 'Users', 'ROLES_MANAGEMENT', 'จัดการระบบ', 1),
-(4, 'นำเข้าข้อมูล', 'import-data', 'Upload', 'IMPORT_DATA', 'ข้อมูล', 1),
-(5, 'ส่งออกข้อมูล', 'export-data', 'Download', 'EXPORT_DATA', 'ข้อมูล', 1),
-(6, 'Audit Log', 'audit-log', 'ClipboardList', 'AUDIT_LOG', 'ข้อมูล', 1),
+(2, 'จัดการสิทธิ์', 'roles-management', 'Shield', 'USER_ROLE_MANAGE', 'จัดการระบบ', 1),
+(3, 'จัดการข้อมูลผู้ใช้', 'users-management', 'Users', 'USER_ROLE_MANAGE', 'จัดการระบบ', 1),
+(4, 'นำเข้าข้อมูล', 'import-data', 'Upload', 'DATA_IMPORT_EXPORT', 'ข้อมูล', 1),
+(5, 'ส่งออกข้อมูล', 'export-data', 'Download', 'DATA_IMPORT_EXPORT', 'ข้อมูล', 1),
+(6, 'Audit Log', 'audit-log', 'ClipboardList', 'AUDIT_LOG_VIEW', 'ข้อมูล', 1),
 (7, 'รายงาน', 'reports', 'FileText', 'ADMIN_REPORTS', 'ข้อมูล', 1),
 (8, 'อนุมัติคำขอ', 'approvals', 'CheckSquare', 'ADMIN_APPROVALS', 'ข้อมูล', 1),
 (9, 'แดชบอร์ด KPI', 'dean-dashboard', 'LayoutDashboard', 'VIEW_DEAN_DASHBOARD', 'จัดการระบบ', 1),
 (10, 'อัตราคงอยู่', 'retention', 'UserCheck', 'VIEW_RETENTION', 'จัดการระบบ', 1),
-(11, 'รายงาน PLO/YLO', 'plo-ylo-report', 'TrendingUp', 'CURRICULUM_REPORT_VIEW', 'งานหลักสูตร', 1),
-(12, 'สรุปข้อมูล 5 ปี', 'five-year-summary', 'CalendarDays', 'COURSE_EXPORT_5YEAR', 'งานหลักสูตร', 1),
+(11, 'รายงาน PLO/YLO', 'plo-ylo-report', 'TrendingUp', 'COURSE_REPORT_VIEW', 'งานหลักสูตร', 1),
+(12, 'สรุปข้อมูล 5 ปี', 'five-year-summary', 'CalendarDays', 'COURSE_REPORT_EXPORT', 'งานหลักสูตร', 1),
 (13, 'จัดการอาจารย์ผู้สอน', 'assign-instructors', 'UserCheck', 'ASSIGN_INSTRUCTORS', 'งานหลักสูตร', 1),
-(14, 'รายงานรายวิชา', 'course-report', 'CalendarDays', 'COURSE_REPORT_CREATE', 'งานหลักสูตร', 1),
-(15, 'CLO Map', 'clo-map', 'UserCheck', 'CLO_DEFINE', 'งานหลักสูตร', 1),
+(14, 'รายงานรายวิชา', 'course-report', 'CalendarDays', 'COURSE_REPORT_VIEW', 'งานหลักสูตร', 1),
+(15, 'CLO Map', 'clo-map', 'UserCheck', 'CLO_MANAGE', 'งานหลักสูตร', 1),
 (16, 'อัปโหลดเอกสาร', 'documents', 'UserCheck', 'RESEARCH_UPLOAD', 'งานหลักสูตร', 1),
-(17, 'การแจ้งเตือน', 'notifications', 'Bell', 'NOTIFICATION_VIEW', 'ระบบทั่วไป', 1),
-(18, 'ข้อมูลส่วนตัว', 'profile', 'User', 'PROFILE_VIEW', 'ระบบทั่วไป', 1),
-(19, 'การตั้งค่า', 'settings', 'Settings', 'SETTINGS', 'ระบบทั่วไป', 1);
+(17, 'การแจ้งเตือน', 'notifications', 'User', 'NOTIFICATION_VIEW', 'ระบบทั่วไป', 1),
+(18, 'ข้อมูลส่วนตัว', 'profile', 'User', 'PROFILE_VIEW_SELF', 'ระบบทั่วไป', 1),
+(19, 'การตั้งค่า', 'settings', 'Settings', 'SYSTEM_SETTINGS', 'ระบบทั่วไป', 1),
+(20, 'โครงการ', 'project-docs', 'Target', 'PROJECT_VIEW', 'โครงการ', 1);
 
 -- --------------------------------------------------------
 
@@ -1274,7 +1142,9 @@ INSERT INTO `users` (`user_id`, `username`, `password_hash`, `role_id`, `created
 (3, '42172021', '$2y$10$bJy3Lgxp.IuluGEUSMSUkeugFjAPf2f2nWW/CNFBYplLFxM59IRUm', 2, '2026-02-12 22:02:38'),
 (4, '41172011', '$2y$10$3K1ZE8cjAfEJKOeV1CrjJ.XzEObB75V3KBpWjDk/X6DaCg1ihyaiC', 2, '2026-02-14 03:47:25'),
 (5, '46172040', '$2y$10$pTXswbeD91ynKGtWQIUSaukCVAq1NjinsVSBpKcuuUMRNgDZx.fU2', 1, '2026-02-14 16:13:36'),
-(6, '41172017', '$2y$10$Ufr2JcYXlZYwjZtyhrObweBjW2wFA85DddGRR15iOA7rGkWpn0uX6', 2, '2026-02-14 18:02:44');
+(6, '41172017', '$2y$10$Ufr2JcYXlZYwjZtyhrObweBjW2wFA85DddGRR15iOA7rGkWpn0uX6', 2, '2026-02-14 18:02:44'),
+(7, '63172133', '$2y$10$X7qXABiTtnCl1xSbziwsc.VkyWBv7sDqou6Iu6ChatJAvoIevCFp6', 2, '2026-03-01 18:20:12'),
+(8, '6604800008', '$2y$10$NqeqUCzI4OhQi8J0ddkbqOwLuaEBOae042PzbJ0iwhjYSEb0bR64i', 2, '2026-05-21 17:17:08');
 
 -- --------------------------------------------------------
 
@@ -1298,7 +1168,9 @@ CREATE TABLE `user_position` (
 INSERT INTO `user_position` (`user_position_id`, `user_id`, `position_id`, `is_primary`, `effective_from`, `effective_to`) VALUES
 (1, 4, 5, 1, NULL, NULL),
 (2, 5, 7, 1, NULL, NULL),
-(3, 6, 1, 1, NULL, NULL);
+(3, 6, 1, 1, NULL, NULL),
+(5, 7, 6, 1, NULL, NULL),
+(9, 8, 2, 1, NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -1353,26 +1225,10 @@ ALTER TABLE `audit_log`
   ADD KEY `user_id` (`user_id`);
 
 --
--- Indexes for table `clo`
+-- Indexes for table `curriculum_framework`
 --
-ALTER TABLE `clo`
-  ADD PRIMARY KEY (`clo_id`),
-  ADD KEY `subject_id` (`subject_id`),
-  ADD KEY `clo_ibfk_2` (`ylo_id`);
-
---
--- Indexes for table `degree`
---
-ALTER TABLE `degree`
-  ADD PRIMARY KEY (`degree_id`);
-
---
--- Indexes for table `enrollment`
---
-ALTER TABLE `enrollment`
-  ADD PRIMARY KEY (`enrollment_id`),
-  ADD KEY `student_id` (`student_id`),
-  ADD KEY `subject_id` (`subject_id`);
+ALTER TABLE `curriculum_framework`
+  ADD PRIMARY KEY (`id`);
 
 --
 -- Indexes for table `faculty`
@@ -1401,16 +1257,11 @@ ALTER TABLE `notifications`
   ADD KEY `user_id` (`user_id`);
 
 --
--- Indexes for table `other_degree`
---
-ALTER TABLE `other_degree`
-  ADD PRIMARY KEY (`degree_id`);
-
---
 -- Indexes for table `permissions`
 --
 ALTER TABLE `permissions`
-  ADD PRIMARY KEY (`permissions_id`);
+  ADD PRIMARY KEY (`permission_id`),
+  ADD UNIQUE KEY `permission_name` (`permission_name`);
 
 --
 -- Indexes for table `plo`
@@ -1436,9 +1287,8 @@ ALTER TABLE `position`
 -- Indexes for table `position_permission`
 --
 ALTER TABLE `position_permission`
-  ADD PRIMARY KEY (`position_permission_id`),
-  ADD KEY `position_permission_ibfk_1` (`position_id`),
-  ADD KEY `position_permission_ibfk_2` (`permission_id`);
+  ADD PRIMARY KEY (`position_id`,`permission_id`),
+  ADD KEY `permission_id` (`permission_id`);
 
 --
 -- Indexes for table `program`
@@ -1467,14 +1317,6 @@ ALTER TABLE `role`
   ADD PRIMARY KEY (`role_id`);
 
 --
--- Indexes for table `role_permission`
---
-ALTER TABLE `role_permission`
-  ADD PRIMARY KEY (`role_permission_id`),
-  ADD KEY `role_id` (`role_id`),
-  ADD KEY `permission_id` (`permission_id`);
-
---
 -- Indexes for table `student`
 --
 ALTER TABLE `student`
@@ -1501,8 +1343,7 @@ ALTER TABLE `Student_License_Attempts`
 -- Indexes for table `subject`
 --
 ALTER TABLE `subject`
-  ADD PRIMARY KEY (`subject_id`),
-  ADD KEY `program_id` (`program_id`);
+  ADD PRIMARY KEY (`subject_id`);
 
 --
 -- Indexes for table `sub_plo`
@@ -1558,31 +1399,13 @@ ALTER TABLE `assessments`
 -- AUTO_INCREMENT for table `audit_log`
 --
 ALTER TABLE `audit_log`
-  MODIFY `audit_log_id` bigint NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT for table `clo`
---
-ALTER TABLE `clo`
-  MODIFY `clo_id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
-
---
--- AUTO_INCREMENT for table `degree`
---
-ALTER TABLE `degree`
-  MODIFY `degree_id` bigint NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT for table `enrollment`
---
-ALTER TABLE `enrollment`
-  MODIFY `enrollment_id` bigint NOT NULL AUTO_INCREMENT;
+  MODIFY `audit_log_id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
 -- AUTO_INCREMENT for table `faculty`
 --
 ALTER TABLE `faculty`
-  MODIFY `faculty_id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=66712148;
+  MODIFY `faculty_id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6604800009;
 
 --
 -- AUTO_INCREMENT for table `faculty_ce_records`
@@ -1603,16 +1426,10 @@ ALTER TABLE `notifications`
   MODIFY `notification_id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
--- AUTO_INCREMENT for table `other_degree`
---
-ALTER TABLE `other_degree`
-  MODIFY `degree_id` bigint NOT NULL AUTO_INCREMENT;
-
---
 -- AUTO_INCREMENT for table `permissions`
 --
 ALTER TABLE `permissions`
-  MODIFY `permissions_id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=71;
+  MODIFY `permission_id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=29;
 
 --
 -- AUTO_INCREMENT for table `plo`
@@ -1631,12 +1448,6 @@ ALTER TABLE `portfolio`
 --
 ALTER TABLE `position`
   MODIFY `position_id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=44;
-
---
--- AUTO_INCREMENT for table `position_permission`
---
-ALTER TABLE `position_permission`
-  MODIFY `position_permission_id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10298;
 
 --
 -- AUTO_INCREMENT for table `program`
@@ -1663,12 +1474,6 @@ ALTER TABLE `role`
   MODIFY `role_id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
--- AUTO_INCREMENT for table `role_permission`
---
-ALTER TABLE `role_permission`
-  MODIFY `role_permission_id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=79;
-
---
 -- AUTO_INCREMENT for table `student_advisor_mapping`
 --
 ALTER TABLE `student_advisor_mapping`
@@ -1681,28 +1486,22 @@ ALTER TABLE `Student_License_Attempts`
   MODIFY `attempt_id` bigint NOT NULL AUTO_INCREMENT;
 
 --
--- AUTO_INCREMENT for table `subject`
---
-ALTER TABLE `subject`
-  MODIFY `subject_id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
-
---
 -- AUTO_INCREMENT for table `system_sidebar_menus`
 --
 ALTER TABLE `system_sidebar_menus`
-  MODIFY `menu_id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=20;
+  MODIFY `menu_id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=21;
 
 --
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `user_id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+  MODIFY `user_id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 
 --
 -- AUTO_INCREMENT for table `user_position`
 --
 ALTER TABLE `user_position`
-  MODIFY `user_position_id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `user_position_id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
 
 --
 -- AUTO_INCREMENT for table `ylo`
@@ -1736,20 +1535,6 @@ ALTER TABLE `audit_log`
   ADD CONSTRAINT `audit_log_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE ON UPDATE RESTRICT;
 
 --
--- Constraints for table `clo`
---
-ALTER TABLE `clo`
-  ADD CONSTRAINT `clo_ibfk_1` FOREIGN KEY (`subject_id`) REFERENCES `subject` (`subject_id`) ON DELETE CASCADE,
-  ADD CONSTRAINT `clo_ibfk_2` FOREIGN KEY (`ylo_id`) REFERENCES `ylo` (`ylo_id`) ON DELETE SET NULL;
-
---
--- Constraints for table `enrollment`
---
-ALTER TABLE `enrollment`
-  ADD CONSTRAINT `enrollment_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `student` (`student_id`),
-  ADD CONSTRAINT `enrollment_ibfk_2` FOREIGN KEY (`subject_id`) REFERENCES `subject` (`subject_id`) ON DELETE CASCADE;
-
---
 -- Constraints for table `faculty_ce_records`
 --
 ALTER TABLE `faculty_ce_records`
@@ -1777,8 +1562,8 @@ ALTER TABLE `portfolio`
 -- Constraints for table `position_permission`
 --
 ALTER TABLE `position_permission`
-  ADD CONSTRAINT `position_permission_ibfk_1` FOREIGN KEY (`position_id`) REFERENCES `position` (`position_id`) ON DELETE CASCADE ON UPDATE RESTRICT,
-  ADD CONSTRAINT `position_permission_ibfk_2` FOREIGN KEY (`permission_id`) REFERENCES `permissions` (`permissions_id`) ON DELETE CASCADE ON UPDATE RESTRICT;
+  ADD CONSTRAINT `position_permission_ibfk_1` FOREIGN KEY (`position_id`) REFERENCES `position` (`position_id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `position_permission_ibfk_2` FOREIGN KEY (`permission_id`) REFERENCES `permissions` (`permission_id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `project`
@@ -1791,13 +1576,6 @@ ALTER TABLE `project`
 --
 ALTER TABLE `project_budget_years`
   ADD CONSTRAINT `project_budget_years_ibfk_1` FOREIGN KEY (`project_id`) REFERENCES `project` (`project_id`) ON DELETE CASCADE;
-
---
--- Constraints for table `role_permission`
---
-ALTER TABLE `role_permission`
-  ADD CONSTRAINT `role_permission_ibfk_1` FOREIGN KEY (`role_id`) REFERENCES `role` (`role_id`) ON DELETE CASCADE,
-  ADD CONSTRAINT `role_permission_ibfk_2` FOREIGN KEY (`permission_id`) REFERENCES `permissions` (`permissions_id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `student`
@@ -1818,12 +1596,6 @@ ALTER TABLE `student_advisor_mapping`
 --
 ALTER TABLE `Student_License_Attempts`
   ADD CONSTRAINT `Student_License_Attempts_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `student` (`student_id`);
-
---
--- Constraints for table `subject`
---
-ALTER TABLE `subject`
-  ADD CONSTRAINT `subject_ibfk_1` FOREIGN KEY (`program_id`) REFERENCES `program` (`program_id`) ON DELETE SET NULL;
 
 --
 -- Constraints for table `user_position`

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Bell,
   Moon,
@@ -30,8 +30,16 @@ const SettingsPage = () => {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   
+  const applyTheme = (theme: string) => {
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const shouldUseDark = theme === "dark" || (theme === "system" && prefersDark);
+
+    document.documentElement.classList.toggle("dark", shouldUseDark);
+    localStorage.setItem("theme", theme);
+  };
+
   const [settings, setSettings] = useState({
-    theme: "system",
+    theme: localStorage.getItem("theme") || "dark",
     language: "th",
     emailNotifications: true,
     pushNotifications: true,
@@ -45,6 +53,10 @@ const SettingsPage = () => {
     new: "",
     confirm: "",
   });
+
+  useEffect(() => {
+    applyTheme(settings.theme);
+  }, [settings.theme]);
 
   const handleSaveSettings = () => {
     toast({
@@ -103,7 +115,10 @@ const SettingsPage = () => {
               </div>
               <Select
                 value={settings.theme}
-                onValueChange={(value) => setSettings({ ...settings, theme: value })}
+                onValueChange={(value) => {
+                  setSettings({ ...settings, theme: value });
+                  applyTheme(value);
+                }}
               >
                 <SelectTrigger className="w-[180px]">
                   <SelectValue />

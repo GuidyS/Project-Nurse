@@ -42,7 +42,7 @@ services:
     ports:
       - "9906:3306"
     volumes:
-      - ./backend/nurseproject_test.sql:/docker-entrypoint-initdb.d/init.sql
+      #- ./backend/nurseproject_test.sql:/docker-entrypoint-initdb.d/init.sql
       - ./mysql-data:/var/lib/mysql
 
   phpmyadmin:
@@ -54,3 +54,4 @@ services:
       PMA_HOST: db
     depends_on:
       - db
+      

@@ -3,7 +3,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CheckCircle, XCircle, Clock, FileText, Users, BookOpen } from 'lucide-react';
 import { useState } from 'react';
@@ -50,38 +49,16 @@ export default function Approvals() {
 
   const pendingCount = approvals.filter(a => a.status === 'pending').length;
 
-  // confirmation dialog state
-  const [isActionDialogOpen, setIsActionDialogOpen] = useState(false);
-  const [pendingAction, setPendingAction] = useState<'approve' | 'reject' | null>(null);
-  const [pendingId, setPendingId] = useState<string | null>(null);
-
-  const performAction = (id: string, action: 'approve' | 'reject') => {
+  const handleApprove = (id: string) => {
     setApprovals(approvals.map(a => 
-      a.id === id ? { ...a, status: action === 'approve' ? 'approved' : 'rejected' } : a
+      a.id === id ? { ...a, status: 'approved' } : a
     ));
   };
 
-  const handleApprove = (id: string) => {
-    performAction(id, 'approve');
-  };
-
   const handleReject = (id: string) => {
-    performAction(id, 'reject');
-  };
-
-  const handleActionConfirm = (id: string, action: 'approve' | 'reject') => {
-    setPendingId(id);
-    setPendingAction(action);
-    setIsActionDialogOpen(true);
-  };
-
-  const onConfirmAction = () => {
-    if (pendingId && pendingAction) {
-      performAction(pendingId, pendingAction);
-    }
-    setPendingId(null);
-    setPendingAction(null);
-    setIsActionDialogOpen(false);
+    setApprovals(approvals.map(a => 
+      a.id === id ? { ...a, status: 'rejected' } : a
+    ));
   };
 
   return (
@@ -171,11 +148,11 @@ export default function Approvals() {
                         <TableCell>{approval.date}</TableCell>
                         <TableCell>
                           <div className="flex gap-2">
-                            <Button size="sm" onClick={() => handleActionConfirm(approval.id, 'approve')}>
+                            <Button size="sm" onClick={() => handleApprove(approval.id)}>
                               <CheckCircle className="mr-1 h-3 w-3" />
                               อนุมัติ
                             </Button>
-                            <Button variant="outline" size="sm" onClick={() => handleActionConfirm(approval.id, 'reject')}>
+                            <Button variant="outline" size="sm" onClick={() => handleReject(approval.id)}>
                               <XCircle className="mr-1 h-3 w-3" />
                               ปฏิเสธ
                             </Button>
@@ -223,30 +200,6 @@ export default function Approvals() {
           </TabsContent>
         </Tabs>
       </div>
-
-      {/* approve/reject confirmation dialog */}
-      <Dialog open={isActionDialogOpen} onOpenChange={setIsActionDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {pendingAction === 'approve' ? 'ยืนยันการอนุมัติ' : 'ยืนยันการปฏิเสธ'}
-            </DialogTitle>
-            <DialogDescription>
-              {pendingAction === 'approve'
-                ? 'คุณแน่ใจหรือไม่ว่าต้องการอนุมัติคำขอนี้?'
-                : 'คุณแน่ใจหรือไม่ว่าต้องการปฏิเสธคำขอนี้?'}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex justify-end gap-2 mt-4">
-            <Button variant="secondary" className="border border-gray-300" onClick={() => setIsActionDialogOpen(false)}>
-              ยกเลิก
-            </Button>
-            <Button variant="destructive" onClick={onConfirmAction}>
-              ตกลง
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </>
   );
 }
