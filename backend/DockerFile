@@ -1,0 +1,27 @@
+# อัปเกรดเป็น PHP 8.2 เพื่อให้รองรับ PhpSpreadsheet เวอร์ชันใหม่ๆ
+FROM php:8.2-apache
+
+# 1. ติดตั้ง System Dependencies สำหรับ gd, zip และ tools ที่จำเป็น
+RUN apt-get update && apt-get upgrade -y \
+    && apt-get install -y \
+    libzip-dev \
+    zip \
+    unzip \
+    libpng-dev \
+    libjpeg-dev \
+    libfreetype6-dev
+
+# 2. ตั้งค่าและติดตั้ง PHP Extensions (เพิ่ม gd และ zip เข้าไปรวมกับของเดิมของคุณ)
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install -j$(nproc) gd zip mysqli pdo pdo_mysql \
+    && docker-php-ext-enable mysqli
+
+# 3. ติดตั้ง Composer (ดึงจาก Official Image มาไว้ในเครื่องเรา)
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+# เปิดใช้งาน rewrite module และตั้งค่า ServerName เพื่อลด Error AH00558 (โค้ดเดิมของคุณ)
+RUN a2enmod rewrite
+RUN echo "ServerName localhost" >> /etc/apache2/apache2.conf
+
+# ตั้งค่าสิทธิ์โฟลเดอร์ html ให้ Apache อ่านไฟล์ได้ (โค้ดเดิมของคุณ)
+RUN chown -R www-data:www-data /var/www/html && chmod -R 755 /var/www/html
