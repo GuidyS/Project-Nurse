@@ -1,17 +1,17 @@
 import * as Icons from 'lucide-react';
-import { 
+import {
   ChevronLeft,
   LogOut,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { 
-  Sidebar, 
-  SidebarContent, 
-  SidebarFooter, 
-  SidebarHeader, 
-  SidebarMenu, 
-  SidebarMenuButton, 
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
   SidebarMenuItem,
   SidebarTrigger,
   useSidebar
@@ -171,7 +171,7 @@ interface SidebarProps {
 //     ],
 //   },
 
-export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
+export function AppSidebar({ onItemClick, activeItem }: SidebarProps) {
 
   const [menuSections, setMenuSections] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -183,7 +183,7 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
 
         // เรียก API (ตรวจสอบ Path ให้ตรงกับที่วาง index.php ไว้)
         const res = await api.get(`/index.php?page=sidebar`);
-        
+
         console.log("Menu Data:", res.data); // ลองเปิด console ดูว่าข้อมูลมาไหม
         setMenuSections(res.data);
       } catch (error) {
@@ -205,6 +205,26 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
     return IconComponent || Icons.HelpCircle; // ถ้าหาไม่เจอให้ใช้ HelpCircle แทน
   };
 
+  const menuTitleByUrl: Record<string, string> = {
+    transcript: "ผลการเรียน",
+    portfolio: "Portfolio",
+    notifications: "การแจ้งเตือน",
+    profile: "ข้อมูลส่วนตัว",
+    settings: "การตั้งค่า",
+  };
+
+  const sectionTitleByUrl: Record<string, string> = {
+    transcript: "นักศึกษา",
+    portfolio: "นักศึกษา",
+  };
+
+  const getMenuTitle = (item: any) => menuTitleByUrl[item.url] || item.title;
+
+  const getSectionTitle = (section: any, items: any[]) => {
+    const matchedItem = items.find((item) => sectionTitleByUrl[item.url]);
+    return matchedItem ? sectionTitleByUrl[matchedItem.url] : section.sectionTitle;
+  };
+
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
 
@@ -224,7 +244,7 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
     sessionStorage.clear(); // ล้าง session (ถ้ามี)
 
     // 3. ส่งผู้ใช้กลับไปหน้า Login และรีโหลดเพื่อล้าง State ทั้งหมด
-    window.location.href = "/"; 
+    window.location.href = "/";
   };
 
   const hasPermission = (name?: string) => {
@@ -239,12 +259,12 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
   ];
 
   return (
-    <Sidebar 
-      collapsible="icon" 
+    <Sidebar
+      collapsible="icon"
       // ใช้สไตล์แบบแปรผันเพื่อบังคับความกว้างตอนหุบให้เป็น 72px เป๊ะๆ
-      style={{ 
-        "--sidebar-width-icon": "72px", 
-        "--sidebar-width": "260px" 
+      style={{
+        "--sidebar-width-icon": "72px",
+        "--sidebar-width": "260px"
       } as React.CSSProperties}
       className={cn(
         'border-r border-sidebar-border bg-sidebar transition-all duration-300 shadow-xl',
@@ -255,7 +275,7 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
       {/* Header */}
       <SidebarHeader className="border-b border-sidebar-border p-4">
         <div className="flex items-center justify-between relative group gap-3">
-          
+
           {/* พื้นที่ Logo */}
           <div className="relative h-10 w-10 shrink-0">
             <div className="flex h-full w-full items-center justify-center rounded-full bg-[#8a2be2] overflow-hidden shadow-sm">
@@ -277,7 +297,7 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
                 <h1 className="text-base font-bold text-slate-700 leading-relaxed">Nursing</h1>
                 <p className="text-[10px] text-slate-500 font-medium whitespace-nowrap uppercase tracking-tighter">Management System</p>
               </div>
-              
+
               {/* ปุ่ม Trigger กลับไปอยู่ที่เดิม (ขวาบน) เมื่อเปิดแถบ */}
               <SidebarTrigger className="text-slate-500 hover:bg-[#8a2be2]/10 hover:text-[#8a2be2]">
                 <ChevronLeft className="h-4 w-4" />
@@ -297,29 +317,31 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
 
           // 2. ถ้ากลุ่มนี้ไม่มีเมนูเหลืออยู่เลย (ความยาวเป็น 0) ให้ส่งค่า null เพื่อไม่เรนเดอร์ทั้ง Section
           if (filteredItems.length === 0) return null;
+          const sectionTitle = getSectionTitle(section, filteredItems);
 
           return (
             <div key={idx} className="px-4 py-2">
               {/* แสดงหัวข้อกลุ่มเฉพาะตอนที่ไม่หุบ และมีเมนูในกลุ่มนั้นจริงๆ */}
-              {!collapsed && section.sectionTitle && (
+              {!collapsed && sectionTitle && (
                 <p className="px-4 text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">
-                  {section.sectionTitle}
+                  {sectionTitle}
                 </p>
               )}
 
               <SidebarMenu>
                 {filteredItems.map((item: any) => {
                   const Icon = getIcon(item.icon);
+                  const title = getMenuTitle(item);
                   const isActive = activeItem === item.url;
                   return (
                     <SidebarMenuItem key={item.url}>
-                      <SidebarMenuButton 
-                        tooltip={item.title}
+                      <SidebarMenuButton
+                        tooltip={title}
                         onClick={() => onItemClick(item.url)}
                         className={cn(
                           "w-full transition-all duration-200 mb-1 group",
-                          isActive 
-                            ? "bg-[#8a2be2]/25 text-white" 
+                          isActive
+                            ? "bg-[#8a2be2]/25 text-white"
                             : "hover:bg-[#8a2be2]/10 hover:text-[#8a2be2]",
                           "active:bg-[#8a2be2]/25 active:text-white",
                           "focus:bg-[#8a2be2]/25 focus:text-white",
@@ -327,12 +349,12 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
                         )}
                       >
                         <Icon className={cn(
-                            "h-4 w-4 shrink-0 transition-colors", 
-                            isActive 
-                              ? "text-white"
-                              : "text-slate-600 hover:text-[#8a2be2]" 
-                          )} />
-                        {!collapsed && <span>{item.title}</span>}
+                          "h-4 w-4 shrink-0 transition-colors",
+                          isActive
+                            ? "text-white"
+                            : "text-slate-600 hover:text-[#8a2be2]"
+                        )} />
+                        {!collapsed && <span>{title}</span>}
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   );
@@ -350,18 +372,19 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
             .filter(item => hasPermission(item.permission)) // เช็คสิทธิ์ก่อนแสดงผลเหมือนเมนูหลัก
             .map((item) => {
               const Icon = getIcon(item.icon); // ใช้ฟังก์ชันแปลงไอคอนเดียวกัน
+              const title = getMenuTitle(item);
               const isActive = activeItem === item.url; // เช็คสถานะ Active เดียวกัน
 
               return (
                 <SidebarMenuItem key={item.url}>
-                  <SidebarMenuButton 
-                    tooltip={item.title}
+                  <SidebarMenuButton
+                    tooltip={title}
                     onClick={() => onItemClick(item.url)}
                     // ใช้ ClassName และ Logic สีชุดเดียวกับ Main Menu
                     className={cn(
                       "w-full transition-all duration-200 mb-1 group",
-                      isActive 
-                        ? "bg-[#8a2be2]/25 text-white" 
+                      isActive
+                        ? "bg-[#8a2be2]/25 text-white"
                         : "text-slate-600 hover:bg-[#8a2be2]/5 hover:text-[#8a2be2]",
                       "active:bg-[#8a2be2]/25 active:text-white",
                       "focus:bg-[#8a2be2]/25 focus:text-white",
@@ -370,12 +393,12 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
                     )}
                   >
                     <Icon className={cn(
-                      "h-4 w-4 shrink-0 transition-colors", 
-                      isActive 
+                      "h-4 w-4 shrink-0 transition-colors",
+                      isActive
                         ? "text-white"
-                        : "text-slate-600 hover:text-[#8a2be2]" 
-                    )} />
-                    {!collapsed && <span>{item.title}</span>}
+                        : "text-slate-600 hover:text-[#8a2be2]"
+                      )} />
+                    {!collapsed && <span>{title}</span>}
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               );
@@ -388,8 +411,8 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
         <div className="flex items-center justify-between relative group">
           <div className="relative h-10 w-10 shrink-0">
             <Avatar className="h-full w-full border border-[#8a2be2]/20">
-              <AvatarFallback 
-                style={{ backgroundColor: '#ad71e6' }} 
+              <AvatarFallback
+                style={{ backgroundColor: '#ad71e6' }}
                 className="text-white text-sm font-semibold"
               >
                 {userInitial}
@@ -397,11 +420,11 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
             </Avatar>
 
             {/* ปุ่ม Logout (แสดงทับ Avatar เมื่อ Hover) */}
-            <button 
+            <button
               onClick={handleLogout}
               className={cn(
                 "absolute inset-0 h-full w-full flex items-center justify-center rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-red-600/80 text-white",
-                !collapsed && "hidden" 
+                !collapsed && "hidden"
               )}
             >
               <LogOut className="h-4 w-4" />
@@ -411,9 +434,9 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
           {!collapsed && (
             <>
               <div className="flex-1 min-w-0 ml-2">
-                <p className="text-sm font-bold text-slate-700 truncate">{ userName }</p>
+                <p className="text-sm font-bold text-slate-700 truncate">{userName}</p>
               </div>
-              <button 
+              <button
                 onClick={handleLogout}
                 className="p-1 text-slate-500 hover:text-red-600 hover:bg-[#dd1d1d]/10 rounded-lg transition-colors"
               >

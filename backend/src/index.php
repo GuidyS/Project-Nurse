@@ -113,11 +113,23 @@
             case 'send-notification':
                 require_once 'components/NotificationPage/send_notification.php';
                 break;
+            case 'get-notification-settings':
+                require_once 'components/NotificationPage/get_settings.php';
+                break;
+            case 'save-notification-settings':
+                require_once 'components/NotificationPage/save_settings.php';
+                break;
             case 'mark-notification-read':
                 require_once 'components/NotificationPage/mark_read.php';
                 break;
             case 'delete-notification':
                 require_once 'components/NotificationPage/delete_notification.php';
+                break;
+
+            /* -------- Student -------- */
+
+            case 'transcript-api':
+                require_once 'components/Student/Transcript/transcript-api.php';
                 break;
 
                 

@@ -12,6 +12,7 @@ import SettingsPage from "@/components/pages/SettingsPage";
 import LoginPage from "@/components/pages/Auth/LoginPage";
 import RegisterPage from "@/components/pages/Auth/RegisterPage";
 import Transcript from "@/components/pages/Student/Transcript";
+import Portfolio from "@/components/pages/Student/Portfolio";
 import CLOManagement from "@/components/pages/Teacher/CLOManagement";
 import PLOYLOReport from "@/components/pages/Teacher/PLOYLOReport";
 import FiveYearSummary from "@/components/pages/Teacher/FiveYearSummary";
@@ -226,6 +227,8 @@ const Index = () => {
         return <Students />;
       case "transcript":
         return <Transcript />;
+      case "portfolio":
+        return <Portfolio />;
       case "transfer-requests":
         return <TransferRequests />;
       default:
