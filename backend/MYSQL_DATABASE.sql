@@ -222,6 +222,7 @@ INSERT INTO `import_history` (`id`, `user_id`, `type`, `file_name`, `record_coun
 
 CREATE TABLE `notifications` (
   `notification_id` bigint NOT NULL,
+  `sender_user_id` bigint DEFAULT NULL COMMENT 'sender user (FK users)',
   `user_id` bigint NOT NULL COMMENT 'แจ้งเตือนถึงใคร (FK users)',
   `title` varchar(255) NOT NULL COMMENT 'หัวข้อแจ้งเตือน',
   `message` text COMMENT 'เนื้อหา',
@@ -231,14 +232,23 @@ CREATE TABLE `notifications` (
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
+
+-- --------------------------------------------------------
+
 --
--- Dumping data for table `notifications`
+-- Table structure for table `user_notification_settings`
 --
 
-INSERT INTO `notifications` (`notification_id`, `user_id`, `title`, `message`, `type`, `channel`, `is_read`, `created_at`) VALUES
-(4, 1, 'คำขอนัดพบอาจารย์', 'นายสมชาย รักเรียน ต้องการนัดพบเพื่อปรึกษาเรื่องการลงทะเบียน', 'request', 'in-app', 0, '2026-02-02 05:35:51'),
-(5, 1, 'แจ้งเตือนกำหนดส่งรายงาน', 'ส่งการแจ้งเตือนกำหนดส่งรายงานโครงการวิจัยให้นักศึกษา 5 คน', 'info', 'email', 0, '2026-02-02 04:35:51'),
-(6, 1, 'ส่งการแจ้งเตือนสำเร็จ', 'แจ้งเตือนผลการเรียนถึงนักศึกษา 12 คน สำเร็จแล้ว', 'success', 'both', 1, '2026-02-01 05:35:51');
+CREATE TABLE `user_notification_settings` (
+  `user_id` bigint NOT NULL,
+  `email_notifications` tinyint(1) NOT NULL DEFAULT '1',
+  `push_notifications` tinyint(1) NOT NULL DEFAULT '1',
+  `grade_notifications` tinyint(1) NOT NULL DEFAULT '1',
+  `project_notifications` tinyint(1) NOT NULL DEFAULT '1',
+  `student_notifications` tinyint(1) NOT NULL DEFAULT '1',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- --------------------------------------------------------
 
@@ -286,6 +296,12 @@ INSERT INTO `permissions` (`permission_id`, `permission_name`, `module_group`, `
 (26, 'AUDIT_LOG_VIEW', 'Admin', 'ดูประวัติการใช้งานระบบ (Audit Log)'),
 (27, 'ADMIN_APPROVALS', 'Admin', 'อนุมัติคำขอต่างๆ ในระบบ'),
 (28, 'ADMIN_REPORTS', 'Admin', 'จัดการรายงานระดับระบบ');
+
+-- --------------------------------------------------------
+
+INSERT INTO `permissions` (`permission_id`, `permission_name`, `module_group`, `description_th`) VALUES
+(29, 'STUDENT_TRANSCRIPT_VIEW', 'Student', 'View own transcript'),
+(30, 'STUDENT_PORTFOLIO_VIEW', 'Student', 'View and manage own portfolio');
 
 -- --------------------------------------------------------
 
@@ -350,6 +366,11 @@ INSERT INTO `position` (`position_id`, `position_name`) VALUES
 (5, 'อาจารย์ผู้รับผิดชอบหลักสูตร'),
 (6, 'อาจารย์ผู้รับผิดชอบโครงการ'),
 (7, 'เลขา');
+
+-- --------------------------------------------------------
+
+INSERT INTO `position` (`position_id`, `position_name`) VALUES
+(8, 'Student');
 
 -- --------------------------------------------------------
 
@@ -428,6 +449,15 @@ INSERT INTO `position_permission` (`position_id`, `permission_id`) VALUES
 (7, 26),
 (7, 27),
 (7, 28);
+
+-- --------------------------------------------------------
+
+INSERT INTO `position_permission` (`position_id`, `permission_id`) VALUES
+(8, 1),
+(8, 3),
+(8, 4),
+(8, 29),
+(8, 30);
 
 -- --------------------------------------------------------
 
@@ -1120,6 +1150,12 @@ INSERT INTO `system_sidebar_menus` (`menu_id`, `title`, `url`, `icon`, `permissi
 
 -- --------------------------------------------------------
 
+INSERT INTO `system_sidebar_menus` (`menu_id`, `title`, `url`, `icon`, `permission_required`, `section_title`, `is_active`) VALUES
+(21, 'ผลการเรียน', 'transcript', 'FileText', 'STUDENT_TRANSCRIPT_VIEW', 'นักศึกษา', 1),
+(22, 'Portfolio', 'portfolio', 'FolderKanban', 'STUDENT_PORTFOLIO_VIEW', 'นักศึกษา', 1);
+
+-- --------------------------------------------------------
+
 --
 -- Table structure for table `users`
 --
@@ -1171,6 +1207,17 @@ INSERT INTO `user_position` (`user_position_id`, `user_id`, `position_id`, `is_p
 (3, 6, 1, 1, NULL, NULL),
 (5, 7, 6, 1, NULL, NULL),
 (9, 8, 2, 1, NULL, NULL);
+
+-- --------------------------------------------------------
+
+INSERT INTO `user_position` (`user_id`, `position_id`, `is_primary`, `effective_from`, `effective_to`)
+SELECT u.user_id, 8, 1, NULL, NULL
+FROM `users` u
+WHERE u.role_id = 3
+  AND NOT EXISTS (
+    SELECT 1 FROM `user_position` up
+    WHERE up.user_id = u.user_id
+  );
 
 -- --------------------------------------------------------
 
@@ -1254,7 +1301,14 @@ ALTER TABLE `import_history`
 --
 ALTER TABLE `notifications`
   ADD PRIMARY KEY (`notification_id`),
-  ADD KEY `user_id` (`user_id`);
+  ADD KEY `user_id` (`user_id`),
+  ADD KEY `sender_user_id` (`sender_user_id`);
+
+--
+-- Indexes for table `user_notification_settings`
+--
+ALTER TABLE `user_notification_settings`
+  ADD PRIMARY KEY (`user_id`);
 
 --
 -- Indexes for table `permissions`
@@ -1429,7 +1483,7 @@ ALTER TABLE `notifications`
 -- AUTO_INCREMENT for table `permissions`
 --
 ALTER TABLE `permissions`
-  MODIFY `permission_id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=29;
+  MODIFY `permission_id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=31;
 
 --
 -- AUTO_INCREMENT for table `plo`
@@ -1489,7 +1543,7 @@ ALTER TABLE `Student_License_Attempts`
 -- AUTO_INCREMENT for table `system_sidebar_menus`
 --
 ALTER TABLE `system_sidebar_menus`
-  MODIFY `menu_id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=21;
+  MODIFY `menu_id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=23;
 
 --
 -- AUTO_INCREMENT for table `users`
@@ -1545,6 +1599,14 @@ ALTER TABLE `faculty_ce_records`
 --
 ALTER TABLE `notifications`
   ADD CONSTRAINT `notification_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE ON UPDATE RESTRICT;
+ALTER TABLE `notifications`
+  ADD CONSTRAINT `notification_ibfk_2` FOREIGN KEY (`sender_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL ON UPDATE RESTRICT;
+
+--
+-- Constraints for table `user_notification_settings`
+--
+ALTER TABLE `user_notification_settings`
+  ADD CONSTRAINT `user_notification_settings_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE ON UPDATE RESTRICT;
 
 --
 -- Constraints for table `plo`
