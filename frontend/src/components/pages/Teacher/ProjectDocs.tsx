@@ -4,15 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { FileText, Upload, Download, Eye, Plus } from 'lucide-react';
-
-// Mock data
-const mockDocs = [
-  { id: '1', name: 'ข้อเสนอโครงการ', project: 'โครงการพัฒนาทักษะการพยาบาล', type: 'proposal', date: '2024-01-05', status: 'approved' },
-  { id: '2', name: 'รายงานความก้าวหน้าครั้งที่ 1', project: 'โครงการพัฒนาทักษะการพยาบาล', type: 'progress', date: '2024-01-15', status: 'approved' },
-  { id: '3', name: 'เอกสารการเงิน', project: 'โครงการพัฒนาทักษะการพยาบาล', type: 'financial', date: '2024-01-10', status: 'pending' },
-  { id: '4', name: 'ข้อเสนอโครงการ', project: 'โครงการวิจัยการดูแลผู้สูงอายุ', type: 'proposal', date: '2023-12-20', status: 'approved' },
-  { id: '5', name: 'รายงานสรุปโครงการ', project: 'โครงการอบรมเทคโนโลยีการพยาบาล', type: 'summary', date: '2024-01-10', status: 'approved' },
-];
+import { useState, useEffect } from 'react'; // นำเข้า Hook สำหรับจัดการสถานะและดึงข้อมูล
 
 const getTypeBadge = (type: string) => {
   switch (type) {
@@ -41,6 +33,32 @@ const getStatusBadge = (status: string) => {
 };
 
 export default function ProjectDocs() {
+  // สร้าง State สำหรับเก็บข้อมูลจริงจากฐานข้อมูล
+  const [docs, setDocs] = useState<any[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  // เรียกใช้ API เพื่อดึงข้อมูลมาแสดงผลทันทีที่เปิดหน้านี้
+  useEffect(() => {
+    fetch('/api/get_project_docs.php') // สลับ Path ให้ตรงกับที่คุณเก็บไฟล์ PHP ไว้จริง
+      .then((res) => res.json())
+      .then((res) => {
+        if (res.status === 'success') {
+          setDocs(res.data); // ยัดข้อมูลจาก DB เข้า State Docs
+        } else {
+          console.error(res.message);
+        }
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("เกิดข้อผิดพลาดในการเชื่อมต่อ API:", err);
+        setLoading(false);
+      });
+  }, []);
+
+  if (loading) {
+    return <div className="p-6 text-center text-muted-foreground">กำลังโหลดข้อมูลเอกสารจากฐานข้อมูล...</div>;
+  }
+
   return (
     <>
       <div className="space-y-6">
@@ -61,7 +79,7 @@ export default function ProjectDocs() {
           </div>
         </div>
 
-        {/* Stats */}
+        {/* Stats - คำนวณจากจำนวนข้อมูลจริงในฐานข้อมูลปัจจุบัน */}
         <div className="grid gap-4 md:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -69,7 +87,7 @@ export default function ProjectDocs() {
               <FileText className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{mockDocs.length}</div>
+              <div className="text-2xl font-bold">{docs.length}</div>
             </CardContent>
           </Card>
           <Card>
@@ -79,7 +97,7 @@ export default function ProjectDocs() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-600">
-                {mockDocs.filter(d => d.status === 'approved').length}
+                {docs.filter(d => d.status === 'approved').length}
               </div>
             </CardContent>
           </Card>
@@ -90,7 +108,7 @@ export default function ProjectDocs() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-yellow-600">
-                {mockDocs.filter(d => d.status === 'pending').length}
+                {docs.filter(d => d.status === 'pending').length}
               </div>
             </CardContent>
           </Card>
@@ -101,7 +119,7 @@ export default function ProjectDocs() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {mockDocs.filter(d => d.type === 'proposal').length}
+                {docs.filter(d => d.type === 'proposal').length}
               </div>
             </CardContent>
           </Card>
@@ -126,25 +144,33 @@ export default function ProjectDocs() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {mockDocs.map((doc) => (
-                  <TableRow key={doc.id}>
-                    <TableCell className="font-medium">{doc.name}</TableCell>
-                    <TableCell className="max-w-[200px] truncate">{doc.project}</TableCell>
-                    <TableCell>{getTypeBadge(doc.type)}</TableCell>
-                    <TableCell>{doc.date}</TableCell>
-                    <TableCell>{getStatusBadge(doc.status)}</TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm">
-                          <Eye className="h-3 w-3" />
-                        </Button>
-                        <Button variant="outline" size="sm">
-                          <Download className="h-3 w-3" />
-                        </Button>
-                      </div>
+                {docs.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                      ยังไม่มีข้อมูลเอกสารโครงการถูกบันทึกอยู่ในระบบขณะนี้
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : (
+                  docs.map((doc) => (
+                    <TableRow key={doc.id}>
+                      <TableCell className="font-medium">{doc.name}</TableCell>
+                      <TableCell className="max-w-[200px] truncate">{doc.project}</TableCell>
+                      <TableCell>{getTypeBadge(doc.type)}</TableCell>
+                      <TableCell>{doc.date}</TableCell>
+                      <TableCell>{getStatusBadge(doc.status)}</TableCell>
+                      <TableCell>
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm">
+                            <Eye className="h-3 w-3" />
+                          </Button>
+                          <Button variant="outline" size="sm">
+                            <Download className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </CardContent>
