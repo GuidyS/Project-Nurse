@@ -397,7 +397,7 @@ export function AppSidebar({ onItemClick, activeItem }: SidebarProps) {
                       isActive
                         ? "text-white"
                         : "text-slate-600 hover:text-[#8a2be2]"
-                      )} />
+                    )} />
                     {!collapsed && <span>{title}</span>}
                   </SidebarMenuButton>
                 </SidebarMenuItem>

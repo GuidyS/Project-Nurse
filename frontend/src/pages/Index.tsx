@@ -150,7 +150,7 @@ const Index = () => {
 
       // Admin
       case "approvals":
-        return <FiveYearSummary />;
+        return <Approvals />;
       case "audit-log":
         return <AuditLog />;
       case "export-data":

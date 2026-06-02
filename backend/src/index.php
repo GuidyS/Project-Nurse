@@ -46,6 +46,15 @@
             case 'get-audit-logs':
                 require_once 'components/Admin/get-audit-logs.php';
                 break;
+            case 'get-approval-requests':
+                require_once 'components/Admin/get-approval-requests.php';
+                break;
+            case 'approve-request':
+                require_once 'components/Admin/approve-request.php';
+                break;
+            case 'reject-request':
+                require_once 'components/Admin/reject-request.php';
+                break;
             case 'export-data':
                 require_once 'components/Admin/export-data.php'; 
                 break;
