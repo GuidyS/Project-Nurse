@@ -8,7 +8,7 @@ header("Content-Type: application/json; charset=UTF-8");
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit(); }
 
-require_once 'auth_middleware.php'; 
+require_once __DIR__ . '/../../middlewares/auth_middleware.php'; 
 $user_id = $_SESSION['user_id'];
 
 $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
@@ -42,28 +42,26 @@ try {
         }
 
         $inQuery = implode(',', array_fill(0, count($my_subject_codes), '?'));
-        $sql_courses = "SELECT subject_id as id, subject_code as code, subject_name_th as name FROM subjects WHERE subject_code IN ($inQuery)";
-        $stmt_c = $pdo->prepare($sql_courses);
-        $stmt_c->execute($my_subject_codes);
-        $courses = $stmt_c->fetchAll(PDO::FETCH_ASSOC);
+        $sql_subject = "SELECT subject_id as id, subject_code as code, subject_name_th as name FROM subject WHERE subject_code IN ($inQuery) AND is_active = 1";
+        $stmt_subject = $pdo->prepare($sql_subject);
+        $stmt_subject->execute($my_subject_codes);
+        $courses = $stmt_subject->fetchAll(PDO::FETCH_ASSOC);
 
         echo json_encode(["status" => "success", "data" => ["courses" => $courses, "students" => []]]);
         exit();
     }
 
-    // 2. ถ้าส่ง subject_id มา -> ให้ดึงรายชื่อเด็กที่ลงทะเบียนวิชานั้น พร้อมคะแนนดิบ
+    // 2. ถ้าส่ง subject_id มา -> ให้ดึงรายชื่อเด็กที่ลงทะเบียนวิชานั้น
     $sql = "
         SELECT 
             s.student_id as id, 
-            s.student_code as studentId, 
+            s.student_id as studentId, 
             CONCAT(s.first_name_th, ' ', s.last_name_th) as name,
-            a.grade,
-            a.raw_scores
-        FROM enrollments e
+            e.grade
+        FROM enrollment e
         JOIN student s ON e.student_id = s.student_id
-        LEFT JOIN assessments a ON e.student_id = a.student_id AND a.subject_id = e.subject_id
         WHERE e.subject_id = ?
-        ORDER BY s.student_code ASC
+        ORDER BY s.student_id ASC
     ";
     $stmt = $pdo->prepare($sql);
     $stmt->execute([$subject_id]);
@@ -71,11 +69,8 @@ try {
 
     $students = [];
     foreach ($students_raw as $st) {
-        // แกะ JSON raw_scores 
-        $scores = $st['raw_scores'] ? json_decode($st['raw_scores'], true) : ["midterm" => "", "final" => "", "assignment" => ""];
-        
-        // คำนวณ Total แบบ Auto 
-        $total = (float)($scores['midterm'] ?? 0) + (float)($scores['final'] ?? 0) + (float)($scores['assignment'] ?? 0);
+        $scores = ["midterm" => "", "final" => "", "assignment" => ""];
+        $total = 0;
 
         $students[] = [
             "id" => $st['id'],

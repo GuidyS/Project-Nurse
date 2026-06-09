@@ -137,6 +137,35 @@
                 require_once 'components/sidebar.php';
                 break;
 
+            // Grading
+            case 'get_grading_data':
+                require_once 'components/Teacher/grading/get_grading_data.php';
+                break;
+            case 'save_grading_data':
+                require_once 'components/Teacher/grading/save_grading_data.php';
+                break;
+
+            // AssignInstructors
+            case 'get-assign-data':
+                require_once 'components/Teacher/AssignInstructors/get_assign_data.php';
+                break;
+            case 'save-assign-instructor':
+                require_once 'components/Teacher/AssignInstructors/save_assign_instructor.php';
+                break;
+
+            // CoursesPage
+            case 'get_courses':
+            case 'get_students':
+            case 'update_grade':
+                require_once 'components/Teacher/CoursesPage/api.php';
+                break;
+
+            // FiveYearSummary
+            case 'get_five_year_summary':
+                require_once 'components/Teacher/FiveYearSummary/get_five_year_summary.php';
+                break;
+
+
         default:
             http_response_code(404);
             echo json_encode(["error" => "API endpoint is not found!"]);

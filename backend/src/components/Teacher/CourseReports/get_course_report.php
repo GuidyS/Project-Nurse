@@ -8,7 +8,7 @@ header("Content-Type: application/json; charset=UTF-8");
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit(); }
 
-require_once 'auth_middleware.php'; 
+require_once __DIR__ . '/../../middlewares/auth_middleware.php'; 
 
 $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
 
@@ -26,13 +26,13 @@ try {
     $grade_template = ['A' => 0, 'B+' => 0, 'B' => 0, 'C+' => 0, 'C' => 0, 'D+' => 0, 'D' => 0, 'F' => 0];
     
     $sql_grades = "
-        SELECT a.grade, COUNT(*) as count 
-        FROM assessments a
-        JOIN subjects s ON a.subject_id = s.subject_id
-        WHERE a.academic_year = :year 
+        SELECT e.grade, COUNT(*) as count 
+        FROM enrollment e
+        JOIN subject s ON e.subject_id = s.subject_id
+        WHERE e.academic_year = :year 
           AND s.subject_code = :code 
-          AND a.grade IS NOT NULL AND a.grade != ''
-        GROUP BY a.grade
+          AND e.grade IS NOT NULL AND e.grade != ''
+        GROUP BY e.grade
     ";
     $stmt_grades = $pdo->prepare($sql_grades);
     $stmt_grades->execute([':year' => $academic_year, ':code' => $subject_code]);
@@ -52,49 +52,8 @@ try {
 
 
     // --- กราฟที่ 2: คำนวณผลสัมฤทธิ์ CLO (CLO Achievement) ---
-    // กวาดเอา JSON clo_scores ของเด็กทุกคนในวิชานี้มารวมกัน
-    $sql_clos = "
-        SELECT a.clo_scores 
-        FROM assessments a
-        JOIN subjects s ON a.subject_id = s.subject_id
-        WHERE a.academic_year = :year 
-          AND s.subject_code = :code 
-          AND a.clo_scores IS NOT NULL
-    ";
-    $stmt_clos = $pdo->prepare($sql_clos);
-    $stmt_clos->execute([':year' => $academic_year, ':code' => $subject_code]);
-    
-    $clo_totals = [];
-    $clo_counts = [];
-
-    while ($row = $stmt_clos->fetch(PDO::FETCH_ASSOC)) {
-        $scores = json_decode($row['clo_scores'], true);
-        if (is_array($scores)) {
-            // สมมติ JSON ของเด็กคือ {"CLO1": 80, "CLO2": 65}
-            foreach ($scores as $clo_name => $score) {
-                if (!isset($clo_totals[$clo_name])) {
-                    $clo_totals[$clo_name] = 0;
-                    $clo_counts[$clo_name] = 0;
-                }
-                $clo_totals[$clo_name] += (float)$score;
-                $clo_counts[$clo_name]++;
-            }
-        }
-    }
-
-    // หาค่าเฉลี่ย
+    // คืนค่าอาร์เรย์เปล่าเนื่องจากไม่มีระบบประเมินคะแนน CLO ในระบบฐานข้อมูลแล้ว
     $cloAchievement = [];
-    foreach ($clo_totals as $clo_name => $total) {
-        $average = round($total / $clo_counts[$clo_name], 2);
-        $cloAchievement[] = [
-            "name" => $clo_name,
-            "achieved" => $average,
-            "target" => 70 // สมมติเป้าหมายของคณะพยาบาลส่วนใหญ่อยู่ที่ 70%
-        ];
-    }
-    
-    // เรียงตามชื่อ CLO1, CLO2
-    usort($cloAchievement, function($a, $b) { return strcmp($a['name'], $b['name']); });
 
     echo json_encode([
         "status" => "success", 

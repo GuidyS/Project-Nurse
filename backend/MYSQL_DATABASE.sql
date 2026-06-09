@@ -147,15 +147,6 @@ CREATE TABLE `other_degree` (
 
 -- --------------------------------------------------------
 
---
--- Table structure for table `plo`
---
-
-CREATE TABLE `plo` (
-  `id` smallint NOT NULL,
-  `description` text COLLATE utf8mb4_general_ci NOT NULL,
-  `sub_plo_id` smallint NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -582,15 +573,6 @@ INSERT INTO `subject_group` (`id`, `subject_group_name`, `credit`) VALUES
 
 -- --------------------------------------------------------
 
---
--- Table structure for table `sub_plo`
---
-
-CREATE TABLE `sub_plo` (
-  `id` smallint NOT NULL,
-  `description` text COLLATE utf8mb4_general_ci NOT NULL,
-  `subject_id` varchar(50) COLLATE utf8mb4_general_ci NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -643,11 +625,6 @@ ALTER TABLE `faculty`
 ALTER TABLE `other_degree`
   ADD PRIMARY KEY (`id`);
 
---
--- Indexes for table `plo`
---
-ALTER TABLE `plo`
-  ADD PRIMARY KEY (`id`);
 
 --
 -- Indexes for table `positions`
@@ -713,12 +690,6 @@ ALTER TABLE `subject`
 ALTER TABLE `subject_group`
   ADD PRIMARY KEY (`id`);
 
---
--- Indexes for table `sub_plo`
---
-ALTER TABLE `sub_plo`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `FK_subject` (`subject_id`);
 
 --
 -- Indexes for table `users`
@@ -773,11 +744,6 @@ ALTER TABLE `subject`
   ADD CONSTRAINT `FK_select_subject` FOREIGN KEY (`select_subject_id`) REFERENCES `select_subject` (`id`),
   ADD CONSTRAINT `FK_subject_group` FOREIGN KEY (`subject_group_id`) REFERENCES `subject_group` (`id`);
 
---
--- Constraints for table `sub_plo`
---
-ALTER TABLE `sub_plo`
-  ADD CONSTRAINT `FK_subject` FOREIGN KEY (`subject_id`) REFERENCES `subject` (`subject_id`);
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

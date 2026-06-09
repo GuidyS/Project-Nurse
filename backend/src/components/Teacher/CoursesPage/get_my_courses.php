@@ -47,8 +47,8 @@ try {
     // 3. ดึงรายละเอียดวิชา และ จำนวนนักศึกษาที่ลงทะเบียน (ตาราง enrollments)
     $inQuery = implode(',', array_fill(0, count($my_subject_codes), '?'));
     $sql = "SELECT s.subject_id as id, s.subject_code as code, s.subject_name_th as name, s.credit as credits, s.semester,
-            (SELECT COUNT(*) FROM enrollments e WHERE e.subject_id = s.subject_id) as students
-            FROM subjects s WHERE s.subject_code IN ($inQuery) AND s.is_active = 1";
+            (SELECT COUNT(*) FROM enrollment e WHERE e.subject_id = s.subject_id) as students
+            FROM subject s WHERE s.subject_code IN ($inQuery) AND s.is_active = 1";
     
     $stmt = $pdo->prepare($sql);
     $stmt->execute($my_subject_codes);

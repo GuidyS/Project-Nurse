@@ -120,15 +120,15 @@ const Index = () => {
 
     if (activeItem === "register") return <RegisterPage onBackToLogin={() => setActiveItem("login")} />;
     if (activeItem === "profile") return <ProfilePage />;
-    if (activeItem === "notifications") return <NotificationsPage />;
-    if (activeItem === "settings") return <SettingsPage />;
+    if (activeItem === "notifications") return <NotificationsPage />;//ไกด์
+    if (activeItem === "settings") return <SettingsPage />;//ไกด์
 
     // 3. 🔒 หมวดสิทธิ์ผู้ดูแลระบบ (Admin - Role 1)
     const adminPages = ["approvals", "audit-log", "export-data", "import-data", "reports", "roles-management", "users-management"];
     if (adminPages.includes(activeItem)) {
       if (roleId !== 1) return <UnauthorizedView />;
       switch (activeItem) {
-        case "approvals": return <Approvals />;
+        case "approvals": return <AdviseNotes />;
         case "audit-log": return <AuditLog />;
         case "export-data": return <ExportData />;
         case "import-data": return <ImportData />;
@@ -162,32 +162,32 @@ const Index = () => {
       if (roleId !== 1 && roleId !== 2) return <UnauthorizedView />;
       switch (activeItem) {
         case "teacher-dashboard": return <Dashboard />;
-        case "courses": return <CoursesPage />;
-        case "five-year-summary": return <FiveYearSummary />;
+        case "courses": return <CoursesPage />;//เอิน เป็นหน้าAdmin ทำแล้ว
+        case "five-year-summary": return <FiveYearSummary />;//เอิน
         case "clo-management": //นวย
         case "clos": return <CLOPage />; // แก้ไขให้ใช้ CLOPage หน้าเดียว นวย
         case "plo-ylo-report": return <PLOYLOReport />;
         case "course-report": return <CourseReports />;
         case "documents": return <Documents />; //นวย
-        case "assign-instructors": return <AssignInstructors />;
+        case "assign-instructors": return <AssignInstructors />;//เอิน admin ทำแล้ว
         case "clo-map": return <CLOMap />;//นวย
         case "evidence": return <Evidence />; //เอิน
-        case "grades": return <Grades />;
-        case "my-courses": return <MyCourses />;//นวย
+        case "grades": return <Grades />;//อาจารย์ ทำแล้ว
+        case "my-courses": return <MyCourses />;//นวย //อาจารย์ ทำแล้ว
         case "performance": return <Performance />;//
         case "practical-students": return <PracticalStudents />;
         case "program-reports": return <ProgramReports />;
-        case "schedule-tasks": return <ScheduleTasks />;//
+        case "schedule-tasks": return <ScheduleTasks />;//ยังไม่ทำ
         case "projectspage": return <ProjectsPage />; //เอิน
-        case "my-projects": return <MyProjects />;//เอิน
-        case "project-docs": return <ProjectDocs />;//
-        case "project-links": return <ProjectLinks />;//
-        case "project-reports": return <ProjectReports />;//
+        case "my-projects": return <MyProjects onItemClick={setActiveItem} />;//เอิน
+        case "project-docs": return <ProjectDocs />;//ยังไม่ทำ
+        case "project-links": return <ProjectLinks />;//ยังไม่ทำ
+        case "project-reports": return <ProjectReports />;//ยังไม่ทำ
         case "advise-notes": return <AdviseNotes />;
         case "advisor-notifications": return <AdvisorNotifications />;
         case "advises": return <Advises />;
-        case "students": return <Students />;//
-        case "transfer-requests": return <TransferRequests />;
+        case "students": return <Students />;
+        case "transfer-requests": return <TransferRequests />;//ยังไม่ทำ
       }
     }
 

@@ -19,20 +19,20 @@ try {
     $years = $stmt_years->fetchAll(PDO::FETCH_COLUMN);
 
     // 2. ดึงรายชื่อวิชาทั้งหมดที่มีการประเมินผล
-    $sql_courses = "
+    $sql_subject = "
         SELECT DISTINCT s.subject_code, s.subject_name_th 
         FROM assessments a
-        JOIN subjects s ON a.subject_id = s.subject_id
+        JOIN subject s ON a.subject_id = s.subject_id
         ORDER BY s.subject_code ASC
     ";
-    $stmt_courses = $pdo->query($sql_courses);
-    $courses = $stmt_courses->fetchAll(PDO::FETCH_ASSOC);
+    $stmt_subject = $pdo->query($sql_subject);
+    $subject = $stmt_subject->fetchAll(PDO::FETCH_ASSOC);
 
     echo json_encode([
         "status" => "success", 
         "data" => [
             "years" => $years,
-            "courses" => $courses
+            "courses" => $subject
         ]
     ]);
 

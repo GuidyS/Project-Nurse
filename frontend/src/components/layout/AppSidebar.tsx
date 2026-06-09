@@ -172,7 +172,7 @@ interface SidebarProps {
 //   },
 
 export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
-
+  const { state } = useSidebar();
   const [menuSections, setMenuSections] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -205,7 +205,6 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
     return IconComponent || Icons.HelpCircle; // ถ้าหาไม่เจอให้ใช้ HelpCircle แทน
   };
 
-  const { state } = useSidebar();
   const collapsed = state === 'collapsed';
 
   const user = JSON.parse(localStorage.getItem('user') || '{}');

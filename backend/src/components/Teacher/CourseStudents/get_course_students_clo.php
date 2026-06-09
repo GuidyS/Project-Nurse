@@ -8,7 +8,7 @@ header("Content-Type: application/json; charset=UTF-8");
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit(); }
 
-require_once 'auth_middleware.php'; 
+require_once __DIR__ . '/../../middlewares/auth_middleware.php'; 
 
 $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
 $subject_id = $_GET['subject_id'] ?? null;
@@ -19,9 +19,9 @@ try {
     }
 
     // 1. หารหัสวิชา (subject_code) จาก subject_id เพื่อเอาไปค้นหา CLO ใน JSON หลักสูตร
-    $stmt_sub = $pdo->prepare("SELECT subject_code FROM subjects WHERE subject_id = ? LIMIT 1");
-    $stmt_sub->execute([$subject_id]);
-    $subject_code = $stmt_sub->fetchColumn();
+    $stmt_subject = $pdo->prepare("SELECT subject_code FROM subject WHERE subject_id = ? LIMIT 1");
+    $stmt_subject->execute([$subject_id]);
+    $subject_code = $stmt_subject->fetchColumn();
 
     // 2. ดึงรายการ CLO ของวิชานี้จาก curriculum_framework
     $clo_headers = [];
@@ -36,18 +36,16 @@ try {
         }
     }
 
-    // 3. ดึงรายชื่อนักศึกษา (enrollments) และคะแนนที่เคยให้ไว้ (assessments)
+    // 3. ดึงรายชื่อนักศึกษา (ตาราง enrollment)
     $sql = "
         SELECT 
             s.student_id as id, 
-            s.student_code as studentId, 
-            CONCAT(s.first_name_th, ' ', s.last_name_th) as name,
-            a.clo_scores
-        FROM enrollments e
+            s.student_id as studentId, 
+            CONCAT(s.first_name_th, ' ', s.last_name_th) as name
+        FROM enrollment e
         JOIN student s ON e.student_id = s.student_id
-        LEFT JOIN assessments a ON e.student_id = a.student_id AND a.subject_id = e.subject_id
         WHERE e.subject_id = ?
-        ORDER BY s.student_code ASC
+        ORDER BY s.student_id ASC
     ";
     $stmt = $pdo->prepare($sql);
     $stmt->execute([$subject_id]);
@@ -55,22 +53,9 @@ try {
 
     $students = [];
     foreach ($students_raw as $st) {
-        // แปลง JSON clo_scores จาก DB ให้เป็น Array
-        $scores = $st['clo_scores'] ? json_decode($st['clo_scores'], true) : [];
-        
-        // คำนวณคะแนนรวม (Overall) เบื้องต้น
+        $scores = [];
         $overall = 0;
-        $count = count($clo_headers);
-        if ($count > 0 && !empty($scores)) {
-            $total = 0;
-            foreach ($clo_headers as $h) {
-                $total += (float)($scores[$h] ?? 0);
-            }
-            $overall = round($total / $count, 2); // หารเฉลี่ย
-        }
-
-        // สถานะเบื้องต้น (ถ้าคะแนนรวม >= 50 ให้ผ่าน)
-        $status = ($overall >= 50) ? 'passed' : ($overall > 0 ? 'warning' : 'pending');
+        $status = 'pending';
 
         $students[] = [
             "id" => $st['id'],

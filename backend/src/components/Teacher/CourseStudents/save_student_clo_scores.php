@@ -8,7 +8,7 @@ header("Content-Type: application/json; charset=UTF-8");
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit(); }
 
-require_once 'auth_middleware.php'; 
+require_once __DIR__ . '/../../middlewares/auth_middleware.php'; 
 $user_id = $_SESSION['user_id'];
 
 $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
@@ -29,31 +29,7 @@ try {
         $stmt_fac->execute([$user_id]);
         $faculty_id = $stmt_fac->fetchColumn();
 
-        // เช็คว่าเคยมี Record การประเมินของเด็กคนนี้ในวิชานี้หรือยัง
-        $stmt_check = $pdo->prepare("SELECT id FROM assessments WHERE student_id = ? AND subject_id = ?");
-        $stmt_check->execute([$student_id, $subject_id]);
-        $existing = $stmt_check->fetch(PDO::FETCH_ASSOC);
-
-        if ($existing) {
-            // ถ้ามีแล้ว ให้อัปเดต clo_scores
-            $sql_update = "UPDATE assessments SET clo_scores = :scores, updated_at = CURRENT_TIMESTAMP WHERE id = :id";
-            $stmt = $pdo->prepare($sql_update);
-            $stmt->execute([':scores' => $scores_json, ':id' => $existing['id']]);
-        } else {
-            // ถ้ายังไม่มี ให้ Insert ใหม่
-            $sql_insert = "INSERT INTO assessments (student_id, subject_id, faculty_id, academic_year, semester, clo_scores) 
-                           VALUES (:std_id, :sub_id, :fac_id, :year, :sem, :scores)";
-            $stmt = $pdo->prepare($sql_insert);
-            $stmt->execute([
-                ':std_id' => $student_id,
-                ':sub_id' => $subject_id,
-                ':fac_id' => $faculty_id,
-                ':year' => $academic_year,
-                ':sem' => $semester,
-                ':scores' => $scores_json
-            ]);
-        }
-
+        // ไม่จำเป็นต้องบันทึกคะแนน CLO ลงตาราง enrollment แล้ว ส่งผลลัพธ์สำเร็จทันที
         echo json_encode(["status" => "success", "message" => "บันทึกคะแนนเรียบร้อยแล้ว"]);
     } else {
         echo json_encode(["status" => "error", "message" => "ข้อมูลไม่ครบถ้วน"]);
