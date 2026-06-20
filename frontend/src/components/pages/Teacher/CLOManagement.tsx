@@ -35,7 +35,7 @@ export default function CLOManagement() {
   // 🌟 2. ดึงข้อมูลจากฐานข้อมูลตอนเปิดหน้าเว็บ
   const fetchCLOData = async () => {
     try {
-      const response = await api.get(`/index.php?page=get_clo_management&subject_code=${subjectCode}`);
+      const response = await api.get(`/index.php?page=get-clo-management&subject-code=${subjectCode}`);
       if (response.data.status === "success") {
         setClos(response.data.data.clos || []); // เซ็ตรายการ CLO
         setPloOptions(response.data.data.plos || []); // เซ็ตรายการ PLO Options
@@ -54,7 +54,7 @@ export default function CLOManagement() {
   // 🌟 3. ฟังก์ชันหลักสำหรับส่ง Array ก้อนใหม่ไปทับใน Database
   const syncToDatabase = async (updatedClos: any[]) => {
     try {
-      const response = await api.post("/index.php?page=save_clo_management", {
+      const response = await api.post("/index.php?page=save-clo-management", {
         subject_code: subjectCode,
         clos: updatedClos
       });

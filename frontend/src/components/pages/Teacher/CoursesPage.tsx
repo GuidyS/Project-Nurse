@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { BookOpen, Users, Edit, Eye, MoreVertical, Plus, Save, X, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +33,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import api from "@/lib/axios";
 
 interface Course {
   id: number;
@@ -43,6 +44,7 @@ interface Course {
   semester: string;
   section: string;
   cloCount: number;
+  instructor?: string;
 }
 
 interface StudentGrade {
@@ -56,36 +58,102 @@ interface StudentGrade {
   grade: string;
 }
 
-const courses: Course[] = [
-  { id: 1, code: "CS101", name: "การเขียนโปรแกรมเบื้องต้น", credits: 3, students: 45, semester: "1/2568", section: "1", cloCount: 5 },
-  { id: 2, code: "CS201", name: "โครงสร้างข้อมูลและอัลกอริทึม", credits: 3, students: 38, semester: "1/2568", section: "1", cloCount: 6 },
-  { id: 3, code: "CS301", name: "ปัญญาประดิษฐ์", credits: 3, students: 32, semester: "1/2568", section: "1", cloCount: 4 },
-  { id: 4, code: "CS401", name: "Machine Learning", credits: 3, students: 28, semester: "1/2568", section: "1", cloCount: 5 },
-];
-
-const initialStudentGrades: StudentGrade[] = [
-  { id: 1, studentId: "64010001", name: "นายสมชาย รักเรียน", midterm: 35, final: 42, assignment: 18, total: 95, grade: "A" },
-  { id: 2, studentId: "64010002", name: "นางสาวสมหญิง ใจดี", midterm: 38, final: 45, assignment: 20, total: 103, grade: "A" },
-  { id: 3, studentId: "64010003", name: "นายวิชัย เก่งกล้า", midterm: 28, final: 35, assignment: 15, total: 78, grade: "B+" },
-  { id: 4, studentId: "64010004", name: "นางสาวพิมพ์ใจ สวยงาม", midterm: 40, final: 48, assignment: 19, total: 107, grade: "A" },
-  { id: 5, studentId: "64010005", name: "นายกิตติ อดทน", midterm: 25, final: 30, assignment: 12, total: 67, grade: "B" },
-  { id: 6, studentId: "64010006", name: "นางสาวนภา ท้องฟ้า", midterm: 32, final: 38, assignment: 17, total: 87, grade: "A-" },
-  { id: 7, studentId: "64010007", name: "นายธนกฤต มั่นคง", midterm: 20, final: 25, assignment: 10, total: 55, grade: "C+" },
-  { id: 8, studentId: "64010008", name: "นางสาวอรุณี แสงทอง", midterm: 30, final: 36, assignment: 16, total: 82, grade: "B+" },
-];
-
 const CoursesPage = () => {
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [isGradeDialogOpen, setIsGradeDialogOpen] = useState(false);
-  const [studentGrades, setStudentGrades] = useState<StudentGrade[]>(initialStudentGrades);
+  const [viewOnly, setViewOnly] = useState(false);
+  const [studentGrades, setStudentGrades] = useState<StudentGrade[]>([]);
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editValues, setEditValues] = useState<Partial<StudentGrade>>({});
   const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
 
-  const openGradeDialog = (course: Course) => {
+  const fetchCourses = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await api.get("/index.php?page=get-my-courses");
+      if (response.data && response.data.status === "success") {
+        const mappedCourses = response.data.data.map((course: any) => ({
+          id: Number(course.id),
+          code: course.code,
+          name: course.name,
+          credits: Number(course.credits),
+          students: Number(course.students),
+          semester: course.semester || "1/2567",
+          section: course.section || "1",
+          cloCount: Number(course.cloCount || 0),
+          instructor: course.instructor
+        }));
+        setCourses(mappedCourses);
+      } else {
+        toast({
+          title: "เกิดข้อผิดพลาด",
+          description: response.data.message || "ไม่สามารถดึงข้อมูลรายวิชาได้",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Failed to fetch courses:", error);
+      toast({
+        title: "เกิดข้อผิดพลาด",
+        description: "ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ในการดึงข้อมูลรายวิชาได้",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    fetchCourses();
+  }, [fetchCourses]);
+
+  const openGradeDialog = async (course: Course, viewMode: boolean = false) => {
     setSelectedCourse(course);
     setIsGradeDialogOpen(true);
+    setViewOnly(viewMode);
+    setSearchQuery("");
+    setStudentGrades([]); // Clear old students
+    
+    try {
+      const response = await api.get(`/index.php?page=get-course-students&subject_id=${course.id}`);
+      if (response.data && response.data.status === "success") {
+        const mappedStudents = response.data.data.map((student: any) => {
+          const midterm = student.midterm !== undefined && student.midterm !== null ? Number(student.midterm) : null;
+          const final = student.final !== undefined && student.final !== null ? Number(student.final) : null;
+          const assignment = student.assignment !== undefined && student.assignment !== null ? Number(student.assignment) : null;
+          const total = (midterm !== null || final !== null || assignment !== null) 
+            ? (midterm ?? 0) + (final ?? 0) + (assignment ?? 0) 
+            : null;
+          return {
+            id: Number(student.id),
+            studentId: student.studentId,
+            name: student.name,
+            midterm,
+            final,
+            assignment,
+            total,
+            grade: student.grade || "-"
+          };
+        });
+        setStudentGrades(mappedStudents);
+      } else {
+        toast({
+          title: "เกิดข้อผิดพลาด",
+          description: response.data.message || "ไม่สามารถดึงรายชื่อนักศึกษาได้",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Failed to fetch students:", error);
+      toast({
+        title: "เกิดข้อผิดพลาด",
+        description: "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์เพื่อดึงรายชื่อนักศึกษาได้",
+        variant: "destructive",
+      });
+    }
   };
 
   const startEditing = (student: StudentGrade) => {
@@ -103,32 +171,61 @@ const CoursesPage = () => {
     setEditValues({});
   };
 
-  const saveGrade = (studentId: number) => {
-    const midterm = editValues.midterm ?? 0;
-    const final = editValues.final ?? 0;
-    const assignment = editValues.assignment ?? 0;
-    const total = midterm + final + assignment;
+  const saveGrade = async (studentId: number) => {
+    const midterm = editValues.midterm ?? null;
+    const final = editValues.final ?? null;
+    const assignment = editValues.assignment ?? null;
+    const total = (midterm !== null || final !== null || assignment !== null) 
+      ? (midterm ?? 0) + (final ?? 0) + (assignment ?? 0) 
+      : null;
+    const newGrade = editValues.grade || studentGrades.find(s => s.id === studentId)?.grade || "F";
 
-    setStudentGrades(
-      studentGrades.map((s) =>
-        s.id === studentId
-          ? {
-              ...s,
-              midterm,
-              final,
-              assignment,
-              total,
-              grade: editValues.grade || s.grade,
-            }
-          : s
-      )
-    );
-    setEditingId(null);
-    setEditValues({});
-    toast({
-      title: "บันทึกสำเร็จ",
-      description: "บันทึกผลการเรียนเรียบร้อยแล้ว",
-    });
+    try {
+      const response = await api.post("/index.php?page=update-grade", {
+        id: studentId,
+        subject_id: selectedCourse?.id,
+        grade: newGrade,
+        midterm: midterm,
+        final: final,
+        assignment: assignment
+      });
+
+      if (response.data && response.data.status === "success") {
+        setStudentGrades(
+          studentGrades.map((s) =>
+            s.id === studentId
+              ? {
+                  ...s,
+                  midterm,
+                  final,
+                  assignment,
+                  total,
+                  grade: newGrade,
+                }
+              : s
+          )
+        );
+        setEditingId(null);
+        setEditValues({});
+        toast({
+          title: "บันทึกสำเร็จ",
+          description: "บันทึกผลการเรียนเรียบร้อยแล้ว",
+        });
+      } else {
+        toast({
+          title: "เกิดข้อผิดพลาด",
+          description: response.data.message || "ไม่สามารถบันทึกเกรดได้",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Failed to save grade:", error);
+      toast({
+        title: "เกิดข้อผิดพลาด",
+        description: "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์เพื่อบันทึกเกรดได้",
+        variant: "destructive",
+      });
+    }
   };
 
   const filteredStudents = studentGrades.filter(
@@ -201,6 +298,7 @@ const CoursesPage = () => {
               <TableHead>นักศึกษา</TableHead>
               <TableHead>ภาคเรียน</TableHead>
               <TableHead>CLO</TableHead>
+              <TableHead>อาจารย์ผู้รับผิดชอบ</TableHead>
               <TableHead className="text-right">การดำเนินการ</TableHead>
             </TableRow>
           </TableHeader>
@@ -222,6 +320,17 @@ const CoursesPage = () => {
                     {course.cloCount} CLO
                   </Badge>
                 </TableCell>
+                <TableCell>
+                  {course.instructor ? (
+                    <Badge className="bg-green-500 hover:bg-green-600 px-2 py-0.5 text-white">
+                      {course.instructor}
+                    </Badge>
+                  ) : (
+                    <Badge variant="destructive" className="px-2 py-0.5">
+                      ยังไม่มอบหมาย
+                    </Badge>
+                  )}
+                </TableCell>
                 <TableCell className="text-right">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -230,10 +339,10 @@ const CoursesPage = () => {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem className="gap-2" onClick={() => openGradeDialog(course)}>
+                      <DropdownMenuItem className="gap-2" onClick={() => openGradeDialog(course, false)}>
                         <Edit className="h-4 w-4" /> บันทึก/แก้ไขผลการเรียน
                       </DropdownMenuItem>
-                      <DropdownMenuItem className="gap-2">
+                      <DropdownMenuItem className="gap-2" onClick={() => openGradeDialog(course, true)}>
                         <Eye className="h-4 w-4" /> ดูรายชื่อนักศึกษา
                       </DropdownMenuItem>
                       <DropdownMenuItem className="gap-2">
@@ -253,7 +362,7 @@ const CoursesPage = () => {
         <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>
-              บันทึก/แก้ไขผลการเรียน - {selectedCourse?.code} {selectedCourse?.name}
+              {viewOnly ? "รายชื่อนักศึกษา" : "บันทึก/แก้ไขผลการเรียน"} - {selectedCourse?.code} {selectedCourse?.name}
             </DialogTitle>
             <DialogDescription>
               กลุ่ม {selectedCourse?.section} ภาคเรียน {selectedCourse?.semester}
@@ -284,7 +393,7 @@ const CoursesPage = () => {
                     <TableHead className="text-center w-[80px]">งาน<br />(20)</TableHead>
                     <TableHead className="text-center w-[80px]">รวม</TableHead>
                     <TableHead className="text-center w-[80px]">เกรด</TableHead>
-                    <TableHead className="text-right w-[100px]">จัดการ</TableHead>
+                    {!viewOnly && <TableHead className="text-right w-[100px]">จัดการ</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -372,37 +481,39 @@ const CoursesPage = () => {
                           getGradeBadge(student.grade)
                         )}
                       </TableCell>
-                      <TableCell className="text-right">
-                        {editingId === student.id ? (
-                          <div className="flex justify-end gap-1">
+                      {!viewOnly && (
+                        <TableCell className="text-right">
+                          {editingId === student.id ? (
+                            <div className="flex justify-end gap-1">
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-8 w-8 text-success"
+                                onClick={() => saveGrade(student.id)}
+                              >
+                                <Save className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-8 w-8 text-destructive"
+                                onClick={cancelEditing}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ) : (
                             <Button
                               size="icon"
                               variant="ghost"
-                              className="h-8 w-8 text-success"
-                              onClick={() => saveGrade(student.id)}
+                              className="h-8 w-8"
+                              onClick={() => startEditing(student)}
                             >
-                              <Save className="h-4 w-4" />
+                              <Edit className="h-4 w-4" />
                             </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-8 w-8 text-destructive"
-                              onClick={cancelEditing}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        ) : (
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-8 w-8"
-                            onClick={() => startEditing(student)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </TableCell>
+                          )}
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>
@@ -414,17 +525,19 @@ const CoursesPage = () => {
             <Button variant="outline" onClick={() => setIsGradeDialogOpen(false)}>
               ปิด
             </Button>
-            <Button
-              onClick={() => {
-                toast({
-                  title: "บันทึกทั้งหมดสำเร็จ",
-                  description: "บันทึกผลการเรียนทั้งหมดเรียบร้อยแล้ว",
-                });
-                setIsGradeDialogOpen(false);
-              }}
-            >
-              บันทึกทั้งหมด
-            </Button>
+            {!viewOnly && (
+              <Button
+                onClick={() => {
+                  toast({
+                    title: "บันทึกทั้งหมดสำเร็จ",
+                    description: "บันทึกผลการเรียนทั้งหมดเรียบร้อยแล้ว",
+                  });
+                  setIsGradeDialogOpen(false);
+                }}
+              >
+                บันทึกทั้งหมด
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

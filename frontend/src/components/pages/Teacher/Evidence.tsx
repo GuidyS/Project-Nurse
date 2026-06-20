@@ -7,26 +7,26 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CheckSquare, Upload, FileImage, FileText, Download, Search, Eye } from 'lucide-react';
-import { useState } from 'react';
+import { CheckSquare, Upload, FileImage, FileText, Download, Search, Eye, Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useToast } from "@/hooks/use-toast";
+import api from "@/lib/axios";
 
-// Mock data
-const mockEvidence = [
-  { id: '1', studentId: '64010001', studentName: 'สมชาย ใจดี', type: 'photo', title: 'ภาพการตรวจสัญญาณชีพ', date: '2024-01-15', verified: true },
-  { id: '2', studentId: '64010001', studentName: 'สมชาย ใจดี', type: 'document', title: 'รายงานการฝึกสัปดาห์ที่ 1', date: '2024-01-14', verified: true },
-  { id: '3', studentId: '64010002', studentName: 'สมหญิง รักเรียน', type: 'photo', title: 'ภาพการเจาะเลือด', date: '2024-01-12', verified: false },
-  { id: '4', studentId: '64010003', studentName: 'มานะ ตั้งใจ', type: 'video', title: 'วิดีโอการทำหัตถการ', date: '2024-01-10', verified: true },
-  { id: '5', studentId: '64010004', studentName: 'มานี ขยัน', type: 'document', title: 'บันทึกการดูแลผู้ป่วย', date: '2024-01-08', verified: false },
-  { id: '6', studentId: '64010005', studentName: 'ปิติ สุขใจ', type: 'photo', title: 'ภาพการทำแผล', date: '2024-01-11', verified: true },
-];
+type EvidenceItem = {
+  id: string;
+  studentId: string;
+  studentName: string;
+  type: string;
+  title: string;
+  url: string;
+  date: string;
+  verified: boolean;
+};
 
-const mockStudents = [
-  { id: '64010001', name: 'สมชาย ใจดี' },
-  { id: '64010002', name: 'สมหญิง รักเรียน' },
-  { id: '64010003', name: 'มานะ ตั้งใจ' },
-  { id: '64010004', name: 'มานี ขยัน' },
-  { id: '64010005', name: 'ปิติ สุขใจ' },
-];
+type StudentItem = {
+  id: string;
+  name: string;
+};
 
 const getTypeBadge = (type: string) => {
   switch (type) {
@@ -42,37 +42,142 @@ const getTypeBadge = (type: string) => {
 };
 
 export default function Evidence() {
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
+  const [evidenceList, setEvidenceList] = useState<EvidenceItem[]>([]);
+  const [students, setStudents] = useState<StudentItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [newEvidence, setNewEvidence] = useState({
     studentId: '',
     title: '',
     type: 'photo',
   });
 
-  const filteredEvidence = mockEvidence.filter(
+  useEffect(() => {
+    if (!isDialogOpen) {
+      setSelectedFile(null);
+    }
+  }, [isDialogOpen]);
+
+  const fetchEvidence = async () => {
+    try {
+      setIsLoading(true);
+      const response = await api.get('/index.php?page=get-evidence');
+      if (response.data.status === 'success') {
+        setEvidenceList(response.data.data.evidence || []);
+        setStudents(response.data.data.students || []);
+      }
+    } catch (error) {
+      toast({ title: "ข้อผิดพลาด", description: "ไม่สามารถดึงข้อมูลหลักฐานได้", variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchEvidence();
+  }, []);
+
+  const filteredEvidence = evidenceList.filter(
     (e) =>
-      e.studentName.includes(searchTerm) ||
-      e.studentId.includes(searchTerm) ||
-      e.title.includes(searchTerm)
+      e.studentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      e.studentId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      e.title.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const stats = {
-    total: mockEvidence.length,
-    verified: mockEvidence.filter(e => e.verified).length,
-    pending: mockEvidence.filter(e => !e.verified).length,
-    photos: mockEvidence.filter(e => e.type === 'photo').length,
+    total: evidenceList.length,
+    verified: evidenceList.filter(e => e.verified).length,
+    pending: evidenceList.filter(e => !e.verified).length,
+    photos: evidenceList.filter(e => e.type === 'photo').length,
   };
 
-  const handleUpload = () => {
-    console.log('Uploading evidence:', newEvidence);
-    setIsDialogOpen(false);
-    setNewEvidence({ studentId: '', title: '', type: 'photo' });
+  const handleUpload = async () => {
+    if (!newEvidence.studentId || !newEvidence.title || !newEvidence.type || !selectedFile) {
+      toast({ title: "แจ้งเตือน", description: "กรุณากรอกข้อมูลและเลือกไฟล์ให้ครบถ้วน", variant: "destructive" });
+      return;
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append('studentId', newEvidence.studentId);
+      formData.append('title', newEvidence.title);
+      formData.append('type', newEvidence.type);
+      formData.append('file', selectedFile);
+
+      const response = await api.post('/index.php?page=upload-evidence', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      if (response.data.status === 'success') {
+        toast({ title: "สำเร็จ", description: "บันทึกหลักฐานและอัปโหลดไฟล์เรียบร้อยแล้ว" });
+        setIsDialogOpen(false);
+        setNewEvidence({ studentId: '', title: '', type: 'photo' });
+        setSelectedFile(null);
+        fetchEvidence();
+      } else {
+        toast({ title: "ข้อผิดพลาด", description: response.data.message || "ไม่สามารถอัปโหลดได้", variant: "destructive" });
+      }
+    } catch (error) {
+      toast({ title: "ข้อผิดพลาด", description: "ไม่สามารถอัปโหลดหลักฐานได้", variant: "destructive" });
+    }
   };
 
-  const handleVerify = (id: string) => {
-    console.log('Verifying evidence:', id);
+  const handleVerify = async (id: string) => {
+    try {
+      const response = await api.post('/index.php?page=verify-evidence', { id });
+      if (response.data.status === 'success') {
+        toast({ title: "สำเร็จ", description: "ยืนยันการตรวจสอบหลักฐานเรียบร้อย" });
+        fetchEvidence();
+      } else {
+        toast({ title: "ข้อผิดพลาด", description: response.data.message || "ไม่สามารถยืนยันได้", variant: "destructive" });
+      }
+    } catch (error) {
+      toast({ title: "ข้อผิดพลาด", description: "ไม่สามารถยืนยันหลักฐานได้", variant: "destructive" });
+    }
   };
+  //ฟังค์ชัน ดู
+
+  const getFileUrl = (urlPath: string) => {
+    if (!urlPath) return '#';
+    if (urlPath.startsWith('http')) return urlPath;
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+    return `${baseUrl}/${urlPath}`;
+  };
+
+  const handleView = (url: string) => {
+    if (!url) {
+      toast({ title: "ข้อผิดพลาด", description: "ไม่พบที่อยู่ไฟล์หลักฐาน", variant: "destructive" });
+      return;
+    }
+    window.open(getFileUrl(url), '_blank');
+  };
+
+  const handleDownload = (url: string, title: string) => {
+    if (!url) {
+      toast({ title: "ข้อผิดพลาด", description: "ไม่พบที่อยู่ไฟล์หลักฐาน", variant: "destructive" });
+      return;
+    }
+    const link = document.createElement('a');
+    link.href = getFileUrl(url);
+    link.setAttribute('download', title || 'download');
+    link.setAttribute('target', '_blank');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex h-96 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <>
@@ -107,7 +212,7 @@ export default function Evidence() {
                       <SelectValue placeholder="เลือกนักศึกษา" />
                     </SelectTrigger>
                     <SelectContent>
-                      {mockStudents.map((student) => (
+                      {students.map((student) => (
                         <SelectItem key={student.id} value={student.id}>
                           {student.id} - {student.name}
                         </SelectItem>
@@ -141,7 +246,14 @@ export default function Evidence() {
                 </div>
                 <div className="grid gap-2">
                   <Label>ไฟล์</Label>
-                  <Input type="file" />
+                  <Input
+                    type="file"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        setSelectedFile(e.target.files[0]);
+                      }
+                    }}
+                  />
                 </div>
               </div>
               <DialogFooter>
@@ -239,11 +351,11 @@ export default function Evidence() {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-2">
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" onClick={() => handleView(evidence.url)}>
                           <Eye className="mr-1 h-3 w-3" />
                           ดู
                         </Button>
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" onClick={() => handleDownload(evidence.url, evidence.title)}>
                           <Download className="mr-1 h-3 w-3" />
                           ดาวน์โหลด
                         </Button>

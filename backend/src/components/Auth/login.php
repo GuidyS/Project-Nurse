@@ -65,6 +65,7 @@ try {
         // 2. เก็บเข้า Session
         $_SESSION['permissions'] = $permissions;
         $_SESSION['user_id'] = $user['user_id'];
+        $_SESSION['username'] = $user['username'];
 
         // ==========================================
         // 🔴 เพิ่มโค้ดบันทึก Audit Log (ล็อกอิน)

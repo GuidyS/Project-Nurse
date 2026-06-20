@@ -1,63 +1,160 @@
-import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Users, Search, UserPlus, BookOpen, Edit } from 'lucide-react';
-import { useState } from 'react';
-
-// Mock data
-const mockCourses = [
-  { id: '1', code: 'NUR101', name: 'พื้นฐานการพยาบาล', instructor: 'อ.สมศักดิ์ รักดี', credits: 3, students: 45, semester: '2/2566' },
-  { id: '2', code: 'NUR201', name: 'การพยาบาลผู้ใหญ่ 1', instructor: 'อ.มานี สุขใจ', credits: 4, students: 42, semester: '2/2566' },
-  { id: '3', code: 'NUR202', name: 'การพยาบาลผู้ใหญ่ 2', instructor: null, credits: 4, students: 40, semester: '2/2566' },
-  { id: '4', code: 'NUR301', name: 'การพยาบาลเด็ก', instructor: 'อ.วิชัย ตั้งใจ', credits: 3, students: 38, semester: '2/2566' },
-  { id: '5', code: 'NUR302', name: 'การพยาบาลจิตเวช', instructor: null, credits: 3, students: 38, semester: '2/2566' },
-  { id: '6', code: 'NUR401', name: 'การบริหารการพยาบาล', instructor: 'อ.สมหญิง มุ่งมั่น', credits: 2, students: 35, semester: '2/2566' },
-];
-
-const mockInstructors = [
-  { id: '1', name: 'อ.สมศักดิ์ รักดี', courses: 2, specialization: 'การพยาบาลพื้นฐาน' },
-  { id: '2', name: 'อ.มานี สุขใจ', courses: 1, specialization: 'การพยาบาลผู้ใหญ่' },
-  { id: '3', name: 'อ.วิชัย ตั้งใจ', courses: 1, specialization: 'การพยาบาลเด็ก' },
-  { id: '4', name: 'อ.สมหญิง มุ่งมั่น', courses: 1, specialization: 'การบริหารการพยาบาล' },
-  { id: '5', name: 'อ.ปิยะ พัฒนา', courses: 0, specialization: 'การพยาบาลจิตเวช' },
-  { id: '6', name: 'อ.มานะ สร้างสรรค์', courses: 0, specialization: 'การพยาบาลผู้ใหญ่' },
-];
+import { Users, Search, UserPlus, BookOpen, Edit, Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import api from '@/lib/axios';
+import { useToast } from '@/hooks/use-toast';
 
 export default function AssignInstructors() {
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState<string | null>(null);
   const [selectedInstructor, setSelectedInstructor] = useState('');
 
-  const filteredCourses = mockCourses.filter(
+  const [coursesList, setCoursesList] = useState<any[]>([]);
+  const [instructorsList, setInstructorsList] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const fetchData = async () => {
+    try {
+      setIsLoading(true);
+      const response = await api.get('/index.php?page=get-assign-data');
+      if (response.data.status === 'success') {
+        setCoursesList(response.data.data.courses || []);
+        setInstructorsList(response.data.data.instructors || []);
+      } else {
+        toast({
+          title: "ดึงข้อมูลล้มเหลว",
+          description: response.data.message || "ไม่สามารถดึงข้อมูลภาระงานอาจารย์ได้",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching assign data:", error);
+      toast({
+        title: "เกิดข้อผิดพลาด",
+        description: "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ในการดึงข้อมูลได้",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const filteredCourses = coursesList.filter(
     (course) =>
-      course.name.includes(searchTerm) ||
-      course.code.includes(searchTerm) ||
-      (course.instructor && course.instructor.includes(searchTerm))
+      course.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      course.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (course.instructor && course.instructor.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const stats = {
-    totalCourses: mockCourses.length,
-    assigned: mockCourses.filter(c => c.instructor).length,
-    unassigned: mockCourses.filter(c => !c.instructor).length,
-    totalInstructors: mockInstructors.length,
+    totalCourses: coursesList.length,
+    assigned: coursesList.filter(c => c.instructor_id).length,
+    unassigned: coursesList.filter(c => !c.instructor_id).length,
+    totalInstructors: instructorsList.length,
   };
 
-  const handleAssign = () => {
-    console.log('Assigning instructor:', selectedInstructor, 'to course:', selectedCourse);
-    setIsDialogOpen(false);
-    setSelectedCourse(null);
-    setSelectedInstructor('');
+  const handleAssign = async () => {
+    if (!selectedCourse || !selectedInstructor) {
+      toast({
+        title: "แจ้งเตือน",
+        description: "กรุณาเลือกอาจารย์ผู้รับผิดชอบรายวิชานี้",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      const response = await api.post('/index.php?page=save-assign-instructor', {
+        subject_code: selectedCourse,
+        faculty_id: selectedInstructor
+      });
+
+      if (response.data.status === 'success') {
+        toast({
+          title: "สำเร็จ",
+          description: "มอบหมายอาจารย์ผู้รับผิดชอบรายวิชาเรียบร้อยแล้ว"
+        });
+        setIsDialogOpen(false);
+        setSelectedCourse(null);
+        setSelectedInstructor('');
+        fetchData();
+      } else {
+        toast({
+          title: "เกิดข้อผิดพลาด",
+          description: response.data.message || "ไม่สามารถบันทึกข้อมูลได้",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error("Error assigning instructor:", error);
+      toast({
+        title: "เกิดข้อผิดพลาด",
+        description: "เกิดข้อผิดพลาดในการส่งคำสั่งมอบหมายไปยังเซิร์ฟเวอร์",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleUnassign = async () => {
+    if (!selectedCourse) return;
+
+    try {
+      setIsSaving(true);
+      const response = await api.post('/index.php?page=save-assign-instructor', {
+        subject_code: selectedCourse,
+        faculty_id: "" // ส่งค่าว่างเพื่อยกเลิกการมอบหมาย
+      });
+
+      if (response.data.status === 'success') {
+        toast({
+          title: "สำเร็จ",
+          description: "ยกเลิกการมอบหมายอาจารย์เรียบร้อยแล้ว"
+        });
+        setIsDialogOpen(false);
+        setSelectedCourse(null);
+        setSelectedInstructor('');
+        fetchData();
+      } else {
+        toast({
+          title: "เกิดข้อผิดพลาด",
+          description: response.data.message || "ไม่สามารถยกเลิกการมอบหมายได้",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error("Error unassigning instructor:", error);
+      toast({
+        title: "เกิดข้อผิดพลาด",
+        description: "เกิดข้อผิดพลาดในการส่งคำสั่งไปยังเซิร์ฟเวอร์",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const openAssignDialog = (courseId: string) => {
     setSelectedCourse(courseId);
+    // ดึงค่าอาจารย์คนเดิมที่สอนอยู่ออกมารอใน dropdown ถ้ามี
+    const currentCourse = coursesList.find(c => c.id === courseId);
+    setSelectedInstructor(currentCourse?.instructor_id || '');
     setIsDialogOpen(true);
   };
 
@@ -77,7 +174,7 @@ export default function AssignInstructors() {
               <BookOpen className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.totalCourses}</div>
+              <div className="text-2xl font-bold">{isLoading ? "-" : stats.totalCourses}</div>
             </CardContent>
           </Card>
           <Card>
@@ -86,7 +183,7 @@ export default function AssignInstructors() {
               <Users className="h-4 w-4 text-green-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">{stats.assigned}</div>
+              <div className="text-2xl font-bold text-green-600">{isLoading ? "-" : stats.assigned}</div>
             </CardContent>
           </Card>
           <Card>
@@ -95,7 +192,7 @@ export default function AssignInstructors() {
               <Users className="h-4 w-4 text-destructive" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-destructive">{stats.unassigned}</div>
+              <div className="text-2xl font-bold text-destructive">{isLoading ? "-" : stats.unassigned}</div>
             </CardContent>
           </Card>
           <Card>
@@ -104,7 +201,7 @@ export default function AssignInstructors() {
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.totalInstructors}</div>
+              <div className="text-2xl font-bold">{isLoading ? "-" : stats.totalInstructors}</div>
             </CardContent>
           </Card>
         </div>
@@ -125,56 +222,67 @@ export default function AssignInstructors() {
             </div>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>รหัสวิชา</TableHead>
-                  <TableHead>ชื่อวิชา</TableHead>
-                  <TableHead>หน่วยกิต</TableHead>
-                  <TableHead>นักศึกษา</TableHead>
-                  <TableHead>ภาคเรียน</TableHead>
-                  <TableHead>อาจารย์ผู้สอน</TableHead>
-                  <TableHead>การดำเนินการ</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredCourses.map((course) => (
-                  <TableRow key={course.id}>
-                    <TableCell className="font-medium">{course.code}</TableCell>
-                    <TableCell>{course.name}</TableCell>
-                    <TableCell>{course.credits}</TableCell>
-                    <TableCell>{course.students}</TableCell>
-                    <TableCell>{course.semester}</TableCell>
-                    <TableCell>
-                      {course.instructor ? (
-                        <Badge className="bg-green-500">{course.instructor}</Badge>
-                      ) : (
-                        <Badge variant="destructive">ยังไม่มอบหมาย</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        variant={course.instructor ? 'outline' : 'default'}
-                        size="sm"
-                        onClick={() => openAssignDialog(course.id)}
-                      >
-                        {course.instructor ? (
-                          <>
-                            <Edit className="mr-1 h-3 w-3" />
-                            เปลี่ยน
-                          </>
-                        ) : (
-                          <>
-                            <UserPlus className="mr-1 h-3 w-3" />
-                            มอบหมาย
-                          </>
-                        )}
-                      </Button>
-                    </TableCell>
+            {isLoading ? (
+              <div className="flex h-64 items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : filteredCourses.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground border-2 border-dashed rounded-lg">
+                ไม่พบวิชาตามเงื่อนไขที่สืบค้น
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>รหัสวิชา</TableHead>
+                    <TableHead>ชื่อวิชา</TableHead>
+                    <TableHead className="text-center">หน่วยกิต</TableHead>
+                    <TableHead className="text-center">นักศึกษาที่ลงทะเบียน</TableHead>
+                    <TableHead className="text-center">ภาคเรียน</TableHead>
+                    <TableHead className="text-center">อาจารย์ประจำวิชา</TableHead>
+                    <TableHead className="text-center">การดำเนินการ</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filteredCourses.map((course) => (
+                    <TableRow key={course.id}>
+                      <TableCell className="font-medium">{course.code}</TableCell>
+                      <TableCell>{course.name}</TableCell>
+                      <TableCell className="text-center">{course.credits}</TableCell>
+                      <TableCell className="text-center">{course.students} คน</TableCell>
+                      <TableCell className="text-center">{course.semester}</TableCell>
+                      <TableCell className="text-center">
+                        {course.instructor ? (
+                          <Badge className="bg-green-500 hover:bg-green-600 px-2.5 py-0.5">{course.instructor}</Badge>
+                        ) : (
+                          <Badge variant="destructive" className="px-2.5 py-0.5">ยังไม่มอบหมาย</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Button
+                          variant={course.instructor ? 'outline' : 'default'}
+                          size="sm"
+                          onClick={() => openAssignDialog(course.id)}
+                          className="h-8"
+                        >
+                          {course.instructor ? (
+                            <>
+                              <Edit className="mr-1.5 h-3.5 w-3.5" />
+                              เปลี่ยน
+                            </>
+                          ) : (
+                            <>
+                              <UserPlus className="mr-1.5 h-3.5 w-3.5" />
+                              มอบหมาย
+                            </>
+                          )}
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
 
@@ -185,22 +293,30 @@ export default function AssignInstructors() {
             <CardDescription>จำนวนรายวิชาที่อาจารย์แต่ละท่านรับผิดชอบ</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-4 md:grid-cols-3">
-              {mockInstructors.map((instructor) => (
-                <div
-                  key={instructor.id}
-                  className="flex items-center justify-between rounded-lg border p-4"
-                >
-                  <div>
-                    <p className="font-medium">{instructor.name}</p>
-                    <p className="text-sm text-muted-foreground">{instructor.specialization}</p>
+            {isLoading ? (
+              <div className="flex h-32 items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : instructorsList.length === 0 ? (
+              <div className="text-center py-6 text-muted-foreground">ไม่พบข้อมูลอาจารย์</div>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-3">
+                {instructorsList.map((instructor) => (
+                  <div
+                    key={instructor.id}
+                    className="flex items-center justify-between rounded-lg border p-4 bg-card shadow-sm hover:shadow-md transition-shadow"
+                  >
+                    <div>
+                      <p className="font-semibold text-foreground">{instructor.name}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">รหัส: {instructor.id}</p>
+                    </div>
+                    <Badge variant={instructor.courses_count > 0 ? 'default' : 'secondary'} className="text-xs">
+                      {instructor.courses_count} วิชา
+                    </Badge>
                   </div>
-                  <Badge variant={instructor.courses > 0 ? 'default' : 'secondary'}>
-                    {instructor.courses} วิชา
-                  </Badge>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -208,39 +324,57 @@ export default function AssignInstructors() {
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>มอบหมายอาจารย์ผู้สอน</DialogTitle>
+              <DialogTitle>มอบหมายอาจารย์ผู้รับผิดชอบรายวิชา</DialogTitle>
               <DialogDescription>
-                เลือกอาจารย์ที่จะรับผิดชอบรายวิชานี้
+                เลือกอาจารย์ผู้ที่จะดูแลรับผิดชอบหลักสูตรในรายวิชานี้
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label>รายวิชา</Label>
-                <p className="text-sm text-muted-foreground">
-                  {mockCourses.find(c => c.id === selectedCourse)?.code} - {mockCourses.find(c => c.id === selectedCourse)?.name}
+              <div className="grid gap-2 border-b pb-3">
+                <Label className="font-semibold">รายวิชา</Label>
+                <p className="text-sm font-medium text-foreground bg-muted p-2 rounded">
+                  {coursesList.find(c => c.id === selectedCourse)?.code} - {coursesList.find(c => c.id === selectedCourse)?.name}
                 </p>
               </div>
               <div className="grid gap-2">
-                <Label>อาจารย์ผู้สอน</Label>
+                <Label className="font-semibold">อาจารย์ประจำวิชา</Label>
                 <Select value={selectedInstructor} onValueChange={setSelectedInstructor}>
                   <SelectTrigger>
-                    <SelectValue placeholder="เลือกอาจารย์" />
+                    <SelectValue placeholder="กรุณาเลือกอาจารย์..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {mockInstructors.map((instructor) => (
+                    {instructorsList.map((instructor) => (
                       <SelectItem key={instructor.id} value={instructor.id}>
-                        {instructor.name} ({instructor.courses} วิชา)
+                        {instructor.name} ({instructor.courses_count} วิชา)
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                ยกเลิก
-              </Button>
-              <Button onClick={handleAssign}>มอบหมาย</Button>
+            <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-between sm:items-center gap-2">
+              {coursesList.find(c => c.id === selectedCourse)?.instructor_id ? (
+                <Button
+                  variant="destructive"
+                  onClick={handleUnassign}
+                  disabled={isSaving}
+                  className="sm:mr-auto w-full sm:w-auto"
+                >
+                  {isSaving && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+                  ยกเลิกการมอบหมาย
+                </Button>
+              ) : (
+                <div className="hidden sm:block" />
+              )}
+              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto justify-end sm:ml-auto">
+                <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isSaving} className="w-full sm:w-auto">
+                  ยกเลิก
+                </Button>
+                <Button onClick={handleAssign} disabled={isSaving} className="w-full sm:w-auto">
+                  {isSaving && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+                  มอบหมาย
+                </Button>
+              </div>
             </DialogFooter>
           </DialogContent>
         </Dialog>

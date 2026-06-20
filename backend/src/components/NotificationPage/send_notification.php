@@ -1,59 +1,181 @@
 <?php
-//  เริ่มต้น Session (ต้องอยู่บรรทัดแรกสุดเสมอ!)
-// ถ้าขาดบรรทัดนี้ $_SESSION['user_id'] จะว่างเปล่า และระบบจะคิดว่าไม่ได้ล็อกอิน
-session_start(); //  เริ่ม Session เพื่อเช็คว่าใครเป็นคนส่ง
-// ตั้งค่า CORS ให้ Frontend (React) คุยกับ Backend ได้
-header("Access-Control-Allow-Origin: http://localhost:5173"); // อนุญาตให้ React Port 5173 เข้าถึงได้
-header("Access-Control-Allow-Credentials: true");  // สำคัญ! อนุญาตให้ส่ง Cookie/Session มาด้วยได้
-header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
+session_start();
+
+header("Access-Control-Allow-Origin: http://localhost:5173");
+header("Access-Control-Allow-Credentials: true");
+header("Access-Control-Allow-Methods: POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
 header("Content-Type: application/json; charset=UTF-8");
 
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit(); }
-//  เชื่อมต่อฐานข้อมูล
-$pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
-// รับข้อมูล JSON ที่ Frontend ส่งมา (เช่น หัวข้อ, ข้อความ, รายชื่อ นศ.)
-$input = json_decode(file_get_contents("php://input"), true);
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit();
+}
 
-// 🔒 SECURITY CHECK: ต้องล็อกอินก่อนถึงจะส่งข้อความได้
 if (!isset($_SESSION['user_id'])) {
     http_response_code(401);
     echo json_encode(["status" => "error", "message" => "Unauthorized"]);
     exit();
 }
 
-// ตรวจสอบว่าส่งข้อมูลมาครบไหม (ต้องมีรายชื่อ นศ. และหัวข้อ)
-if ($input && !empty($input['student_ids']) && !empty($input['title'])) {
-    try {
-        //  TRANSACTION START: เริ่มกระบวนการบันทึกแบบกลุ่ม
-        // ถ้าการบันทึกคนใดคนหนึ่งพัง ระบบจะยกเลิกทั้งหมด (Rollback) เพื่อไม่ให้ข้อมูลขยะตกค้าง
-        $pdo->beginTransaction(); 
+$input = json_decode(file_get_contents("php://input"), true);
 
-        $sql = "INSERT INTO notifications (user_id, title, message, type, is_read) 
-                VALUES (:user_id, :title, :message, 'info', 0)";
-        $stmt = $pdo->prepare($sql);
+if (!$input || empty($input['student_ids']) || empty($input['title'])) {
+    http_response_code(400);
+    echo json_encode(["status" => "error", "message" => "Missing required fields"]);
+    exit();
+}
 
-        //  LOOP: วนลูปส่งแจ้งเตือนให้ นศ. ทีละคน ตามรายชื่อที่เลือกมา
-        foreach ($input['student_ids'] as $student_user_id) {
-            $stmt->execute([
-                ':user_id' => $student_user_id,
-                ':title' => $input['title'],
-                ':message' => $input['message']
-            ]);
+$channel = $input['channel'] ?? 'in-app';
+$allowedChannels = ['in-app', 'email', 'both'];
+$type = $input['type'] ?? 'info';
+$allowedTypes = ['info', 'warning', 'success', 'request'];
+$category = $input['category'] ?? ($type === 'request' ? 'request' : 'student');
+$allowedCategories = ['general', 'student', 'request', 'grade', 'project'];
+
+if (!in_array($channel, $allowedChannels, true)) {
+    http_response_code(400);
+    echo json_encode(["status" => "error", "message" => "Invalid channel"]);
+    exit();
+}
+
+if (!in_array($type, $allowedTypes, true)) {
+    http_response_code(400);
+    echo json_encode(["status" => "error", "message" => "Invalid type"]);
+    exit();
+}
+
+if (!in_array($category, $allowedCategories, true)) {
+    http_response_code(400);
+    echo json_encode(["status" => "error", "message" => "Invalid category"]);
+    exit();
+}
+
+function canReceiveNotification(array $settings, string $category): bool
+{
+    if ($category === 'grade') {
+        return (bool) $settings['grade_notifications'];
+    }
+
+    if ($category === 'project') {
+        return (bool) $settings['project_notifications'];
+    }
+
+    if ($category === 'student' || $category === 'request') {
+        return (bool) $settings['student_notifications'];
+    }
+
+    return true;
+}
+
+function resolveChannel(string $requestedChannel, array $settings): ?string
+{
+    $canUseInApp = (bool) $settings['push_notifications'];
+    $canUseEmail = (bool) $settings['email_notifications'];
+
+    if ($requestedChannel === 'in-app') {
+        return $canUseInApp ? 'in-app' : null;
+    }
+
+    if ($requestedChannel === 'email') {
+        return $canUseEmail ? 'email' : null;
+    }
+
+    if ($canUseInApp && $canUseEmail) {
+        return 'both';
+    }
+
+    if ($canUseInApp) {
+        return 'in-app';
+    }
+
+    if ($canUseEmail) {
+        return 'email';
+    }
+
+    return null;
+}
+
+try {
+    $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+    $roleStmt = $pdo->prepare("SELECT role_id FROM users WHERE user_id = :user_id LIMIT 1");
+    $roleStmt->execute([':user_id' => $_SESSION['user_id']]);
+    $roleId = (int) $roleStmt->fetchColumn();
+
+    if ($roleId === 3) {
+        http_response_code(403);
+        echo json_encode([
+            "status" => "error",
+            "message" => "Students are not allowed to send notifications"
+        ]);
+        exit();
+    }
+
+    $pdo->beginTransaction();
+
+    $settingsSql = "SELECT
+                        COALESCE(email_notifications, 1) AS email_notifications,
+                        COALESCE(push_notifications, 1) AS push_notifications,
+                        COALESCE(grade_notifications, 1) AS grade_notifications,
+                        COALESCE(project_notifications, 1) AS project_notifications,
+                        COALESCE(student_notifications, 1) AS student_notifications
+                    FROM user_notification_settings
+                    WHERE user_id = :user_id";
+    $settingsStmt = $pdo->prepare($settingsSql);
+
+    $sql = "INSERT INTO notifications (user_id, sender_user_id, title, message, type, channel, is_read)
+            VALUES (:user_id, :sender_user_id, :title, :message, :type, :channel, 0)";
+    $stmt = $pdo->prepare($sql);
+    $sentCount = 0;
+    $skippedCount = 0;
+
+    foreach ($input['student_ids'] as $student_user_id) {
+        $settingsStmt->execute([':user_id' => $student_user_id]);
+        $settings = $settingsStmt->fetch(PDO::FETCH_ASSOC) ?: [
+            'email_notifications' => 1,
+            'push_notifications' => 1,
+            'grade_notifications' => 1,
+            'project_notifications' => 1,
+            'student_notifications' => 1,
+        ];
+
+        if (!canReceiveNotification($settings, $category)) {
+            $skippedCount++;
+            continue;
         }
 
-        //  COMMIT: บันทึกจริงเมื่อทุกอย่างเรียบร้อย
-        $pdo->commit();
-        echo json_encode(["status" => "success", "message" => "ส่งแจ้งเตือนสำเร็จ"]);
+        $resolvedChannel = resolveChannel($channel, $settings);
+        if ($resolvedChannel === null) {
+            $skippedCount++;
+            continue;
+        }
 
-    } catch (Exception $e) {
-        //  ROLLBACK: ย้อนกลับถ้ามี error
-        $pdo->rollBack();
-        http_response_code(500);
-        echo json_encode(["status" => "error", "message" => $e->getMessage()]);
+        $stmt->execute([
+            ':user_id' => $student_user_id,
+            ':sender_user_id' => $_SESSION['user_id'],
+            ':title' => $input['title'],
+            ':message' => $input['message'] ?? '',
+            ':type' => $type,
+            ':channel' => $resolvedChannel,
+        ]);
+        $sentCount++;
     }
-} else {
-    http_response_code(400);
-    echo json_encode(["status" => "error", "message" => "ข้อมูลไม่ครบถ้วน"]);
+
+    $pdo->commit();
+    echo json_encode([
+        "status" => "success",
+        "message" => "Notification sent",
+        "sent" => $sentCount,
+        "skipped" => $skippedCount,
+    ]);
+} catch (Exception $e) {
+    if (isset($pdo) && $pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
+
+    http_response_code(500);
+    echo json_encode(["status" => "error", "message" => $e->getMessage()]);
 }
 ?>

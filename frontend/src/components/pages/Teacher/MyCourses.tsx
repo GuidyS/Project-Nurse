@@ -29,7 +29,7 @@ export default function MyCourses() {
   const fetchMyCourses = async () => {
     try {
       setIsLoading(true);
-      const response = await api.get('/index.php?page=get_teacher_courses_overview');
+      const response = await api.get('/index.php?page=get-teacher-courses-overview');
       if (response.data.status === 'success') {
         setCourses(response.data.data);
       } else {
