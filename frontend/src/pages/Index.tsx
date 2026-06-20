@@ -133,7 +133,7 @@ const Index = () => {
     if (adminPages.includes(activeItem)) {
       if (roleId !== 1) return <UnauthorizedView />;
       switch (activeItem) {
-        case "approvals": return <StudentsInfo />;                                 //*
+        case "approvals": return <TransferRequests />;                                 //*
         case "audit-log": return <AuditLog />;                                     //*                                 
         case "export-data": return <ExportData />;                                 //*
         case "import-data": return <ImportData />;                                 //*
@@ -194,7 +194,7 @@ const Index = () => {
         case "advises": return <Advises />;
         case "students": return <Students />;                                       /* รายชื่อเด็กทั้งระบบ */
         case "students-info": return <StudentsInfo />;                              /* รายชื่อเด็กในที่ปรึกษาของอจ. */
-        case "transfer-requests": return <TransferRequests />;
+        case "transfer-requests": return <TransferRequests />;                      //*
       }
     }
 
