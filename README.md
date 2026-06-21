@@ -42,7 +42,7 @@
 ?>
 ```
 
-2. Frontend Environment Setup (Vite)
+### 2. Frontend Environment Setup (Vite)
 กำหนด URL หลักสำหรับเรียกใช้งาน API:
 
 * **Directory:** `frontend/src/`
@@ -55,5 +55,17 @@ VITE_API_BASE_URL = http://localhost:8080
 ```
 
 ---
+
+### 3. Install nodes
+ติดตั้ง node ในฝั่ง frontend
+
+* **Directory:** `frontend`
+
+
+**Source Code:**
+```
+# คำลั่งติดตั้ง node
+npm install
+```
 
 ***อย่าลืมอัปเดต database ให้เป็นล่าสุดด้วย

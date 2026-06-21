@@ -30,6 +30,8 @@ const SettingsPage = () => {
   const { toast } = useToast();
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
+  const savedTheme =
+    typeof window !== "undefined" ? localStorage.getItem("theme") || "system" : "system";
   
   const applyTheme = (theme: string) => {
     const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
@@ -49,6 +51,23 @@ const SettingsPage = () => {
     studentNotifications: true,
   });
   const [isSavingSettings, setIsSavingSettings] = useState(false);
+
+  useEffect(() => {
+    const applyTheme = () => {
+      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      const shouldUseDark = settings.theme === "dark" || (settings.theme === "system" && prefersDark);
+
+      document.documentElement.classList.toggle("dark", shouldUseDark);
+    };
+
+    localStorage.setItem("theme", settings.theme);
+    applyTheme();
+
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    mediaQuery.addEventListener("change", applyTheme);
+
+    return () => mediaQuery.removeEventListener("change", applyTheme);
+  }, [settings.theme]);
 
   const [passwords, setPasswords] = useState({
     current: "",

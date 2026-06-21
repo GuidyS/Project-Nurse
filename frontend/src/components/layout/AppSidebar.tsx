@@ -279,7 +279,7 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
               </div>
               
               {/* ปุ่ม Trigger กลับไปอยู่ที่เดิม (ขวาบน) เมื่อเปิดแถบ */}
-              <SidebarTrigger className="text-slate-500 hover:bg-[#8a2be2]/10 hover:text-[#8a2be2]">
+              <SidebarTrigger className="text-sidebar-foreground/70 hover:bg-[#8a2be2]/10 hover:text-[#8a2be2]">
                 <ChevronLeft className="h-4 w-4" />
               </SidebarTrigger>
             </>
