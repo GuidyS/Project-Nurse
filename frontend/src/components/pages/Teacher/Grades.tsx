@@ -1,28 +1,64 @@
-import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FileText, Search, Save, Edit } from 'lucide-react';
-import { useState } from 'react';
+import { FileText, Search, Save, Edit, Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import api from '@/lib/axios';
+import { useToast } from '@/hooks/use-toast';
 
-// Mock data
-const mockGrades = [
-  { id: '1', studentId: '64010001', name: 'สมชาย ใจดี', midterm: 85, final: 78, assignment: 90, total: 84, grade: 'A', editable: true },
-  { id: '2', studentId: '64010002', name: 'สมหญิง รักเรียน', midterm: 72, final: 80, assignment: 85, total: 79, grade: 'B+', editable: true },
-  { id: '3', studentId: '65010001', name: 'มานะ ตั้งใจ', midterm: 68, final: 65, assignment: 75, total: 69, grade: 'B', editable: true },
-  { id: '4', studentId: '65010002', name: 'มานี ขยัน', midterm: 55, final: 60, assignment: 70, total: 62, grade: 'C+', editable: true },
-  { id: '5', studentId: '66010001', name: 'ปิติ สุขใจ', midterm: 92, final: 88, assignment: 95, total: 92, grade: 'A', editable: true },
-];
-
-const gradeOptions = ['A', 'B+', 'B', 'C+', 'C', 'D+', 'D', 'F'];
+const gradeOptions = ['A', 'B+', 'B', 'C+', 'C', 'D+', 'D', 'F', '-'];
 
 export default function Grades() {
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCourse, setSelectedCourse] = useState('NUR101');
-  const [grades, setGrades] = useState(mockGrades);
+  
+  const [courses, setCourses] = useState<any[]>([]);
+  const [selectedCourse, setSelectedCourse] = useState<string>('');
+  const [grades, setGrades] = useState<any[]>([]);
+  
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // 1. โหลดรายวิชาทั้งหมดที่อาจารย์คนนี้สอน
+  useEffect(() => {
+    const fetchCourses = async () => {
+      try {
+        const res = await api.get('/index.php?page=get-grading-data');
+        if (res.data.status === 'success') {
+          const courseList = res.data.data.courses || [];
+          setCourses(courseList);
+          if (courseList.length > 0) {
+            setSelectedCourse(courseList[0].id.toString());
+          }
+        }
+      } catch (error) {
+        toast({ title: 'ข้อผิดพลาด', description: 'ไม่สามารถโหลดรายวิชาได้', variant: 'destructive' });
+      }
+    };
+    fetchCourses();
+  }, []);
+
+  // 2. โหลดรายชื่อนักศึกษาเมื่อเปลี่ยนวิชา
+  useEffect(() => {
+    if (!selectedCourse) return;
+    
+    const fetchStudents = async () => {
+      setIsLoading(true);
+      try {
+        const res = await api.get(`/index.php?page=get-grading-data&subject_id=${selectedCourse}`);
+        if (res.data.status === 'success') {
+          setGrades(res.data.data.students || []);
+        }
+      } catch (error) {
+        toast({ title: 'ข้อผิดพลาด', description: 'ไม่สามารถโหลดรายชื่อนักศึกษาได้', variant: 'destructive' });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchStudents();
+  }, [selectedCourse]);
 
   const filteredGrades = grades.filter(
     (grade) =>
@@ -36,20 +72,39 @@ export default function Grades() {
     ));
   };
 
-  const handleSaveAll = () => {
-    console.log('Saving grades:', grades);
+  // 3. บันทึกเกรดทั้งหมด
+  const handleSaveAll = async () => {
+    if (!selectedCourse || grades.length === 0) return;
+    
+    setIsSaving(true);
+    try {
+      const res = await api.post('/index.php?page=save-grading-data', {
+        subject_id: selectedCourse,
+        students: grades
+      });
+      
+      if (res.data.status === 'success') {
+        toast({ title: 'บันทึกสำเร็จ', description: 'บันทึกผลการเรียนทั้งหมดเรียบร้อยแล้ว' });
+      } else {
+        toast({ title: 'ข้อผิดพลาด', description: res.data.message, variant: 'destructive' });
+      }
+    } catch (error) {
+      toast({ title: 'ข้อผิดพลาด', description: 'ไม่สามารถบันทึกเกรดได้', variant: 'destructive' });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
     <>
-      <div className="space-y-6">
+      <div className="space-y-6 animate-fade-in">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">บันทึกเกรด</h1>
             <p className="text-muted-foreground">บันทึกและแก้ไขผลการเรียนวิชาที่สอน</p>
           </div>
-          <Button onClick={handleSaveAll}>
-            <Save className="mr-2 h-4 w-4" />
+          <Button onClick={handleSaveAll} disabled={isSaving || grades.length === 0}>
+            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
             บันทึกทั้งหมด
           </Button>
         </div>
@@ -65,9 +120,11 @@ export default function Grades() {
                 <SelectValue placeholder="เลือกรายวิชา" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="NUR101">NUR101 - พื้นฐานการพยาบาล</SelectItem>
-                <SelectItem value="NUR201">NUR201 - การพยาบาลผู้ใหญ่ 1</SelectItem>
-                <SelectItem value="NUR301">NUR301 - การพยาบาลเด็ก</SelectItem>
+                {courses.map(course => (
+                  <SelectItem key={course.id} value={course.id.toString()}>
+                    {course.code} - {course.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </CardContent>
@@ -78,7 +135,7 @@ export default function Grades() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
-              ผลการเรียน - {selectedCourse}
+              ผลการเรียน
             </CardTitle>
             <CardDescription>คะแนนและเกรดของนักศึกษา</CardDescription>
             <div className="flex items-center gap-2 pt-4">
@@ -92,53 +149,56 @@ export default function Grades() {
             </div>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>รหัสนักศึกษา</TableHead>
-                  <TableHead>ชื่อ-นามสกุล</TableHead>
-                  <TableHead className="text-center">สอบกลางภาค (30%)</TableHead>
-                  <TableHead className="text-center">สอบปลายภาค (40%)</TableHead>
-                  <TableHead className="text-center">งานมอบหมาย (30%)</TableHead>
-                  <TableHead className="text-center">รวม</TableHead>
-                  <TableHead className="text-center">เกรด</TableHead>
-                  <TableHead>การดำเนินการ</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredGrades.map((grade) => (
-                  <TableRow key={grade.id}>
-                    <TableCell className="font-medium">{grade.studentId}</TableCell>
-                    <TableCell>{grade.name}</TableCell>
-                    <TableCell className="text-center">{grade.midterm}</TableCell>
-                    <TableCell className="text-center">{grade.final}</TableCell>
-                    <TableCell className="text-center">{grade.assignment}</TableCell>
-                    <TableCell className="text-center font-bold">{grade.total}</TableCell>
-                    <TableCell className="text-center">
-                      <Select
-                        value={grade.grade}
-                        onValueChange={(value) => handleGradeChange(grade.id, value)}
-                      >
-                        <SelectTrigger className="w-[80px]">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {gradeOptions.map((g) => (
-                            <SelectItem key={g} value={g}>{g}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell>
-                      <Button variant="outline" size="sm">
-                        <Edit className="mr-1 h-3 w-3" />
-                        แก้ไข
-                      </Button>
-                    </TableCell>
+            {isLoading ? (
+              <div className="flex justify-center py-10"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>รหัสนักศึกษา</TableHead>
+                    <TableHead>ชื่อ-นามสกุล</TableHead>
+                    <TableHead className="text-center">สอบกลางภาค (30%)</TableHead>
+                    <TableHead className="text-center">สอบปลายภาค (40%)</TableHead>
+                    <TableHead className="text-center">งานมอบหมาย (30%)</TableHead>
+                    <TableHead className="text-center">รวม</TableHead>
+                    <TableHead className="text-center">เกรด</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filteredGrades.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">ไม่มีข้อมูลนักศึกษาในวิชานี้</TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredGrades.map((grade) => (
+                      <TableRow key={grade.id}>
+                        <TableCell className="font-medium font-mono">{grade.studentId}</TableCell>
+                        <TableCell>{grade.name}</TableCell>
+                        <TableCell className="text-center text-muted-foreground">-</TableCell>
+                        <TableCell className="text-center text-muted-foreground">-</TableCell>
+                        <TableCell className="text-center text-muted-foreground">-</TableCell>
+                        <TableCell className="text-center font-bold text-muted-foreground">-</TableCell>
+                        <TableCell className="text-center">
+                          <Select
+                            value={grade.grade === null ? '-' : grade.grade}
+                            onValueChange={(value) => handleGradeChange(grade.id, value)}
+                          >
+                            <SelectTrigger className="w-[80px] mx-auto">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {gradeOptions.map((g) => (
+                                <SelectItem key={g} value={g}>{g}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
       </div>

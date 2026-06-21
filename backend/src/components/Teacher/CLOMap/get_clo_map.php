@@ -1,4 +1,5 @@
 <?php
+<<<<<<< HEAD
 session_start();
 // อนุญาตให้ React (Frontend) ข้ามโดเมนมาดึงข้อมูลได้
 header("Access-Control-Allow-Origin: http://localhost:5173");
@@ -10,12 +11,16 @@ header("Content-Type: application/json; charset=UTF-8");
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit(); }
 
 require_once 'auth_middleware.php'; // เปลี่ยน Path ให้ตรงกับที่คุณเก็บไฟล์นี้ไว้
+=======
+
+//require_once 'auth_middleware.php'; // เปลี่ยน Path ให้ตรงกับที่คุณเก็บไฟล์นี้ไว้
+>>>>>>> nuy-branch
 
 $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
 
 try {
     //  ดึงรายชื่อวิชาทั้งหมดที่กำลังเปิดสอนจากตาราง subjects
-    $sql_subjects = "SELECT subject_code as code, subject_name_th as name FROM subjects WHERE is_active = 1 ORDER BY subject_code ASC";
+    $sql_subjects = "SELECT subject_code as code, subject_name_th as name FROM subject WHERE is_active = 1 ORDER BY subject_code ASC";
     $stmt_subjects = $pdo->prepare($sql_subjects);
     $stmt_subjects->execute();
     $courses = $stmt_subjects->fetchAll(PDO::FETCH_ASSOC);
@@ -34,7 +39,7 @@ try {
         //  ดึงชื่อหัวข้อ PLO ทั้งหมดมาทำเป็น Header ของตาราง (เช่น ['PLO1', 'PLO2', 'PLO3'])
         if (isset($data['plos']) && is_array($data['plos'])) {
             foreach ($data['plos'] as $plo) {
-                $plos[] = $plo['id']; // เก็บเฉพาะ ID ไปแสดงผล
+                $plos[] = $plo['plo_id'] ?? $plo['id']; // เก็บเฉพาะ ID ไปแสดงผล
             }
         }
 

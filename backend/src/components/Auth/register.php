@@ -69,6 +69,24 @@ try {
             ':role'     => $role
         ]);
 
+        // ==========================================
+        // 🔴 เพิ่มโค้ดบันทึก Audit Log ตรงนี้
+        // ==========================================
+        $new_user_id = $db->lastInsertId(); // ดึง ID ของคนที่เพิ่งสมัครสำเร็จ
+        
+        // เช็คว่าเป็นการที่ Admin กดเพิ่มให้ (มี Session) หรือ นักศึกษาสมัครเอง
+        $actor_id = isset($_SESSION['user_id']) ? $_SESSION['user_id'] : $new_user_id; 
+        $ip_address = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'; // ดึง IP เครื่องที่ใช้งาน
+
+        $log_sql = "INSERT INTO audit_log (user_id, action_type, resource, details, ip_address) 
+                    VALUES (:uid, 'create', 'ผู้ใช้', :details, :ip)";
+        $db->prepare($log_sql)->execute([
+            ':uid' => $actor_id,
+            ':details' => "สร้างบัญชีผู้ใช้ใหม่ (Username: " . $username . ")",
+            ':ip' => $ip_address
+        ]);
+        // ==========================================
+
     echo json_encode(["status" => "success", "message" => "ลงทะเบียนสำเร็จ"]);
 
 } catch (Exception $e) {

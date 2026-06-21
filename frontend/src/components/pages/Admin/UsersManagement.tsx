@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Search, Edit, Trash2, MoreHorizontal, UserPlus } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import api from "@/lib/axios";
 
 interface User {
   id: string;
@@ -50,35 +51,47 @@ const subRoleLabels: Record<string, string> = {
 };
 
 export default function UsersManagement() {
-  const [users, setUsers] = useState<User[]>(mockUsers);
+  const [users, setUsers] = useState<User[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newUser, setNewUser] = useState<{ email: string; fullName: string; role: "admin" | "student" | "teacher" }>({ email: "", fullName: "", role: "student" });
   const { toast } = useToast();
+
+  // ดึงข้อมูลผู้ใช้จาก API
+  const fetchUsers = async () => {
+    try {
+      const response = await api.get("/index.php?page=get-users");
+      setUsers(response.data);
+    } catch (error) {
+      toast({ title: "โหลดข้อมูลล้มเหลว", variant: "destructive" });
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const handleAddUser = () => {
+    // แนะนำให้นำไปเปิดหน้า Register หรือเรียก API register.php แทนครับ
+    toast({ title: "แนะนำ", description: "กรุณาใช้หน้าสมัครสมาชิกเพื่อเพิ่มผู้ใช้ใหม่" });
+    setIsAddDialogOpen(false);
+  };
+
+  const handleDeleteUser = async (id: string) => {
+    try {
+      await api.delete(`/index.php?page=manage-user&id=${id}`);
+      setUsers(users.filter((u) => u.id !== id));
+      toast({ title: "ลบผู้ใช้สำเร็จ" });
+    } catch (error) {
+      toast({ title: "ลบผู้ใช้ล้มเหลว", variant: "destructive" });
+    }
+  };
 
   const filteredUsers = users.filter(
     (user) =>
       user.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       user.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
-
-  const handleAddUser = () => {
-    const user: User = {
-      id: Date.now().toString(),
-      ...newUser,
-      status: "active",
-      createdAt: new Date().toISOString().split("T")[0],
-    };
-    setUsers([...users, user]);
-    setIsAddDialogOpen(false);
-    setNewUser({ email: "", fullName: "", role: "student" });
-    toast({ title: "เพิ่มผู้ใช้สำเร็จ", description: `เพิ่ม ${user.fullName} เรียบร้อยแล้ว` });
-  };
-
-  const handleDeleteUser = (id: string) => {
-    setUsers(users.filter((u) => u.id !== id));
-    toast({ title: "ลบผู้ใช้สำเร็จ", description: "ลบผู้ใช้ออกจากระบบแล้ว" });
-  };
 
   const handleToggleStatus = (id: string) => {
     setUsers(users.map((u) => 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
 import { Download, FileSpreadsheet, FileText, Users, BookOpen, FolderKanban, GraduationCap, Calendar } from "lucide-react";
+import api from "@/lib/axios";
 
 const exportCategories = [
   { 
@@ -65,7 +66,7 @@ export default function ExportData() {
     }
   };
 
-  const handleExport = () => {
+  const handleExport = async () => {
     if (!selectedCategory) {
       toast({ title: "กรุณาเลือกประเภทข้อมูล", variant: "destructive" });
       return;
@@ -76,16 +77,43 @@ export default function ExportData() {
     }
 
     toast({
-      title: "กำลังส่งออกข้อมูล",
-      description: `กำลังสร้างไฟล์ ${currentCategory?.label}.${format}...`,
+      title: "กำลังเตรียมข้อมูล",
+      description: "ระบบกำลังสร้างไฟล์ กรุณารอสักครู่...",
     });
 
-    setTimeout(() => {
+    try {
+      // ยิง API ไปสร้างไฟล์ (ส่งแบบ blob เพื่อรับไฟล์กลับมาดาวน์โหลด)
+      const response = await api.post("/index.php?page=export-data", {
+        category: selectedCategory,
+        fields: selectedFields,
+        format: format,
+        academicYear: academicYear,
+        semester: semester
+      }, {
+        responseType: 'blob' // 👈 สำคัญมาก! บอกให้ axios รับข้อมูลเป็นไฟล์
+      });
+
+      // สร้าง Link จำลองเพื่อบังคับให้เบราว์เซอร์ดาวน์โหลดไฟล์
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      // ตั้งชื่อไฟล์ เช่น ข้อมูลนักศึกษา_2568.csv
+      link.setAttribute('download', `${currentCategory?.label}_${academicYear}.${format}`); 
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+
       toast({
         title: "ส่งออกสำเร็จ",
-        description: `ดาวน์โหลด ${currentCategory?.label}.${format} เรียบร้อยแล้ว`,
+        description: `ดาวน์โหลดไฟล์เรียบร้อยแล้ว`,
       });
-    }, 1500);
+    } catch (error) {
+      toast({
+        title: "เกิดข้อผิดพลาด",
+        description: "ไม่สามารถส่งออกข้อมูลได้",
+        variant: "destructive"
+      });
+    }
   };
 
   return (

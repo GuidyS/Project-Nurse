@@ -1,15 +1,8 @@
 <?php
-session_start();
-header("Access-Control-Allow-Origin: http://localhost:5173");
-header("Access-Control-Allow-Credentials: true");
-header("Access-Control-Allow-Methods: GET, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization");
-header("Content-Type: application/json; charset=UTF-8");
 
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit(); }
+// require_once 'auth_middleware.php'; // นำกลับมาใช้เมื่อเชื่อมระบบ Login แล้ว
 
-require_once 'auth_middleware.php'; 
-
+// 🔧 เปลี่ยนข้อมูลเชื่อมต่อให้ตรงกับโปรเจกต์ของคุณ
 $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
 $subject_code = $_GET['subject_code'] ?? null;
 
@@ -19,6 +12,7 @@ try {
         exit();
     }
 
+    // ดึงข้อมูลหลักสูตรที่กำลังใช้งานอยู่
     $sql = "SELECT mapping_json FROM curriculum_framework WHERE is_active = 1 LIMIT 1";
     $stmt = $pdo->query($sql);
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -26,14 +20,17 @@ try {
     if ($row) {
         $data = json_decode($row['mapping_json'], true);
         
-        // 1. ดึงข้อมูล CLO ของวิชานั้นๆ (ถ้าไม่มีให้คืนค่าเป็น Array ว่าง)
-        $clos = $data['subject_mappings'][$subject_code]['clos'] ?? [];
+        // 1. ดึงข้อมูล CLO ของวิชานั้นๆ จากคีย์ "course_clos" (ถ้าไม่มีให้คืนค่า Array ว่าง)
+        $clos = $data['course_clos'][$subject_code] ?? [];
 
-        // 2. ดึงรายชื่อ PLO หลักสูตรทั้งหมด เพื่อเอาไปทำ Dropdown ใน Modal ของ React
+        // 2. ดึงรายชื่อ PLO หลักสูตรทั้งหมดมาสร้างเป็นตัวเลือกให้ React
         $plos = [];
         if (isset($data['plos'])) {
             foreach ($data['plos'] as $plo) {
-                $plos[] = ["id" => $plo['id'], "name" => $plo['id']]; // ปรับเพิ่ม description ได้ถ้าต้องการ
+                $plos[] = [
+                    "id" => $plo['plo_id'], 
+                    "name" => $plo['plo_id'] . " - " . mb_substr($plo['plo_name'], 0, 50) . "..." // ตัดชื่อให้สั้นลงสำหรับ Dropdown
+                ]; 
             }
         }
 

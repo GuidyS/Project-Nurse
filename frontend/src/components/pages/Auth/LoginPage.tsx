@@ -60,24 +60,18 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
     setIsLoading(true);
     
     try {
-    // 1. ยิง API จริงๆ
     const response = await api.post("/index.php?page=login", {
       username: username,
       password: password,
     });
 
-    // 2. ถ้าสำเร็จ (Status 200 และ backend ตอบ success)
     if (response.data.status === "success") {
-      // --- ส่วนที่ต้องเพิ่ม/แก้ไข ---
-      // เก็บข้อมูล user และ permissions ลงใน localStorage เพื่อให้ HasPermission นำไปใช้ได้
       localStorage.setItem("user", JSON.stringify(response.data.user));
       
       toast.success("เข้าสู่ระบบสำเร็จ");
       onLoginSuccess(response.data.user);
-      // ----------------------------
     }
   } catch (error: any) {
-    // 3. ถ้าพลาด (เช่น 401 หรือ 400 จาก PHP)
     const message = error.response?.data?.message || "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง";
     toast.error(message);
     console.error("Login Error:", error);
@@ -123,7 +117,7 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
 
       if (response.data.status === "success") {
         toast.success("เปลี่ยนรหัสผ่านสำเร็จ!");
-        setShowResetPassword(false); // กลับหน้า Login
+        setShowResetPassword(false);
         setForgotusername("");
         setNewPassword("");
         setConfirmNewPassword("");
@@ -137,7 +131,8 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
 
   if (showResetPassword) {
     return (
-      <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-2xl border border-slate-200 shadow-xl">
+      // เปลี่ยนจาก bg-white border-slate-200 เป็น bg-card border-border
+      <div className="w-full max-w-md p-8 space-y-6 bg-card rounded-2xl border border-border shadow-xl">
         <div className="space-y-4 text-center flex flex-col items-center">
           <div className="relative h-28 w-28 shrink-0 overflow-hidden rounded-full shadow-md border-4 border-[#8a2be2]/10">
             <img
@@ -146,16 +141,17 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
               className="object-cover w-full h-full scale-110"
             />
           </div>
-          <h2 className="text-2xl font-semibold tracking-tight text-slate-700">รีเซ็ตรหัสผ่าน</h2>
+          {/* เปลี่ยน text-slate-700 เป็น text-card-foreground */}
+          <h2 className="text-2xl font-semibold tracking-tight text-card-foreground">รีเซ็ตรหัสผ่าน</h2>
         </div>
         <form onSubmit={handleResetPassword} className="space-y-6" noValidate>
           <div className="space-y-4">
             <div className="space-y-2">
               <Label
                 htmlFor="reset-username"
-                className={cn("text-sm font-medium text-slate-700", resetErrors.username && "text-red-600")}
+                className={cn("text-sm font-medium text-foreground", resetErrors.username && "text-destructive")}
               >
-                Username (ID)
+                รหัสประจำตัว (ID)
               </Label>
               <Input
                 id="reset-username"
@@ -169,19 +165,19 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
                     setResetErrors((current) => ({ ...current, username: undefined }));
                   }
                 }}
-                className="h-12"
+                className="h-12 bg-background border-border"
               />
               {resetErrors.username && (
-                <p className="text-sm font-medium text-red-600">{resetErrors.username}</p>
+                <p className="text-sm font-medium text-destructive">{resetErrors.username}</p>
               )}
             </div>
 
             <div className="space-y-2">
               <Label
                 htmlFor="new-password"
-                className={cn("text-sm font-medium text-slate-700", resetErrors.newPassword && "text-red-600")}
+                className={cn("text-sm font-medium text-foreground", resetErrors.newPassword && "text-destructive")}
               >
-                New Password
+                รหัสผ่านใหม่
               </Label>
               <Input
                 id="new-password"
@@ -196,19 +192,19 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
                     setResetErrors((current) => ({ ...current, newPassword: undefined }));
                   }
                 }}
-                className="h-12"
+                className="h-12 bg-background border-border"
               />
               {resetErrors.newPassword && (
-                <p className="text-sm font-medium text-red-600">{resetErrors.newPassword}</p>
+                <p className="text-sm font-medium text-destructive">{resetErrors.newPassword}</p>
               )}
             </div>
 
             <div className="space-y-2">
               <Label
                 htmlFor="confirm-new-password"
-                className={cn("text-sm font-medium text-slate-700", resetErrors.confirmNewPassword && "text-red-600")}
+                className={cn("text-sm font-medium text-foreground", resetErrors.confirmNewPassword && "text-destructive")}
               >
-                Confirm New Password
+                ยืนยันรหัสผ่าน
               </Label>
               <Input
                 id="confirm-new-password"
@@ -223,15 +219,15 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
                     setResetErrors((current) => ({ ...current, confirmNewPassword: undefined }));
                   }
                 }}
-                className="h-12"
+                className="h-12 bg-background border-border"
               />
               {resetErrors.confirmNewPassword && (
-                <p className="text-sm font-medium text-red-600">{resetErrors.confirmNewPassword}</p>
+                <p className="text-sm font-medium text-destructive">{resetErrors.confirmNewPassword}</p>
               )}
             </div>
             <Button 
               type="submit" 
-              className="w-full h-12 font-medium bg-[#8a2be2] text-background hover:bg-[#8a2be2]/90 rounded-xl"
+              className="w-full h-12 font-medium bg-[#8a2be2] text-white hover:bg-[#8a2be2]/90 rounded-xl"
               disabled={isLoading}
             >
               {isLoading ? (
@@ -248,7 +244,7 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
             type="button"
             onClick={handleBackToLogin}
             disabled={isLoading}
-            className="font-semibold text-slate-700 transition-colors hover:text-[#8a2be2] hover:underline underline-offset-4 disabled:pointer-events-none disabled:opacity-50"
+            className="font-semibold text-foreground transition-colors hover:text-[#8a2be2] hover:underline underline-offset-4 disabled:pointer-events-none disabled:opacity-50"
           >
             เข้าสู่ระบบ
           </button>
@@ -258,28 +254,28 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
   }
 
   return (
-    <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-2xl border border-slate-200 shadow-xl">
+    // เปลี่ยนจาก bg-white border-slate-200 เป็น bg-card border-border
+    <div className="w-full max-w-md p-8 space-y-6 bg-card rounded-2xl border border-border shadow-xl">
       <div className="w-full max-w-md space-y-6"> 
         <div className="space-y-4 text-center flex flex-col items-center">
           <div className="relative h-28 w-28 shrink-0 overflow-hidden rounded-full shadow-md border-4 border-[#8a2be2]/10">
             <img 
               src="../../Nurse_logo.jpg" 
               alt="Logo" 
-              className="object-cover w-full h-full scale-110" // ใช้ scale เพื่อปรับซูมเข้าเล็กน้อยถ้าขอบขาวเยอะ
+              className="object-cover w-full h-full scale-110" 
             />
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-700">เข้าสู่ระบบ</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-card-foreground">เข้าสู่ระบบ</h1>
         </div>
         <form onSubmit={handleLogin} className="space-y-6">
 
           <div className="space-y-4">
-            {/* username */}
             <div className="space-y-2">
               <Label
                 htmlFor="username"
-                className={cn("text-sm font-medium text-slate-700", loginErrors.username && "text-red-600")}
+                className={cn("text-sm font-medium text-foreground", loginErrors.username && "text-destructive")}
               >
-                Username
+                รหัสประจำตัว
               </Label>
               <Input
                 id="username"
@@ -294,20 +290,19 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
                     setLoginErrors((current) => ({ ...current, username: undefined }));
                   }
                 }}
-                className="h-12"
+                className="h-12 bg-background border-border text-foreground"
               />
               {loginErrors.username && (
-                <p className="text-sm font-medium text-red-600">{loginErrors.username}</p>
+                <p className="text-sm font-medium text-destructive">{loginErrors.username}</p>
               )}
             </div>
 
-            {/* Password */}
             <div className="space-y-2">
               <Label
                 htmlFor="password"
-                className={cn("text-sm font-medium text-slate-700", loginErrors.password && "text-red-600")}
+                className={cn("text-sm font-medium text-foreground", loginErrors.password && "text-destructive")}
               >
-                Password
+                รหัสผ่าน
               </Label>
               <div className="relative">
                 <Input
@@ -323,7 +318,7 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
                       setLoginErrors((current) => ({ ...current, password: undefined }));
                     }
                   }}
-                  className="h-12 pr-12"
+                  className="h-12 pr-12 bg-background border-border text-foreground"
                 />
                 <button
                   type="button"
@@ -338,12 +333,11 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
                 </button>
               </div>
               {loginErrors.password && (
-                <p className="text-sm font-medium text-red-600">{loginErrors.password}</p>
+                <p className="text-sm font-medium text-destructive">{loginErrors.password}</p>
               )}
             </div>
           </div>
 
-          {/* Remember & Forgot */}
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <Checkbox
@@ -362,20 +356,19 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
             <button
               type="button"
               onClick={() => setShowResetPassword(true)}
-              className="text-sm font-medium text-slate-700 underline hover:text-foreground/80 transition-colors"
+              className="text-sm font-medium text-foreground underline hover:text-foreground/80 transition-colors"
             >
               รีเซ็ตรหัสผ่าน?
             </button>
           </div>
 
-          {/* Submit */}
           <Button 
             type="submit" 
-            className="w-full h-12 font-medium bg-[#8a2be2] text-background hover:bg-[#8a2be2]/90 rounded-xl"
+            className="w-full h-12 font-medium bg-[#8a2be2] text-white hover:bg-[#8a2be2]/90 rounded-xl"
             disabled={isLoading}
           >
             {isLoading ? (
-              <div className="h-5 w-5 animate-spin rounded-full border-2 border-background border-t-transparent" />
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
             ) : (
               "เข้าสู่ระบบ"
             )}
@@ -383,8 +376,8 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
           <p className="text-center text-sm text-muted-foreground">
             ยังไม่ได้สมัครสมาชิก?{" "}
             <button 
-              onClick={onGoToRegister} // เมื่อคลิกจะไปเรียกฟังก์ชันเปลี่ยนหน้าใน Index.tsx
-              className="text-text-slate-700 hover:text-[#8a2be2] font-semibold hover:underline underline-offset-4"
+              onClick={onGoToRegister}
+              className="text-foreground hover:text-[#8a2be2] font-semibold hover:underline underline-offset-4 transition-colors"
             >
               สมัครสมาชิก
             </button>

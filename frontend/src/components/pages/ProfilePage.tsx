@@ -44,7 +44,7 @@ const ProfilePage = () => {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const res = await api.get("/index.php", {
+        const res = await api.get("/index.php?page=statcard", {
           params: { page: "profile" },
           // สำคัญมาก: ต้องแนบ withCredentials เพื่อให้ Axios ส่ง Session Cookie ไปให้ PHP
           withCredentials: true 

@@ -4,36 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Download, TrendingUp, TrendingDown, Minus, BarChart3, FileText } from 'lucide-react';
-import { useState } from 'react';
+import { Download, TrendingUp, TrendingDown, Minus, BarChart3, FileText, Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, BarChart, Bar } from 'recharts';
-
-// Mock data for 5 years
-const yearlyData = [
-  { year: '2562', graduates: 245, employmentRate: 92, avgGPA: 3.15, plo1: 85, plo2: 78, plo3: 82, plo4: 88, plo5: 75 },
-  { year: '2563', graduates: 258, employmentRate: 88, avgGPA: 3.22, plo1: 87, plo2: 80, plo3: 84, plo4: 86, plo5: 78 },
-  { year: '2564', graduates: 262, employmentRate: 85, avgGPA: 3.18, plo1: 86, plo2: 82, plo3: 85, plo4: 87, plo5: 80 },
-  { year: '2565', graduates: 270, employmentRate: 91, avgGPA: 3.25, plo1: 88, plo2: 84, plo3: 86, plo4: 89, plo5: 82 },
-  { year: '2566', graduates: 275, employmentRate: 94, avgGPA: 3.28, plo1: 90, plo2: 85, plo3: 88, plo4: 91, plo5: 84 },
-];
-
-const courseData = [
-  { code: 'NUR101', name: 'พื้นฐานการพยาบาล', y2562: 3.12, y2563: 3.18, y2564: 3.15, y2565: 3.22, y2566: 3.25, trend: 'up' },
-  { code: 'NUR201', name: 'การพยาบาลผู้ใหญ่ 1', y2562: 3.05, y2563: 3.08, y2564: 3.10, y2565: 3.15, y2566: 3.18, trend: 'up' },
-  { code: 'NUR202', name: 'การพยาบาลผู้ใหญ่ 2', y2562: 2.95, y2563: 2.98, y2564: 3.02, y2565: 3.05, y2566: 3.08, trend: 'up' },
-  { code: 'NUR301', name: 'การพยาบาลเด็ก', y2562: 3.20, y2563: 3.18, y2564: 3.15, y2565: 3.22, y2566: 3.25, trend: 'stable' },
-  { code: 'NUR302', name: 'การพยาบาลจิตเวช', y2562: 3.30, y2563: 3.28, y2564: 3.25, y2565: 3.22, y2566: 3.20, trend: 'down' },
-  { code: 'NUR401', name: 'การบริหารการพยาบาล', y2562: 3.40, y2563: 3.42, y2564: 3.45, y2565: 3.48, y2566: 3.50, trend: 'up' },
-];
-
-const ploChartData = yearlyData.map(y => ({
-  year: y.year,
-  'PLO1: ความรู้': y.plo1,
-  'PLO2: ทักษะ': y.plo2,
-  'PLO3: จริยธรรม': y.plo3,
-  'PLO4: สื่อสาร': y.plo4,
-  'PLO5: เทคโนโลยี': y.plo5,
-}));
+import api from '@/lib/axios';
 
 const getTrendIcon = (trend: string) => {
   switch (trend) {
@@ -48,10 +22,115 @@ const getTrendIcon = (trend: string) => {
 
 export default function FiveYearSummary() {
   const [selectedProgram, setSelectedProgram] = useState('all');
+  const [yearlyData, setYearlyData] = useState<any[]>([]);
+  const [courseData, setCourseData] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchFiveYearSummary = async () => {
+      try {
+        setIsLoading(true);
+        const response = await api.get('/index.php?page=get-five-year-summary');
+        if (response.data && response.data.status === 'success') {
+          setYearlyData(response.data.data.yearlyData || []);
+          setCourseData(response.data.data.courseData || []);
+        }
+      } catch (error) {
+        console.error('Failed to fetch five year summary data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchFiveYearSummary();
+  }, []);
 
   const handleExport = (format: string) => {
     console.log('Exporting as:', format);
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex h-[60vh] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  const ploChartData = yearlyData.map(y => ({
+    year: y.year,
+    'PLO1: ความรู้': Number(y.plo1 || 0),
+    'PLO2: ทักษะ': Number(y.plo2 || 0),
+    'PLO3: จริยธรรม': Number(y.plo3 || 0),
+    'PLO4: สื่อสาร': Number(y.plo4 || 0),
+    'PLO5: เทคโนโลยี': Number(y.plo5 || 0),
+  }));
+
+  const totalGraduates = yearlyData.reduce((acc, y) => acc + Number(y.graduates || 0), 0);
+  
+  const avgEmploymentRate = yearlyData.length > 0
+    ? (yearlyData.reduce((acc, y) => acc + Number(y.employmentRate || 0), 0) / yearlyData.length).toFixed(1)
+    : '0.0';
+
+  const avgGPAVal = yearlyData.length > 0
+    ? (yearlyData.reduce((acc, y) => acc + Number(y.avgGPA || 0), 0) / yearlyData.length).toFixed(2)
+    : '0.00';
+
+  const years = yearlyData.map(d => d.year);
+
+  // คำนวณแนวโน้ม PLO เฉลี่ยรวม
+  const getPloTrend = () => {
+    if (yearlyData.length < 2) {
+      return { 
+        text: 'คงที่', 
+        icon: <Minus className="h-6 w-6 text-muted-foreground" />, 
+        color: 'text-muted-foreground', 
+        subtitle: 'ยังไม่มีข้อมูลเพียงพอ' 
+      };
+    }
+
+    // หาเฉลี่ย PLO รวมของแต่ละปี
+    const avgPlos = yearlyData.map(y => {
+      const sum = Number(y.plo1 || 0) + Number(y.plo2 || 0) + Number(y.plo3 || 0) + Number(y.plo4 || 0) + Number(y.plo5 || 0);
+      return sum / 5;
+    });
+
+    const latest = avgPlos[avgPlos.length - 1];
+    const previous = avgPlos[avgPlos.length - 2];
+
+    if (latest === 0 && previous === 0) {
+      return { 
+        text: 'ไม่มีข้อมูล', 
+        icon: <Minus className="h-6 w-6 text-muted-foreground" />, 
+        color: 'text-muted-foreground', 
+        subtitle: 'ยังไม่มีประวัติการประเมิน PLO' 
+      };
+    }
+
+    if (latest > previous) {
+      return { 
+        text: 'ดีขึ้น', 
+        icon: <TrendingUp className="h-6 w-6 text-green-500" />, 
+        color: 'text-green-600', 
+        subtitle: 'ผลลัพธ์การเรียนรู้เฉลี่ยดีขึ้น' 
+      };
+    } else if (latest < previous) {
+      return { 
+        text: 'ลดลง', 
+        icon: <TrendingDown className="h-6 w-6 text-destructive" />, 
+        color: 'text-destructive', 
+        subtitle: 'ผลลัพธ์การเรียนรู้เฉลี่ยลดลง' 
+      };
+    } else {
+      return { 
+        text: 'คงที่', 
+        icon: <Minus className="h-6 w-6 text-muted-foreground" />, 
+        color: 'text-muted-foreground', 
+        subtitle: 'ผลลัพธ์การเรียนรู้ทรงตัว' 
+      };
+    }
+  };
+
+  const ploTrend = getPloTrend();
 
   return (
     <>
@@ -91,7 +170,7 @@ export default function FiveYearSummary() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {yearlyData.reduce((acc, y) => acc + y.graduates, 0).toLocaleString()}
+                {totalGraduates.toLocaleString()}
               </div>
               <p className="text-xs text-muted-foreground">คน</p>
             </CardContent>
@@ -102,7 +181,7 @@ export default function FiveYearSummary() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-600">
-                {(yearlyData.reduce((acc, y) => acc + y.employmentRate, 0) / yearlyData.length).toFixed(1)}%
+                {avgEmploymentRate}%
               </div>
               <p className="text-xs text-muted-foreground">เฉลี่ย 5 ปี</p>
             </CardContent>
@@ -113,7 +192,7 @@ export default function FiveYearSummary() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {(yearlyData.reduce((acc, y) => acc + y.avgGPA, 0) / yearlyData.length).toFixed(2)}
+                {avgGPAVal}
               </div>
               <p className="text-xs text-muted-foreground">เฉลี่ย 5 ปี</p>
             </CardContent>
@@ -124,10 +203,10 @@ export default function FiveYearSummary() {
             </CardHeader>
             <CardContent>
               <div className="flex items-center gap-2">
-                <TrendingUp className="h-6 w-6 text-green-500" />
-                <span className="text-2xl font-bold text-green-600">ดีขึ้น</span>
+                {ploTrend.icon}
+                <span className={`text-2xl font-bold ${ploTrend.color}`}>{ploTrend.text}</span>
               </div>
-              <p className="text-xs text-muted-foreground">ทุกด้านมีพัฒนาการ</p>
+              <p className="text-xs text-muted-foreground">{ploTrend.subtitle}</p>
             </CardContent>
           </Card>
         </div>
@@ -190,49 +269,51 @@ export default function FiveYearSummary() {
             <CardDescription>เกรดเฉลี่ยรายวิชาย้อนหลัง 5 ปี</CardDescription>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>รหัสวิชา</TableHead>
-                  <TableHead>ชื่อวิชา</TableHead>
-                  <TableHead className="text-center">2562</TableHead>
-                  <TableHead className="text-center">2563</TableHead>
-                  <TableHead className="text-center">2564</TableHead>
-                  <TableHead className="text-center">2565</TableHead>
-                  <TableHead className="text-center">2566</TableHead>
-                  <TableHead className="text-center">แนวโน้ม</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {courseData.map((course) => (
-                  <TableRow key={course.code}>
-                    <TableCell className="font-medium">{course.code}</TableCell>
-                    <TableCell>{course.name}</TableCell>
-                    <TableCell className="text-center">{course.y2562.toFixed(2)}</TableCell>
-                    <TableCell className="text-center">{course.y2563.toFixed(2)}</TableCell>
-                    <TableCell className="text-center">{course.y2564.toFixed(2)}</TableCell>
-                    <TableCell className="text-center">{course.y2565.toFixed(2)}</TableCell>
-                    <TableCell className="text-center">{course.y2566.toFixed(2)}</TableCell>
-                    <TableCell className="text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        {getTrendIcon(course.trend)}
-                        <Badge
-                          variant={
-                            course.trend === 'up'
-                              ? 'default'
-                              : course.trend === 'down'
-                              ? 'destructive'
-                              : 'secondary'
-                          }
-                        >
-                          {course.trend === 'up' ? 'ดีขึ้น' : course.trend === 'down' ? 'ลดลง' : 'คงที่'}
-                        </Badge>
-                      </div>
-                    </TableCell>
+            {courseData.length === 0 ? (
+              <div className="text-center py-6 text-muted-foreground">ไม่พบรายวิชาที่สอนในฐานข้อมูลหลักสูตรที่เลือก</div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>รหัสวิชา</TableHead>
+                    <TableHead>ชื่อวิชา</TableHead>
+                    {years.map((y) => (
+                      <TableHead key={y} className="text-center">{y}</TableHead>
+                    ))}
+                    <TableHead className="text-center">แนวโน้ม</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {courseData.map((course) => (
+                    <TableRow key={course.code}>
+                      <TableCell className="font-medium">{course.code}</TableCell>
+                      <TableCell>{course.name}</TableCell>
+                      {years.map((y) => (
+                        <TableCell key={y} className="text-center">
+                          {Number(course['y' + y] || 0).toFixed(2)}
+                        </TableCell>
+                      ))}
+                      <TableCell className="text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          {getTrendIcon(course.trend)}
+                          <Badge
+                            variant={
+                              course.trend === 'up'
+                                ? 'default'
+                                : course.trend === 'down'
+                                ? 'destructive'
+                                : 'secondary'
+                            }
+                          >
+                            {course.trend === 'up' ? 'ดีขึ้น' : course.trend === 'down' ? 'ลดลง' : 'คงที่'}
+                          </Badge>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
 

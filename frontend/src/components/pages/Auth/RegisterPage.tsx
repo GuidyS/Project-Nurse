@@ -15,7 +15,6 @@ type RegisterErrors = {
   username?: string;
   password?: string;
   confirmPassword?: string;
-  form?: string;
 };
 
 const RegisterPage = ({ onBackToLogin }: RegisterPageProps) => {
@@ -34,15 +33,11 @@ const RegisterPage = ({ onBackToLogin }: RegisterPageProps) => {
     }
   };
 
-  const handleRegister = async () => {
-    if (isLoading) return;
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
 
     const nextErrors: RegisterErrors = {};
-    const trimmedUsername = username.trim();
-
-    setStatusMessage(null);
-
-    if (!trimmedUsername) {
+    if (!username.trim()) {
       nextErrors.username = "กรุณากรอก Username";
     }
     if (!password.trim()) {
@@ -65,28 +60,19 @@ const RegisterPage = ({ onBackToLogin }: RegisterPageProps) => {
 
     try {
       const response = await api.post("/index.php?page=register", {
-        username: trimmedUsername,
+        username,
         password,
         role,
       });
 
       if (response.data.status === "success") {
-        setStatusMessage({ type: "success", text: response.data.message || "ลงทะเบียนสำเร็จ" });
         toast.success("ลงทะเบียนสำเร็จ!", {
           description: "คุณสามารถเข้าสู่ระบบได้ทันที",
         });
         onBackToLogin();
-        return;
       }
-
-      const message = response.data.message || "ลงทะเบียนไม่สำเร็จ";
-      setErrors({ form: message });
-      setStatusMessage({ type: "error", text: message });
-      toast.error(message);
     } catch (error: any) {
       const message = error.response?.data?.message || "เกิดข้อผิดพลาดในการลงทะเบียน";
-      setErrors({ form: message });
-      setStatusMessage({ type: "error", text: message });
       toast.error(message);
     } finally {
       setIsLoading(false);
@@ -94,7 +80,8 @@ const RegisterPage = ({ onBackToLogin }: RegisterPageProps) => {
   };
 
   return (
-    <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-2xl border border-slate-200 shadow-xl">
+    // ปรับ Card เป็นแบบรองรับโหมดมืด (bg-card border-border)
+    <div className="w-full max-w-md p-8 space-y-6 bg-card rounded-2xl border border-border shadow-xl">
       <div className="space-y-4 text-center flex flex-col items-center">
         <div className="relative h-28 w-28 shrink-0 overflow-hidden rounded-full shadow-md border-4 border-[#8a2be2]/10">
           <img
@@ -104,21 +91,14 @@ const RegisterPage = ({ onBackToLogin }: RegisterPageProps) => {
           />
         </div>
         <div className="space-y-2">
-          <h2 className="text-2xl font-semibold tracking-tight text-slate-700">Create New Account</h2>
+          <h2 className="text-2xl font-semibold tracking-tight text-card-foreground">ลงทะเบียนเข้าสู่ระบบ</h2>
           <p className="text-sm text-muted-foreground">
-            Enter your ID and set a password to register
+            กรอกรหัสประจำตัวและรหัสผ่านเพื่อลงทะเบียน
           </p>
         </div>
       </div>
 
-      <form
-        onSubmit={(event) => {
-          event.preventDefault();
-          void handleRegister();
-        }}
-        className="space-y-6"
-        noValidate
-      >
+      <form onSubmit={handleRegister} className="space-y-6" noValidate>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <button
@@ -128,11 +108,12 @@ const RegisterPage = ({ onBackToLogin }: RegisterPageProps) => {
                 "h-16 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all",
                 role === "student"
                   ? "bg-[#8a2be2] text-white border-[#8a2be2] shadow-sm"
-                  : "bg-white text-slate-600 border-slate-200 hover:border-[#8a2be2]/50 hover:text-[#8a2be2]",
+                  // ปรับปุ่มที่ยังไม่ได้เลือกให้เข้ากับโหมดมืด (bg-background text-muted-foreground border-border)
+                  : "bg-background text-muted-foreground border-border hover:border-[#8a2be2]/50 hover:text-[#8a2be2]",
               )}
             >
               <GraduationCap size={18} />
-              <span className="text-xs font-medium">Student</span>
+              <span className="text-xs font-medium">นักศึกษา</span>
             </button>
             <button
               type="button"
@@ -141,25 +122,25 @@ const RegisterPage = ({ onBackToLogin }: RegisterPageProps) => {
                 "h-16 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all",
                 role === "teacher"
                   ? "bg-[#8a2be2] text-white border-[#8a2be2] shadow-sm"
-                  : "bg-white text-slate-600 border-slate-200 hover:border-[#8a2be2]/50 hover:text-[#8a2be2]",
+                  : "bg-background text-muted-foreground border-border hover:border-[#8a2be2]/50 hover:text-[#8a2be2]",
               )}
             >
               <Briefcase size={18} />
-              <span className="text-xs font-medium">Teacher</span>
+              <span className="text-xs font-medium">บุคลากร</span>
             </button>
           </div>
 
           <div className="space-y-2">
             <Label
               htmlFor="reg-username"
-              className={cn("text-sm font-medium text-slate-700", errors.username && "text-red-600")}
+              className={cn("text-sm font-medium text-foreground", errors.username && "text-destructive")}
             >
-              Username (ID)
+              รหัสประจำตัว (ID)
             </Label>
             <Input
               id="reg-username"
-              placeholder="Your ID (e.g. 41172008)"
-              className="h-12"
+              placeholder="(เช่น 41172008)"
+              className="h-12 bg-background border-border text-foreground"
               value={username}
               error={Boolean(errors.username)}
               aria-invalid={Boolean(errors.username)}
@@ -169,23 +150,23 @@ const RegisterPage = ({ onBackToLogin }: RegisterPageProps) => {
               }}
             />
             {errors.username && (
-              <p className="text-sm font-medium text-red-600">{errors.username}</p>
+              <p className="text-sm font-medium text-destructive">{errors.username}</p>
             )}
           </div>
 
           <div className="space-y-2">
             <Label
               htmlFor="reg-password"
-              className={cn("text-sm font-medium text-slate-700", errors.password && "text-red-600")}
+              className={cn("text-sm font-medium text-foreground", errors.password && "text-destructive")}
             >
-              Password
+              รหัสผ่าน
             </Label>
             <div className="relative">
               <Input
                 id="reg-password"
                 type={showPassword ? "text" : "password"}
                 placeholder="••••••••"
-                className="h-12 pr-12"
+                className="h-12 pr-12 bg-background border-border text-foreground"
                 value={password}
                 error={Boolean(errors.password)}
                 aria-invalid={Boolean(errors.password)}
@@ -204,22 +185,22 @@ const RegisterPage = ({ onBackToLogin }: RegisterPageProps) => {
               </button>
             </div>
             {errors.password && (
-              <p className="text-sm font-medium text-red-600">{errors.password}</p>
+              <p className="text-sm font-medium text-destructive">{errors.password}</p>
             )}
           </div>
 
           <div className="space-y-2">
             <Label
               htmlFor="confirm-password"
-              className={cn("text-sm font-medium text-slate-700", errors.confirmPassword && "text-red-600")}
+              className={cn("text-sm font-medium text-foreground", errors.confirmPassword && "text-destructive")}
             >
-              Confirm Password
+              ยืนยันรหัสผ่าน
             </Label>
             <Input
               id="confirm-password"
               type={showPassword ? "text" : "password"}
               placeholder="••••••••"
-              className="h-12"
+              className="h-12 bg-background border-border text-foreground"
               value={confirmPassword}
               error={Boolean(errors.confirmPassword)}
               aria-invalid={Boolean(errors.confirmPassword)}
@@ -229,50 +210,32 @@ const RegisterPage = ({ onBackToLogin }: RegisterPageProps) => {
               }}
             />
             {errors.confirmPassword && (
-              <p className="text-sm font-medium text-red-600">{errors.confirmPassword}</p>
+              <p className="text-sm font-medium text-destructive">{errors.confirmPassword}</p>
             )}
           </div>
         </div>
 
-        {(statusMessage || errors.form) && (
-          <div
-            className={cn(
-              "rounded-lg border px-4 py-3 text-sm font-medium",
-              statusMessage?.type === "success"
-                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                : "border-red-200 bg-red-50 text-red-700",
-            )}
-            role="status"
-          >
-            {statusMessage?.text || errors.form}
-          </div>
-        )}
-
         <Button
           type="submit"
-          onClick={(event) => {
-            event.preventDefault();
-            void handleRegister();
-          }}
-          className="w-full h-12 font-medium bg-[#8a2be2] text-background hover:bg-[#8a2be2]/90 rounded-xl"
+          className="w-full h-12 font-medium bg-[#8a2be2] text-white hover:bg-[#8a2be2]/90 rounded-xl"
           disabled={isLoading}
         >
           {isLoading ? (
-            <div className="h-5 w-5 animate-spin rounded-full border-2 border-background border-t-transparent" />
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
           ) : (
-            "Sign up"
+            "ลงทะเบียน"
           )}
         </Button>
       </form>
 
       <p className="text-center text-sm text-muted-foreground">
-        Already have an account?{" "}
+        มีทะเบียนในระบบแล้ว?{" "}
         <button
           type="button"
           onClick={onBackToLogin}
-          className="font-semibold text-slate-700 hover:text-[#8a2be2] hover:underline underline-offset-4"
+          className="font-semibold text-foreground hover:text-[#8a2be2] hover:underline underline-offset-4 transition-colors"
         >
-          Sign in
+          เข้าสู่ระบบ
         </button>
       </p>
     </div>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Bell,
   Moon,
@@ -24,14 +24,25 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
+import api from "@/lib/axios";
 
 const SettingsPage = () => {
   const { toast } = useToast();
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
+  const savedTheme =
+    typeof window !== "undefined" ? localStorage.getItem("theme") || "system" : "system";
   
+  const applyTheme = (theme: string) => {
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const shouldUseDark = theme === "dark" || (theme === "system" && prefersDark);
+
+    document.documentElement.classList.toggle("dark", shouldUseDark);
+    localStorage.setItem("theme", theme);
+  };
+
   const [settings, setSettings] = useState({
-    theme: "system",
+    theme: localStorage.getItem("theme") || "dark",
     language: "th",
     emailNotifications: true,
     pushNotifications: true,
@@ -39,6 +50,24 @@ const SettingsPage = () => {
     projectNotifications: true,
     studentNotifications: true,
   });
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+
+  useEffect(() => {
+    const applyTheme = () => {
+      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      const shouldUseDark = settings.theme === "dark" || (settings.theme === "system" && prefersDark);
+
+      document.documentElement.classList.toggle("dark", shouldUseDark);
+    };
+
+    localStorage.setItem("theme", settings.theme);
+    applyTheme();
+
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    mediaQuery.addEventListener("change", applyTheme);
+
+    return () => mediaQuery.removeEventListener("change", applyTheme);
+  }, [settings.theme]);
 
   const [passwords, setPasswords] = useState({
     current: "",
@@ -46,11 +75,63 @@ const SettingsPage = () => {
     confirm: "",
   });
 
-  const handleSaveSettings = () => {
-    toast({
-      title: "บันทึกสำเร็จ",
-      description: "การตั้งค่าของคุณได้รับการบันทึกแล้ว",
-    });
+  useEffect(() => {
+    applyTheme(settings.theme);
+  }, [settings.theme]);
+
+  useEffect(() => {
+    const loadNotificationSettings = async () => {
+      try {
+        const response = await api.get("/index.php?page=get-notification-settings");
+        const data = response.data?.data;
+
+        if (!data) return;
+
+        setSettings((current) => ({
+          ...current,
+          emailNotifications: Boolean(data.emailNotifications),
+          pushNotifications: Boolean(data.pushNotifications),
+          gradeNotifications: Boolean(data.gradeNotifications),
+          projectNotifications: Boolean(data.projectNotifications),
+          studentNotifications: Boolean(data.studentNotifications),
+        }));
+      } catch (error) {
+        toast({
+          title: "โหลดการตั้งค่าไม่สำเร็จ",
+          description: "ไม่สามารถโหลดค่าการแจ้งเตือนล่าสุดได้",
+          variant: "destructive",
+        });
+      }
+    };
+
+    loadNotificationSettings();
+  }, [toast]);
+
+  const handleSaveSettings = async () => {
+    setIsSavingSettings(true);
+
+    try {
+      await api.post("/index.php?page=save-notification-settings", {
+        emailNotifications: settings.emailNotifications,
+        pushNotifications: settings.pushNotifications,
+        gradeNotifications: settings.gradeNotifications,
+        projectNotifications: settings.projectNotifications,
+        studentNotifications: settings.studentNotifications,
+      });
+
+      toast({
+        title: "บันทึกสำเร็จ",
+        description: "การตั้งค่าของคุณได้รับการบันทึกแล้ว",
+      });
+    } catch (error) {
+      toast({
+        title: "บันทึกไม่สำเร็จ",
+        description: "ไม่สามารถบันทึกการตั้งค่าการแจ้งเตือนได้",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingSettings(false);
+    }
   };
 
   const handleChangePassword = () => {
@@ -103,7 +184,10 @@ const SettingsPage = () => {
               </div>
               <Select
                 value={settings.theme}
-                onValueChange={(value) => setSettings({ ...settings, theme: value })}
+                onValueChange={(value) => {
+                  setSettings({ ...settings, theme: value });
+                  applyTheme(value);
+                }}
               >
                 <SelectTrigger className="w-[180px]">
                   <SelectValue />
@@ -131,6 +215,7 @@ const SettingsPage = () => {
               </Select>
             </div>
 
+            {/*
             <Separator />
 
             <div className="flex items-center justify-between">
@@ -154,6 +239,7 @@ const SettingsPage = () => {
                 </SelectContent>
               </Select>
             </div>
+            */}
           </CardContent>
         </Card>
 
@@ -324,9 +410,9 @@ const SettingsPage = () => {
 
         {/* Save Button */}
         <div className="flex justify-end">
-          <Button onClick={handleSaveSettings} size="lg">
+          <Button onClick={handleSaveSettings} size="lg" disabled={isSavingSettings}>
             <Save className="h-4 w-4 mr-2" />
-            บันทึกการตั้งค่า
+            {isSavingSettings ? "กำลังบันทึก..." : "บันทึกการตั้งค่า"}
           </Button>
         </div>
       </div>

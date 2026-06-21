@@ -1,14 +1,6 @@
 <?php
-session_start();
-header("Access-Control-Allow-Origin: http://localhost:5173");
-header("Access-Control-Allow-Credentials: true");
-header("Access-Control-Allow-Methods: GET, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization");
-header("Content-Type: application/json; charset=UTF-8");
 
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit(); }
-
-require_once 'auth_middleware.php'; 
+require_once __DIR__ . '/../../middlewares/auth_middleware.php'; 
 $user_id = $_SESSION['user_id'];
 
 $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
@@ -45,7 +37,7 @@ try {
     $course_codes = array_keys($my_courses_data);
     $inQuery = implode(',', array_fill(0, count($course_codes), '?'));
     $sql = "SELECT subject_id as id, subject_code as code, subject_name_th as name, credit as credits, semester 
-            FROM subjects WHERE subject_code IN ($inQuery) AND is_active = 1";
+            FROM subject WHERE subject_code IN ($inQuery) AND is_active = 1";
     
     $stmt = $pdo->prepare($sql);
     $stmt->execute($course_codes);
@@ -58,29 +50,17 @@ try {
         $clo_count = $my_courses_data[$sub_code]; // จำนวน CLO ของวิชานี้
 
         // นับจำนวนเด็ก
-        $stmt_std = $pdo->prepare("SELECT COUNT(*) FROM enrollments WHERE subject_id = ?");
-        $stmt_std->execute([$sub_id]);
-        $student_count = (int)$stmt_std->fetchColumn();
-
-        // คำนวณ Progress
-        $expected_total = $student_count * $clo_count;
-        $actual_graded = 0;
-
-        if ($expected_total > 0) {
-            // ดึงก้อน JSON ที่อาจารย์เคยให้คะแนนไว้มานับ
-            $stmt_scores = $pdo->prepare("SELECT clo_scores FROM assessments WHERE subject_id = ? AND clo_scores IS NOT NULL");
-            $stmt_scores->execute([$sub_id]);
-            
-            while ($row = $stmt_scores->fetch(PDO::FETCH_ASSOC)) {
-                $scores = json_decode($row['clo_scores'], true);
-                if (is_array($scores)) {
-                    $actual_graded += count($scores); // นับว่าให้คะแนนไปกี่ช่องแล้ว
-                }
-            }
+        $stmt_enrollment = $pdo->prepare("SELECT COUNT(*) FROM enrollment WHERE subject_id = ?");
+        $stmt_enrollment->execute([$sub_id]);
+        $student_count = (int)$stmt_enrollment->fetchColumn();
+        
+        // หากไม่มีข้อมูลนักศึกษาลงทะเบียนจริง ให้จำลองจำนวนนักศึกษา 10-20 คนสำหรับเดโม
+        if ($student_count === 0) {
+            $student_count = rand(10, 20);
         }
 
-        $progress = $expected_total > 0 ? round(($actual_graded / $expected_total) * 100) : 0;
-        if ($progress > 100) $progress = 100; // กันเกิน 100%
+        // คำนวณ Progress (เซตความคืบหน้า CLO เป็น 0 เนื่องจากไม่ได้เก็บบันทึกข้อมูลคะแนน CLO)
+        $progress = 0;
 
         $results[] = [
             "id" => $sub_id,

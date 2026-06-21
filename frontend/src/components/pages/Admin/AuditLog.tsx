@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar, Search, Filter, Download, User, FileEdit, Trash2, Plus, LogIn, LogOut, Shield } from "lucide-react";
 import ExportButton from "@/components/dashboard/ExportButton";
+import { useToast } from "@/hooks/use-toast";
+import api from "@/lib/axios";
 
 interface AuditEntry {
   id: string;
@@ -18,19 +20,6 @@ interface AuditEntry {
   details: string;
   ipAddress: string;
 }
-
-const mockAuditLog: AuditEntry[] = [
-  { id: "1", timestamp: "2569-02-03 14:32:15", user: "admin@faculty.edu", userRole: "admin", action: "create", resource: "ผู้ใช้", details: "สร้างบัญชี instructor2@faculty.edu", ipAddress: "192.168.1.100" },
-  { id: "2", timestamp: "2569-02-03 14:15:42", user: "dean@faculty.edu", userRole: "teacher", action: "update", resource: "รายงาน", details: "แก้ไขรายงาน KPI ประจำเดือน", ipAddress: "192.168.1.105" },
-  { id: "3", timestamp: "2569-02-03 13:58:20", user: "student1@student.edu", userRole: "student", action: "login", resource: "ระบบ", details: "เข้าสู่ระบบสำเร็จ", ipAddress: "10.0.0.55" },
-  { id: "4", timestamp: "2569-02-03 13:45:33", user: "admin@faculty.edu", userRole: "admin", action: "role_change", resource: "Role", details: "เปลี่ยน Role ของ advisor@faculty.edu เป็น advisor", ipAddress: "192.168.1.100" },
-  { id: "5", timestamp: "2569-02-03 12:30:18", user: "instructor1@faculty.edu", userRole: "teacher", action: "update", resource: "เกรด", details: "บันทึกเกรดวิชา CS101", ipAddress: "192.168.1.110" },
-  { id: "6", timestamp: "2569-02-03 11:22:05", user: "admin@faculty.edu", userRole: "admin", action: "delete", resource: "ผู้ใช้", details: "ลบบัญชี temp@faculty.edu", ipAddress: "192.168.1.100" },
-  { id: "7", timestamp: "2569-02-03 10:15:42", user: "student2@student.edu", userRole: "student", action: "create", resource: "Portfolio", details: "อัปโหลดใบประกาศนียบัตร", ipAddress: "10.0.0.60" },
-  { id: "8", timestamp: "2569-02-03 09:45:30", user: "dean@faculty.edu", userRole: "teacher", action: "logout", resource: "ระบบ", details: "ออกจากระบบ", ipAddress: "192.168.1.105" },
-  { id: "9", timestamp: "2569-02-02 16:30:00", user: "admin@faculty.edu", userRole: "admin", action: "create", resource: "รายวิชา", details: "เพิ่มรายวิชา CS201", ipAddress: "192.168.1.100" },
-  { id: "10", timestamp: "2569-02-02 15:20:45", user: "advisor@faculty.edu", userRole: "teacher", action: "update", resource: "Advice Note", details: "เพิ่ม Advice Note ให้นักศึกษา 64010001", ipAddress: "192.168.1.115" },
-];
 
 const actionIcons: Record<AuditEntry["action"], React.ReactNode> = {
   create: <Plus className="h-4 w-4" />,
@@ -60,11 +49,31 @@ const actionColors: Record<AuditEntry["action"], string> = {
 };
 
 export default function AuditLog() {
+  const [logs, setLogs] = useState<AuditEntry[]>([]); // 👈 เก็บข้อมูลจริง
   const [searchQuery, setSearchQuery] = useState("");
   const [actionFilter, setActionFilter] = useState("all");
   const [roleFilter, setRoleFilter] = useState("all");
+  const { toast } = useToast();
 
-  const filteredLogs = mockAuditLog.filter((entry) => {
+  // ดึงข้อมูลจาก API
+  useEffect(() => {
+    const fetchLogs = async () => {
+      try {
+        const response = await api.get("/index.php?page=get-audit-logs");
+        if (Array.isArray(response.data)) {
+          setLogs(response.data);
+        } else {
+          setLogs([]);
+        }
+      } catch (error) {
+        toast({ title: "โหลดข้อมูล Audit Log ล้มเหลว", variant: "destructive" });
+        setLogs([]);
+      }
+    };
+    fetchLogs();
+  }, []);
+
+  const filteredLogs = logs.filter((entry) => {
     const matchesSearch = 
       entry.user.toLowerCase().includes(searchQuery.toLowerCase()) ||
       entry.details.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -94,7 +103,7 @@ export default function AuditLog() {
                   <Plus className="h-5 w-5 text-success" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{mockAuditLog.filter((e) => e.action === "create").length}</p>
+                  <p className="text-2xl font-bold">{logs.filter((e) => e.action === "create").length}</p>
                   <p className="text-xs text-muted-foreground">สร้างใหม่</p>
                 </div>
               </div>
@@ -107,7 +116,7 @@ export default function AuditLog() {
                   <FileEdit className="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{mockAuditLog.filter((e) => e.action === "update").length}</p>
+                  <p className="text-2xl font-bold">{logs.filter((e) => e.action === "update").length}</p>
                   <p className="text-xs text-muted-foreground">แก้ไข</p>
                 </div>
               </div>
@@ -120,7 +129,7 @@ export default function AuditLog() {
                   <Trash2 className="h-5 w-5 text-destructive" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{mockAuditLog.filter((e) => e.action === "delete").length}</p>
+                  <p className="text-2xl font-bold">{logs.filter((e) => e.action === "delete").length}</p>
                   <p className="text-xs text-muted-foreground">ลบ</p>
                 </div>
               </div>
@@ -133,7 +142,7 @@ export default function AuditLog() {
                   <LogIn className="h-5 w-5 text-warning" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{mockAuditLog.filter((e) => e.action === "login" || e.action === "logout").length}</p>
+                  <p className="text-2xl font-bold">{logs.filter((e) => e.action === "login" || e.action === "logout").length}</p>
                   <p className="text-xs text-muted-foreground">เข้า/ออกระบบ</p>
                 </div>
               </div>

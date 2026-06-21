@@ -1,271 +1,293 @@
 import { useState, useEffect } from "react";
-import { Plus, Search, Filter, Eye, Edit, MoreVertical, Trash2 } from "lucide-react";
+import { Plus, Search, Filter, Eye, Edit, MoreVertical, Upload, Link2, FileText, Trash2, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import CreateProjectDialog from "@/components/ui/CreateProjectDialog";
-import EditProjectDialog from "@/components/ui/EditProjectDialog";
-import api from "@/lib/axios";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
+import api from "@/lib/axios";
 
-const PROJECTS_PAGE = "?page=projectspage";
+// โครงสร้างข้อมูลที่ตรงกับฐานข้อมูลจริง
+interface Project {
+  project_id: number;
+  project_name_th: string;
+  project_name_en: string;
+  description: string;
+}
 
 const ProjectsPage = () => {
-  // 1. ใส่ Mockup Data เป็นค่าเริ่มต้น
-const [projects, setProjects] = useState<any[]>([
-    {
-      id: 1,
-      name: "ระบบติดตามและแจ้งเตือนสัญญาณชีพผู้ป่วย",
-      nameEn: "Patient Vitals Monitoring System",
-      description: "พัฒนาระบบเชื่อมต่ออุปกรณ์วัดสัญญาณชีพเข้ากับหน้าจอ Central Monitor ที่เคาน์เตอร์พยาบาลแบบเรียลไทม์",
-      type: "เทคโนโลยีการแพทย์",
-      status: "กำลังดำเนินการ",
-      progress: 60,
-      deadline: "2026-08-30",
-      budget: "450000",
-    },
-    {
-      id: 2,
-      name: "แอปพลิเคชันดูแลผู้ป่วยติดเตียงที่บ้าน",
-      nameEn: "Home Care Nursing Application",
-      description: "ระบบสำหรับพยาบาลวิชาชีพเพื่อบันทึกข้อมูลการเยี่ยมบ้าน วิดีโอคอลติดตามอาการ และให้คำปรึกษาญาติผู้ป่วย",
-      type: "บริการสุขภาพชุมชน",
-      status: "เริ่มโครงการ",
-      progress: 15,
-      deadline: "2026-12-15",
-      budget: "200000",
-    },
-    {
-      id: 3,
-      name: "ระบบตรวจสอบและป้องกันความคลาดเคลื่อนทางยา",
-      nameEn: "Medication Administration Checking System",
-      description: "ระบบสแกนบาร์โค้ดยาและสายรัดข้อมือผู้ป่วยก่อนบริหารยา เพื่อลดอุบัติการณ์ Medication Error",
-      type: "พัฒนาคุณภาพบริการ",
-      status: "เสร็จสิ้น",
-      progress: 100,
-      deadline: "2026-02-28",
-      budget: "350000",
-    },
-    {
-      id: 4,
-      name: "ระบบจัดตารางเวรพยาบาลอัจฉริยะ",
-      nameEn: "Smart Nurse Scheduling System",
-      description: "โปรแกรมจัดตารางขึ้นเวรอัตโนมัติตามอัตรากำลังของแต่ละแผนก และคำนวณชั่วโมงพักผ่อนที่เหมาะสม",
-      type: "บริหารจัดการภายใน",
-      status: "กำลังดำเนินการ",
-      progress: 80,
-      deadline: "2026-06-10",
-      budget: "150000",
-    },
-    {
-      id: 5,
-      name: "แพลตฟอร์มประเมินสมรรถนะและเก็บหน่วยกิตพยาบาล",
-      nameEn: "Nursing Competency & CNEU Platform",
-      description: "ระบบจัดการการสอบทักษะทางการพยาบาลและเก็บสะสมคะแนนหน่วยกิตการศึกษาต่อเนื่อง (CNEU)",
-      type: "การศึกษาและฝึกอบรม",
-      status: "รอตรวจสอบ",
-      progress: 90,
-      deadline: "2026-05-20",
-      budget: "180000",
-    }
-  ]);
-  
+  const { toast } = useToast();
+  const [projects, setProjects] = useState<Project[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [loading, setLoading] = useState(false); // เปลี่ยนเป็น false เพราะมีข้อมูลรออยู่แล้ว
-  
-  // States สำหรับจัดการ Dialog ต่างๆ
-  const [createOpen, setCreateOpen] = useState(false);
-  const [editOpen, setEditOpen] = useState(false);
-  const [selectedProject, setSelectedProject] = useState<any>(null); 
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // [GET]
+  // States สำหรับจัดการ Modal เพิ่มและแก้ไข
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [formData, setFormData] = useState({
+    project_id: "",
+    project_name_th: "",
+    project_name_en: "",
+    description: "",
+  });
+
+  // 1. ฟังก์ชันดึงข้อมูลโครงการทั้งหมด (Read)
   const fetchProjects = async () => {
     try {
-      setLoading(true);
-      const { data } = await api.get(PROJECTS_PAGE);
-      if (data.status === "success") {
-        const mappedProjects = data.data.map((p: any) => ({
-          id: p.project_id,
-          name: p.project_name_th,
-          nameEn: p.project_name_en, 
-          description: p.description,
-          type: "โครงการทั่วไป", 
-          status: "กำลังดำเนินการ",
-          progress: 50, 
-          deadline: "-",
-          budget: "0",
-        }));
-        setProjects(mappedProjects);
-      }
-    } catch (error) {
-      console.error("Error fetching projects:", error);
-    } finally {
-      setLoading(false);
-    }
-
-  };
-
-  useEffect(() => {
-    // ปิดการดึงข้อมูลจาก API ชั่วคราว หน้าเว็บจะได้โชว์ Mockup 5 อันนั้น
-    fetchProjects();
-  }, []);
-
-  // [POST] จำลองการสร้างโครงการใหม่
-  const handleCreate = async (data: { name: string; categories: string[]; budget: number; deadline: string }) => {
-    // อัปเดต State จำลองไปก่อน
-    const newProject = {
-      id: projects.length + 1,
-      name: data.name,
-      nameEn: "",
-      description: `Budget: ${data.budget}, Deadline: ${data.deadline}`,
-      type: "โครงการทั่วไป",
-      status: "กำลังดำเนินการ",
-      progress: 0,
-      deadline: data.deadline,
-      budget: data.budget.toString()
-    };
-    setProjects([...projects, newProject]);
-    setCreateOpen(false); // ปิด Dialog (ถ้า Dialog ไม่ได้ปิดเอง)
-
-    try {
-      const res = await api.post(PROJECTS_PAGE, {
-        project_name_th: data.name,
-        project_name_en: "", 
-        description: `Budget: ${data.budget}, Deadline: ${data.deadline}`, 
+      setIsLoading(true);
+      const res = await api.get("/index.php?page=get-project", {
+        params: { search: searchQuery },
       });
-      const result = res.data;
-      if (result.status === "success") fetchProjects();
-      else alert("Error: " + result.message);
-    } catch (error) {
-      console.error("Error creating project:", error);
-    }
-  };
-
-  // [PUT] จำลองการอัปเดตโครงการ
-  const handleUpdate = async (updateData: { project_id: number; project_name_th: string; project_name_en: string; description: string }) => {
-    // อัปเดต State จำลองไปก่อน
-    setProjects(projects.map(p => 
-      p.id === updateData.project_id 
-        ? { ...p, name: updateData.project_name_th, nameEn: updateData.project_name_en, description: updateData.description } 
-        : p
-    ));
-    setEditOpen(false); // ปิด Dialog
-
-
-    try {
-      const res = await api.put(PROJECTS_PAGE, updateData);
-      const result = res.data;
-      if (result.status === "success") {
-        fetchProjects(); 
-      } else {
-        alert("ไม่สามารถแก้ไขได้: " + result.message);
+      if (res.data.status === "success") {
+        setProjects(res.data.data || []);
       }
     } catch (error) {
-      console.error("Error updating project:", error);
+      toast({ title: "ข้อผิดพลาด", description: "ไม่สามารถดึงข้อมูลโครงการได้", variant: "destructive" });
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  // [DELETE] จำลองการลบโครงการ
-  const handleDelete = async (id: number) => {
-    if (!window.confirm("คุณต้องการลบโครงการนี้ใช่หรือไม่?")) return;
-    
-    // อัปเดต State จำลองไปก่อน
-    setProjects(projects.filter(p => p.id !== id));
+  // ดึงข้อมูลเมื่อโหลดหน้าเว็บ หรือเมื่อมีการค้นหา
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      fetchProjects();
+    }, 500); // หน่วงเวลา 0.5 วิ เพื่อไม่ให้ยิง API ถี่เกินไปตอนพิมพ์ค้นหา
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchQuery]);
+
+  // 2. เปิดฟอร์มสร้างโครงการใหม่
+  const handleOpenCreateModal = () => {
+    setEditMode(false);
+    setFormData({ project_id: "", project_name_th: "", project_name_en: "", description: "" });
+    setIsModalOpen(true);
+  };
+
+  // 3. เปิดฟอร์มแก้ไขโครงการ
+  const handleOpenEditModal = (project: Project) => {
+    setEditMode(true);
+    setFormData({
+      project_id: project.project_id.toString(),
+      project_name_th: project.project_name_th,
+      project_name_en: project.project_name_en || "",
+      description: project.description || "",
+    });
+    setIsModalOpen(true);
+  };
+
+  // 4. บันทึกข้อมูล (Create & Update)
+  const handleSaveProject = async () => {
+    if (!formData.project_name_th.trim()) {
+      toast({ title: "แจ้งเตือน", description: "กรุณากรอกชื่อโครงการ (ภาษาไทย)", variant: "destructive" });
+      return;
+    }
 
     try {
-      const res = await api.delete(PROJECTS_PAGE, { data: { project_id: id } });
-      const result = res.data;
-      if (result.status === "success") fetchProjects();
-      else alert("ไม่สามารถลบได้: " + result.message);
-    } catch (error) {
-      console.error("Error deleting project:", error);
-    }   
+      setIsSubmitting(true);
+      const endpoint = editMode ? "/index.php?page=update-project" : "/index.php?page=add-project";
+      const payload = editMode ? formData : {
+        project_name_th: formData.project_name_th,
+        project_name_en: formData.project_name_en,
+        description: formData.description
+      };
+
+      const res = await api.post(endpoint, payload);
+      
+      if (res.data.status === "success") {
+        toast({ title: "สำเร็จ", description: res.data.message });
+        setIsModalOpen(false);
+        fetchProjects(); // รีโหลดข้อมูลใหม่
+      }
+    } catch (error: any) {
+      toast({ title: "ข้อผิดพลาด", description: error.response?.data?.message || "ไม่สามารถบันทึกข้อมูลได้", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  // เปิดหน้าต่างแก้ไข พร้อมส่งข้อมูลไปให้ Dialog
-  const openEditDialog = (project: any) => {
-    setSelectedProject(project);
-    setEditOpen(true);
-  };
+  // 5. ลบโครงการ (Delete)
+  const handleDeleteProject = async (id: number) => {
+    if (!confirm("คุณแน่ใจหรือไม่ว่าต้องการลบโครงการนี้? ข้อมูลที่เกี่ยวข้องอาจถูกลบไปด้วย")) return;
 
-  const filteredProjects = projects.filter((p) =>
-    p.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+    try {
+      const res = await api.post("/index.php?page=delete_project", { project_id: id });
+      if (res.data.status === "success") {
+        toast({ title: "ลบสำเร็จ", description: "ลบโครงการออกจากระบบแล้ว" });
+        fetchProjects();
+      }
+    } catch (error: any) {
+      toast({ title: "ข้อผิดพลาด", description: "ไม่สามารถลบโครงการได้ อาจมีการใช้งานอยู่", variant: "destructive" });
+    }
+  };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">จัดการโครงการ</h1>
-          <p className="text-muted-foreground mt-1">สร้าง แก้ไข และติดตามความคืบหน้าโครงการ</p>
+          <p className="text-muted-foreground mt-1">สร้าง แก้ไข และติดตามความคืบหน้าโครงการภาควิชา</p>
         </div>
-        <Button className="gap-2" onClick={() => setCreateOpen(true)}>
+        <Button className="gap-2" onClick={handleOpenCreateModal}>
           <Plus className="h-4 w-4" />
           สร้างโครงการใหม่
         </Button>
-
-        {/* เรียกใช้ Dialog สร้าง */}
-        <CreateProjectDialog open={createOpen} onOpenChange={setCreateOpen} onCreate={handleCreate} />
-        
-        {/* เรียกใช้ Dialog แก้ไข */}
-        <EditProjectDialog open={editOpen} onOpenChange={setEditOpen} projectData={selectedProject} onUpdate={handleUpdate} />
       </div>
 
+      {/* Search & Filter */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="ค้นหาโครงการ..."
+            placeholder="ค้นหาโครงการด้วยชื่อภาษาไทย หรือ ภาษาอังกฤษ..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10"
           />
         </div>
+        <Button variant="outline" className="gap-2">
+          <Filter className="h-4 w-4" />
+          กรอง
+        </Button>
       </div>
 
-      {loading ? (
-        <div className="text-center py-10 text-muted-foreground">กำลังโหลดข้อมูล...</div>
+      {/* Project Cards */}
+      {isLoading ? (
+        <div className="flex justify-center items-center py-20">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      ) : projects.length === 0 ? (
+        <div className="text-center py-20 text-muted-foreground border-2 border-dashed rounded-xl">
+          ไม่พบข้อมูลโครงการในระบบ
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {filteredProjects.map((project) => (
-            <div key={project.id} className="bg-card rounded-xl shadow-card p-5 hover:shadow-md transition-shadow border">
+          {projects.map((project) => (
+            <div key={project.project_id} className="bg-card rounded-xl shadow-sm border p-5 hover:shadow-md transition-shadow relative">
               <div className="flex items-start justify-between mb-3">
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-foreground line-clamp-2">{project.name}</h3>
-                  {project.description && (
-                     <p className="text-sm text-muted-foreground truncate mt-1">{project.description}</p>
+                <div className="flex-1 min-w-0 pr-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Badge variant="outline" className="text-xs bg-primary/5">โครงการคณะ</Badge>
+                    <Badge variant="secondary" className="text-xs">กำลังดำเนินการ</Badge>
+                  </div>
+                  <h3 className="font-semibold text-foreground line-clamp-2">{project.project_name_th}</h3>
+                  {project.project_name_en && (
+                    <p className="text-xs text-muted-foreground mt-1 truncate">{project.project_name_en}</p>
                   )}
                 </div>
+                
+                {/* 3-Dots Menu */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
                       <MoreVertical className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
+                  <DropdownMenuContent align="end" className="w-48">
                     <DropdownMenuItem className="gap-2">
-                      <Eye className="h-4 w-4" /> ดูรายละเอียด
+                      <Eye className="h-4 w-4 text-blue-500" /> ดูรายละเอียด
                     </DropdownMenuItem>
-                    {/* ปุ่มแก้ไข เรียกฟังก์ชัน openEditDialog */}
-                    <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => openEditDialog(project)}>
-                      <Edit className="h-4 w-4" /> แก้ไขโครงการ
+                    <DropdownMenuItem className="gap-2" onClick={() => handleOpenEditModal(project)}>
+                      <Edit className="h-4 w-4 text-orange-500" /> แก้ไขโครงการ
                     </DropdownMenuItem>
-                    {/* ปุ่มลบ */}
-                    <DropdownMenuItem className="gap-2 text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer" onClick={() => handleDelete(project.id)}>
+                    <DropdownMenuItem className="gap-2">
+                      <Upload className="h-4 w-4 text-green-500" /> อัปโหลดเอกสาร
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="gap-2">
+                      <Link2 className="h-4 w-4 text-purple-500" /> เชื่อมโยงระดับ LO
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem className="gap-2 text-red-600 focus:bg-red-50" onClick={() => handleDeleteProject(project.project_id)}>
                       <Trash2 className="h-4 w-4" /> ลบโครงการ
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
+
+              {/* Progress & Info (Mock data visual fallbacks for now) */}
+              <div className="space-y-3 mt-4 pt-4 border-t border-slate-100">
+                <p className="text-sm text-slate-600 line-clamp-2 min-h-[40px]">
+                  {project.description || "ไม่มีคำอธิบายโครงการ"}
+                </p>
+                <div>
+                  <div className="flex items-center justify-between text-xs mb-1">
+                    <span className="text-muted-foreground">ความคืบหน้า (จำลอง)</span>
+                    <span className="font-medium text-primary">0%</span>
+                  </div>
+                  <div className="relative h-1.5 bg-muted rounded-full overflow-hidden">
+                    <div className="absolute left-0 top-0 h-full rounded-full bg-primary transition-all w-0" />
+                  </div>
+                </div>
+              </div>
             </div>
           ))}
         </div>
       )}
+
+      {/* Modal เพิ่ม/แก้ไขโครงการ */}
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>{editMode ? "แก้ไขข้อมูลโครงการ" : "สร้างโครงการใหม่"}</DialogTitle>
+            <DialogDescription>
+              กรอกรายละเอียดข้อมูลของโครงการเพื่อบันทึกลงในฐานข้อมูลคณะพยาบาลศาสตร์
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label>ชื่อโครงการ (ภาษาไทย) <span className="text-red-500">*</span></Label>
+              <Input
+                value={formData.project_name_th}
+                onChange={(e) => setFormData({ ...formData, project_name_th: e.target.value })}
+                placeholder="เช่น โครงการพัฒนาศักยภาพนักศึกษา..."
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>ชื่อโครงการ (ภาษาอังกฤษ)</Label>
+              <Input
+                value={formData.project_name_en}
+                onChange={(e) => setFormData({ ...formData, project_name_en: e.target.value })}
+                placeholder="เช่น Student Development Project..."
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>รายละเอียดโครงการ</Label>
+              <Textarea
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="อธิบายวัตถุประสงค์ หรือเป้าหมายของโครงการโดยสังเขป..."
+                rows={4}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsModalOpen(false)} disabled={isSubmitting}>
+              ยกเลิก
+            </Button>
+            <Button onClick={handleSaveProject} disabled={isSubmitting}>
+              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              {editMode ? "บันทึกการแก้ไข" : "สร้างโครงการ"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

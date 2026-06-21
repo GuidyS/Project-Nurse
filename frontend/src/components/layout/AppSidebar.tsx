@@ -212,9 +212,7 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
         const fallbackMenuSections = getFallbackMenuSections(Number(user.role_id));
 
         // เรียก API (ตรวจสอบ Path ให้ตรงกับที่วาง index.php ไว้)
-        const res = user.user_id
-          ? await api.get(`?page=sidebar&user_id=${user.user_id}`)
-          : { data: fallbackMenuSections };
+        const res = await api.get(`/index.php?page=sidebar`);
         
         console.log("Menu Data:", res.data); // ลองเปิด console ดูว่าข้อมูลมาไหม
         setMenuSections(Array.isArray(res.data) && res.data.length > 0 ? res.data : fallbackMenuSections);
@@ -268,8 +266,8 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
 
   const bottomMenuItems = [
     { title: "การแจ้งเตือน", url: "notifications", icon: "Bell", permission: "NOTIFICATION_VIEW" },
-    { title: "ข้อมูลส่วนตัว", url: "profile", icon: "User", permission: "PROFILE_VIEW" },
-    { title: "การตั้งค่า", url: "settings", icon: "Settings", permission: "SETTINGS" },
+    { title: "ข้อมูลส่วนตัว", url: "profile", icon: "User", permission: "PROFILE_VIEW_SELF" },
+    { title: "การตั้งค่า", url: "settings", icon: "Settings", permission: "SYSTEM_SETTINGS" },
   ];
 
   const visibleBottomMenuItems = bottomMenuItems;
@@ -283,7 +281,7 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
         "--sidebar-width": "260px" 
       } as React.CSSProperties}
       className={cn(
-        'border-r border-sidebar-border bg-sidebar transition-all duration-300 shadow-xl',
+        'border-r border-sidebar-border bg-sidebar shadow-xl',
         collapsed ? 'w-[72px]' : 'w-64'
       )}
     >
@@ -310,12 +308,12 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
           {!collapsed && (
             <>
               <div className="flex-1 min-w-0">
-                <h1 className="text-base font-bold text-slate-700 leading-relaxed">Nursing</h1>
-                <p className="text-[10px] text-slate-500 font-medium whitespace-nowrap uppercase tracking-tighter">Management System</p>
+                <h1 className="text-base font-bold text-foreground leading-relaxed">Nursing</h1>
+                <p className="text-[10px] text-muted-foreground font-medium whitespace-nowrap uppercase tracking-tighter">Management System</p>
               </div>
               
               {/* ปุ่ม Trigger กลับไปอยู่ที่เดิม (ขวาบน) เมื่อเปิดแถบ */}
-              <SidebarTrigger className="text-slate-500 hover:bg-[#8a2be2]/10 hover:text-[#8a2be2]">
+              <SidebarTrigger className="text-sidebar-foreground/70 hover:bg-[#8a2be2]/10 hover:text-[#8a2be2]">
                 <ChevronLeft className="h-4 w-4" />
               </SidebarTrigger>
             </>
@@ -363,11 +361,9 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
                         )}
                       >
                         <Icon className={cn(
-                            "h-4 w-4 shrink-0 transition-colors", 
-                            isActive 
-                              ? "text-[#8a2be2]"
-                              : "text-slate-600 hover:text-[#8a2be2]" 
-                          )} />
+                          "sidebar-main-icon", 
+                          isActive && "active"
+                        )} />
                         {!collapsed && <span>{item.title}</span>}
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -383,21 +379,23 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
       {visibleBottomMenuItems.length > 0 && (
       <div className="mt-auto border-t border-sidebar-border p-4">
         <SidebarMenu>
-          {visibleBottomMenuItems.map((item) => {
-              const Icon = getIcon(item.icon); // ใช้ฟังก์ชันแปลงไอคอนเดียวกัน
-              const isActive = activeItem === item.url; // เช็คสถานะ Active เดียวกัน
+          {bottomMenuItems
+            .filter(item => hasPermission(item.permission))
+            .map((item) => {
+              const Icon = getIcon(item.icon);
+              const isActive = activeItem === item.url;
 
               return (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton 
                     tooltip={item.title}
                     onClick={() => onItemClick(item.url)}
-                    // ใช้ ClassName และ Logic สีชุดเดียวกับ Main Menu
                     className={cn(
                       "w-full transition-all duration-200 mb-1 group",
                       isActive 
                         ? "bg-[#8a2be2]/10 text-[#8a2be2]" 
-                        : "text-slate-600 hover:bg-[#8a2be2]/5 hover:text-[#8a2be2]",
+                        // เอา text-slate-600 ออกเพื่อให้สีสอดคล้องกับเมนูด้านบน
+                        : "hover:bg-[#8a2be2]/10 hover:text-[#8a2be2]", 
                       "active:bg-[#8a2be2]/10 active:text-[#8a2be2]",
                       "focus:bg-[#8a2be2]/10 focus:text-[#8a2be2]",
                       "focus-visible:ring-2 focus-visible:ring-[#8a2be2]/50",
@@ -405,10 +403,8 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
                     )}
                   >
                     <Icon className={cn(
-                      "h-4 w-4 shrink-0 transition-colors", 
-                      isActive 
-                        ? "text-[#8a2be2]"
-                        : "text-slate-600 hover:text-[#8a2be2]" 
+                      "sidebar-bottom-icon", 
+                      isActive && "active"
                     )} />
                     {!collapsed && <span>{item.title}</span>}
                   </SidebarMenuButton>
@@ -423,11 +419,9 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
       <SidebarFooter className="border-t border-sidebar-border p-4">
         <div className="flex items-center justify-between relative group">
           <div className="relative h-10 w-10 shrink-0">
-            <Avatar className="h-full w-full border border-[#8a2be2]/20">
-              <AvatarFallback 
-                style={{ backgroundColor: '#ad71e6' }} 
-                className="text-white text-sm font-semibold"
-              >
+            {/* เรียกใช้ Class จาก index.css */}
+            <Avatar className="sidebar-profile-avatar">
+              <AvatarFallback className="sidebar-profile-fallback">
                 {userInitial}
               </AvatarFallback>
             </Avatar>
@@ -436,7 +430,7 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
             <button 
               onClick={handleLogout}
               className={cn(
-                "absolute inset-0 h-full w-full flex items-center justify-center rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-red-600/80 text-white",
+                "sidebar-logout-overlay", // เรียกใช้ Class จาก index.css
                 !collapsed && "hidden" 
               )}
             >
@@ -447,11 +441,13 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
           {!collapsed && (
             <>
               <div className="flex-1 min-w-0 ml-2">
-                <p className="text-sm font-bold text-slate-700 truncate">{ userName }</p>
+                {/* เรียกใช้ Class จาก index.css */}
+                <p className="sidebar-profile-name">{ userName }</p>
               </div>
+              {/* เรียกใช้ Class จาก index.css */}
               <button 
                 onClick={handleLogout}
-                className="p-1 text-slate-500 hover:text-red-600 hover:bg-[#dd1d1d]/10 rounded-lg transition-colors"
+                className="sidebar-logout-btn"
               >
                 <LogOut className="h-4 w-4" />
               </button>

@@ -1,21 +1,11 @@
-import { useState } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { FileText, Upload, Download, Eye, Plus } from 'lucide-react';
-import UploadDocumentDialog from '@/components/ui/UploadDocumentDialog';
-import CreateDocumentDialog from '@/components/ui/CreateDocumentDialog';
-
-// Initial mock data
-const initialDocs = [
-  { id: '1', name: 'ข้อเสนอโครงการ', project: 'โครงการพัฒนาทักษะการพยาบาล', type: 'proposal', date: '2024-01-05', status: 'approved' },
-  { id: '2', name: 'รายงานความก้าวหน้าครั้งที่ 1', project: 'โครงการพัฒนาทักษะการพยาบาล', type: 'progress', date: '2024-01-15', status: 'approved' },
-  { id: '3', name: 'เอกสารการเงิน', project: 'โครงการพัฒนาทักษะการพยาบาล', type: 'financial', date: '2024-01-10', status: 'pending' },
-  { id: '4', name: 'ข้อเสนอโครงการ', project: 'โครงการวิจัยการดูแลผู้สูงอายุ', type: 'proposal', date: '2023-12-20', status: 'approved' },
-  { id: '5', name: 'รายงานสรุปโครงการ', project: 'โครงการอบรมเทคโนโลยีการพยาบาล', type: 'summary', date: '2024-01-10', status: 'approved' },
-];
+import { useState, useEffect } from 'react'; // นำเข้า Hook สำหรับจัดการสถานะและดึงข้อมูล
+import api from '@/lib/axios';
 
 const getTypeBadge = (type: string) => {
   switch (type) {
@@ -44,33 +34,32 @@ const getStatusBadge = (status: string) => {
 };
 
 export default function ProjectDocs() {
-  const [docs, setDocs] = useState(initialDocs);
-  const [uploadOpen, setUploadOpen] = useState(false);
-  const [createDocumentOpen, setCreateDocumentOpen] = useState(false);
+  // สร้าง State สำหรับเก็บข้อมูลจริงจากฐานข้อมูล
+  const [docs, setDocs] = useState<any[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
 
-  const handleUpload = (data: { name: string; project: string; type: string; file: File }) => {
-    const newDoc = {
-      id: String(Date.now()),
-      name: data.name,
-      project: data.project,
-      type: data.type,
-      date: new Date().toISOString().slice(0, 10),
-      status: 'pending',
-    };
-    setDocs((prev) => [newDoc, ...prev]);
-  };
+  // เรียกใช้ API เพื่อดึงข้อมูลมาแสดงผลทันทีที่เปิดหน้านี้
+  useEffect(() => {
+    // ใช้ api.get แทน fetch และเปลี่ยน URL ให้วิ่งผ่าน index.php
+    api.get('/index.php?page=get-project-docs')
+      .then((res) => {
+        // Axios จะแปลง JSON ให้เราอัตโนมัติ ข้อมูลจะอยู่ใน res.data
+        if (res.data.status === 'success') {
+          setDocs(res.data.data);
+        } else {
+          console.error(res.data.message);
+        }
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("เกิดข้อผิดพลาดในการเชื่อมต่อ API:", err);
+        setLoading(false);
+      });
+  }, []);
 
-  const handleCreate = (data: { name: string; project: string; type: string; description: string }) => {
-    const newDoc = {
-      id: String(Date.now()),
-      name: data.name,
-      project: data.project,
-      type: data.type,
-      date: new Date().toISOString().slice(0, 10),
-      status: 'pending',
-    };
-    setDocs((prev) => [newDoc, ...prev]);
-  };
+  if (loading) {
+    return <div className="p-6 text-center text-muted-foreground">กำลังโหลดข้อมูลเอกสารจากฐานข้อมูล...</div>;
+  }
 
   return (
     <>
@@ -81,31 +70,18 @@ export default function ProjectDocs() {
             <p className="text-muted-foreground">จัดการเอกสารโครงการทั้งหมด</p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setUploadOpen(true)}>
+            <Button variant="outline">
               <Upload className="mr-2 h-4 w-4" />
               อัปโหลด
             </Button>
-            <Button onClick={() => setCreateDocumentOpen(true)}>
+            <Button>
               <Plus className="mr-2 h-4 w-4" />
               สร้างเอกสาร
             </Button>
           </div>
         </div>
 
-        <UploadDocumentDialog
-          open={uploadOpen}
-          onOpenChange={setUploadOpen}
-          onUpload={handleUpload}
-          projects={Array.from(new Set(docs.map((doc) => doc.project)))}
-        />
-
-        <CreateDocumentDialog
-          open={createDocumentOpen}
-          onOpenChange={setCreateDocumentOpen}
-          onCreate={handleCreate}
-        />
-
-        {/* Stats */}
+        {/* Stats - คำนวณจากจำนวนข้อมูลจริงในฐานข้อมูลปัจจุบัน */}
         <div className="grid gap-4 md:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -170,25 +146,33 @@ export default function ProjectDocs() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {docs.map((doc) => (
-                  <TableRow key={doc.id}>
-                    <TableCell className="font-medium">{doc.name}</TableCell>
-                    <TableCell className="max-w-[200px] truncate">{doc.project}</TableCell>
-                    <TableCell>{getTypeBadge(doc.type)}</TableCell>
-                    <TableCell>{doc.date}</TableCell>
-                    <TableCell>{getStatusBadge(doc.status)}</TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm">
-                          <Eye className="h-3 w-3" />
-                        </Button>
-                        <Button variant="outline" size="sm">
-                          <Download className="h-3 w-3" />
-                        </Button>
-                      </div>
+                {docs.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                      ยังไม่มีข้อมูลเอกสารโครงการถูกบันทึกอยู่ในระบบขณะนี้
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : (
+                  docs.map((doc) => (
+                    <TableRow key={doc.id}>
+                      <TableCell className="font-medium">{doc.name}</TableCell>
+                      <TableCell className="max-w-[200px] truncate">{doc.project}</TableCell>
+                      <TableCell>{getTypeBadge(doc.type)}</TableCell>
+                      <TableCell>{doc.date}</TableCell>
+                      <TableCell>{getStatusBadge(doc.status)}</TableCell>
+                      <TableCell>
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm">
+                            <Eye className="h-3 w-3" />
+                          </Button>
+                          <Button variant="outline" size="sm">
+                            <Download className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </CardContent>

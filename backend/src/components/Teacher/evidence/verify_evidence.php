@@ -8,7 +8,7 @@ header("Content-Type: application/json; charset=UTF-8");
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit(); }
 
-require_once 'auth_middleware.php'; 
+require_once __DIR__ . '/../../middlewares/auth_middleware.php'; 
 
 $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
 $input = json_decode(file_get_contents("php://input"), true);

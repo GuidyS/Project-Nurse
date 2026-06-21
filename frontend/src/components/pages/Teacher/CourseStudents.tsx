@@ -1,40 +1,79 @@
-import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Users, Search, Download, Target } from 'lucide-react';
-import { useState } from 'react';
-import { Progress } from '@/components/ui/progress';
+import { Search, Target, Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import api from '@/lib/axios';
+import { useToast } from '@/hooks/use-toast';
 import HasPermission from '../Auth/HasPermission';
-
-// Mock data
-const mockStudents = [
-  { id: '1', studentId: '64010001', name: 'สมชาย ใจดี', clo1: 85, clo2: 78, clo3: 90, clo4: 82, overall: 84, status: 'passed' },
-  { id: '2', studentId: '64010002', name: 'สมหญิง รักเรียน', clo1: 72, clo2: 80, clo3: 85, clo4: 75, overall: 78, status: 'passed' },
-  { id: '3', studentId: '65010001', name: 'มานะ ตั้งใจ', clo1: 68, clo2: 65, clo3: 70, clo4: 72, overall: 69, status: 'passed' },
-  { id: '4', studentId: '65010002', name: 'มานี ขยัน', clo1: 55, clo2: 50, clo3: 60, clo4: 58, overall: 56, status: 'failed' },
-  { id: '5', studentId: '66010001', name: 'ปิติ สุขใจ', clo1: 92, clo2: 88, clo3: 95, clo4: 90, overall: 91, status: 'passed' },
-];
 
 const getStatusBadge = (status: string) => {
   switch (status) {
-    case 'passed':
-      return <Badge className="bg-green-500">ผ่าน</Badge>;
-    case 'failed':
-      return <Badge variant="destructive">ไม่ผ่าน</Badge>;
-    default:
-      return <Badge variant="secondary">{status}</Badge>;
+    case 'passed': return <Badge className="bg-green-500">ผ่านเกณฑ์</Badge>;
+    case 'failed': return <Badge variant="destructive">ไม่ผ่านเกณฑ์</Badge>;
+    default: return <Badge variant="secondary">รอดำเนินการ</Badge>;
   }
 };
 
-const CourseStudents = () => {
+export default function CourseStudents() {
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCourse, setSelectedCourse] = useState('NUR101');
+  
+  const [courses, setCourses] = useState<any[]>([]);
+  const [selectedCourse, setSelectedCourse] = useState<string>('');
+  const [students, setStudents] = useState<any[]>([]);
+  const [cloHeaders, setCloHeaders] = useState<string[]>([]);
+  
+  const [isLoadingCourses, setIsLoadingCourses] = useState(true);
+  const [isLoadingStudents, setIsLoadingStudents] = useState(false);
 
-  const filteredStudents = mockStudents.filter(
+  // 1. ดึงรายวิชาทั้งหมดที่อาจารย์ล็อกอินคนนี้สอน
+  useEffect(() => {
+    const fetchMyCourses = async () => {
+      try {
+        setIsLoadingCourses(true);
+        const res = await api.get('/index.php?page=get-course-students-clo');
+        if (res.data.status === 'success') {
+          const courseList = res.data.data.courses || [];
+          setCourses(courseList);
+          if (courseList.length > 0) {
+            setSelectedCourse(courseList[0].id.toString());
+          }
+        }
+      } catch (error) {
+        toast({ title: 'ข้อผิดพลาด', description: 'ไม่สามารถโหลดรายวิชาได้', variant: 'destructive' });
+      } finally {
+        setIsLoadingCourses(false);
+      }
+    };
+    fetchMyCourses();
+  }, []);
+
+  // 2. ดึงข้อมูลนักศึกษาและหัวข้อ CLO เมื่ออาจารย์สลับรายวิชา
+  useEffect(() => {
+    if (!selectedCourse) return;
+
+    const fetchStudentsCLO = async () => {
+      setIsLoadingStudents(true);
+      try {
+        const res = await api.get(`/index.php?page=get-course-students-clo&subject_id=${selectedCourse}`);
+        if (res.data.status === 'success') {
+          setStudents(res.data.data.students || []);
+          setCloHeaders(res.data.data.clo_headers || []);
+        }
+      } catch (error) {
+        toast({ title: 'ข้อผิดพลาด', description: 'ไม่สามารถโหลดข้อมูลคะแนน CLO ได้', variant: 'destructive' });
+      } finally {
+        setIsLoadingStudents(false);
+      }
+    };
+    fetchStudentsCLO();
+  }, [selectedCourse]);
+
+  const filteredStudents = students.filter(
     (student) =>
       student.name.includes(searchTerm) ||
       student.studentId.includes(searchTerm)
@@ -42,152 +81,106 @@ const CourseStudents = () => {
 
   return (
     <>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">รายชื่อนักศึกษา</h1>
-            <p className="text-muted-foreground">นักศึกษาที่ลงทะเบียนในรายวิชาที่รับผิดชอบ</p>
-          </div>
-          <Button variant="outline">
-            <Download className="mr-2 h-4 w-4" />
-            ส่งออก
-          </Button>
+      <div className="space-y-6 animate-fade-in">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">ผลสัมฤทธิ์ CLO รายบุคคล</h1>
+          <p className="text-muted-foreground">ติดตามและประเมินคะแนน Course Learning Outcomes ของนักศึกษา</p>
         </div>
 
-        {/* Course Selection */}
+        {/* Course Selection Dropdown */}
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
+          <CardHeader><CardTitle>เลือกรายวิชา</CardTitle></CardHeader>
+          <CardContent>
+            {isLoadingCourses ? (
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            ) : (
               <Select value={selectedCourse} onValueChange={setSelectedCourse}>
                 <SelectTrigger className="w-[300px]">
-                  <SelectValue placeholder="เลือกรายวิชา" />
+                  <SelectValue placeholder="เลือกรายวิชาเพื่อดูข้อมูล" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="NUR101">NUR101 - พื้นฐานการพยาบาล</SelectItem>
-                  <SelectItem value="NUR201">NUR201 - การพยาบาลผู้ใหญ่ 1</SelectItem>
-                  <SelectItem value="NUR301">NUR301 - การพยาบาลเด็ก</SelectItem>
+                  {courses.map(course => (
+                    <SelectItem key={course.id} value={course.id.toString()}>
+                      {course.code} - {course.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
-              <div className="flex items-center gap-2">
-                <Search className="h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="ค้นหานักศึกษา..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-[250px]"
-                />
-              </div>
-
-              {/* วาง HasPermission ครอบปุ่มเพิ่มนักศึกษาตรงนี้ */}
-              <HasPermission permission="assign_student_to_course">
-                <Button className="flex items-center gap-2">
-                  <Target className="h-4 w-4" /> เพิ่มนักศึกษา
-                </Button>
-              </HasPermission>
-
-              <Button variant="outline" className="flex items-center gap-2">
-                <Download className="h-4 w-4" /> Export
-              </Button>
-
-            </div>
+            )}
           </CardContent>
         </Card>
 
-        {/* Stats */}
-        <div className="grid gap-4 md:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">นักศึกษาทั้งหมด</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{mockStudents.length}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">ผ่าน CLO</CardTitle>
-              <Target className="h-4 w-4 text-green-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">
-                {mockStudents.filter(s => s.status === 'passed').length}
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">ไม่ผ่าน CLO</CardTitle>
-              <Target className="h-4 w-4 text-destructive" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-destructive">
-                {mockStudents.filter(s => s.status === 'failed').length}
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">อัตราการผ่าน</CardTitle>
-              <Target className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {Math.round((mockStudents.filter(s => s.status === 'passed').length / mockStudents.length) * 100)}%
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Students Table */}
+        {/* Students CLO Table */}
         <Card>
           <CardHeader>
-            <CardTitle>ผลการประเมิน CLO รายบุคคล</CardTitle>
-            <CardDescription>คะแนนผลลัพธ์การเรียนรู้ระดับรายวิชา</CardDescription>
+            <CardTitle className="flex items-center gap-2">
+              <Target className="h-5 w-5 text-primary" /> รายชื่อนักศึกษาและการประเมินผล
+            </CardTitle>
+            <CardDescription>คะแนนเฉลี่ยร้อยละแยกตามผลลัพธ์การเรียนรู้ (CLO)</CardDescription>
+            <div className="flex items-center gap-2 pt-4">
+              <Search className="h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="ค้นหาชื่อหรือรหัสนักศึกษา..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="max-w-sm"
+              />
+            </div>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>รหัสนักศึกษา</TableHead>
-                  <TableHead>ชื่อ-นามสกุล</TableHead>
-                  <TableHead className="text-center">CLO1</TableHead>
-                  <TableHead className="text-center">CLO2</TableHead>
-                  <TableHead className="text-center">CLO3</TableHead>
-                  <TableHead className="text-center">CLO4</TableHead>
-                  <TableHead className="text-center">รวม</TableHead>
-                  <TableHead>สถานะ</TableHead>
-                  <TableHead>จัดการ</TableHead> {/* เพิ่มหัวข้อคอลัมน์ใหม่ */}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredStudents.map((student) => (
-                  <TableRow key={student.id}>
-                    <TableCell className="font-medium">{student.studentId}</TableCell>
-                    <TableCell>{student.name}</TableCell>
-                    <TableCell className="text-center">{student.clo1}</TableCell>
-                    <TableCell className="text-center">{student.clo2}</TableCell>
-                    <TableCell className="text-center">{student.clo3}</TableCell>
-                    <TableCell className="text-center">{student.clo4}</TableCell>
-                    <TableCell className="text-center font-bold">{student.overall}</TableCell>
-                    <TableCell>{getStatusBadge(student.status)}</TableCell>
-                    {/* เพิ่มส่วนการจัดการตรงนี้ */}
-                    <TableCell>
-                      <HasPermission permission="manage_course_grading">
-                        <Button size="sm" variant="ghost" onClick={() => console.log('ไปหน้าให้เกรด', student.id)}>
-                          ให้เกรด CLO
-                        </Button>
-                      </HasPermission>
-                    </TableCell>
+            {isLoadingStudents ? (
+              <div className="flex justify-center py-10"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>รหัสนักศึกษา</TableHead>
+                    <TableHead>ชื่อ-นามสกุล</TableHead>
+                    {/* 🔧 วนลูปหัวตาราง CLO แบบอัตโนมัติตามที่หลังบ้านส่งมา */}
+                    {cloHeaders.map((clo) => (
+                      <TableHead key={clo} className="text-center">{clo}</TableHead>
+                    ))}
+                    <TableHead className="text-center">ภาพรวมวิชา</TableHead>
+                    <TableHead>ผลประเมิน</TableHead>
+                    <TableHead>จัดการ</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filteredStudents.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5 + cloHeaders.length} className="text-center py-8 text-muted-foreground">
+                        ไม่พบข้อมูลนักศึกษาในรายวิชานี้
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredStudents.map((student) => (
+                      <TableRow key={student.id}>
+                        <TableCell className="font-medium font-mono">{student.studentId}</TableCell>
+                        <TableCell>{student.name}</TableCell>
+                        
+                        {/* 🔧 ดึงคะแนน CLO มาแสดงผลตาม Key ไดนามิก */}
+                        {cloHeaders.map((clo) => (
+                          <TableCell key={clo} className="text-center">
+                            {student.scores && student.scores[clo] !== undefined ? `${student.scores[clo]}%` : '-'}
+                          </TableCell>
+                        ))}
+                        
+                        <TableCell className="text-center font-bold">{student.overall}%</TableCell>
+                        <TableCell>{getStatusBadge(student.status)}</TableCell>
+                        <TableCell>
+                          <HasPermission permission="manage_course_grading">
+                            <Button size="sm" variant="outline">ให้เกรด CLO</Button>
+                          </HasPermission>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
       </div>
     </>
   );
 }
-
-export default CourseStudents;

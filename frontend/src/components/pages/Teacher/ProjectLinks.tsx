@@ -5,17 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { TrendingUp, Save, Link } from 'lucide-react';
-import { useState } from 'react';
-
-// Mock data
-const mockProjects = [
-  { id: '1', name: 'โครงการพัฒนาทักษะการพยาบาล' },
-  { id: '2', name: 'โครงการวิจัยการดูแลผู้สูงอายุ' },
-];
-
-const plos = ['PLO1', 'PLO2', 'PLO3', 'PLO4', 'PLO5'];
-const ylos = ['YLO1', 'YLO2', 'YLO3', 'YLO4'];
-const clos = ['CLO1', 'CLO2', 'CLO3', 'CLO4'];
+import { useState, useEffect } from 'react';
 
 interface LinkMatrix {
   [projectId: string]: {
@@ -25,191 +15,265 @@ interface LinkMatrix {
   };
 }
 
-const initialLinks: LinkMatrix = {
-  '1': { plos: ['PLO1', 'PLO2'], ylos: ['YLO1', 'YLO3'], clos: ['CLO1', 'CLO2'] },
-  '2': { plos: ['PLO3', 'PLO4'], ylos: ['YLO2'], clos: ['CLO3'] },
-};
-
 export default function ProjectLinks() {
-  const [links, setLinks] = useState(initialLinks);
-  const [selectedProject, setSelectedProject] = useState('1');
+  const [projects, setProjects] = useState<any[]>([]);
+  const [plos, setPlos] = useState<string[]>([]);
+  const [ylos, setYlos] = useState<string[]>([]);
+  const [clos, setClos] = useState<string[]>([]);
+  const [links, setLinks] = useState<LinkMatrix>({});
+  
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
+  const [loading, setLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
-  const toggleLink = (type: 'plos' | 'ylos' | 'clos', value: string) => {
+  // 1. โหลดข้อมูลเมทริกซ์การเชื่อมโยงจากหลังบ้าน
+  useEffect(() => {
+    fetch('/api/get_project_links.php')
+      .then(res => res.json())
+      .then(res => {
+        if (res.status === 'success') {
+          setProjects(res.data.projects);
+          setPlos(res.data.plos);
+          setYlos(res.data.ylos);
+          setClos(res.data.clos);
+          setLinks(res.data.links);
+          if (res.data.projects.length > 0) {
+            setSelectedProjectId(res.data.projects[0].id.toString());
+          }
+        }
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error("เกิดข้อผิดพลาดในการโหลดเมทริกซ์:", err);
+        setLoading(false);
+      });
+  }, []);
+
+  // 2. จัดการเมื่อมีการติ๊กเลือก Checkbox ในตาราง
+  const handleCheckboxChange = (type: 'plos' | 'ylos' | 'clos', code: string, checked: boolean) => {
+    if (!selectedProjectId) return;
+
     setLinks(prev => {
-      const projectLinks = prev[selectedProject] || { plos: [], ylos: [], clos: [] };
-      const currentValues = projectLinks[type];
-      const newValues = currentValues.includes(value)
-        ? currentValues.filter(v => v !== value)
-        : [...currentValues, value];
+      const currentProjectLinks = prev[selectedProjectId] || { plos: [], ylos: [], clos: [] };
+      let updatedList = [...currentProjectLinks[type]];
+
+      if (checked) {
+        if (!updatedList.includes(code)) updatedList.push(code);
+      } else {
+        updatedList = updatedList.filter(item => item !== code);
+      }
+
       return {
         ...prev,
-        [selectedProject]: {
-          ...projectLinks,
-          [type]: newValues,
-        },
+        [selectedProjectId]: {
+          ...currentProjectLinks,
+          [type]: updatedList
+        }
       };
     });
   };
 
+  // 3. ฟังก์ชันส่งข้อมูลความเชื่อมโยงกลับไปบันทึกลงฐานข้อมูล
   const handleSave = () => {
-    console.log('Saving links:', links);
+    if (!selectedProjectId) return;
+    setIsSaving(true);
+
+    fetch('/api/save_project_links.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        project_id: selectedProjectId,
+        links: links[selectedProjectId] || { plos: [], ylos: [], clos: [] }
+      })
+    })
+      .then(res => res.json())
+      .then(res => {
+        if (res.status === 'success') {
+          alert('บันทึกข้อมูลการเชื่อมโยงเป้าหมายเรียบร้อยแล้ว!');
+        } else {
+          alert('เกิดข้อผิดพลาด: ' + res.message);
+        }
+        setIsSaving(false);
+      })
+      .catch(err => {
+        console.error("บันทึกผิดพลาด:", err);
+        setIsSaving(false);
+      });
   };
 
-  const currentProject = mockProjects.find(p => p.id === selectedProject);
-  const currentLinks = links[selectedProject] || { plos: [], ylos: [], clos: [] };
+  if (loading) {
+    return <div className="p-6 text-center text-muted-foreground">กำลังโหลดโครงสร้างเมทริกซ์...</div>;
+  }
+
+  const currentProjectName = projects.find(p => p.id.toString() === selectedProjectId)?.name || '';
+  const currentLinks = links[selectedProjectId] || { plos: [], ylos: [], clos: [] };
 
   return (
     <>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">เชื่อมโยง PLO/YLO/CLO</h1>
-            <p className="text-muted-foreground">ระบุการเชื่อมต่อผลลัพธ์การเรียนรู้ของโครงการ</p>
-          </div>
-          <Button onClick={handleSave}>
-            <Save className="mr-2 h-4 w-4" />
-            บันทึก
-          </Button>
+      <div className="grid gap-6 md:grid-cols-3">
+        {/* คอลัมน์ซ้าย: รายชื่อโครงการ */}
+        <div className="md:col-span-1 space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <TrendingUp className="h-5 w-5" />
+                เลือกโครงการ
+              </CardTitle>
+              <CardDescription>คลิกเลือกโครงการที่ต้องการจัดพิกัดเป้าหมาย</CardDescription>
+            </CardHeader>
+            <CardContent className="p-2">
+              <div className="space-y-1">
+                {projects.map((project) => (
+                  <button
+                    key={project.id}
+                    onClick={() => setSelectedProjectId(project.id.toString())}
+                    className={`w-full text-left px-4 py-3 rounded-lg text-sm transition-colors font-medium ${
+                      selectedProjectId === project.id.toString()
+                        ? 'bg-primary text-primary-foreground'
+                        : 'hover:bg-muted text-foreground'
+                    }`}
+                  >
+                    {project.name}
+                  </button>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* สรุปเป้าหมายที่เชื่อมโยงอยู่ปัจจุบัน */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm font-semibold">สรุปผลลัพธ์ที่เชื่อมโยง</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="rounded-lg border p-3">
+                <h4 className="text-xs font-semibold mb-2 text-muted-foreground">PLO</h4>
+                <div className="flex flex-wrap gap-1.5">
+                  {currentLinks.plos.length > 0 ? (
+                    currentLinks.plos.map(code => <Badge key={code} variant="secondary">{code}</Badge>)
+                  ) : (
+                    <span className="text-xs text-muted-foreground">ยังไม่มีการเชื่อมโยง</span>
+                  )}
+                </div>
+              </div>
+              <div className="rounded-lg border p-3">
+                <h4 className="text-xs font-semibold mb-2 text-muted-foreground">YLO</h4>
+                <div className="flex flex-wrap gap-1.5">
+                  {currentLinks.ylos.length > 0 ? (
+                    currentLinks.ylos.map(code => <Badge key={code} variant="secondary">{code}</Badge>)
+                  ) : (
+                    <span className="text-xs text-muted-foreground">ยังไม่มีการเชื่อมโยง</span>
+                  )}
+                </div>
+              </div>
+              <div className="rounded-lg border p-3">
+                <h4 className="text-xs font-semibold mb-2 text-muted-foreground">CLO</h4>
+                <div className="flex flex-wrap gap-1.5">
+                  {currentLinks.clos.length > 0 ? (
+                    currentLinks.clos.map(code => <Badge key={code} variant="secondary">{code}</Badge>)
+                  ) : (
+                    <span className="text-xs text-muted-foreground">ยังไม่มีการเชื่อมโยง</span>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
-        {/* Project Selection */}
-        <Card>
-          <CardHeader>
-            <CardTitle>เลือกโครงการ</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex gap-2">
-              {mockProjects.map((project) => (
-                <Button
-                  key={project.id}
-                  variant={selectedProject === project.id ? 'default' : 'outline'}
-                  onClick={() => setSelectedProject(project.id)}
-                >
-                  {project.name}
-                </Button>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+        {/* คอลัมน์ขวา: ตารางจับคู่ความเชื่อมโยง Matrix */}
+        <div className="md:col-span-2">
+          <Card className="h-full flex flex-col">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+              <div>
+                <CardTitle className="text-xl flex items-center gap-2">
+                  <Link className="h-5 w-5" />
+                  เมทริกซ์การเชื่อมโยงเป้าหมาย
+                </CardTitle>
+                <CardDescription className="mt-1 font-medium text-primary">
+                  {currentProjectName || 'กรุณาเลือกโครงการด้านซ้าย'}
+                </CardDescription>
+              </div>
+              <Button onClick={handleSave} disabled={!selectedProjectId || isSaving}>
+                <Save className="mr-2 h-4 w-4" />
+                {isSaving ? 'กำลังบันทึก...' : 'บันทึกพิกัด'}
+              </Button>
+            </CardHeader>
+            <CardContent className="flex-1 overflow-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[120px]">ประเภทผลลัพธ์</TableHead>
+                    <TableHead>เป้าหมายระดับหลักสูตรและรายวิชา</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {/* ตารางส่วน PLO */}
+                  <TableRow>
+                    <TableCell className="font-bold align-top pt-4">PLO</TableCell>
+                    <TableCell>
+                      <div className="grid grid-cols-2 gap-4">
+                        {plos.map((plo) => (
+                          <div key={plo} className="flex items-start space-x-2 p-1.5 rounded hover:bg-muted/50">
+                            <Checkbox
+                              id={`plo-${plo}`}
+                              checked={currentLinks.plos.includes(plo)}
+                              onCheckedChange={(checked) => handleCheckboxChange('plos', plo, !!checked)}
+                            />
+                            <label id={`label-plo-${plo}`} htmlFor={`plo-${plo}`} className="text-sm leading-none cursor-pointer font-medium select-none">
+                              {plo}
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    </TableCell>
+                  </TableRow>
 
-        {/* Current Project Info */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Link className="h-5 w-5" />
-              {currentProject?.name}
-            </CardTitle>
-            <CardDescription>เลือก PLO, YLO และ CLO ที่เกี่ยวข้องกับโครงการ</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* PLO Section */}
-            <div>
-              <h3 className="text-lg font-medium mb-3">Program Learning Outcomes (PLO)</h3>
-              <div className="grid grid-cols-5 gap-4">
-                {plos.map((plo) => (
-                  <div key={plo} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={plo}
-                      checked={currentLinks.plos.includes(plo)}
-                      onCheckedChange={() => toggleLink('plos', plo)}
-                    />
-                    <label htmlFor={plo} className="text-sm font-medium">
-                      {plo}
-                    </label>
-                  </div>
-                ))}
-              </div>
-            </div>
+                  {/* ตารางส่วน YLO */}
+                  <TableRow>
+                    <TableCell className="font-bold align-top pt-4">YLO</TableCell>
+                    <TableCell>
+                      <div className="grid grid-cols-2 gap-4">
+                        {ylos.map((ylo) => (
+                          <div key={ylo} className="flex items-start space-x-2 p-1.5 rounded hover:bg-muted/50">
+                            <Checkbox
+                              id={`ylo-${ylo}`}
+                              checked={currentLinks.ylos.includes(ylo)}
+                              onCheckedChange={(checked) => handleCheckboxChange('ylos', ylo, !!checked)}
+                            />
+                            <label id={`label-ylo-${ylo}`} htmlFor={`ylo-${ylo}`} className="text-sm leading-none cursor-pointer font-medium select-none">
+                              {ylo}
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    </TableCell>
+                  </TableRow>
 
-            {/* YLO Section */}
-            <div>
-              <h3 className="text-lg font-medium mb-3">Year Learning Outcomes (YLO)</h3>
-              <div className="grid grid-cols-4 gap-4">
-                {ylos.map((ylo) => (
-                  <div key={ylo} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={ylo}
-                      checked={currentLinks.ylos.includes(ylo)}
-                      onCheckedChange={() => toggleLink('ylos', ylo)}
-                    />
-                    <label htmlFor={ylo} className="text-sm font-medium">
-                      {ylo}
-                    </label>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* CLO Section */}
-            <div>
-              <h3 className="text-lg font-medium mb-3">Course Learning Outcomes (CLO)</h3>
-              <div className="grid grid-cols-4 gap-4">
-                {clos.map((clo) => (
-                  <div key={clo} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={clo}
-                      checked={currentLinks.clos.includes(clo)}
-                      onCheckedChange={() => toggleLink('clos', clo)}
-                    />
-                    <label htmlFor={clo} className="text-sm font-medium">
-                      {clo}
-                    </label>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Summary */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
-              สรุปการเชื่อมโยง
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 md:grid-cols-3">
-              <div className="rounded-lg border p-4">
-                <h4 className="font-medium mb-2">PLO ที่เชื่อมโยง</h4>
-                <div className="flex flex-wrap gap-2">
-                  {currentLinks.plos.length > 0 ? (
-                    currentLinks.plos.map((plo) => (
-                      <Badge key={plo} variant="outline">{plo}</Badge>
-                    ))
-                  ) : (
-                    <span className="text-sm text-muted-foreground">ยังไม่ได้เลือก</span>
-                  )}
-                </div>
-              </div>
-              <div className="rounded-lg border p-4">
-                <h4 className="font-medium mb-2">YLO ที่เชื่อมโยง</h4>
-                <div className="flex flex-wrap gap-2">
-                  {currentLinks.ylos.length > 0 ? (
-                    currentLinks.ylos.map((ylo) => (
-                      <Badge key={ylo} variant="outline">{ylo}</Badge>
-                    ))
-                  ) : (
-                    <span className="text-sm text-muted-foreground">ยังไม่ได้เลือก</span>
-                  )}
-                </div>
-              </div>
-              <div className="rounded-lg border p-4">
-                <h4 className="font-medium mb-2">CLO ที่เชื่อมโยง</h4>
-                <div className="flex flex-wrap gap-2">
-                  {currentLinks.clos.length > 0 ? (
-                    currentLinks.clos.map((clo) => (
-                      <Badge key={clo} variant="outline">{clo}</Badge>
-                    ))
-                  ) : (
-                    <span className="text-sm text-muted-foreground">ยังไม่ได้เลือก</span>
-                  )}
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+                  {/* ตารางส่วน CLO */}
+                  <TableRow>
+                    <TableCell className="font-bold align-top pt-4">CLO</TableCell>
+                    <TableCell>
+                      <div className="grid grid-cols-2 gap-4">
+                        {clos.map((clo) => (
+                          <div key={clo} className="flex items-start space-x-2 p-1.5 rounded hover:bg-muted/50">
+                            <Checkbox
+                              id={`clo-${clo}`}
+                              checked={currentLinks.clos.includes(clo)}
+                              onCheckedChange={(checked) => handleCheckboxChange('clos', clo, !!checked)}
+                            />
+                            <label id={`label-clo-${clo}`} htmlFor={`clo-${clo}`} className="text-sm leading-none cursor-pointer font-medium select-none">
+                              {clo}
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </>
   );
