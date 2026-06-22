@@ -165,6 +165,17 @@
                 require_once 'components/Teacher/FiveYearSummary/get_five_year_summary.php';
                 break;
 
+            // AdviseNotes
+            case 'get_advise_notes':
+                require_once 'components/Teacher/AdviseNotes/get_advise_notes.php';
+                break;
+            case 'get_advise_students':
+                require_once 'components/Teacher/AdviseNotes/get_advise_students.php';
+                break;
+            case 'save_advise_note':
+                require_once 'components/Teacher/AdviseNotes/save_advise_note.php';
+                break;
+
 
         default:
             http_response_code(404);

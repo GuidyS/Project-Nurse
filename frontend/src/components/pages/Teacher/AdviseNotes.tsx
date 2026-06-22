@@ -8,24 +8,8 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MessageSquare, Plus, Search, Calendar, FileText } from 'lucide-react';
-import { useState } from 'react';
-
-// Mock data
-const mockNotes = [
-  { id: '1', studentId: '64010001', studentName: 'สมชาย ใจดี', date: '2024-01-15', topic: 'แนะนำการลงทะเบียน', type: 'academic', summary: 'นักศึกษาสอบถามเกี่ยวกับการลงทะเบียนวิชาเลือก แนะนำให้พิจารณาตามความสนใจและเวลาที่มี' },
-  { id: '2', studentId: '64010002', studentName: 'สมหญิง รักเรียน', date: '2024-01-10', topic: 'ปัญหาผลการเรียน', type: 'warning', summary: 'GPA ตกลงมาในเทอมที่แล้ว แนะนำให้เข้าร่วมกลุ่มติวและพบอาจารย์ประจำวิชา' },
-  { id: '3', studentId: '65010002', studentName: 'มานี ขยัน', date: '2024-01-08', topic: 'เสี่ยงรีไทร์', type: 'critical', summary: 'GPA ต่ำกว่า 2.00 สองเทอมติด ต้องติดตามใกล้ชิดและประสานงานกับผู้ปกครอง' },
-  { id: '4', studentId: '66010002', studentName: 'ปิยะ มุ่งมั่น', date: '2024-01-05', topic: 'ปรับตัวปีหนึ่ง', type: 'academic', summary: 'นักศึกษาใหม่มีปัญหาในการปรับตัว แนะนำให้เข้าร่วมกิจกรรมชมรมและพบเพื่อนใหม่' },
-];
-
-const mockStudents = [
-  { id: '64010001', name: 'สมชาย ใจดี' },
-  { id: '64010002', name: 'สมหญิง รักเรียน' },
-  { id: '65010001', name: 'มานะ ตั้งใจ' },
-  { id: '65010002', name: 'มานี ขยัน' },
-  { id: '66010001', name: 'ปิติ สุขใจ' },
-  { id: '66010002', name: 'ปิยะ มุ่งมั่น' },
-];
+import { useState, useEffect } from 'react';
+import axios from 'axios';
 
 const getTypeBadge = (type: string) => {
   switch (type) {
@@ -45,24 +29,96 @@ const getTypeBadge = (type: string) => {
 export default function AdviseNotes() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  
+  const [notes, setNotes] = useState<any[]>([]);
+  const [students, setStudents] = useState<any[]>([]);
+  const [stats, setStats] = useState({ total: 0, thisMonth: 0, warning: 0, critical: 0 });
+  
   const [newNote, setNewNote] = useState({
+    id: '',
     studentId: '',
     topic: '',
     type: 'academic',
     summary: '',
   });
 
-  const filteredNotes = mockNotes.filter(
+  const fetchNotes = async () => {
+    try {
+      const res = await axios.get('http://localhost:8080/index.php?page=get_advise_notes', { withCredentials: true });
+      if (res.data.status === 'success') {
+        setNotes(res.data.data.notes);
+        setStats(res.data.data.stats);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchStudents = async () => {
+    try {
+      const res = await axios.get('http://localhost:8080/index.php?page=get_advise_students', { withCredentials: true });
+      if (res.data.status === 'success') {
+        setStudents(res.data.data);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  useEffect(() => {
+    fetchNotes();
+    fetchStudents();
+  }, []);
+
+  const filteredNotes = notes.filter(
     (note) =>
-      note.studentName.includes(searchTerm) ||
-      note.studentId.includes(searchTerm) ||
-      note.topic.includes(searchTerm)
+      note.studentName?.includes(searchTerm) ||
+      note.studentId?.includes(searchTerm) ||
+      note.topic?.includes(searchTerm)
   );
 
-  const handleSave = () => {
-    console.log('Saving note:', newNote);
-    setIsDialogOpen(false);
-    setNewNote({ studentId: '', topic: '', type: 'academic', summary: '' });
+  const handleSave = async () => {
+    try {
+      const res = await axios.post('http://localhost:8080/index.php?page=save_advise_note', newNote, { withCredentials: true });
+      if (res.data.status === 'success') {
+        setIsDialogOpen(false);
+        setNewNote({ id: '', studentId: '', topic: '', type: 'academic', summary: '' });
+        fetchNotes();
+      } else {
+        alert(res.data.message);
+      }
+    } catch (err) {
+      console.error(err);
+      alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+    }
+  };
+
+  const handleEdit = (note: any) => {
+    setNewNote({
+      id: note.id,
+      studentId: note.studentId,
+      topic: note.topic,
+      type: note.type,
+      summary: note.summary
+    });
+    setIsDialogOpen(true);
+  };
+
+  const handleView = (note: any) => {
+    setNewNote({
+      id: note.id,
+      studentId: note.studentId,
+      topic: note.topic,
+      type: note.type,
+      summary: note.summary
+    });
+    setIsViewDialogOpen(true);
+  };
+
+  const openNewDialog = () => {
+    setNewNote({ id: '', studentId: '', topic: '', type: 'academic', summary: '' });
+    setIsDialogOpen(true);
   };
 
   return (
@@ -73,16 +129,15 @@ export default function AdviseNotes() {
             <h1 className="text-3xl font-bold tracking-tight">Advice Notes</h1>
             <p className="text-muted-foreground">บันทึกการให้คำปรึกษานักศึกษา</p>
           </div>
+          <Button onClick={openNewDialog}>
+            <Plus className="mr-2 h-4 w-4" />
+            เพิ่มบันทึก
+          </Button>
+
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                เพิ่มบันทึก
-              </Button>
-            </DialogTrigger>
             <DialogContent className="sm:max-w-[600px]">
               <DialogHeader>
-                <DialogTitle>เพิ่มบันทึกการให้คำปรึกษา</DialogTitle>
+                <DialogTitle>{newNote.id ? 'แก้ไขบันทึกการให้คำปรึกษา' : 'เพิ่มบันทึกการให้คำปรึกษา'}</DialogTitle>
                 <DialogDescription>
                   บันทึกรายละเอียดการให้คำปรึกษานักศึกษา
                 </DialogDescription>
@@ -98,8 +153,8 @@ export default function AdviseNotes() {
                       <SelectValue placeholder="เลือกนักศึกษา" />
                     </SelectTrigger>
                     <SelectContent>
-                      {mockStudents.map((student) => (
-                        <SelectItem key={student.id} value={student.id}>
+                      {students.map((student) => (
+                        <SelectItem key={student.id} value={String(student.id)}>
                           {student.id} - {student.name}
                         </SelectItem>
                       ))}
@@ -151,6 +206,36 @@ export default function AdviseNotes() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+
+          {/* View Details Dialog */}
+          <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+            <DialogContent className="sm:max-w-[600px]">
+              <DialogHeader>
+                <DialogTitle>รายละเอียดการให้คำปรึกษา</DialogTitle>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <Label className="font-bold">นักศึกษา:</Label>
+                  <div>{students.find(s => s.id === newNote.studentId)?.name || newNote.studentId}</div>
+                </div>
+                <div className="grid gap-2">
+                  <Label className="font-bold">หัวข้อ:</Label>
+                  <div>{newNote.topic}</div>
+                </div>
+                <div className="grid gap-2">
+                  <Label className="font-bold">ประเภท:</Label>
+                  <div>{getTypeBadge(newNote.type)}</div>
+                </div>
+                <div className="grid gap-2">
+                  <Label className="font-bold">รายละเอียด:</Label>
+                  <div className="whitespace-pre-wrap border p-3 rounded-md bg-muted/50 min-h-[100px]">{newNote.summary}</div>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsViewDialogOpen(false)}>ปิด</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
 
         {/* Stats */}
@@ -161,7 +246,7 @@ export default function AdviseNotes() {
               <FileText className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{mockNotes.length}</div>
+              <div className="text-2xl font-bold">{stats.total}</div>
             </CardContent>
           </Card>
           <Card>
@@ -170,7 +255,7 @@ export default function AdviseNotes() {
               <Calendar className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">4</div>
+              <div className="text-2xl font-bold">{stats.thisMonth}</div>
             </CardContent>
           </Card>
           <Card>
@@ -179,7 +264,7 @@ export default function AdviseNotes() {
               <MessageSquare className="h-4 w-4 text-yellow-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-yellow-600">1</div>
+              <div className="text-2xl font-bold text-yellow-600">{stats.warning}</div>
             </CardContent>
           </Card>
           <Card>
@@ -188,7 +273,7 @@ export default function AdviseNotes() {
               <MessageSquare className="h-4 w-4 text-destructive" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-destructive">1</div>
+              <div className="text-2xl font-bold text-destructive">{stats.critical}</div>
             </CardContent>
           </Card>
         </div>
@@ -230,12 +315,17 @@ export default function AdviseNotes() {
                     <TableCell>{getTypeBadge(note.type)}</TableCell>
                     <TableCell>
                       <div className="flex gap-2">
-                        <Button variant="outline" size="sm">ดูรายละเอียด</Button>
-                        <Button variant="outline" size="sm">แก้ไข</Button>
+                        <Button variant="outline" size="sm" onClick={() => handleView(note)}>ดูรายละเอียด</Button>
+                        <Button variant="outline" size="sm" onClick={() => handleEdit(note)}>แก้ไข</Button>
                       </div>
                     </TableCell>
                   </TableRow>
                 ))}
+                {filteredNotes.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center text-muted-foreground py-6">ไม่มีข้อมูล</TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </CardContent>

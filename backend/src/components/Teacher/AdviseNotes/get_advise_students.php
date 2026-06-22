@@ -8,17 +8,16 @@ header("Content-Type: application/json; charset=UTF-8");
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit(); }
 
-require_once 'auth_middleware.php'; 
+require_once __DIR__ . '/../../middlewares/auth_middleware.php';
 
 $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
 
 try {
     // ดึงรหัสนักศึกษา ชื่อ และนามสกุล จากตาราง student (เฉพาะคนที่ยังเรียนอยู่)
     // *ถ้าอนาคตอยากให้ดึงเฉพาะเด็กในที่ปรึกษา ต้อง JOIN กับตาราง student_advisor_mapping ครับ
-    $sql = "SELECT student_id, student_code as id, CONCAT(first_name_th, ' ', last_name_th) as name 
+    $sql = "SELECT student_id, student_id as id, CONCAT(first_name_th, ' ', last_name_th) as name 
             FROM student 
-            WHERE status = 'Studying' 
-            ORDER BY student_code ASC";
+            ORDER BY student_id ASC";
     
     $stmt = $pdo->prepare($sql);
     $stmt->execute();
