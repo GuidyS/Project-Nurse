@@ -14,50 +14,29 @@ requireLogin();
 $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
 
 try {
-    if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-        $sql = "
-            SELECT 
-                u.user_id as id, u.email, u.username, r.role_name,
-                f.first_name_th as f_fname, f.last_name_th as f_lname, f.administrative_position as teacherSubRole,
-                s.first_name_th as s_fname, s.last_name_th as s_lname,
-                u.is_active, u.created_at
-            FROM users u
-            JOIN role r ON u.role_id = r.role_id
-            LEFT JOIN faculty f ON u.user_id = f.user_id
-            LEFT JOIN student s ON u.user_id = s.user_id
-            ORDER BY u.created_at DESC
-        ";
-        
-        $stmt = $pdo->query($sql);
-        $users = [];
-        
-        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-            $fullName = $row['username']; 
-            if (!empty($row['f_fname'])) $fullName = $row['f_fname'] . ' ' . $row['f_lname'];
-            elseif (!empty($row['s_fname'])) $fullName = $row['s_fname'] . ' ' . $row['s_lname'];
+    $sql = "
+        SELECT 
+            u.user_id AS id,
+            u.email,
+            -- ดึงชื่อจากตาราง faculty หรือ student ขึ้นอยู่กับว่าเขาเป็นใคร
+            COALESCE(CONCAT(f.first_name_th, ' ', f.last_name_th), CONCAT(s.first_name_th, ' ', s.last_name_th), 'ผู้ดูแลระบบ') AS fullName,
+            r.role_name_en AS role,
+            f.title AS teacherSubRole,
+            'active' AS status, -- ฐานข้อมูลไดน่ายังไม่มีคอลัมน์ status ให้จำลองเป็น active ไปก่อน
+            DATE_FORMAT(u.created_at, '%Y-%m-%d') AS createdAt
+        FROM users u
+        LEFT JOIN role r ON u.role_id = r.role_id
+        LEFT JOIN faculty f ON u.user_id = f.user_id
+        LEFT JOIN student s ON u.user_id = s.user_id
+        ORDER BY u.created_at DESC
+    ";
 
-            $role_lower = strtolower($row['role_name']);
-            if (!in_array($role_lower, ['admin', 'teacher', 'student'])) $role_lower = 'student';
+    $stmt = $pdo->query($sql);
+    $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-            $date = new DateTime($row['created_at']);
-            $year_th = (int)$date->format('Y') + 543;
-            $createdAtStr = $year_th . '-' . $date->format('m-d');
+    echo json_encode($users);
 
-            $users[] = [
-                "id" => (string)$row['id'],
-                "email" => $row['email'] ?: ($row['username'] . "@faculty.edu"),
-                "fullName" => $fullName,
-                "role" => $role_lower,
-                "teacherSubRole" => $row['teacherSubRole'],
-                "status" => $row['is_active'] == 1 ? "active" : "inactive",
-                "createdAt" => $createdAtStr
-            ];
-        }
-        echo json_encode($users);
-    } else {
-        echo json_encode(["status" => "error", "message" => "Invalid Method"]);
-    }
-} catch (PDOException $e) {
+} catch (Exception $e) {
     http_response_code(500);
     echo json_encode(["status" => "error", "message" => $e->getMessage()]);
 }

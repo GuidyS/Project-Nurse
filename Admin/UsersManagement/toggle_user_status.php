@@ -30,9 +30,9 @@ try {
         $stmt = $pdo->prepare("UPDATE users SET is_active = ? WHERE user_id = ?");
         $stmt->execute([$is_active_val, $target_id]);
 
-        $log_action = "Toggle Status User ID {$target_id} to {$new_status}";
-        $stmt_log = $pdo->prepare("INSERT INTO audit_log (user_id, action, created_at) VALUES (?, ?, NOW())");
-        $stmt_log->execute([$admin_id, $log_action]);
+       $log_details = "Toggle Status User ID {$target_id} to {$new_status}";
+$stmt_log = $pdo->prepare("INSERT INTO audit_log (user_id, action_type, resource, details, ip_address, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+$stmt_log->execute([$admin_id, "UPDATE", "users", $log_details, $_SERVER['REMOTE_ADDR']]);
 
         echo json_encode(["status" => "success", "message" => "อัปเดตสถานะสำเร็จ"]);
     } else {

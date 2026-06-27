@@ -43,10 +43,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $data[] = $row_data;
     }
 
-    // บันทึกประวัติลง Audit Log 
-    $stmt_log = $pdo->prepare("INSERT INTO audit_log (user_id, action, created_at) VALUES (?, 'Export Data: students', NOW())");
-    $stmt_log->execute([$user_id]);
-
+ $stmt_log = $pdo->prepare("INSERT INTO audit_log (user_id, action_type, resource, details, ip_address, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+$stmt_log->execute([$user_id, "EXPORT", "students", "Export Data: students", $_SERVER['REMOTE_ADDR']]);
     // สร้างและส่งไฟล์ CSV
     $filename = "export_students_" . date('YmdHis') . ".csv";
     header('Content-Type: text/csv; charset=UTF-8');

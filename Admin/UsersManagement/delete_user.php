@@ -27,9 +27,9 @@ try {
         $stmt = $pdo->prepare("DELETE FROM users WHERE user_id = ?");
         $stmt->execute([$target_id]);
 
-        $log_action = "Delete User ID: " . $target_id;
-        $stmt_log = $pdo->prepare("INSERT INTO audit_log (user_id, action, created_at) VALUES (?, ?, NOW())");
-        $stmt_log->execute([$admin_id, $log_action]);
+        $log_details = "Delete User ID: " . $target_id;
+$stmt_log = $pdo->prepare("INSERT INTO audit_log (user_id, action_type, resource, details, ip_address, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+$stmt_log->execute([$admin_id, "DELETE", "users", $log_details, $_SERVER['REMOTE_ADDR']]);
 
         echo json_encode(["status" => "success", "message" => "ลบผู้ใช้สำเร็จ"]);
     } else {
