@@ -70,7 +70,7 @@ export default function ImportData() {
     setIsUploading(true);
     
     try {
-      const response = await api.post("/index.php?page=upload", formData, {
+      const response = await api.post("/index.php?page=import-data", formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
         onUploadProgress: (p) => setUploadProgress(Math.round((p.loaded * 100) / (p.total || 100)))
       });

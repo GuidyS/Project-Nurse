@@ -3,6 +3,7 @@ import {
   ChevronLeft,
   LogOut,
 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { 
@@ -175,6 +176,19 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
 
   const [menuSections, setMenuSections] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const fetchUnreadCount = async () => {
+    try {
+      const response = await api.get("/index.php?page=get-notifications");
+      const data = Array.isArray(response.data) ? response.data : (response.data?.data || []);
+      // กรองเฉพาะการแจ้งเตือนที่ได้รับและยังไม่ได้อ่าน
+      const count = data.filter((n: any) => n.direction === "received" && !n.isRead).length;
+      setUnreadCount(count);
+    } catch (error) {
+      console.error("Failed to fetch unread notifications count");
+    }
+  };
 
   useEffect(() => {
     const fetchMenus = async () => {
@@ -195,6 +209,16 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
     };
 
     fetchMenus();
+
+    fetchUnreadCount();
+    const intervalId = setInterval(fetchUnreadCount, 30000);
+
+    window.addEventListener("updateNotificationBadge", fetchUnreadCount);
+
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener("updateNotificationBadge", fetchUnreadCount);
+    };
   }, []);
 
   if (isLoading) return <div className="p-4">กำลังโหลดเมนู...</div>;
@@ -349,6 +373,7 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
             .map((item) => {
               const Icon = getIcon(item.icon);
               const isActive = activeItem === item.url;
+              const isNotification = item.url === "notifications";
 
               return (
                 <SidebarMenuItem key={item.url}>
@@ -372,6 +397,22 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
                       isActive && "active"
                     )} />
                     {!collapsed && <span>{item.title}</span>}
+
+                    {/* 🎯 5. ส่วนแสดงตัวเลข Badge แจ้งเตือนสีแดง */}
+                    {isNotification && unreadCount > 0 && (
+                      collapsed ? (
+                        // กรณีหุบ Sidebar: โชว์เป็นวงกลมเล็กๆ ซ้อนบนไอคอน
+                        <span className="absolute top-1 right-2 flex h-3 w-3 items-center justify-center rounded-full bg-destructive text-[8px] font-bold text-destructive-foreground ring-2 ring-sidebar">
+                          {unreadCount > 9 ? '9+' : unreadCount}
+                        </span>
+                      ) : (
+                        // กรณีขยาย Sidebar: โชว์เป็น Badge ตัวเลขต่อท้ายข้อความ
+                        <Badge variant="destructive" className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full px-1 text-[10px]">
+                          {unreadCount > 99 ? '99+' : unreadCount}
+                        </Badge>
+                      )
+                    )}
+
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               );

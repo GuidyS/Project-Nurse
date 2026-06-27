@@ -7,7 +7,7 @@ $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USE
 
 try {
     // 1. หา faculty_id ของอาจารย์ที่ล็อกอิน
-    $stmt_fac = $pdo->prepare("SELECT faculty_id FROM faculty WHERE user_id = ? LIMIT 1");
+    $stmt_fac = $pdo->prepare("SELECT faculty_id FROM faculty WHERE faculty_id = ? LIMIT 1");
     $stmt_fac->execute([$user_id]);
     $my_faculty_id = $stmt_fac->fetchColumn();
 

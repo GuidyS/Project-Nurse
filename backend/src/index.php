@@ -3,7 +3,8 @@
     header("Access-Control-Allow-Origin: http://localhost:5173");
     header("Access-Control-Allow-Credentials: true");
     header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
-    header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, ngrok-skip-browser-warning");
+    header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
+    header("Content-Type: application/json; charset=UTF-8");
 
     // --- เพิ่มส่วนนี้เข้าไป ---
     if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
@@ -28,11 +29,13 @@
             case 'profile':
                 require_once 'components/ProfilePage/api.php';
                 break;
+
+            // NotificationPage
             case 'get-notifications':
                 require_once 'components/NotificationPage/get_notifications.php';
                 break;
             case 'get-notification-students':
-                require_once 'components/NotificationPage/get_students.php';
+                require_once 'components/NotificationPage/get_student_notifications.php';
                 break;
             case 'send-notification':
                 require_once 'components/NotificationPage/send_notification.php';
@@ -51,35 +54,35 @@
             
             /* -------- Admin -------- */
 
-            case 'upload':
-                require_once 'components/Admin/get-import-history.php';
-                break;
             case 'get-users':
-                require_once 'components/Admin/get-users.php';
+                require_once 'components/Admin/ManageUsers/get-users.php';
                 break;
             case 'manage-user':
-                require_once 'components/Admin/manage-user.php';
+                require_once 'components/Admin/ManageUsers/manage-user.php';
                 break;
             case 'manage-role':
-                require_once 'components/Admin/manage-role.php';
+                require_once 'components/Admin/ManageUsers/manage-role.php';
                 break;
             case 'get-audit-logs':
-                require_once 'components/Admin/get-audit-logs.php';
+                require_once 'components/Admin/AuditLogs/get-audit-logs.php';
                 break;
             case 'get-approval-requests':
-                require_once 'components/Admin/get-approval-requests.php';
+                require_once 'components/Admin/Approvals/get-approval-requests.php';
                 break;
             case 'approve-request':
-                require_once 'components/Admin/approve-request.php';
+                require_once 'components/Admin/Approvals/approve-request.php';
                 break;
             case 'reject-request':
-                require_once 'components/Admin/reject-request.php';
+                require_once 'components/Admin/Approvals/reject-request.php';
                 break;
             case 'export-data':
-                require_once 'components/Admin/export-data.php'; 
+                require_once 'components/Admin/ExportData/export-data.php'; 
+                break;
+            case 'import-data':
+                require_once 'components/Admin/ImportData/import-data.php'; 
                 break;
             case 'get-import-history':
-                require_once 'components/Admin/get_import_history.php'; // ชื่อไฟล์จากที่คุณส่งมา
+                require_once 'components/Admin/ImportData/get-import-history.php';
                 break;
 
             /* -------- Teacher -------- */
@@ -205,11 +208,24 @@
                 require_once 'components/Teacher/MyCourses/get_teacher_courses_overview.php';
                 break;
 
+            // Performance
+            case 'get-performance':
+                require_once 'components/Teacher/Performance/get_performance.php';
+                break;  
+            case 'save-performance':
+                require_once 'components/Teacher/Performance/save_performance.php';
+                break;  
+
             // PracticalStudents (นักศึกษาฝึกปฏิบัติ)
             case 'get-practical-students':
                 require_once 'components/Teacher/PracticalStudents/get_practical_students.php';
                 break;  
                               
+            // MyProjects
+            case 'get-my-projects':
+                require_once 'components/Teacher/MyProjects/get_my_projects.php';
+                break;
+
             // ProjectPage
             case 'add-project':
                 require_once 'components/Teacher/ProjectsPage/add_project.php';
@@ -256,6 +272,11 @@
                 require_once 'components/Teacher/ScheduleTasks/update_task_status';
                 break;
 
+            // Students
+            case 'get-students':
+                require_once 'components/Teacher/Students/get_students.php';
+                break;
+
             // TransferRequests
             case 'create-transfer-request':
                 require_once 'components/Teacher/TransferRequests/create_transfer_request';
@@ -269,9 +290,23 @@
 
             /* -------- Student -------- */
 
-            // CLOManagement
+            // Transcript
             case 'transcript-api':
-                require_once 'components/Student/transcript-api.php';
+                require_once 'components/Student/Transcript/transcript_api.php';
+                break;
+
+            // Portfolio
+            case 'get-portfolio':
+                require_once 'components/Student/Portfolio/get_portfolio.php';
+                break;
+            case 'get-portfolio-detail':
+                require_once 'components/Student/Portfolio/get_portfolio_detail.php';
+                break;
+            case 'save-portfolio':
+                require_once 'components/Student/Portfolio/save_portfolio.php';
+                break;
+            case 'delete-portfolio':
+                require_once 'components/Student/Portfolio/delete_portfolio.php';
                 break;
                 
             case 'sidebar':

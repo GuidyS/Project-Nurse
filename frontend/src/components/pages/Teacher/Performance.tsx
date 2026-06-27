@@ -10,33 +10,27 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
 import { TrendingUp, Search, Star, Plus, BarChart3 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Legend } from 'recharts';
+import api from '@/lib/axios';
 
-// Mock data
-const mockPerformances = [
-  { id: '1', studentId: '64010001', name: 'สมชาย ใจดี', skill: 4.5, attitude: 4.8, knowledge: 4.2, communication: 4.0, overall: 4.4, lastEval: '2024-01-10' },
-  { id: '2', studentId: '64010002', name: 'สมหญิง รักเรียน', skill: 3.8, attitude: 4.2, knowledge: 3.5, communication: 4.5, overall: 4.0, lastEval: '2024-01-08' },
-  { id: '3', studentId: '64010003', name: 'มานะ ตั้งใจ', skill: 4.8, attitude: 5.0, knowledge: 4.5, communication: 4.2, overall: 4.6, lastEval: '2024-01-12' },
-  { id: '4', studentId: '64010004', name: 'มานี ขยัน', skill: 3.0, attitude: 3.5, knowledge: 2.8, communication: 3.2, overall: 3.1, lastEval: '2024-01-05' },
-  { id: '5', studentId: '64010005', name: 'ปิติ สุขใจ', skill: 4.0, attitude: 4.5, knowledge: 3.8, communication: 4.0, overall: 4.1, lastEval: '2024-01-11' },
-];
+// กำหนด TypeScript Interface สำหรับรองรับข้อมูลจาก Database
+interface PerformanceData {
+  id: string;
+  studentId: string;
+  name: string;
+  skill: number;
+  attitude: number;
+  knowledge: number;
+  communication: number;
+  overall: number;
+  lastEval: string;
+}
 
-const chartData = [
-  { name: 'ทักษะปฏิบัติ', avg: 4.0 },
-  { name: 'ทัศนคติ', avg: 4.4 },
-  { name: 'ความรู้', avg: 3.8 },
-  { name: 'สื่อสาร', avg: 4.0 },
-];
-
-const radarData = [
-  { subject: 'ทักษะปฏิบัติ', A: 4.5, fullMark: 5 },
-  { subject: 'ทัศนคติ', A: 4.8, fullMark: 5 },
-  { subject: 'ความรู้', A: 4.2, fullMark: 5 },
-  { subject: 'การสื่อสาร', A: 4.0, fullMark: 5 },
-  { subject: 'ทำงานเป็นทีม', A: 4.3, fullMark: 5 },
-  { subject: 'ตรงต่อเวลา', A: 4.7, fullMark: 5 },
-];
+interface StudentDropdownItem {
+  student_id: string;
+  display_name: string;
+}
 
 const getScoreBadge = (score: number) => {
   if (score >= 4.5) return <Badge className="bg-green-500">ดีเยี่ยม</Badge>;
@@ -57,13 +51,82 @@ export default function Performance() {
   });
   const [comment, setComment] = useState('');
 
-  const filteredPerformances = mockPerformances.filter(
-    (p) => p.name.includes(searchTerm) || p.studentId.includes(searchTerm)
+  // === [ ส่วนที่เพิ่มเข้ามาใหม่: States สำหรับเก็บข้อมูลจาก Database API ] ===
+  const [performances, setPerformances] = useState<PerformanceData[]>([]);
+  const [chartData, setChartData] = useState<{ name: string; avg: number }[]>([]);
+  const [radarData, setRadarData] = useState<any[]>([]);
+  const [studentList, setStudentList] = useState<StudentDropdownItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // URL ของ API Backend (ปรับเปลี่ยนพอร์ตหรือพาร์ทได้ตามจริงครับ)
+  const API_BASE_URL = 'http://localhost/api'; 
+
+  // ก. ฟังก์ชันดึงข้อมูลทั้งหมดจากฐานข้อมูลมาแสดงผล
+  const fetchPerformanceData = async () => {
+    try {
+      setLoading(true);
+      // แนบ credentials: true ไปด้วยเสมอกรณีเผื่อใช้ session ร่วมกับ auth_middleware.php ของบอส
+      const response = await fetch(`${API_BASE_URL}/get_performance_data.php`, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' }
+      });
+      const result = await response.json();
+      
+      if (result.status === 'success') {
+        setPerformances(result.data.performances);
+        setChartData(result.data.chartData);
+        setRadarData(result.data.radarData);
+        setStudentList(result.data.studentList);
+      }
+    } catch (error) {
+      console.error('Error fetching performance data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // เรียกใช้ดึงข้อมูลทันทีเมื่อเปิดหน้านี้ขึ้นมา
+  useEffect(() => {
+    fetchPerformanceData();
+  }, []);
+
+  // ข. ค้นหาข้อมูลนักศึกษาจาก State ที่ได้มาจากตารางจริง
+  const filteredPerformances = performances.filter(
+    (p) => p.name.includes(searchTerm) || p.studentId.toString().includes(searchTerm)
   );
 
-  const handleSave = () => {
-    console.log('Saving evaluation:', { selectedStudent, scores, comment });
-    setIsDialogOpen(false);
+  // ค. ฟังก์ชันส่งข้อมูลประเมินตัวจริงกลับไปบันทึกลงฐานข้อมูล
+  const handleSave = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/save_performance_eval.php`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          selectedStudent,
+          scores,
+          comment
+        }),
+      });
+      
+      const result = await response.json();
+      
+      if (result.status === 'success') {
+        setIsDialogOpen(false);
+        // เคลียร์ค่าในฟอร์มให้กลับเป็นเริ่มต้น
+        setSelectedStudent('');
+        setScores({ skill: [4], attitude: [4], knowledge: [4], communication: [4] });
+        setComment('');
+        // ดึงข้อมูลใหม่จากฐานข้อมูลเพื่ออัปเดตกราฟและตารางหน้าจอแบบเรียลไทม์
+        fetchPerformanceData();
+      } else {
+        alert(result.message || 'เกิดข้อผิดพลาดในการบันทึก');
+      }
+    } catch (error) {
+      console.error('Error saving evaluation:', error);
+      alert('ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ Backend ได้');
+    }
   };
 
   return (
@@ -96,9 +159,10 @@ export default function Performance() {
                       <SelectValue placeholder="เลือกนักศึกษา" />
                     </SelectTrigger>
                     <SelectContent>
-                      {mockPerformances.map((p) => (
-                        <SelectItem key={p.studentId} value={p.studentId}>
-                          {p.studentId} - {p.name}
+                      {/* ดึงข้อมูลจากรายชื่อนักศึกษาจริงในระบบ แทนของ Mock เดิม */}
+                      {studentList.map((student) => (
+                        <SelectItem key={student.student_id} value={student.student_id.toString()}>
+                          {student.display_name}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -174,7 +238,7 @@ export default function Performance() {
                 <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
                   ยกเลิก
                 </Button>
-                <Button onClick={handleSave}>บันทึกประเมิน</Button>
+                <Button onClick={handleSave} disabled={!selectedStudent}>บันทึกประเมิน</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -190,15 +254,19 @@ export default function Performance() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={250}>
-                <BarChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis domain={[0, 5]} />
-                  <Tooltip />
-                  <Bar dataKey="avg" fill="hsl(var(--primary))" />
-                </BarChart>
-              </ResponsiveContainer>
+              {loading ? (
+                <div className="flex h-[250px] items-center justify-center text-sm text-muted-foreground">กำลังโหลดข้อมูลกราฟ...</div>
+              ) : (
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis domain={[0, 5]} />
+                    <Tooltip />
+                    <Bar dataKey="avg" fill="hsl(var(--primary))" />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
             </CardContent>
           </Card>
 
@@ -210,14 +278,18 @@ export default function Performance() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={250}>
-                <RadarChart data={radarData}>
-                  <PolarGrid />
-                  <PolarAngleAxis dataKey="subject" />
-                  <PolarRadiusAxis domain={[0, 5]} />
-                  <Radar name="คะแนน" dataKey="A" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.5} />
-                </RadarChart>
-              </ResponsiveContainer>
+              {loading ? (
+                <div className="flex h-[250px] items-center justify-center text-sm text-muted-foreground">กำลังโหลดข้อมูลกราฟ...</div>
+              ) : (
+                <ResponsiveContainer width="100%" height={250}>
+                  <RadarChart data={radarData}>
+                    <PolarGrid />
+                    <PolarAngleAxis dataKey="subject" />
+                    <PolarRadiusAxis domain={[0, 5]} />
+                    <Radar name="คะแนน" dataKey="A" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.5} />
+                  </RadarChart>
+                </ResponsiveContainer>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -253,19 +325,29 @@ export default function Performance() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredPerformances.map((p) => (
-                  <TableRow key={p.id}>
-                    <TableCell className="font-medium">{p.studentId}</TableCell>
-                    <TableCell>{p.name}</TableCell>
-                    <TableCell>{p.skill.toFixed(1)}</TableCell>
-                    <TableCell>{p.attitude.toFixed(1)}</TableCell>
-                    <TableCell>{p.knowledge.toFixed(1)}</TableCell>
-                    <TableCell>{p.communication.toFixed(1)}</TableCell>
-                    <TableCell className="font-bold">{p.overall.toFixed(1)}</TableCell>
-                    <TableCell>{getScoreBadge(p.overall)}</TableCell>
-                    <TableCell>{p.lastEval}</TableCell>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center py-4 text-muted-foreground">กำลังโหลดข้อมูลนักศึกษา...</TableCell>
                   </TableRow>
-                ))}
+                ) : filteredPerformances.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center py-4 text-muted-foreground">ไม่พบข้อมูลผลการประเมิน</TableCell>
+                  </TableRow>
+                ) : (
+                  filteredPerformances.map((p) => (
+                    <TableRow key={p.id}>
+                      <TableCell className="font-medium">{p.studentId}</TableCell>
+                      <TableCell>{p.name}</TableCell>
+                      <TableCell>{p.skill.toFixed(1)}</TableCell>
+                      <TableCell>{p.attitude.toFixed(1)}</TableCell>
+                      <TableCell>{p.knowledge.toFixed(1)}</TableCell>
+                      <TableCell>{p.communication.toFixed(1)}</TableCell>
+                      <TableCell className="font-bold">{p.overall.toFixed(1)}</TableCell>
+                      <TableCell>{getScoreBadge(p.overall)}</TableCell>
+                      <TableCell>{p.lastEval}</TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </CardContent>

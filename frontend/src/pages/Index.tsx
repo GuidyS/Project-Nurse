@@ -133,11 +133,11 @@ const Index = () => {
     if (adminPages.includes(activeItem)) {
       if (roleId !== 1) return <UnauthorizedView />;
       switch (activeItem) {
-        case "approvals": return <TransferRequests />;                                 //*
+        case "approvals": return <Performance />;                                 //*
         case "audit-log": return <AuditLog />;                                     //*                                 
         case "export-data": return <ExportData />;                                 //*
         case "import-data": return <ImportData />;                                 //*
-        case "reports": return <PracticalStudents />;                                        
+        case "reports": return <Portfolio />;                                        
         case "roles-management": return <RolesManagement />;                       //*
         case "users-management": return <UsersManagement />;                       //*
       }

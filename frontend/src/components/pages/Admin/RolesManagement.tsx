@@ -21,14 +21,6 @@ interface UserWithRole {
   teacherSubRole?: string;
 }
 
-const mockUsersWithRoles: UserWithRole[] = [
-  { id: "1", email: "dean@faculty.edu", fullName: "ศ.ดร.สมศักดิ์ ใจดี", currentRole: "teacher", teacherSubRole: "dean" },
-  { id: "2", email: "instructor1@faculty.edu", fullName: "ผศ.ดร.มานี รักเรียน", currentRole: "teacher", teacherSubRole: "instructor" },
-  { id: "3", email: "advisor@faculty.edu", fullName: "รศ.ดร.ประยุทธ์ ช่วยเหลือ", currentRole: "teacher", teacherSubRole: "advisor" },
-  { id: "4", email: "student1@student.edu", fullName: "นายสมชาย เก่งมาก", currentRole: "student" },
-  { id: "5", email: "student2@student.edu", fullName: "นางสาวสมหญิง ขยันเรียน", currentRole: "student" },
-];
-
 const roles = [
   { value: "admin", label: "ผู้ดูแลระบบ", description: "สิทธิ์เต็มในการจัดการระบบ" },
   { value: "teacher", label: "อาจารย์", description: "สิทธิ์ในการจัดการข้อมูลการเรียนการสอน" },
@@ -64,7 +56,7 @@ const subRoleLabels: Record<string, string> = {
 };
 
 export default function RolesManagement() {
-  const [users, setUsers] = useState<UserWithRole[]>(mockUsersWithRoles);
+  const [users, setUsers] = useState<UserWithRole[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedUser, setSelectedUser] = useState<UserWithRole | null>(null);
   const [newRole, setNewRole] = useState("");

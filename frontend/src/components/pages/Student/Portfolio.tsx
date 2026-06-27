@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,7 +9,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, FileText, Award, FolderOpen, Plus, Eye, Download, Trash2, Calendar, Image } from "lucide-react";
+import { Upload, FileText, Award, FolderOpen, Plus, Eye, Download, Trash2, Calendar, Loader2, ExternalLink } from "lucide-react";
+import api from "@/lib/axios";
 
 interface PortfolioItem {
   id: string;
@@ -17,16 +18,8 @@ interface PortfolioItem {
   type: "certificate" | "project" | "activity" | "award";
   description: string;
   date: string;
-  fileName?: string;
-  imageUrl?: string;
+  file_name?: string; // ปรับให้ตรงกับฐานข้อมูล
 }
-
-const mockPortfolioItems: PortfolioItem[] = [
-  { id: "1", title: "ใบประกาศนียบัตร Python Certification", type: "certificate", description: "ผ่านการอบรมหลักสูตร Python for Data Science", date: "2568-12-15", fileName: "python_cert.pdf" },
-  { id: "2", title: "โครงการพัฒนาแอปพลิเคชัน", type: "project", description: "พัฒนาแอปพลิเคชันจัดการงานสำหรับนักศึกษา", date: "2568-11-20", fileName: "project_doc.pdf" },
-  { id: "3", title: "รางวัลชนะเลิศ Hackathon", type: "award", description: "รางวัลชนะเลิศการแข่งขัน Hackathon ระดับมหาวิทยาลัย", date: "2568-10-05", fileName: "hackathon_award.jpg" },
-  { id: "4", title: "กิจกรรมจิตอาสา", type: "activity", description: "เข้าร่วมกิจกรรมจิตอาสาช่วยเหลือชุมชน", date: "2568-09-12", fileName: "volunteer.pdf" },
-];
 
 const typeLabels: Record<PortfolioItem["type"], string> = {
   certificate: "ใบประกาศนียบัตร",
@@ -43,11 +36,34 @@ const typeColors: Record<PortfolioItem["type"], string> = {
 };
 
 const Portfolio = () => {
-  const [items, setItems] = useState<PortfolioItem[]>(mockPortfolioItems);
+  const [items, setItems] = useState<PortfolioItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isUploading, setIsUploading] = useState(false);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newItem, setNewItem] = useState({ title: "", type: "certificate" as PortfolioItem["type"], description: "" });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
+  const [detailItem, setDetailItem] = useState<any>(null);
+  const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const { toast } = useToast();
+
+  const fetchPortfolio = async () => {
+    try {
+      setIsLoading(true);
+      const res = await api.get('/index.php?page=get-portfolio');
+      if (res.data.status === 'success') {
+        setItems(res.data.data);
+      }
+    } catch (error) {
+      toast({ title: "ข้อผิดพลาด", description: "ไม่สามารถโหลดข้อมูล Portfolio ได้", variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPortfolio();
+  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -55,31 +71,71 @@ const Portfolio = () => {
     }
   };
 
-  const handleAddItem = () => {
+  const handleAddItem = async () => {
     if (!newItem.title || !selectedFile) {
-      toast({ title: "กรุณากรอกข้อมูลให้ครบถ้วน", variant: "destructive" });
+      toast({ title: "กรุณากรอกข้อมูลและแนบไฟล์ให้ครบถ้วน", variant: "destructive" });
       return;
     }
 
-    const item: PortfolioItem = {
-      id: Date.now().toString(),
-      title: newItem.title,
-      type: newItem.type,
-      description: newItem.description,
-      date: new Date().toISOString().split("T")[0],
-      fileName: selectedFile.name,
-    };
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append('title', newItem.title);
+    formData.append('type', newItem.type);
+    formData.append('description', newItem.description);
+    formData.append('file', selectedFile);
 
-    setItems([item, ...items]);
-    setIsAddDialogOpen(false);
-    setNewItem({ title: "", type: "certificate", description: "" });
-    setSelectedFile(null);
-    toast({ title: "อัปโหลดสำเร็จ", description: `เพิ่ม ${item.title} เรียบร้อยแล้ว` });
+    try {
+      const res = await api.post('/index.php?page=save-portfolio', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      if (res.data.status === 'success') {
+        toast({ title: "อัปโหลดสำเร็จ", description: `เพิ่ม ${newItem.title} เรียบร้อยแล้ว` });
+        setIsAddDialogOpen(false);
+        setNewItem({ title: "", type: "certificate", description: "" });
+        setSelectedFile(null);
+        fetchPortfolio(); // รีเฟรชข้อมูลใหม่
+      }
+    } catch (error) {
+      toast({ title: "ข้อผิดพลาด", description: "อัปโหลดไม่สำเร็จ", variant: "destructive" });
+    } finally {
+      setIsUploading(false);
+    }
   };
 
-  const handleDeleteItem = (id: string) => {
-    setItems(items.filter((item) => item.id !== id));
-    toast({ title: "ลบสำเร็จ", description: "ลบรายการออกจาก Portfolio แล้ว" });
+  const handleDeleteItem = async (id: string) => {
+    if(!confirm('คุณแน่ใจหรือไม่ที่จะลบผลงานนี้?')) return;
+    
+    try {
+      const res = await api.delete(`/index.php?page=delete-portfolio&id=${id}`);
+      if (res.data.status === 'success') {
+        toast({ title: "ลบสำเร็จ", description: "ลบรายการออกจาก Portfolio แล้ว" });
+        fetchPortfolio();
+      }
+    } catch (error) {
+      toast({ title: "ข้อผิดพลาด", description: "ไม่สามารถลบผลงานได้", variant: "destructive" });
+    }
+  };
+
+  const handleViewDetail = async (id: string) => {
+    try {
+      setIsDetailDialogOpen(true); // เปิดหน้าต่างขึ้นมาก่อนเพื่อโชว์ Loading
+      setIsLoadingDetail(true);
+      setDetailItem(null); // เคลียร์ข้อมูลเก่าทิ้ง
+
+      const res = await api.get(`/index.php?page=get-portfolio-detail&id=${id}`);
+      if (res.data.status === 'success') {
+        setDetailItem(res.data.data);
+      } else {
+        toast({ title: "ข้อผิดพลาด", description: "ไม่พบข้อมูลผลงานชิ้นนี้", variant: "destructive" });
+        setIsDetailDialogOpen(false);
+      }
+    } catch (error) {
+      toast({ title: "ข้อผิดพลาด", description: "โหลดรายละเอียดล้มเหลว", variant: "destructive" });
+      setIsDetailDialogOpen(false);
+    } finally {
+      setIsLoadingDetail(false);
+    }
   };
 
   const getItemsByType = (type: PortfolioItem["type"]) => items.filter((item) => item.type === type);
@@ -156,12 +212,73 @@ const Portfolio = () => {
                 </div>
               </div>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>ยกเลิก</Button>
-                <Button onClick={handleAddItem}>อัปโหลด</Button>
+                <Button variant="outline" onClick={() => setIsAddDialogOpen(false)} disabled={isUploading}>ยกเลิก</Button>
+                <Button onClick={handleAddItem} disabled={isUploading}>
+                  {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  อัปโหลด
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
         </div>
+
+        <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
+          <DialogContent className="sm:max-w-[600px]">
+            <DialogHeader>
+              <DialogTitle>รายละเอียดผลงาน</DialogTitle>
+              <DialogDescription>ข้อมูลเชิงลึกของแฟ้มสะสมผลงาน</DialogDescription>
+            </DialogHeader>
+            <div className="py-4 space-y-4">
+              {isLoadingDetail ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+              ) : detailItem ? (
+                <>
+                  <div className="flex items-center gap-2 mb-4">
+                    <Badge className={typeColors[detailItem.type as PortfolioItem["type"]] || "bg-secondary"}>
+                      {typeLabels[detailItem.type as PortfolioItem["type"]] || "ทั่วไป"}
+                    </Badge>
+                    <span className="text-sm text-muted-foreground flex items-center gap-1">
+                      <Calendar className="h-3 w-3" /> อัปโหลดเมื่อ: {detailItem.date}
+                    </span>
+                  </div>
+                  
+                  <h3 className="text-xl font-bold text-foreground">{detailItem.title}</h3>
+                  
+                  <div className="bg-muted/30 p-4 rounded-lg text-sm text-foreground whitespace-pre-wrap border border-border mt-2">
+                    {detailItem.description || "ไม่มีคำอธิบายเพิ่มเติม"}
+                  </div>
+
+                  {detailItem.fileName && (
+                    <div className="mt-6 border border-border rounded-lg p-3 flex items-center justify-between bg-card">
+                      <div className="flex items-center gap-3 overflow-hidden">
+                        <div className="p-2 bg-primary/10 text-primary rounded-md shrink-0">
+                          <FileText className="h-5 w-5" />
+                        </div>
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-sm font-medium truncate">{detailItem.fileName}</span>
+                          <span className="text-xs text-muted-foreground">ไฟล์แนบระบบ</span>
+                        </div>
+                      </div>
+                      
+                      {/* ปุ่มเปิดดูไฟล์แนบบนหน้าเบราว์เซอร์แยกต่างหาก */}
+                      {detailItem.fileUrl && (
+                        <Button variant="outline" size="sm" className="shrink-0 gap-1" asChild>
+                          <a href={detailItem.fileUrl} target="_blank" rel="noopener noreferrer">
+                            เปิดดู <ExternalLink className="h-3 w-3" />
+                          </a>
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-center text-muted-foreground py-8">ไม่พบข้อมูล</div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Summary Cards */}
         <div className="grid gap-4 md:grid-cols-4">
@@ -231,42 +348,52 @@ const Portfolio = () => {
 
           {["all", "certificate", "project", "activity", "award"].map((tab) => (
             <TabsContent key={tab} value={tab} className="mt-4">
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {(tab === "all" ? items : getItemsByType(tab as PortfolioItem["type"])).map((item) => (
-                  <Card key={item.id} className="hover:border-primary/50 transition-colors">
-                    <CardHeader className="pb-2">
-                      <div className="flex items-start justify-between">
-                        <Badge className={typeColors[item.type]}>{typeLabels[item.type]}</Badge>
-                        <div className="flex gap-1">
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <Download className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteItem(item.id)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <h3 className="font-semibold mb-1">{item.title}</h3>
-                      <p className="text-sm text-muted-foreground mb-3">{item.description}</p>
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <div className="flex items-center gap-1">
-                          <FileText className="h-3 w-3" />
-                          {item.fileName}
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          {item.date}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+              {isLoading ? (
+                <div className="py-12 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {(tab === "all" ? items : getItemsByType(tab as PortfolioItem["type"])).length === 0 ? (
+                    <div className="col-span-full py-8 text-center text-muted-foreground">ไม่พบผลงานในหมวดหมู่นี้</div>
+                  ) : (
+                    (tab === "all" ? items : getItemsByType(tab as PortfolioItem["type"])).map((item) => (
+                      <Card key={item.id} onClick={() => handleViewDetail(item.id)} className="hover:border-primary/50 transition-colors">
+                        <CardHeader className="pb-2">
+                          <div className="flex items-start justify-between">
+                            <Badge className={typeColors[item.type]}>{typeLabels[item.type]}</Badge>
+                            <div className="flex gap-1">
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8 text-destructive hover:bg-destructive/10 z-10" 
+                                onClick={(e) => {
+                                  e.stopPropagation(); 
+                                  handleDeleteItem(item.id);
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>                           
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <h3 className="font-semibold mb-1">{item.title}</h3>
+                          <p className="text-sm text-muted-foreground mb-3">{item.description}</p>
+                          <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <div className="flex items-center gap-1">
+                              <FileText className="h-3 w-3" />
+                              {item.file_name || 'ไม่มีไฟล์แนบ'}
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              {item.date}
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))
+                  )}
+                </div>
+              )}
             </TabsContent>
           ))}
         </Tabs>

@@ -24,15 +24,6 @@ interface User {
   createdAt: string;
 }
 
-const mockUsers: User[] = [
-  { id: "1", email: "admin@faculty.edu", fullName: "ผู้ดูแลระบบ", role: "admin", status: "active", createdAt: "2568-01-01" },
-  { id: "2", email: "dean@faculty.edu", fullName: "ศ.ดร.สมศักดิ์ ใจดี", role: "teacher", teacherSubRole: "dean", status: "active", createdAt: "2568-01-05" },
-  { id: "3", email: "instructor1@faculty.edu", fullName: "ผศ.ดร.มานี รักเรียน", role: "teacher", teacherSubRole: "instructor", status: "active", createdAt: "2568-01-10" },
-  { id: "4", email: "student1@student.edu", fullName: "นายสมชาย เก่งมาก", role: "student", status: "active", createdAt: "2568-02-01" },
-  { id: "5", email: "student2@student.edu", fullName: "นางสาวสมหญิง ขยันเรียน", role: "student", status: "active", createdAt: "2568-02-01" },
-  { id: "6", email: "advisor@faculty.edu", fullName: "รศ.ดร.ประยุทธ์ ช่วยเหลือ", role: "teacher", teacherSubRole: "advisor", status: "inactive", createdAt: "2567-06-15" },
-];
-
 const roleLabels: Record<string, string> = {
   admin: "ผู้ดูแลระบบ",
   student: "นักศึกษา",

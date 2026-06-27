@@ -18,7 +18,7 @@ $db = new Connect;
 try {
     // 🧑‍🎓 [ขั้นตอนที่ 1] ลองตรวจสอบก่อนว่าผู้ใช้งานคนนี้มีประวัติต่อยู่ในตาราง student หรือไม่
     // โดยเช็คจากรหัสนักศึกษา (username) หรือ user_id 
-    $sql_student = "SELECT student_id, title, first_name_th, last_name_th, email, phone, year 
+    $sql_student = "SELECT student_id, title, first_name_th, last_name_th, email, phone, year_level AS year 
                     FROM student 
                     WHERE student_id = :student_id_1 OR student_id = :student_id_2 LIMIT 1";
     $stmt_student = $db->prepare($sql_student);
@@ -28,18 +28,18 @@ try {
     ]);
     $student = $stmt_student->fetch(PDO::FETCH_ASSOC);
 
-    // 🎯 ถ้าเจอข้อมูลในตารางนักศึกษา ให้ส่งก้อน JSON นักศึกษากลับไปทันที
+    // ถ้าเจอข้อมูลในตารางนักศึกษา ให้จัด Format ส่งกลับไปให้ตรงสเปคหน้าบ้าน
     if ($student) {
         echo json_encode([
             "status" => "success",
             "data" => [
                 "id" => $student['student_id'],
-                "title" => $student['title'],
-                "first_name" => $student['first_name_th'], // แมปตัวแปรให้ตรงกับ ProfilePage.tsx
-                "last_name" => $student['last_name_th'],
-                "email" => !empty($student['email']) ? $student['email'] : $student['student_id'] . "@siam.edu",
-                "phone" => !empty($student['phone']) ? $student['phone'] : "-",
-                "position" => "นักศึกษา ชั้นปีที่ " . ($student['year'] ?? "1"),
+                "title" => $student['title'], 
+                "first_name" => $student['first_name_th'], 
+                "last_name" => $student['last_name_th'],   
+                "email" => $student['email'] ?? ($username . "@siam.edu"),
+                "phone" => $student['phone'] ?? "-",
+                "position" => "นักศึกษา ชั้นปีที่ " . $student['year'], // ดึงมาจาก alias year ได้ทันที
                 "program" => "หลักสูตรพยาบาลศาสตรบัณฑิต",
                 "faculty" => "พยาบาลศาสตร์"
             ]

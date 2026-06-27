@@ -27,7 +27,8 @@ services:
       - ./backend/src:/var/www/html/
     ports:
       - 8080:80
-
+    environment:
+      - TZ=Asia/Bangkok # 🔧 เพิ่มตรงนี้: บังคับให้ระบบ PHP ใช้เวลาประเทศไทย (ICT)
 
   # Database
   db:
@@ -39,6 +40,7 @@ services:
       MYSQL_DATABASE: MYSQL_DATABASE
       MYSQL_USER: MYSQL_USER
       MYSQL_PASSWORD: MYSQL_PASSWORD
+      TZ: Asia/Bangkok # 🔧 เพิ่มตรงนี้: บังคับให้ Engine ของ MySQL แสตมป์ CURRENT_TIMESTAMP เป็นเวลาไทย
     ports:
       - "9906:3306"
     volumes:

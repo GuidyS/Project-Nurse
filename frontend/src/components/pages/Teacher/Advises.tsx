@@ -24,16 +24,16 @@ const getStatusBadge = (status: string) => {
 export default function Advises() {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
-  const [advisees, setAdvisees] = useState<any[]>([]);
+  const [advises, setAdvises] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const fetchAdvisees = async () => {
+    const fetchAdvises = async () => {
       try {
         setIsLoading(true);
         const res = await api.get('/index.php?page=get-advises');
         if (res.data.status === 'success') {
-          setAdvisees(res.data.data || []);
+          setAdvises(res.data.data || []);
         } else {
           toast({ title: 'ข้อผิดพลาด', description: res.data.message, variant: 'destructive' });
         }
@@ -43,20 +43,20 @@ export default function Advises() {
         setIsLoading(false);
       }
     };
-    fetchAdvisees();
+    fetchAdvises();
   }, []);
 
-  const filteredAdvisees = advisees.filter(
+  const filteredAdvises = advises.filter(
     (student) =>
       student.name.includes(searchTerm) ||
       student.studentId.includes(searchTerm)
   );
 
   const stats = {
-    total: advisees.length,
+    total: advises.length,
     maxCapacity: 12, // (เกณฑ์สัดส่วน อาจารย์ 1 คน ต่อ นศ. 12 คน)
-    needsAdvice: advisees.filter(s => s.needsAdvice).length,
-    critical: advisees.filter(s => s.status === 'critical').length,
+    needsAdvice: advises.filter(s => s.needsAdvice).length,
+    critical: advises.filter(s => s.status === 'critical').length,
   };
 
   return (
@@ -106,7 +106,7 @@ export default function Advises() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-600">
-                {advisees.filter(s => s.status === 'normal').length}
+                {advises.filter(s => s.status === 'normal').length}
               </div>
               <p className="text-xs text-muted-foreground">คน</p>
             </CardContent>
@@ -133,7 +133,7 @@ export default function Advises() {
               <div className="flex justify-center items-center py-10">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
               </div>
-            ) : filteredAdvisees.length === 0 ? (
+            ) : filteredAdvises.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg">
                 ไม่มีข้อมูลนักศึกษาในความดูแล
               </div>
@@ -151,7 +151,7 @@ export default function Advises() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredAdvisees.map((student) => (
+                  {filteredAdvises.map((student) => (
                     <TableRow key={student.id}>
                       <TableCell className="font-medium font-mono">{student.studentId}</TableCell>
                       <TableCell>{student.name}</TableCell>
