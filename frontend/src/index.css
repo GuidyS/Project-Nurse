@@ -1,0 +1,207 @@
+@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Clean White/Blue Theme */
+    --background: 220 20% 97%;
+    --foreground: 220 25% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 25% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 25% 15%;
+
+    /* Blue Primary */
+    --primary: 217 91% 50%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Light Gray Secondary */
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 220 25% 25%;
+
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 10% 46%;
+
+    /* Orange Accent */
+    --accent: 25 95% 53%;
+    --accent-foreground: 0 0% 100%;
+
+    /* Success Green */
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
+
+    /* Warning Yellow */
+    --warning: 45 93% 47%;
+    --warning-foreground: 0 0% 0%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 217 91% 50%;
+
+    --radius: 0.75rem;
+
+    /* Sidebar */
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 220 10% 40%;
+    --sidebar-primary: 217 91% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 217 91% 97%;
+    --sidebar-accent-foreground: 217 91% 50%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217 91% 50%;
+
+    /* Custom shadows */
+    --shadow-sm: 0 1px 2px 0 hsl(220 25% 15% / 0.05);
+    --shadow-card: 0 1px 3px 0 hsl(220 25% 15% / 0.1), 0 1px 2px -1px hsl(220 25% 15% / 0.1);
+  }
+
+  .dark {
+    --background: 222 47% 5%;
+    --foreground: 210 40% 98%;
+
+    --card: 222 38% 8%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222 38% 8%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 222 30% 13%;
+    --secondary-foreground: 210 40% 96%;
+
+    --muted: 222 30% 13%;
+    --muted-foreground: 215 20% 72%;
+
+    --accent: 25 95% 55%;
+    --accent-foreground: 0 0% 100%;
+
+    --success: 142 70% 45%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 45 93% 50%;
+    --warning-foreground: 0 0% 0%;
+
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 222 26% 18%;
+    --input: 222 26% 18%;
+    --ring: 217 91% 60%;
+
+    --sidebar-background: 222 42% 6%;
+    --sidebar-foreground: 210 28% 88%;
+    --sidebar-primary: 217 91% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 222 32% 13%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 222 26% 16%;
+    --sidebar-ring: 217 91% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    background: hsl(var(--background));
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Sarabun', sans-serif;
+    min-height: 100vh;
+  }
+
+  #root {
+    min-height: 100vh;
+    background: hsl(var(--background));
+    color: hsl(var(--foreground));
+  }
+}
+
+@layer utilities {
+  .shadow-card {
+    box-shadow: var(--shadow-card);
+  }
+}
+
+@layer components {
+  /* --- User Profile & Logout UI --- */
+  .sidebar-profile-avatar {
+    @apply h-full w-full border border-[#8a2be2]/20;
+  }
+  
+  .sidebar-profile-fallback {
+    background-color: #ad71e6 !important;
+    color: white !important;
+    @apply text-sm font-semibold;
+  }
+
+  .dark .sidebar-profile-fallback {
+    /* ใช้สีพื้นหลังม่วงความทึบ 10% (rgba ของ #8a2be2) ให้ตรงกับปุ่ม active */
+    background-color: rgba(138, 43, 226, 0.1) !important; 
+    /* สีตัวอักษรเป็นสีม่วง */
+    color: #8a2be2 !important; 
+  }
+
+  .sidebar-logout-overlay {
+    @apply absolute inset-0 h-full w-full flex items-center justify-center rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-destructive/90 text-white;
+  }
+
+  .sidebar-profile-name {
+    /* เรียกใช้ color ตรงๆ ป้องกัน Error กรณี tailwind config ไม่ครอบคลุม */
+    color: hsl(var(--sidebar-foreground));
+    @apply text-sm font-bold truncate;
+  }
+
+  .sidebar-logout-btn {
+    color: hsl(var(--sidebar-foreground));
+    opacity: 0.7;
+    @apply p-1 hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors;
+  }
+
+  /* --- Main Menu Icons --- */
+  .sidebar-main-icon {
+    /* ตั้งค่าเริ่มต้นให้สีไอคอนรองรับ Dark/Light Mode */
+    @apply h-4 w-4 shrink-0 transition-colors text-sidebar-foreground/70;
+  }
+
+  /* ดักจับ Hover เฉพาะปุ่มใครปุ่มมัน */
+  [data-sidebar="menu-button"]:hover .sidebar-main-icon {
+    @apply text-[#8a2be2];
+  }
+
+  /* สีตอนที่เมนูนั้นกำลัง Active อยู่ */
+  .sidebar-main-icon.active {
+    @apply text-[#8a2be2];
+  }
+  
+  /* --- Bottom Menu Icons --- */
+  .sidebar-bottom-icon {
+    /* 1. เอา group-hover ออกจากตรงนี้ เพื่อไม่ให้มันจำสีมาจากกล่องใหญ่ */
+    @apply h-4 w-4 shrink-0 transition-colors text-sidebar-foreground/70;
+  }
+
+  /* 2. ดักจับว่าถ้าเมาส์ชี้ที่ "ปุ่มเมนู" ตัวไหน ค่อยให้ไอคอนข้างในปุ่มนั้นเปลี่ยนสี */
+  [data-sidebar="menu-button"]:hover .sidebar-bottom-icon {
+    @apply text-[#8a2be2];
+  }
+
+  /* 3. สีตอนที่เมนูนั้นกำลัง Active อยู่ */
+  .sidebar-bottom-icon.active {
+    @apply text-[#8a2be2];
+  }
+}

@@ -1,0 +1,183 @@
+import { MainLayout } from '@/components/layout/MainLayout';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { FileText, Upload, Download, Eye, Plus } from 'lucide-react';
+import { useState, useEffect } from 'react'; // นำเข้า Hook สำหรับจัดการสถานะและดึงข้อมูล
+import api from '@/lib/axios';
+
+const getTypeBadge = (type: string) => {
+  switch (type) {
+    case 'proposal':
+      return <Badge className="bg-blue-500">ข้อเสนอ</Badge>;
+    case 'progress':
+      return <Badge className="bg-green-500">รายงานความก้าวหน้า</Badge>;
+    case 'financial':
+      return <Badge className="bg-yellow-500">การเงิน</Badge>;
+    case 'summary':
+      return <Badge className="bg-purple-500">สรุปโครงการ</Badge>;
+    default:
+      return <Badge variant="secondary">{type}</Badge>;
+  }
+};
+
+const getStatusBadge = (status: string) => {
+  switch (status) {
+    case 'approved':
+      return <Badge className="bg-green-500">อนุมัติ</Badge>;
+    case 'pending':
+      return <Badge className="bg-yellow-500">รอตรวจสอบ</Badge>;
+    default:
+      return <Badge variant="secondary">{status}</Badge>;
+  }
+};
+
+export default function ProjectDocs() {
+  // สร้าง State สำหรับเก็บข้อมูลจริงจากฐานข้อมูล
+  const [docs, setDocs] = useState<any[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  // เรียกใช้ API เพื่อดึงข้อมูลมาแสดงผลทันทีที่เปิดหน้านี้
+  useEffect(() => {
+    // ใช้ api.get แทน fetch และเปลี่ยน URL ให้วิ่งผ่าน index.php
+    api.get('/index.php?page=get-project-docs')
+      .then((res) => {
+        // Axios จะแปลง JSON ให้เราอัตโนมัติ ข้อมูลจะอยู่ใน res.data
+        if (res.data.status === 'success') {
+          setDocs(res.data.data);
+        } else {
+          console.error(res.data.message);
+        }
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("เกิดข้อผิดพลาดในการเชื่อมต่อ API:", err);
+        setLoading(false);
+      });
+  }, []);
+
+  if (loading) {
+    return <div className="p-6 text-center text-muted-foreground">กำลังโหลดข้อมูลเอกสารจากฐานข้อมูล...</div>;
+  }
+
+  return (
+    <>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">สร้างเอกสารโครงการ</h1>
+            <p className="text-muted-foreground">จัดการเอกสารโครงการทั้งหมด</p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline">
+              <Upload className="mr-2 h-4 w-4" />
+              อัปโหลด
+            </Button>
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              สร้างเอกสาร
+            </Button>
+          </div>
+        </div>
+
+        {/* Stats - คำนวณจากจำนวนข้อมูลจริงในฐานข้อมูลปัจจุบัน */}
+        <div className="grid gap-4 md:grid-cols-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">เอกสารทั้งหมด</CardTitle>
+              <FileText className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{docs.length}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">อนุมัติแล้ว</CardTitle>
+              <FileText className="h-4 w-4 text-green-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">
+                {docs.filter(d => d.status === 'approved').length}
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">รอตรวจสอบ</CardTitle>
+              <FileText className="h-4 w-4 text-yellow-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-yellow-600">
+                {docs.filter(d => d.status === 'pending').length}
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">ข้อเสนอโครงการ</CardTitle>
+              <FileText className="h-4 w-4 text-primary" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {docs.filter(d => d.type === 'proposal').length}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Documents Table */}
+        <Card>
+          <CardHeader>
+            <CardTitle>รายการเอกสาร</CardTitle>
+            <CardDescription>เอกสารโครงการทั้งหมด</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>ชื่อเอกสาร</TableHead>
+                  <TableHead>โครงการ</TableHead>
+                  <TableHead>ประเภท</TableHead>
+                  <TableHead>วันที่</TableHead>
+                  <TableHead>สถานะ</TableHead>
+                  <TableHead>การดำเนินการ</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {docs.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                      ยังไม่มีข้อมูลเอกสารโครงการถูกบันทึกอยู่ในระบบขณะนี้
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  docs.map((doc) => (
+                    <TableRow key={doc.id}>
+                      <TableCell className="font-medium">{doc.name}</TableCell>
+                      <TableCell className="max-w-[200px] truncate">{doc.project}</TableCell>
+                      <TableCell>{getTypeBadge(doc.type)}</TableCell>
+                      <TableCell>{doc.date}</TableCell>
+                      <TableCell>{getStatusBadge(doc.status)}</TableCell>
+                      <TableCell>
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm">
+                            <Eye className="h-3 w-3" />
+                          </Button>
+                          <Button variant="outline" size="sm">
+                            <Download className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
+    </>
+  );
+}

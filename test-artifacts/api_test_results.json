@@ -1,0 +1,210 @@
+[
+  {
+    "tc": "LOGIN",
+    "name": "Login อาจารย์ T001",
+    "http": 200,
+    "verdict": "PASS",
+    "note": "ล็อกอินได้ มี session",
+    "resp": "{\"status\":\"success\",\"user\":{\"user_id\":2,\"username\":\"T001\",\"name\":\"\\u0e2a\\u0e21\\u0e0a\\u0e32\\u0e22 \\u0e43\\u0e08\\u0e14\\u0e35\",\"role_id\":2,\"position_id\":2..."
+  },
+  {
+    "tc": "TC-FR030-01",
+    "name": "CLOPage: get-subjects",
+    "http": 200,
+    "verdict": "PASS",
+    "note": "",
+    "resp": "{\"status\":\"success\",\"data\":[{\"subject_code\":\"103-111\",\"subject_name_th\":\"\\u0e01\\u0e32\\u0e23\\u0e1e\\u0e22\\u0e32\\u0e1a\\u0e32\\u0e25\\u0e1e\\u0e37\\u0e49\\u0e1..."
+  },
+  {
+    "tc": "TC-FR030-02",
+    "name": "CLOPage: get-clos (subject 1)",
+    "http": 401,
+    "verdict": "DEFECT?",
+    "note": "ถ้า 401 = bug session_start หาย",
+    "resp": "{\"status\":\"error\",\"message\":\"Unauthorized\"}"
+  },
+  {
+    "tc": "TC-FR030-03",
+    "name": "CLOPage: add-clo",
+    "http": 401,
+    "verdict": "DEFECT?",
+    "note": "อาจ 401 จาก session",
+    "resp": ""
+  },
+  {
+    "tc": "TC-FR030-05",
+    "name": "CLOPage: update-clo",
+    "http": 401,
+    "verdict": "DEFECT?",
+    "note": "",
+    "resp": ""
+  },
+  {
+    "tc": "TC-FR030-07",
+    "name": "CLOPage: get-clos ไม่ส่ง subject_id",
+    "http": 401,
+    "verdict": "PASS(neg)",
+    "note": "ควรเป็น error",
+    "resp": "{\"status\":\"error\",\"message\":\"Unauthorized\"}"
+  },
+  {
+    "tc": "TC-FR028-01",
+    "name": "CLOMgmt: get (param ถูก subject_code)",
+    "http": 200,
+    "verdict": "PASS",
+    "note": "",
+    "resp": "{\"status\":\"success\",\"data\":{\"clos\":[{\"id\":\"1\",\"code\":\"CLO1\",\"description\":\"\\u0e2d\\u0e18\\u0e34\\u0e1a\\u0e32\\u0e22\\u0e2b\\u0e25\\u0e31\\u0e01\\u0e01\\u0e32\\u0..."
+  },
+  {
+    "tc": "TC-FR028-04",
+    "name": "CLOMgmt: get (param FE ใช้จริง subject-code)",
+    "http": 200,
+    "verdict": "DEFECT-CONFIRMED",
+    "note": "FE ส่ง subject-code แต่ BE อ่าน subject_code",
+    "resp": "{\"status\":\"error\",\"message\":\"\\u0e01\\u0e23\\u0e38\\u0e13\\u0e32\\u0e23\\u0e30\\u0e1a\\u0e38\\u0e23\\u0e2b\\u0e31\\u0e2a\\u0e27\\u0e34\\u0e0a\\u0e32\"}"
+  },
+  {
+    "tc": "TC-FR028-03",
+    "name": "CLOMgmt: save น้ำหนักรวม 120% (>100)",
+    "http": 200,
+    "verdict": "CHECK",
+    "note": "บันทึกได้แม้เกิน 100% = ไม่มี validation",
+    "resp": "<br /> <b>Warning</b>: require_once(./middlewares/auth_middleware.php): Failed to open stream: No such file or directory in <b>/var/www/html/component..."
+  },
+  {
+    "tc": "TC-FR034-06",
+    "name": "CLOMap: get-clo-map (เช็ค merge conflict)",
+    "http": 200,
+    "verdict": "DEFECT-CONFIRMED",
+    "note": "ถ้า parse error/ไม่ใช่ JSON = ยืนยัน merge conflict markers",
+    "resp": "<br /> <b>Parse error</b>: syntax error, unexpected token &quot;&lt;&lt;&quot;, expecting end of file in <b>/var/www/html/components/Teacher/CLOMap/ge..."
+  },
+  {
+    "tc": "TC-FR034-03",
+    "name": "CLOMap: save-clo-map",
+    "http": 200,
+    "verdict": "PASS",
+    "note": "",
+    "resp": "{\"status\":\"success\",\"message\":\"\\u0e1a\\u0e31\\u0e19\\u0e17\\u0e36\\u0e01\\u0e02\\u0e49\\u0e2d\\u0e21\\u0e39\\u0e25 CLO Map \\u0e2a\\u0e33\\u0e40\\u0e23\\u0e47\\u0e08!\"..."
+  },
+  {
+    "tc": "TC-FR033-01",
+    "name": "Reports: get-report-filters",
+    "http": 200,
+    "verdict": "FAIL",
+    "note": "status=None",
+    "resp": "<br /> <b>Warning</b>: require_once(/var/www/html/components/Teacher/CourseReports/../../config/config.php): Failed to open stream: No such file or di..."
+  },
+  {
+    "tc": "TC-FR033-02",
+    "name": "Reports: get-course-report",
+    "http": 200,
+    "verdict": "FAIL",
+    "note": "status=None",
+    "resp": "<br /> <b>Warning</b>: require_once(/var/www/html/components/Teacher/CourseReports/../../config/config.php): Failed to open stream: No such file or di..."
+  },
+  {
+    "tc": "TC-FR033-04",
+    "name": "Reports: ตัวกรองไม่ครบ (ไม่ส่ง subject)",
+    "http": 200,
+    "verdict": "UNEXPECTED",
+    "note": "ควรเป็น error",
+    "resp": "<br /> <b>Warning</b>: require_once(/var/www/html/components/Teacher/CourseReports/../../config/config.php): Failed to open stream: No such file or di..."
+  },
+  {
+    "tc": "TC-FR009-01",
+    "name": "Courses: get-my-courses",
+    "http": 200,
+    "verdict": "FAIL",
+    "note": "status=None",
+    "resp": "<br /> <b>Warning</b>: require_once(/var/www/html/components/Teacher/CoursesPage/../../config/config.php): Failed to open stream: No such file or dire..."
+  },
+  {
+    "tc": "TC-FR009-02",
+    "name": "Courses: get-course-students",
+    "http": 200,
+    "verdict": "FAIL",
+    "note": "status=None",
+    "resp": "<br /> <b>Warning</b>: require_once(/var/www/html/components/Teacher/CoursesPage/../../config/config.php): Failed to open stream: No such file or dire..."
+  },
+  {
+    "tc": "TC-FR009-03",
+    "name": "Courses: update-grade (id=1 -> A)",
+    "http": 200,
+    "verdict": "FAIL",
+    "note": "status=None",
+    "resp": "<br /> <b>Warning</b>: require_once(/var/www/html/components/Teacher/CoursesPage/../../config/config.php): Failed to open stream: No such file or dire..."
+  },
+  {
+    "tc": "TC-FR035-01",
+    "name": "CourseStudents: list courses",
+    "http": 200,
+    "verdict": "PASS",
+    "note": "",
+    "resp": "{\"status\":\"success\",\"data\":{\"courses\":[{\"id\":1,\"code\":\"103-111\",\"name\":\"\\u0e01\\u0e32\\u0e23\\u0e1e\\u0e22\\u0e32\\u0e1a\\u0e32\\u0e25\\u0e1e\\u0e37\\u0e49\\u0e19..."
+  },
+  {
+    "tc": "TC-FR035-02",
+    "name": "CourseStudents: students+CLO (subject 1)",
+    "http": 200,
+    "verdict": "PASS",
+    "note": "",
+    "resp": "{\"status\":\"success\",\"data\":{\"courses\":[],\"students\":[{\"id\":\"6401001\",\"studentId\":\"6401001\",\"name\":\"\\u0e19\\u0e32\\u0e07\\u0e2a\\u0e32\\u0e27\\u0e2a\\u0e21\\u0..."
+  },
+  {
+    "tc": "TC-FR035-05",
+    "name": "CourseStudents: save (stub?)",
+    "http": 200,
+    "verdict": "STUB-CONFIRMED",
+    "note": "ตอบ success แต่ไม่บันทึก DB จริง",
+    "resp": "{\"status\":\"success\",\"message\":\"\\u0e1a\\u0e31\\u0e19\\u0e17\\u0e36\\u0e01\\u0e1c\\u0e25\\u0e2a\\u0e31\\u0e21\\u0e24\\u0e17\\u0e18\\u0e34\\u0e4c\\u0e04\\u0e30\\u0e41\\u0e1..."
+  },
+  {
+    "tc": "TC-FR037-01",
+    "name": "Documents: get-documents",
+    "http": 200,
+    "verdict": "PASS",
+    "note": "",
+    "resp": "{\"status\":\"success\",\"data\":{\"documents\":[{\"id\":\"doc_seed_1\",\"name\":\"TQF 3 - 103-111\",\"type\":\"TQF 3\",\"uploadedAt\":\"2025-06-01\",\"size\":\"1.2 MB\",\"status\"..."
+  },
+  {
+    "tc": "TC-FR037-02",
+    "name": "Documents: upload-document",
+    "http": 200,
+    "verdict": "DEFECT?",
+    "note": "อาจติด auth_middleware",
+    "resp": "<br /> <b>Warning</b>: require_once(auth_middleware.php): Failed to open stream: No such file or directory in <b>/var/www/html/components/Teacher/Docu..."
+  },
+  {
+    "tc": "TC-FR037-03",
+    "name": "Documents: upload ข้อมูลไม่ครบ",
+    "http": 200,
+    "verdict": "UNEXPECTED",
+    "note": "ควรเป็น error",
+    "resp": "<br /> <b>Warning</b>: require_once(auth_middleware.php): Failed to open stream: No such file or directory in <b>/var/www/html/components/Teacher/Docu..."
+  },
+  {
+    "tc": "TC-FR036-06",
+    "name": "Grades: get-grading-data (เช็ค path case)",
+    "http": 200,
+    "verdict": "DEFECT-CONFIRMED",
+    "note": "index.php ชี้ Teacher/Grades/ แต่โฟลเดอร์จริง Teacher/grading/",
+    "resp": "<br /> <b>Warning</b>: require_once(components/Teacher/Grades/get_grading_data.php): Failed to open stream: No such file or directory in <b>/var/www/h..."
+  },
+  {
+    "tc": "TC-FR036-03",
+    "name": "Grades: save-grading-data (ให้เกรด 6401004)",
+    "http": 200,
+    "verdict": "DEFECT?",
+    "note": "",
+    "resp": "<br /> <b>Warning</b>: require_once(components/Teacher/Grades/save_grading_data.php): Failed to open stream: No such file or directory in <b>/var/www/..."
+  },
+  {
+    "tc": "TC-FR038-01",
+    "name": "MyCourses: overview",
+    "http": 200,
+    "verdict": "PASS",
+    "note": "",
+    "resp": "{\"status\":\"success\",\"data\":[{\"id\":1,\"code\":\"103-111\",\"name\":\"\\u0e01\\u0e32\\u0e23\\u0e1e\\u0e22\\u0e32\\u0e1a\\u0e32\\u0e25\\u0e1e\\u0e37\\u0e49\\u0e19\\u0e10\\u0e3..."
+  }
+]
