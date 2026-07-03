@@ -58,19 +58,11 @@ export default function Performance() {
   const [studentList, setStudentList] = useState<StudentDropdownItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // URL ของ API Backend (ปรับเปลี่ยนพอร์ตหรือพาร์ทได้ตามจริงครับ)
-  const API_BASE_URL = 'http://localhost/api'; 
-
-  // ก. ฟังก์ชันดึงข้อมูลทั้งหมดจากฐานข้อมูลมาแสดงผล
   const fetchPerformanceData = async () => {
     try {
       setLoading(true);
-      // แนบ credentials: true ไปด้วยเสมอกรณีเผื่อใช้ session ร่วมกับ auth_middleware.php ของบอส
-      const response = await fetch(`${API_BASE_URL}/get_performance_data.php`, {
-        method: 'GET',
-        headers: { 'Accept': 'application/json' }
-      });
-      const result = await response.json();
+      const response = await api.get('/index.php?page=get-performance');
+      const result = response.data;
       
       if (result.status === 'success') {
         setPerformances(result.data.performances);
@@ -98,19 +90,13 @@ export default function Performance() {
   // ค. ฟังก์ชันส่งข้อมูลประเมินตัวจริงกลับไปบันทึกลงฐานข้อมูล
   const handleSave = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/save_performance_eval.php`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      const response = await api.post('/index.php?page=save-performance', {
           selectedStudent,
           scores,
           comment
-        }),
-      });
+        });
       
-      const result = await response.json();
+      const result = response.data;
       
       if (result.status === 'success') {
         setIsDialogOpen(false);

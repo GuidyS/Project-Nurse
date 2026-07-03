@@ -1,28 +1,30 @@
 <?php
-header("Content-Type: application/json");
-header("Access-Control-Allow-Origin: *");
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
-// เชื่อมต่อฐานข้อมูล
-$pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
-$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/../../middlewares/auth_middleware.php';
+
+header("Content-Type: application/json; charset=UTF-8");
 
 try {
-    // ดึงข้อมูลทั้งหมดจากตารางสถิติ
-    $stmt = $pdo->query("SELECT type, code_name AS name, target_score AS target, achieved_score AS achieved, description FROM curriculum_report_stats ORDER BY code_name ASC");
+    $db = new Connect();
+
+    $stmt = $db->query("SELECT type, code_name AS name, target_score AS target, achieved_score AS achieved, description FROM curriculum_report_stats ORDER BY code_name ASC");
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     $ploData = [];
     $yloData = [];
 
-    // วนลูปแยกข้อมูลเป็น 2 ก้อน (PLO และ YLO) ตามที่หน้าบ้านต้องการ
     foreach ($rows as $row) {
         $item = [
             'name' => $row['name'],
             'target' => (float)$row['target'],
             'achieved' => (float)$row['achieved'],
-            'description' => $row['description']
+            'description' => $row['description'],
         ];
-        
+
         if ($row['type'] === 'PLO') {
             $ploData[] = $item;
         } else {
@@ -34,11 +36,10 @@ try {
         "status" => "success",
         "data" => [
             "ploData" => $ploData,
-            "yloData" => $yloData
-        ]
+            "yloData" => $yloData,
+        ],
     ]);
-
-} catch (PDOException $e) {
+} catch (Exception $e) {
+    http_response_code(500);
     echo json_encode(["status" => "error", "message" => $e->getMessage()]);
 }
-?>

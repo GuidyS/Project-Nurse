@@ -51,7 +51,8 @@
                 break;
             case 'delete-notification':
                 require_once 'components/NotificationPage/delete_notification.php';
-            
+                break;
+
             /* -------- Admin -------- */
 
             case 'get-users':
@@ -83,6 +84,9 @@
                 break;
             case 'get-import-history':
                 require_once 'components/Admin/ImportData/get-import-history.php';
+                break;
+            case 'admin-reports':
+                require_once 'components/Admin/Reports/get-reports.php';
                 break;
 
             /* -------- Teacher -------- */
@@ -197,10 +201,36 @@
 
             // Grades
             case 'get-grading-data':
-                require_once 'components/Teacher/Grades/get_grading_data.php';
+                require_once 'components/Teacher/grading/get_grading_data.php';
                 break;
             case 'save-grading-data':
-                require_once 'components/Teacher/Grades/save_grading_data.php';
+                require_once 'components/Teacher/grading/save_grading_data.php';
+                break;
+
+            // Dashboard
+            case 'teacher-dashboard':
+                require_once 'components/Teacher/Dashboard/get_dashboard_stats.php';
+                break;
+
+            // DeanDashboard
+            case 'get-dean-dashboard':
+                require_once 'components/Teacher/DeanDashboard/get_dean_dashboard.php';
+                break;
+
+            // PLOYLOReport
+            case 'get-plo-ylo-report':
+                require_once 'components/Teacher/PLOYLOReport/get_plo_ylo_report.php';
+                break;
+
+            // AdviseNotes
+            case 'get-advise-notes':
+                require_once 'components/Teacher/AdviseNotes/get_advise_notes.php';
+                break;
+            case 'save-advise-note':
+                require_once 'components/Teacher/AdviseNotes/save_advise_note.php';
+                break;
+            case 'get-advise-students':
+                require_once 'components/Teacher/AdviseNotes/get_advise_students.php';
                 break;
 
             // MyCourses
@@ -250,7 +280,7 @@
 
             // ProjectLinks
             case 'get-project-links':
-                require_once 'components/Teacher/ProjectLinks/get_project_links';
+                require_once 'components/Teacher/ProjectLinks/get_project_links.php';
                 break;
             case 'create-project-links':
                 require_once 'components/Teacher/ProjectLinks/save_project_links.php';
@@ -258,18 +288,18 @@
 
             // ProjectReports
             case 'get-project-reports':
-                require_once 'components/Teacher/ProjectReports/get_project_links';
+                require_once 'components/Teacher/ProjectReports/get_project_reports.php';
                 break;
 
             // ScheduleTasks
             case 'create-schedule-task':
-                require_once 'components/Teacher/ScheduleTasks/create_schedule_task';
+                require_once 'components/Teacher/ScheduleTasks/create_schedule_task.php';
                 break;
             case 'get-schedule-tasks':
-                require_once 'components/Teacher/ScheduleTasks/get_schedule_tasks';
+                require_once 'components/Teacher/ScheduleTasks/get_schedule_tasks.php';
                 break;
             case 'update-task-status':
-                require_once 'components/Teacher/ScheduleTasks/update_task_status';
+                require_once 'components/Teacher/ScheduleTasks/update_task_status.php';
                 break;
 
             // Students

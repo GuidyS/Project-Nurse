@@ -4,11 +4,54 @@ header("Content-Type: application/json");
 
 try {
     $db = new Connect();
-    $data = json_decode(file_get_contents("php://input"), true);
+    $method = $_SERVER['REQUEST_METHOD'];
+    $positionMap = [
+        'dean' => 1,
+        'instructor' => 2,
+        'advisor' => 3,
+        'practical_instructor' => 4,
+        'program_manager' => 5,
+        'project_manager' => 6
+    ];
+    $positionSlugMap = array_flip($positionMap);
+
+    if ($method === 'GET') {
+        $userId = $_GET['userId'] ?? null;
+        if (!$userId) throw new Exception("ไม่พบผู้ใช้");
+
+        $stmt = $db->prepare("SELECT position_id, is_primary FROM user_position WHERE user_id = :user_id ORDER BY is_primary DESC, position_id ASC");
+        $stmt->execute([':user_id' => $userId]);
+        $positions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $primaryPosition = "";
+        $secondaryPositions = [];
+        foreach ($positions as $position) {
+            $slug = $positionSlugMap[(int)$position['position_id']] ?? null;
+            if (!$slug) continue;
+
+            if ((int)$position['is_primary'] === 1 && !$primaryPosition) {
+                $primaryPosition = $slug;
+            } else {
+                $secondaryPositions[] = $slug;
+            }
+        }
+
+        echo json_encode([
+            "status" => "success",
+            "data" => [
+                "primaryPosition" => $primaryPosition,
+                "secondaryPositions" => array_values(array_unique($secondaryPositions))
+            ]
+        ]);
+        exit;
+    }
+
+    $data = json_decode(file_get_contents("php://input"), true) ?: [];
     
     $userId = $data['userId'] ?? null;
     $newRole = $data['newRole'] ?? null; // admin, teacher, student
-    $newSubRole = $data['newSubRole'] ?? null; // dean, instructor...
+    $primaryPosition = $data['primaryPosition'] ?? ($data['newSubRole'] ?? null);
+    $secondaryPositions = is_array($data['secondaryPositions'] ?? null) ? $data['secondaryPositions'] : [];
 
     if (!$userId || !$newRole) throw new Exception("ข้อมูลไม่ครบถ้วน");
 
@@ -21,18 +64,32 @@ try {
     $stmt = $db->prepare("UPDATE users SET role_id = :role_id WHERE user_id = :user_id");
     $stmt->execute([':role_id' => $roleId, ':user_id' => $userId]);
 
-    // 2. อัปเดตตาราง user_position (ถ้าเป็น teacher)
-    if ($newRole == 'teacher' && $newSubRole) {
-        $subRoleMap = [
-            'dean' => 1, 'instructor' => 2, 'advisor' => 3, 
-            'practical_instructor' => 4, 'program_manager' => 5, 'project_manager' => 6
-        ];
-        $positionId = $subRoleMap[$newSubRole] ?? 2;
+    // 2. อัปเดตตาราง user_position
+    $db->prepare("DELETE FROM user_position WHERE user_id = :id")->execute([':id' => $userId]);
 
-        // ล้างตำแหน่งเดิมที่เป็น Primary แล้วใส่ใหม่
-        $db->prepare("DELETE FROM user_position WHERE user_id = :id")->execute([':id' => $userId]);
-        $stmt = $db->prepare("INSERT INTO user_position (user_id, position_id, is_primary) VALUES (:uid, :pid, 1)");
-        $stmt->execute([':uid' => $userId, ':pid' => $positionId]);
+    if ($newRole == 'teacher') {
+        if (!$primaryPosition || !isset($positionMap[$primaryPosition])) {
+            throw new Exception("กรุณาเลือกตำแหน่งหลักของอาจารย์");
+        }
+
+        $insertStmt = $db->prepare("INSERT INTO user_position (user_id, position_id, is_primary) VALUES (:uid, :pid, :is_primary)");
+        $insertStmt->execute([
+            ':uid' => $userId,
+            ':pid' => $positionMap[$primaryPosition],
+            ':is_primary' => 1
+        ]);
+
+        foreach (array_values(array_unique($secondaryPositions)) as $secondaryPosition) {
+            if ($secondaryPosition === $primaryPosition || !isset($positionMap[$secondaryPosition])) {
+                continue;
+            }
+
+            $insertStmt->execute([
+                ':uid' => $userId,
+                ':pid' => $positionMap[$secondaryPosition],
+                ':is_primary' => 0
+            ]);
+        }
     }
 
     $db->commit();

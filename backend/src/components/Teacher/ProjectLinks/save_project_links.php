@@ -1,6 +1,6 @@
 <?php
 if (session_status() === PHP_SESSION_NONE) session_start();
-require_once __DIR__ . '/../../config/config.php';
+require_once __DIR__ . '/../../../config/config.php';
 
 header("Access-Control-Allow-Origin: http://localhost:5173");
 header("Access-Control-Allow-Credentials: true");
@@ -13,6 +13,10 @@ try {
     
     // รับข้อมูล JSON จาก React
     $input = json_decode(file_get_contents('php://input'), true);
+
+    if (!isset($input['projectId']) && isset($input['project_id'])) {
+        $input['projectId'] = $input['project_id'];
+    }
 
     if (!isset($input['projectId']) || !isset($input['links'])) {
         throw new Exception("ข้อมูลไม่ครบถ้วนสำหรับการบันทึก");

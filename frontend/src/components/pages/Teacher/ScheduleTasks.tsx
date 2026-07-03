@@ -95,7 +95,7 @@ export default function ScheduleTasks() {
 
     try {
       setIsSubmitting(true);
-      const response = await api.post('/index.php?page=create_schedule_task', newTask);
+      const response = await api.post('/index.php?page=create-schedule-task', newTask);
       if (response.data.status === 'success') {
         toast({ title: 'สำเร็จ', description: 'มอบหมายงานใหม่เรียบร้อยแล้ว' });
         setIsDialogOpen(false);
@@ -112,7 +112,7 @@ export default function ScheduleTasks() {
   // 3. ฟังก์ชันอัปเดตสถานะเป็น "เสร็จสิ้น"
   const handleCompleteTask = async (taskId: string) => {
     try {
-      const response = await api.post('/index.php?page=update_task_status', { 
+      const response = await api.post('/index.php?page=update-task-status', {
         taskId: taskId, 
         status: 'completed' 
       });

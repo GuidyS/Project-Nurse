@@ -5,6 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { FileText, Download, BarChart3, DollarSign } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend } from 'recharts';
+import api from '@/lib/axios';
 
 export default function ProjectReports() {
   const [projects, setProjects] = useState<any[]>([]);
@@ -19,19 +20,22 @@ export default function ProjectReports() {
   // ฟังก์ชันดึงข้อมูลรายงานจาก API
   const fetchReportData = (projectId = '') => {
     setLoading(true);
-    fetch(`/api/get_project_reports.php${projectId ? `?project_id=${projectId}` : ''}`)
-      .then(res => res.json())
+    const url = projectId
+      ? `/index.php?page=get-project-reports&project_id=${projectId}`
+      : '/index.php?page=get-project-reports';
+    api.get(url)
       .then(res => {
-        if (res.status === 'success') {
-          setProjects(res.data.projects);
-          if (!selectedProject && res.data.selectedProjectId) {
-            setSelectedProject(res.data.selectedProjectId.toString());
+        const data = res.data;
+        if (data.status === 'success') {
+          setProjects(data.data.projects);
+          if (!selectedProject && data.data.selectedProjectId) {
+            setSelectedProject(data.data.selectedProjectId.toString());
           }
-          setStats(res.data.stats);
-          setBudgetData(res.data.budgetData);
-          setProgressData(res.data.progressData);
+          setStats(data.data.stats);
+          setBudgetData(data.data.budgetData);
+          setProgressData(data.data.progressData);
         } else {
-          console.error(res.message);
+          console.error(data.message);
         }
         setLoading(false);
       })

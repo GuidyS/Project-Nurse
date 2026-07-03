@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { TrendingUp, Save, Link } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import api from '@/lib/axios';
 
 interface LinkMatrix {
   [projectId: string]: {
@@ -28,17 +29,17 @@ export default function ProjectLinks() {
 
   // 1. โหลดข้อมูลเมทริกซ์การเชื่อมโยงจากหลังบ้าน
   useEffect(() => {
-    fetch('/api/get_project_links.php')
-      .then(res => res.json())
+    api.get('/index.php?page=get-project-links')
       .then(res => {
-        if (res.status === 'success') {
-          setProjects(res.data.projects);
-          setPlos(res.data.plos);
-          setYlos(res.data.ylos);
-          setClos(res.data.clos);
-          setLinks(res.data.links);
-          if (res.data.projects.length > 0) {
-            setSelectedProjectId(res.data.projects[0].id.toString());
+        const data = res.data;
+        if (data.status === 'success') {
+          setProjects(data.data.projects);
+          setPlos(data.data.plos);
+          setYlos(data.data.ylos);
+          setClos(data.data.clos);
+          setLinks(data.data.links);
+          if (data.data.projects.length > 0) {
+            setSelectedProjectId(data.data.projects[0].id.toString());
           }
         }
         setLoading(false);
@@ -78,20 +79,16 @@ export default function ProjectLinks() {
     if (!selectedProjectId) return;
     setIsSaving(true);
 
-    fetch('/api/save_project_links.php', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        project_id: selectedProjectId,
+    api.post('/index.php?page=create-project-links', {
+        projectId: selectedProjectId,
         links: links[selectedProjectId] || { plos: [], ylos: [], clos: [] }
       })
-    })
-      .then(res => res.json())
       .then(res => {
-        if (res.status === 'success') {
+        const data = res.data;
+        if (data.status === 'success') {
           alert('บันทึกข้อมูลการเชื่อมโยงเป้าหมายเรียบร้อยแล้ว!');
         } else {
-          alert('เกิดข้อผิดพลาด: ' + res.message);
+          alert('เกิดข้อผิดพลาด: ' + data.message);
         }
         setIsSaving(false);
       })
