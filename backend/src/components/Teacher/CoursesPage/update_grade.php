@@ -18,11 +18,14 @@ try {
     }
 
     // อัปเดตเกรดโดยอ้างอิงจาก enrollment_id ที่เราดึงมาจาก get_course_students.php
-    $sql = "UPDATE enrollment SET grade = :grade WHERE enrollment_id = :id";
+    $sql = "UPDATE enrollment SET grade = :grade, midterm = :midterm, final = :final, assignment = :assignment WHERE enrollment_id = :id";
     $stmt = $db->prepare($sql);
     $stmt->execute([
         ':id' => $input['id'],
-        ':grade' => $input['grade']
+        ':grade' => $input['grade'],
+        ':midterm' => $input['midterm'] ?? null,
+        ':final' => $input['final'] ?? null,
+        ':assignment' => $input['assignment'] ?? null
     ]);
     
     // ตรวจสอบว่าอัปเดตสำเร็จไหม

@@ -85,7 +85,14 @@ export default function CLOManagement() {
       const id = Date.now().toString();
       updatedClos = [...clos, { id, ...newCLO, weight: Number(newCLO.weight), status: 'active' }];
     }
-    
+
+    // กฎ: น้ำหนัก CLO รวมต้องไม่เกิน 100%
+    const total = updatedClos.reduce((acc, c) => acc + Number(c.weight || 0), 0);
+    if (total > 100) {
+      toast({ title: "น้ำหนักรวมเกิน 100%", description: `รวมได้ ${total}% — กรุณาปรับให้ไม่เกิน 100%`, variant: "destructive" });
+      return;
+    }
+
     setIsDialogOpen(false);
     resetForm();
     syncToDatabase(updatedClos); // 👈 ส่งไปบันทึก

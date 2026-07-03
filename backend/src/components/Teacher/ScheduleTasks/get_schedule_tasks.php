@@ -2,7 +2,7 @@
 header('Content-Type: application/json');
 
 // ใช้ไฟล์ Config กลางของโปรเจกต์คุณ (แก้ปัญหาเรื่องการประกาศ PDO ดิบๆ)
-require_once __DIR__ . '/../../config/config.php';
+require_once __DIR__ . '/../../../config/config.php';
 
 try {
     $db = new Connect();

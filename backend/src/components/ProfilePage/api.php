@@ -18,7 +18,7 @@ $db = new Connect;
 try {
     // 🧑‍🎓 [ขั้นตอนที่ 1] ลองตรวจสอบก่อนว่าผู้ใช้งานคนนี้มีประวัติต่อยู่ในตาราง student หรือไม่
     // โดยเช็คจากรหัสนักศึกษา (username) หรือ user_id 
-    $sql_student = "SELECT student_id, title, first_name_th, last_name_th, email, phone, year 
+    $sql_student = "SELECT student_id, title, first_name_th, last_name_th, email, phone, year_level AS year
                     FROM student 
                     WHERE student_id = :student_id_1 OR student_id = :student_id_2 LIMIT 1";
     $stmt_student = $db->prepare($sql_student);

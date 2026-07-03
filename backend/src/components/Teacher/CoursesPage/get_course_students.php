@@ -20,10 +20,10 @@ try {
     // ดึงเด็กที่ลงทะเบียนวิชานี้ และเกรดจริงจากตาราง enrollment
     $sql = "
         SELECT 
-            e.enrollment_id as id, 
-            s.student_id as studentId, 
+            e.enrollment_id as id,
+            s.student_id as studentId,
             CONCAT(IFNULL(s.title,''), s.first_name_th, ' ', s.last_name_th) as name,
-            e.grade
+            e.grade, e.midterm, e.final, e.assignment
         FROM enrollment e
         JOIN student s ON e.student_id = s.student_id
         WHERE e.subject_id = ?

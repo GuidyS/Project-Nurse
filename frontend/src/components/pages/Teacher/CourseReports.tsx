@@ -60,7 +60,33 @@ export default function CourseReports() {
   }, [selectedYear, selectedCourse]);
 
   const handleExport = (format: string) => {
-    toast({ title: 'กำลังเตรียมส่งออก', description: `ระบบกำลังสร้างไฟล์รายงานในรูปแบบ ${format.toUpperCase()}` });
+    if (!reportData.gradeDistribution.length) {
+      toast({ title: 'ไม่มีข้อมูลให้ส่งออก', variant: 'destructive' });
+      return;
+    }
+    if (format === 'pdf') {
+      // ใช้การพิมพ์ของเบราว์เซอร์ (Save as PDF) เป็นการส่งออก PDF จริง
+      window.print();
+      return;
+    }
+    // Excel/CSV: สร้างไฟล์ CSV จริงจากข้อมูลรายงาน แล้วดาวน์โหลด
+    const rows: string[][] = [
+      ['รายงานผลการศึกษา'],
+      ['ปีการศึกษา', String(selectedYear), 'รายวิชา', String(selectedCourse)],
+      ['นักศึกษาทั้งหมด', String(totalStudents), 'อัตราการผ่าน(%)', String(passRate), 'เกรดเฉลี่ย', String(gpa)],
+      [],
+      ['เกรด', 'จำนวน (คน)'],
+      ...reportData.gradeDistribution.map((g) => [String(g.grade), String(g.count)]),
+    ];
+    const csv = '﻿' + rows.map((r) => r.map((c) => `"${c ?? ''}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `report_${selectedCourse}_${selectedYear}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast({ title: 'ส่งออกสำเร็จ', description: `ดาวน์โหลดไฟล์รายงานแล้ว` });
   };
 
   // การคำนวณตัวเลขสถิติแบบ Real-time

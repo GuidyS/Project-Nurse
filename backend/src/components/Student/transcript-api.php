@@ -38,7 +38,7 @@ try {
                         CONCAT(st.title, st.first_name_th, ' ', st.last_name_th) AS student_name, 
                         'พยาบาลศาสตร์' AS faculty, 
                         'พยาบาลศาสตรบัณฑิต' AS major,
-                        IFNULL(st.year, 2) AS current_year
+                        IFNULL(st.year_level, 2) AS current_year
                     FROM student st
                     WHERE st.student_id = :student_id";
                     

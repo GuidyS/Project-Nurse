@@ -21,6 +21,11 @@ INSERT INTO `clo` (`subject_id`,`description`,`ylo_id`,`clo_code`) VALUES
   (1,'สื่อสารภาษาอังกฤษในสถานการณ์ทั่วไปได้','YLO1','CLO2');
 
 -- ---------- 2) enrollment (การลงทะเบียนเรียน) ----------
+-- ล้างคะแนน CLO รายบุคคลที่เคยทดสอบไว้ (ถ้าตารางมีอยู่)
+SET @has_scores := (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='MYSQL_DATABASE' AND table_name='student_clo_scores');
+SET @sql := IF(@has_scores>0, 'DELETE FROM student_clo_scores', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
 DELETE FROM `enrollment`;
 INSERT INTO `enrollment` (`student_id`,`subject_id`,`academic_year`,`semester`,`section`,`grade`,`status`) VALUES
   (6603400001,1,2567,1,1,'A','Active'),

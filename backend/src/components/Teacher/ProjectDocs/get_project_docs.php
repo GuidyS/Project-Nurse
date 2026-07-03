@@ -6,10 +6,12 @@ $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
 try {
     // ดึงข้อมูลเอกสารทั้งหมดที่มีอยู่ในฐานข้อมูล เรียงตามวันที่ล่าสุด
-    $sql = "SELECT id, name, project, type, date, status, file_path FROM project_documents ORDER BY date DESC, id DESC";
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute();
-    $docs = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    // ตาราง project_documents ยังไม่มีในฐานข้อมูล — คืน array ว่างเพื่อให้หน้าโหลดได้
+    $docs = [];
+    if ($pdo->query("SHOW TABLES LIKE 'project_documents'")->rowCount() > 0) {
+        $stmt = $pdo->query("SELECT id, name, project, type, date, status, file_path FROM project_documents ORDER BY date DESC, id DESC");
+        $docs = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
 
     // ส่งข้อมูลที่เป็น Array ของจริงกลับไปให้ React
     echo json_encode([

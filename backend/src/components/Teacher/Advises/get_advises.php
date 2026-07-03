@@ -32,29 +32,21 @@ try {
             s.student_id as id, 
             s.student_id as studentId, 
             CONCAT(IFNULL(s.title,''), s.first_name_th, ' ', s.last_name_th) as name,
-            IFNULL(s.year, 1) as year,
+            IFNULL(s.year_level, 1) as year,
             0.00 as gpa,
             'normal' as status,
             false as needsAdvice
     ";
 
     // 💡 ถ้ามีตารางประวัติคำปรึกษา ให้เชื่อมข้อมูลมา (ใช้ al. นำหน้าป้องกันการยืมคอลัมน์)
-    if ($has_advice_log) {
-        $sql .= ", (
-            SELECT DATE_FORMAT(MAX(al.created_at), '%Y-%m-%d') 
-            FROM advice_log al 
-            WHERE al.student_id = s.student_id AND al.advisor_id = :faculty_id
-        ) as lastContact ";
-    } else {
-        // ถ้ายังไม่มีตารางนี้ ให้ส่งเครื่องหมายขีด (-) กลับไปโชว์ที่หน้าจอ React ก่อน
-        $sql .= ", '-' as lastContact ";
-    }
+    // ตาราง advice_log ไม่มีคอลัมน์วันที่ (created_at) — ส่ง '-' ไปก่อน
+    $sql .= ", '-' as lastContact ";
 
     $sql .= "
         FROM student s
         JOIN student_advisor_mapping sam ON s.student_id = sam.student_id
         WHERE sam.faculty_id = :faculty_id
-        ORDER BY s.year DESC, s.student_id ASC
+        ORDER BY s.year_level DESC, s.student_id ASC
     ";
     
     $stmt = $db->prepare($sql);

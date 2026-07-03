@@ -54,13 +54,11 @@ try {
         $stmt_enrollment->execute([$sub_id]);
         $student_count = (int)$stmt_enrollment->fetchColumn();
         
-        // หากไม่มีข้อมูลนักศึกษาลงทะเบียนจริง ให้จำลองจำนวนนักศึกษา 10-20 คนสำหรับเดโม
-        if ($student_count === 0) {
-            $student_count = rand(10, 20);
-        }
-
-        // คำนวณ Progress (เซตความคืบหน้า CLO เป็น 0 เนื่องจากไม่ได้เก็บบันทึกข้อมูลคะแนน CLO)
-        $progress = 0;
+        // ความคืบหน้าการให้เกรด = สัดส่วนนักศึกษาที่มีเกรดแล้ว (ข้อมูลจริง ไม่สุ่ม)
+        $stmt_g = $pdo->prepare("SELECT COUNT(*) FROM enrollment WHERE subject_id = ? AND grade IS NOT NULL AND grade <> ''");
+        $stmt_g->execute([$sub_id]);
+        $graded = (int)$stmt_g->fetchColumn();
+        $progress = $student_count > 0 ? (int)round($graded * 100 / $student_count) : 0;
 
         $results[] = [
             "id" => $sub_id,

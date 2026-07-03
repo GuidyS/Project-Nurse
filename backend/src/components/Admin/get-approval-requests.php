@@ -54,7 +54,7 @@ try {
         FROM approval_requests ar
         LEFT JOIN users requester ON ar.requester_user_id = requester.user_id
         LEFT JOIN users reviewer ON ar.reviewed_by = reviewer.user_id
-        LEFT JOIN faculty f ON requester.user_id = f.user_id
+        LEFT JOIN faculty f ON requester.username = f.faculty_id
         LEFT JOIN grade_change_requests gcr ON ar.approval_request_id = gcr.approval_request_id
         LEFT JOIN student_transfer_requests str ON ar.approval_request_id = str.approval_request_id
         LEFT JOIN project_approval_requests par ON ar.approval_request_id = par.approval_request_id

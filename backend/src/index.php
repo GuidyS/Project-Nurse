@@ -48,7 +48,8 @@
                 break;
             case 'delete-notification':
                 require_once 'components/NotificationPage/delete_notification.php';
-            
+                break;
+
             /* -------- Admin -------- */
 
             case 'upload':
@@ -79,7 +80,7 @@
                 require_once 'components/Admin/export-data.php'; 
                 break;
             case 'get-import-history':
-                require_once 'components/Admin/get_import_history.php'; // ชื่อไฟล์จากที่คุณส่งมา
+                require_once 'components/Admin/get-import-history.php';
                 break;
             case 'performance':
                 require_once 'components/Performance.php';
@@ -91,7 +92,7 @@
                 require_once 'components/Teacher/Dashboard/get_dashboard_stats.php';
                 break;
             case 'teacher-courses':
-                require_once 'components/Teacher/CoursesPage/api.php';
+                require_once 'components/Teacher/CoursesPage/get_my_courses.php';
                 break;
 
             /* -------- Teacher -------- */
@@ -139,6 +140,12 @@
                 break;
             case 'get-clos':
                 require_once 'components/Teacher/CLOPage/get_clos.php';
+                break;
+            case 'get-mapping':
+                require_once 'components/Teacher/CLOPage/get_mapping.php';
+                break;
+            case 'save-mapping':
+                require_once 'components/Teacher/CLOPage/save_mapping.php';
                 break;
             case 'add-clo':
                 require_once 'components/Teacher/CLOPage/addclo.php';
@@ -246,7 +253,7 @@
 
             // ProjectLinks
             case 'get-project-links':
-                require_once 'components/Teacher/ProjectLinks/get_project_links';
+                require_once 'components/Teacher/ProjectLinks/get_project_links.php';
                 break;
             case 'create-project-links':
                 require_once 'components/Teacher/ProjectLinks/save_project_links.php';
@@ -254,29 +261,29 @@
 
             // ProjectReports
             case 'get-project-reports':
-                require_once 'components/Teacher/ProjectReports/get_project_links';
+                require_once 'components/Teacher/ProjectReports/get_project_reports.php';
                 break;
 
             // ScheduleTasks
             case 'create-schedule-task':
-                require_once 'components/Teacher/ScheduleTasks/create_schedule_task';
+                require_once 'components/Teacher/ScheduleTasks/create_schedule_task.php';
                 break;
             case 'get-schedule-tasks':
-                require_once 'components/Teacher/ScheduleTasks/get_schedule_tasks';
+                require_once 'components/Teacher/ScheduleTasks/get_schedule_tasks.php';
                 break;
             case 'update-task-status':
-                require_once 'components/Teacher/ScheduleTasks/update_task_status';
+                require_once 'components/Teacher/ScheduleTasks/update_task_status.php';
                 break;
 
             // TransferRequests
             case 'create-transfer-request':
-                require_once 'components/Teacher/TransferRequests/create_transfer_request';
+                require_once 'components/Teacher/TransferRequests/create_transfer_request.php';
                 break;
             case 'get-transfer-requests':
-                require_once 'components/Teacher/TransferRequests/get_transfer_requests';
+                require_once 'components/Teacher/TransferRequests/get_transfer_requests.php';
                 break;
             case 'update-transfer-status':
-                require_once 'components/Teacher/TransferRequests/update_transfer_status';
+                require_once 'components/Teacher/TransferRequests/update_transfer_status.php';
                 break;
 
             /* -------- Student -------- */

@@ -7,7 +7,15 @@ $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
 try {
     // สมมติสิทธิ์เป็น Advisor ID: 1 (เปลี่ยนตามระบบ Session จริงของคุณได้เลย)
-    $current_advisor_id = 1; 
+    $current_advisor_id = 1;
+
+    // ตาราง advisor_transfer_request ยังไม่มีในฐานข้อมูล — คืนโครงสร้างว่าง (ยังมี dropdown ให้ใช้งาน)
+    if ($pdo->query("SHOW TABLES LIKE 'advisor_transfer_request'")->rowCount() === 0) {
+        $students = $pdo->query("SELECT student_id AS id, CONCAT(first_name_th,' ',last_name_th) AS name FROM student LIMIT 100")->fetchAll(PDO::FETCH_ASSOC);
+        $advisors = $pdo->query("SELECT faculty_id AS id, CONCAT(IFNULL(title,''),first_name_th,' ',last_name_th) AS name FROM faculty LIMIT 100")->fetchAll(PDO::FETCH_ASSOC);
+        echo json_encode(["status"=>"success","data"=>["incoming"=>[],"outgoing"=>[],"history"=>[],"dropdowns"=>["students"=>$students,"advisors"=>$advisors]]], JSON_UNESCAPED_UNICODE);
+        exit();
+    }
 
     // 1. คำขอรับเข้า (Incoming) -> คนอื่นส่งมาให้เราพิจารณา
     $stmtIn = $pdo->prepare("SELECT request_id AS id, student_id AS studentId, student_id AS studentName, from_advisor_id AS otherAdvisor, reason, DATE(created_at) AS date, status FROM advisor_transfer_request WHERE to_advisor_id = :adv_id AND status = 'pending'");
