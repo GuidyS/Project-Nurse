@@ -22,9 +22,19 @@ interface Course {
 
 interface CLO {
   clo_id: number;
+  clo_code?: string | null;
   description: string;
   ylo_id: string | null;
 }
+
+// ตัวเลือกมาตรฐานสำหรับ Dropdown
+const CLO_OPTIONS = Array.from({ length: 10 }, (_, i) => `CLO${i + 1}`);
+const YLO_OPTIONS = [
+  { value: "YLO1", label: "YLO1 — ชั้นปีที่ 1" },
+  { value: "YLO2", label: "YLO2 — ชั้นปีที่ 2" },
+  { value: "YLO3", label: "YLO3 — ชั้นปีที่ 3" },
+  { value: "YLO4", label: "YLO4 — ชั้นปีที่ 4" },
+];
 
 export default function CLOPage() {
   const { toast } = useToast();
@@ -39,6 +49,7 @@ export default function CLOPage() {
   
   // Form State สำหรับสร้าง/แก้ไข
   const [formData, setFormData] = useState({
+    clo_code: "",
     description: "",
     ylo_id: "",
   });
@@ -58,25 +69,22 @@ export default function CLOPage() {
     fetchCourses();
   }, []);
 
-  // 2. ดึง CLO เมื่อมีการเปลี่ยนวิชา
-  useEffect(() => {
+  // 2. ดึง CLO (ใช้ซ้ำหลังเพิ่ม/แก้/ลบ เพื่อให้แสดงผลตรงกับฐานข้อมูลแบบ real-time)
+  const fetchCLOs = async (withSpinner = true) => {
     if (!selectedCourse) return;
-    
-    const fetchCLOs = async () => {
-      setIsLoading(true);
-      try {
-        const res = await api.get(`/index.php?page=get-clos&subject_id=${selectedCourse}`);
-        // Backend ส่ง {status, data:[...]} ต้องอ่านจาก res.data.data
-        setClos(res.data?.data || []);
-      } catch (error) {
-        toast({ title: "ข้อผิดพลาด", description: "ดึงข้อมูล CLO ไม่สำเร็จ", variant: "destructive" });
-        setClos([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchCLOs();
-  }, [selectedCourse]);
+    if (withSpinner) setIsLoading(true);
+    try {
+      const res = await api.get(`/index.php?page=get-clos&subject_id=${selectedCourse}`);
+      setClos(res.data?.data || []);
+    } catch (error) {
+      toast({ title: "ข้อผิดพลาด", description: "ดึงข้อมูล CLO ไม่สำเร็จ", variant: "destructive" });
+      setClos([]);
+    } finally {
+      if (withSpinner) setIsLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchCLOs(); }, [selectedCourse]);
 
   // 3. ฟังก์ชันเพิ่ม / แก้ไข CLO
   const handleSave = async () => {
@@ -90,30 +98,31 @@ export default function CLOPage() {
         // โหมดแก้ไข
         const res = await api.post('/index.php?page=update-clo', {
           clo_id: isEditing,
+          clo_code: formData.clo_code || null,
           description: formData.description,
           ylo_id: formData.ylo_id
         });
         if (res.data.status === 'success') {
           toast({ title: "สำเร็จ", description: "แก้ไข CLO เรียบร้อยแล้ว" });
-          setClos(clos.map(c => c.clo_id === isEditing ? { ...c, description: formData.description, ylo_id: formData.ylo_id } : c));
         }
       } else {
         // โหมดเพิ่มใหม่
         const res = await api.post('/index.php?page=add-clo', {
           subject_id: parseInt(selectedCourse),
+          clo_code: formData.clo_code || null,
           description: formData.description,
           ylo_id: formData.ylo_id
         });
         if (res.data.status === 'success') {
           toast({ title: "สำเร็จ", description: "เพิ่ม CLO เรียบร้อยแล้ว" });
-          // รีเฟรชดึงข้อมูลใหม่
-          const refresh = await api.get(`/index.php?page=get-clos&subject_id=${selectedCourse}`);
-          setClos(refresh.data?.data || []);
         }
       }
-      
+
+      // ดึงข้อมูลล่าสุดจากฐานข้อมูลทันที (real-time ไม่ต้อง refresh)
+      await fetchCLOs(false);
+
       // เคลียร์ฟอร์ม
-      setFormData({ description: "", ylo_id: "" });
+      setFormData({ clo_code: "", description: "", ylo_id: "" });
       setIsEditing(null);
     } catch (error) {
       toast({ title: "ข้อผิดพลาด", description: "ไม่สามารถบันทึกข้อมูลได้", variant: "destructive" });
@@ -123,12 +132,12 @@ export default function CLOPage() {
   // 4. ฟังก์ชันลบ CLO
   const handleDelete = async (clo_id: number) => {
     if (!confirm("คุณต้องการลบ CLO นี้ใช่หรือไม่?")) return;
-    
+
     try {
       const res = await api.post('/index.php?page=delete-clo', { clo_id });
       if (res.data.status === 'success') {
         toast({ title: "สำเร็จ", description: "ลบข้อมูลเรียบร้อยแล้ว" });
-        setClos(clos.filter(c => c.clo_id !== clo_id));
+        await fetchCLOs(false); // อัปเดตรายการทันที
       }
     } catch (error) {
       toast({ title: "ข้อผิดพลาด", description: "ไม่สามารถลบข้อมูลได้", variant: "destructive" });
@@ -137,7 +146,7 @@ export default function CLOPage() {
 
   const handleEditClick = (clo: CLO) => {
     setIsEditing(clo.clo_id);
-    setFormData({ description: clo.description, ylo_id: clo.ylo_id || "" });
+    setFormData({ clo_code: clo.clo_code || "", description: clo.description, ylo_id: clo.ylo_id || "" });
   };
 
   return (
@@ -189,19 +198,38 @@ export default function CLOPage() {
               <div className="bg-muted/30 p-4 rounded-lg mb-6 border border-border">
                 <h4 className="text-sm font-semibold mb-3">{isEditing ? "แก้ไข CLO" : "เพิ่ม CLO ใหม่"}</h4>
                 <div className="grid gap-3">
-                  <Textarea 
-                    placeholder="รายละเอียด CLO..." 
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* รหัส CLO แบบ Dropdown */}
+                    <Select value={formData.clo_code} onValueChange={(v) => setFormData({ ...formData, clo_code: v })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="-- เลือกรหัส CLO --" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CLO_OPTIONS.map((c) => (
+                          <SelectItem key={c} value={c}>{c}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {/* รหัส YLO แบบ Dropdown */}
+                    <Select value={formData.ylo_id} onValueChange={(v) => setFormData({ ...formData, ylo_id: v })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="-- เลือก YLO ที่สอดคล้อง --" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {YLO_OPTIONS.map((y) => (
+                          <SelectItem key={y.value} value={y.value}>{y.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Textarea
+                    placeholder="รายละเอียด CLO..."
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   />
-                  <Input 
-                    placeholder="รหัส YLO ที่สอดคล้อง (เช่น YLO1)" 
-                    value={formData.ylo_id}
-                    onChange={(e) => setFormData({ ...formData, ylo_id: e.target.value })}
-                  />
                   <div className="flex justify-end gap-2">
                     {isEditing && (
-                      <Button variant="outline" onClick={() => { setIsEditing(null); setFormData({ description: "", ylo_id: "" }); }}>ยกเลิก</Button>
+                      <Button variant="outline" onClick={() => { setIsEditing(null); setFormData({ clo_code: "", description: "", ylo_id: "" }); }}>ยกเลิก</Button>
                     )}
                     <Button onClick={handleSave} className="gap-2">
                       <Save className="h-4 w-4" /> บันทึก
@@ -221,7 +249,7 @@ export default function CLOPage() {
                         <div className="space-y-2 flex-1">
                           <div className="flex items-center gap-2">
                             <Badge className="bg-primary/10 text-primary hover:bg-primary/20">
-                              CLO {index + 1}
+                              {clo.clo_code || `CLO ${index + 1}`}
                             </Badge>
                             {clo.ylo_id && <Badge variant="secondary">{clo.ylo_id}</Badge>}
                           </div>

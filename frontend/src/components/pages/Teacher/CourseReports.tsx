@@ -26,8 +26,10 @@ export default function CourseReports() {
         const res = await api.get('/index.php?page=get-report-filters');
         if (res.data.status === 'success') {
           const data = res.data.data;
-          setFilters(data);
-          if (data.years.length > 0) setSelectedYear(data.years[0]);
+          // เรียงปีการศึกษาจากล่าสุด → เก่าสุด และเลือกปีล่าสุดให้อัตโนมัติ
+          const sortedYears = [...(data.years || [])].sort((a: any, b: any) => Number(b) - Number(a));
+          setFilters({ ...data, years: sortedYears });
+          if (sortedYears.length > 0) setSelectedYear(sortedYears[0]);
           if (data.courses.length > 0) setSelectedCourse(data.courses[0].subject_code);
         }
       } catch (error) {

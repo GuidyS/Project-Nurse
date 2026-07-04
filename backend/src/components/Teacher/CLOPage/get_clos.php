@@ -21,10 +21,10 @@ try {
     if ($subject_id) {
     //  SQL: ดึงรหัสวิชาและชื่อวิชา (เฉพาะ Active หรือทั้งหมดตามต้องการ)
     // เรียงตามรหัสวิชา
-    $sql = "SELECT clo_id, description, ylo_id 
-                FROM clo 
-                WHERE subject_id = :subject_id 
-                ORDER BY clo_id ASC"; // เรียงตาม ID แทน เพราะไม่มี code แล้ว
+    $sql = "SELECT clo_id, clo_code, description, ylo_id
+                FROM clo
+                WHERE subject_id = :subject_id
+                ORDER BY clo_id ASC";
      //ดึงข้อมูลและส่งกลับ       
     $stmt = $pdo->prepare($sql);
     $stmt->execute([':subject_id' => $subject_id]);

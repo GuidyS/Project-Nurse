@@ -16,13 +16,14 @@ try {
     if (!empty($input['subject_id']) && !empty($input['description'])) {
         
         
-        $sql = "INSERT INTO clo (subject_id, description, ylo_id) 
-                VALUES (:subject_id, :description, :ylo_id)";
-        
+        $sql = "INSERT INTO clo (subject_id, clo_code, description, ylo_id)
+                VALUES (:subject_id, :clo_code, :description, :ylo_id)";
+
         $stmt = $pdo->prepare($sql);
         $stmt->execute([
             ':subject_id' => $input['subject_id'],
-            ':description' => $input['description'], 
+            ':clo_code' => $input['clo_code'] ?? null,
+            ':description' => $input['description'],
             ':ylo_id' => $input['ylo_id'] ?? null
         ]);
 

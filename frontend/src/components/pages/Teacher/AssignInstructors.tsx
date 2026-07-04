@@ -14,6 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 export default function AssignInstructors() {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
+  const [instructorSearch, setInstructorSearch] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState<string | null>(null);
   const [selectedInstructor, setSelectedInstructor] = useState('');
@@ -59,6 +60,14 @@ export default function AssignInstructors() {
       course.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (course.instructor && course.instructor.toLowerCase().includes(searchTerm.toLowerCase()))
   );
+
+  // ภาระงานอาจารย์: ค้นหาตามชื่อ/รหัส + เรียงคนที่มีวิชามากไว้ก่อน
+  const filteredInstructors = instructorsList
+    .filter((i) =>
+      String(i.name ?? "").toLowerCase().includes(instructorSearch.toLowerCase()) ||
+      String(i.id ?? "").includes(instructorSearch)
+    )
+    .sort((a, b) => (b.courses_count || 0) - (a.courses_count || 0));
 
   const stats = {
     totalCourses: coursesList.length,
@@ -291,17 +300,26 @@ export default function AssignInstructors() {
           <CardHeader>
             <CardTitle>ภาระงานอาจารย์</CardTitle>
             <CardDescription>จำนวนรายวิชาที่อาจารย์แต่ละท่านรับผิดชอบ</CardDescription>
+            <div className="flex items-center gap-2 pt-4">
+              <Search className="h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="ค้นหาชื่อหรือรหัสอาจารย์..."
+                value={instructorSearch}
+                onChange={(e) => setInstructorSearch(e.target.value)}
+                className="max-w-sm"
+              />
+            </div>
           </CardHeader>
           <CardContent>
             {isLoading ? (
               <div className="flex h-32 items-center justify-center">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
               </div>
-            ) : instructorsList.length === 0 ? (
+            ) : filteredInstructors.length === 0 ? (
               <div className="text-center py-6 text-muted-foreground">ไม่พบข้อมูลอาจารย์</div>
             ) : (
               <div className="grid gap-4 md:grid-cols-3">
-                {instructorsList.map((instructor) => (
+                {filteredInstructors.map((instructor) => (
                   <div
                     key={instructor.id}
                     className="flex items-center justify-between rounded-lg border p-4 bg-card shadow-sm hover:shadow-md transition-shadow"
@@ -310,9 +328,11 @@ export default function AssignInstructors() {
                       <p className="font-semibold text-foreground">{instructor.name}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">รหัส: {instructor.id}</p>
                     </div>
-                    <Badge variant={instructor.courses_count > 0 ? 'default' : 'secondary'} className="text-xs">
-                      {instructor.courses_count} วิชา
-                    </Badge>
+                    {instructor.courses_count > 0 ? (
+                      <Badge className="text-xs">{instructor.courses_count} วิชา</Badge>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">ยังไม่มีวิชา</span>
+                    )}
                   </div>
                 ))}
               </div>
@@ -345,7 +365,7 @@ export default function AssignInstructors() {
                   <SelectContent>
                     {instructorsList.map((instructor) => (
                       <SelectItem key={instructor.id} value={instructor.id}>
-                        {instructor.name} ({instructor.courses_count} วิชา)
+                        {instructor.name}{instructor.courses_count > 0 ? ` (${instructor.courses_count} วิชา)` : ''}
                       </SelectItem>
                     ))}
                   </SelectContent>

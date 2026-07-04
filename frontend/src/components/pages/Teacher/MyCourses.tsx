@@ -141,7 +141,6 @@ export default function MyCourses() {
                   </div>
                   <div className="flex gap-2 pt-2">
                     <Button variant="outline" className="flex-1" onClick={() => { window.location.href = "/?page=clos"; }}>จัดการ CLO</Button>
-                    <Button className="flex-1" onClick={() => { window.location.href = "/?page=grades"; }}>ให้คะแนน</Button>
                   </div>
                 </CardContent>
               </Card>

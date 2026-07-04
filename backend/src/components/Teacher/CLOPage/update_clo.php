@@ -15,15 +15,17 @@ try {
     if (!empty($input['clo_id']) && !empty($input['description'])) {
         
         //  SQL Update: แก้ไข description และ ylo_id
-        $sql = "UPDATE clo 
-                SET description = :description, 
-                    ylo_id = :ylo_id
+        $sql = "UPDATE clo
+                SET description = :description,
+                    ylo_id = :ylo_id,
+                    clo_code = :clo_code
                 WHERE clo_id = :clo_id";
-        
+
         $stmt = $pdo->prepare($sql);
         $stmt->execute([
             ':description' => $input['description'],
-            ':ylo_id' => $input['ylo_id'] ?? null, 
+            ':ylo_id' => $input['ylo_id'] ?? null,
+            ':clo_code' => $input['clo_code'] ?? null,
             ':clo_id' => $input['clo_id']
         ]);
 
