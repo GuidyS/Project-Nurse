@@ -25,7 +25,6 @@ import Advises from "@/components/pages/Teacher/Advises";
 import AssignInstructors from "@/components/pages/Teacher/AssignInstructors";
 import CLOMap from "@/components/pages/Teacher/CLOMap";
 import Evidence from "@/components/pages/Teacher/Evidence";
-import Grades from "@/components/pages/Teacher/Grades";
 import MyCourses from "@/components/pages/Teacher/MyCourses";
 import MyProjects from "@/components/pages/Teacher/MyProjects";
 import Performance from "@/components/pages/Teacher/Performance";
@@ -157,7 +156,7 @@ const Index = () => {
     const teacherPages = [
       "teacher-dashboard", "courses", "course-students", "five-year-summary", "clo-management", "clos",
       "plo-ylo-report", "course-report", "documents", "assign-instructors", "clo-map",
-      "evidence", "grades", "my-courses", "performance", "practical-students",
+      "evidence", "my-courses", "performance", "practical-students",
       "program-reports", "schedule-tasks", "projectspage", "my-projects", "project-docs",
       "project-links", "project-reports", "advise-notes", "advisor-notifications", "advises",
       "students", "transfer-requests"
@@ -178,7 +177,6 @@ const Index = () => {
         case "assign-instructors": return <AssignInstructors />;                    //*
         case "clo-map": return <CLOMap />;                                          //*
         case "evidence": return <Evidence />;                                       //*
-        case "grades": return <Grades />;                                           //*
         case "my-courses": return <MyCourses />;                                    //*
         case "performance": return <Performance />;
         case "practical-students": return <PracticalStudents />;                    //* /* ดูรายชื่อนศ.และประเมินผลการฝึกปฏิบัติของเด็กได้*/ /* อจ.ปฏิบัติ */

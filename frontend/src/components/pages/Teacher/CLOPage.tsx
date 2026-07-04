@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
 
@@ -46,6 +47,7 @@ export default function CLOPage() {
   
   const [isLoading, setIsLoading] = useState(false);
   const [isEditing, setIsEditing] = useState<number | null>(null);
+  const [editOpen, setEditOpen] = useState(false); // Pop-up แก้ไข CLO
   
   // Form State สำหรับสร้าง/แก้ไข
   const [formData, setFormData] = useState({
@@ -121,9 +123,10 @@ export default function CLOPage() {
       // ดึงข้อมูลล่าสุดจากฐานข้อมูลทันที (real-time ไม่ต้อง refresh)
       await fetchCLOs(false);
 
-      // เคลียร์ฟอร์ม
+      // เคลียร์ฟอร์ม + ปิด pop-up (ถ้าเปิดอยู่)
       setFormData({ clo_code: "", description: "", ylo_id: "" });
       setIsEditing(null);
+      setEditOpen(false);
     } catch (error) {
       toast({ title: "ข้อผิดพลาด", description: "ไม่สามารถบันทึกข้อมูลได้", variant: "destructive" });
     }
@@ -144,9 +147,17 @@ export default function CLOPage() {
     }
   };
 
+  // เปิด Pop-up แก้ไข (ไม่ใช้ฟอร์มด้านบนแล้ว)
   const handleEditClick = (clo: CLO) => {
     setIsEditing(clo.clo_id);
     setFormData({ clo_code: clo.clo_code || "", description: clo.description, ylo_id: clo.ylo_id || "" });
+    setEditOpen(true);
+  };
+
+  const closeEditDialog = () => {
+    setEditOpen(false);
+    setIsEditing(null);
+    setFormData({ clo_code: "", description: "", ylo_id: "" });
   };
 
   return (
@@ -196,7 +207,7 @@ export default function CLOPage() {
 
               {/* ฟอร์มเพิ่ม/แก้ไข */}
               <div className="bg-muted/30 p-4 rounded-lg mb-6 border border-border">
-                <h4 className="text-sm font-semibold mb-3">{isEditing ? "แก้ไข CLO" : "เพิ่ม CLO ใหม่"}</h4>
+                <h4 className="text-sm font-semibold mb-3">เพิ่ม CLO ใหม่</h4>
                 <div className="grid gap-3">
                   <div className="grid grid-cols-2 gap-3">
                     {/* รหัส CLO แบบ Dropdown */}
@@ -228,9 +239,6 @@ export default function CLOPage() {
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   />
                   <div className="flex justify-end gap-2">
-                    {isEditing && (
-                      <Button variant="outline" onClick={() => { setIsEditing(null); setFormData({ clo_code: "", description: "", ylo_id: "" }); }}>ยกเลิก</Button>
-                    )}
                     <Button onClick={handleSave} className="gap-2">
                       <Save className="h-4 w-4" /> บันทึก
                     </Button>
@@ -280,6 +288,51 @@ export default function CLOPage() {
           )}
         </div>
       </div>
+
+      {/* Pop-up แก้ไข CLO */}
+      <Dialog open={editOpen} onOpenChange={(o) => { if (!o) closeEditDialog(); }}>
+        {/* กันกล่องปิดเองเวลาคลิกนอก dropdown — ปิดได้ด้วยปุ่มเท่านั้น */}
+        <DialogContent onInteractOutside={(e) => e.preventDefault()}>
+          <DialogHeader>
+            <DialogTitle>แก้ไข CLO</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3 py-2">
+            <div className="grid grid-cols-2 gap-3">
+              <Select value={formData.clo_code} onValueChange={(v) => setFormData({ ...formData, clo_code: v })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="-- เลือกรหัส CLO --" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CLO_OPTIONS.map((c) => (
+                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={formData.ylo_id} onValueChange={(v) => setFormData({ ...formData, ylo_id: v })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="-- เลือก YLO ที่สอดคล้อง --" />
+                </SelectTrigger>
+                <SelectContent>
+                  {YLO_OPTIONS.map((y) => (
+                    <SelectItem key={y.value} value={y.value}>{y.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Textarea
+              placeholder="รายละเอียด CLO..."
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={closeEditDialog}>ยกเลิก</Button>
+            <Button onClick={handleSave} className="gap-2">
+              <Save className="h-4 w-4" /> บันทึก
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
