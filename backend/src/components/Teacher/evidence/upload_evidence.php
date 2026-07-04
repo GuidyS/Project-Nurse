@@ -38,49 +38,61 @@ try {
         }
 
         // 3. จัดการเรื่องอัปโหลดไฟล์จริง
-        $file_path = "uploads/placeholder.jpg"; // ค่าเริ่มต้นจำลอง
-        
-        if (isset($_FILES['file']) && $_FILES['file']['error'] === UPLOAD_ERR_OK) {
-            $fileTmpPath = $_FILES['file']['tmp_name'];
-            $fileName = $_FILES['file']['name'];
-            $fileExtension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
-            
-            // ตั้งชื่อไฟล์ใหม่เพื่อป้องกันชื่อซ้ำและอักขระพิเศษ
-            $newFileName = "evidence_" . $student_id . "_" . time() . "." . $fileExtension;
-            
-            $uploadFileDir = __DIR__ . '/../../../uploads/';
-            
-            // สร้างโฟลเดอร์ uploads หากยังไม่มี
-            if (!file_exists($uploadFileDir)) {
-                mkdir($uploadFileDir, 0777, true);
-            }
-            
-            $dest_path = $uploadFileDir . $newFileName;
-            
-            if (move_uploaded_file($fileTmpPath, $dest_path)) {
-                $file_path = "uploads/" . $newFileName;
-            } else {
-                echo json_encode(["status" => "error", "message" => "เกิดข้อผิดพลาดในการย้ายไฟล์ไปยังเซิร์ฟเวอร์"]);
-                exit();
-            }
+        if (!isset($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) {
+            $error_code = $_FILES['file']['error'] ?? 'unknown';
+            echo json_encode(["status" => "error", "message" => "อัปโหลดไฟล์ไม่สำเร็จ (Error Code: $error_code). ไฟล์อาจมีขนาดใหญ่เกินไป"]);
+            exit();
         }
+        
+        $fileTmpPath = $_FILES['file']['tmp_name'];
+        $fileName = $_FILES['file']['name'];
+        $fileExtension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+        $mime_type = mime_content_type($fileTmpPath);
+        
+        $is_image = in_array($fileExtension, ['jpg', 'jpeg', 'png', 'gif']);
+        $is_video = in_array($fileExtension, ['mp4', 'mov', 'avi']);
+        $is_doc = in_array($fileExtension, ['pdf', 'xls', 'xlsx', 'csv', 'doc', 'docx']);
 
-        // 4. แพ็กข้อมูลเป็น JSON เพื่อยัดลงคอลัมน์ file_path
+        // Insert metadata first to get portfolio_id
         $meta_data = [
-            "url" => $file_path,
             "title" => $title,
             "type" => $type,
-            "verified" => false
+            "verified" => false,
+            "url" => "" // Will be updated to ID-based URL
         ];
         $file_path_json = json_encode($meta_data, JSON_UNESCAPED_UNICODE);
 
-        // 5. บันทึกลงตาราง portfolio
         $sql = "INSERT INTO portfolio (student_id, file_path) VALUES (:student_id, :file_path)";
         $stmt = $pdo->prepare($sql);
         $stmt->execute([
             ':student_id' => $student_id,
             ':file_path' => $file_path_json
         ]);
+        
+        $portfolio_id = $pdo->lastInsertId();
+        
+        // Handle file based on type
+        $fileData = file_get_contents($fileTmpPath);
+        
+        if ($is_image) {
+            $stmt = $pdo->prepare("INSERT INTO portfolio_images (portfolio_id, image_data) VALUES (?, ?)");
+            $stmt->execute([$portfolio_id, $fileData]);
+            
+        } elseif ($is_video) {
+            $stmt = $pdo->prepare("INSERT INTO portfolio_videos (portfolio_id, video_data, mime_type) VALUES (?, ?, ?)");
+            $stmt->execute([$portfolio_id, $fileData, $mime_type]);
+            
+        } else {
+            // Documents or others go to portfolio table
+            $stmt = $pdo->prepare("UPDATE portfolio SET file_data = ? WHERE portfolio_id = ?");
+            $stmt->execute([$fileData, $portfolio_id]);
+        }
+        
+        // Update URL to use the new ID format
+        $meta_data['url'] = "index.php?page=download-file&id=" . $portfolio_id;
+        $file_path_json = json_encode($meta_data, JSON_UNESCAPED_UNICODE);
+        $stmt = $pdo->prepare("UPDATE portfolio SET file_path = ? WHERE portfolio_id = ?");
+        $stmt->execute([$file_path_json, $portfolio_id]);
 
         echo json_encode(["status" => "success", "message" => "อัปโหลดหลักฐานสำเร็จ"]);
     } else {

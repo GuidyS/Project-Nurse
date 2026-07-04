@@ -29,7 +29,7 @@ try {
     $sql = "
         SELECT 
             p.project_id as id, 
-            p.project_name as name, 
+            p.project_name_th as name, 
             p.academic_year as academic_year
         FROM project p
         WHERE p.responsible_faculty_id = ?

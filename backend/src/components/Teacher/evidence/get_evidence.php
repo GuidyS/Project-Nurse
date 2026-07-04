@@ -38,14 +38,13 @@ try {
             $type = $meta['type'] ?? 'document';
             $title = $meta['title'] ?? 'เอกสารแนบ';
             $verified = (bool)($meta['verified'] ?? false);
-            $url = $meta['url'] ?? '';
         } else {
-            // กรณีเป็นข้อมูลเก่าที่เคยเป็นแค่ Path ธรรมดา
+            // กรณีเป็นข้อมูลเก่า
             $type = 'document';
             $title = 'หลักฐานทั่วไป';
             $verified = false;
-            $url = $row['file_path'];
         }
+        $url = "index.php?page=download-file&id=" . $row['id'];
 
         $evidenceList[] = [
             "id" => $row['id'],

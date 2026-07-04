@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect, Fragment } from "react";
+import api from "@/lib/axios";
 import { Search, Filter, Download, Eye, Mail, MoreVertical, Target, CheckCircle2, Lock } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -58,14 +59,7 @@ interface PLOIndicator {
   subIndicators: string[];
 }
 
-const students: Student[] = [
-  { id: 1, studentId: "64010001", name: "นายสมชาย รักเรียน", year: 2, gpa: 3.45, status: "ปกติ", email: "somchai@student.edu" },
-  { id: 2, studentId: "64010002", name: "นางสาวสมหญิง ใจดี", year: 4, gpa: 3.78, status: "ปกติ", email: "somying@student.edu" },
-  { id: 3, studentId: "64010003", name: "นายวิชัย เก่งกล้า", year: 4, gpa: 2.89, status: "รอพบอาจารย์", email: "wichai@student.edu" },
-  { id: 4, studentId: "65010001", name: "นางสาวพิมพ์ใจ สวยงาม", year: 3, gpa: 3.92, status: "ปกติ", email: "pimjai@student.edu" },
-  { id: 5, studentId: "65010002", name: "นายกิตติ อดทน", year: 3, gpa: 3.12, status: "ปกติ", email: "kitti@student.edu" },
-  { id: 6, studentId: "66010001", name: "นางสาวนภา ท้องฟ้า", year: 2, gpa: 3.67, status: "ปกติ", email: "napa@student.edu" },
-];
+// students array fetched from API
 
 // PLO indicators with sub-indicators
 const ploIndicators: PLOIndicator[] = [
@@ -134,6 +128,8 @@ const getInitialMapping = (yearLevel: number, studentId?: string): Record<string
 };
 
 const StudentsInfo = () => {
+  const [students, setStudents] = useState<Student[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -141,17 +137,74 @@ const StudentsInfo = () => {
   const [mappingData, setMappingData] = useState<Record<string, Record<string, boolean>>>({});
   const { toast } = useToast();
 
+  useEffect(() => {
+    fetchStudents();
+  }, []);
+
+  const fetchStudents = async () => {
+    try {
+      setLoading(true);
+      const res = await api.get('/components/Teacher/Advises/get_advises.php');
+      if (res.data.status === 'success') {
+        const formattedData = res.data.data.map((item: any) => ({
+          ...item,
+          email: item.email || `${item.studentId}@student.edu`
+        }));
+        setStudents(formattedData);
+      }
+    } catch (error) {
+      console.error("Error fetching students:", error);
+      toast({
+        title: "เกิดข้อผิดพลาด",
+        description: "ไม่สามารถโหลดข้อมูลนักศึกษาได้",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const filteredStudents = students.filter(
     (s) =>
       s.name.includes(searchQuery) ||
       s.studentId.includes(searchQuery)
   );
 
+  const handleExport = () => {
+    try {
+      const headers = ['รหัสนักศึกษา', 'ชื่อ-นามสกุล', 'ชั้นปี', 'เกรดเฉลี่ย', 'สถานะ', 'อีเมล'];
+      const csvRows = [headers.join(',')];
+      
+      filteredStudents.forEach(student => {
+        csvRows.push([
+          student.studentId,
+          student.name,
+          student.year,
+          student.gpa,
+          student.status,
+          student.email
+        ].join(','));
+      });
+      
+      const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + csvRows.join('\n');
+      const encodedUri = encodeURI(csvContent);
+      
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `รายชื่อนักศึกษา.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('Error exporting data:', error);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
-    if (status === "ปกติ") {
+    if (status === "ปกติ" || status === "normal" || status === "active") {
       return <Badge variant="outline" className="bg-success/10 text-success border-success/30">ปกติ</Badge>;
     }
-    return <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30">{status}</Badge>;
+    return <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30">{status === "normal" ? "ปกติ" : status}</Badge>;
   };
 
   const openStudentDetail = (student: Student) => {
@@ -232,7 +285,7 @@ const StudentsInfo = () => {
           <h1 className="text-2xl font-bold text-foreground">นักศึกษาในที่ปรึกษา</h1>
           <p className="text-muted-foreground mt-1">จัดการข้อมูลนักศึกษาและติดตาม PLO/YLO/CLO</p>
         </div>
-        <Button variant="outline" className="gap-2">
+        <Button variant="outline" className="gap-2" onClick={handleExport}>
           <Download className="h-4 w-4" />
           ส่งออกรายชื่อ
         </Button>
@@ -240,7 +293,7 @@ const StudentsInfo = () => {
 
       {/* Search & Filter */}
       <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
+        <div className="relative w-full max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="ค้นหาชื่อหรือรหัสนักศึกษา..."
@@ -249,10 +302,6 @@ const StudentsInfo = () => {
             className="pl-10"
           />
         </div>
-        <Button variant="outline" className="gap-2">
-          <Filter className="h-4 w-4" />
-          กรอง
-        </Button>
       </div>
 
       {/* Table */}
@@ -418,7 +467,7 @@ const StudentsInfo = () => {
                   </TableHeader>
                   <TableBody>
                     {Object.entries(coursesByCategory).map(([category, categoryCourses]) => (
-                      <>
+                      <Fragment key={category}>
                         {/* Category Header */}
                         <TableRow key={category} className="bg-muted/30">
                           <TableCell 
@@ -454,7 +503,7 @@ const StudentsInfo = () => {
                             )}
                           </TableRow>
                         ))}
-                      </>
+                      </Fragment>
                     ))}
                   </TableBody>
                 </Table>

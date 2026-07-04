@@ -72,13 +72,13 @@ export default function RolesManagement() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { toast } = useToast();
 
-// ดึงข้อมูลผู้ใช้จาก API ตัวเดียวกัน
+  // ดึงข้อมูลผู้ใช้จาก API ตัวเดียวกัน
   const fetchUsers = async () => {
     try {
       const response = await api.get("/index.php?page=get-users");
       // Map ให้ตรงกับ Interface UserWithRole
       setUsers(response.data.map((u: any) => ({
-        id: u.id, email: u.email, fullName: u.fullName, 
+        id: u.id, email: u.email, fullName: u.fullName,
         currentRole: u.role, teacherSubRole: u.teacherSubRole
       })));
     } catch (error) {
@@ -92,7 +92,7 @@ export default function RolesManagement() {
 
   const handleAssignRole = async () => {
     if (!selectedUser || !newRole) return;
-    
+
     try {
       await api.post("/index.php?page=manage-role", {
         userId: selectedUser.id,

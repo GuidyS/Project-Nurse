@@ -8,59 +8,57 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CalendarDays, Plus, Clock, CheckCircle, AlertTriangle, Search } from 'lucide-react';
-import { useState } from 'react';
+import { CalendarDays, Plus, Clock, CheckCircle, AlertTriangle, Search, Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useToast } from '@/hooks/use-toast';
+import api from '@/lib/axios';
 
-// Mock data
-const mockTasks = [
-  { id: '1', studentId: '64010001', studentName: 'สมชาย ใจดี', task: 'ฝึกตรวจสัญญาณชีพ', dueDate: '2024-01-20', status: 'in_progress', priority: 'high' },
-  { id: '2', studentId: '64010002', studentName: 'สมหญิง รักเรียน', task: 'เขียนรายงานการฝึก', dueDate: '2024-01-18', status: 'completed', priority: 'medium' },
-  { id: '3', studentId: '64010003', studentName: 'มานะ ตั้งใจ', task: 'นำเสนอกรณีศึกษา', dueDate: '2024-01-25', status: 'pending', priority: 'high' },
-  { id: '4', studentId: '64010004', studentName: 'มานี ขยัน', task: 'ทบทวนขั้นตอนการดูแลผู้ป่วย', dueDate: '2024-01-15', status: 'overdue', priority: 'high' },
-  { id: '5', studentId: '64010005', studentName: 'ปิติ สุขใจ', task: 'ฝึกการเจาะเลือด', dueDate: '2024-01-22', status: 'in_progress', priority: 'medium' },
-  { id: '6', studentId: '64010006', studentName: 'ปิยะ มุ่งมั่น', task: 'สังเกตการณ์ผ่าตัด', dueDate: '2024-01-28', status: 'pending', priority: 'low' },
-];
+// Interfaces สำหรับ TypeScript
+interface Task {
+  id: string;
+  studentId: string;
+  studentName: string;
+  task: string;
+  dueDate: string;
+  status: string;
+  priority: string;
+}
 
-const mockStudents = [
-  { id: '64010001', name: 'สมชาย ใจดี' },
-  { id: '64010002', name: 'สมหญิง รักเรียน' },
-  { id: '64010003', name: 'มานะ ตั้งใจ' },
-  { id: '64010004', name: 'มานี ขยัน' },
-  { id: '64010005', name: 'ปิติ สุขใจ' },
-  { id: '64010006', name: 'ปิยะ มุ่งมั่น' },
-];
+interface Student {
+  id: string;
+  name: string;
+}
 
 const getStatusBadge = (status: string) => {
   switch (status) {
-    case 'completed':
-      return <Badge className="bg-green-500">เสร็จสิ้น</Badge>;
-    case 'in_progress':
-      return <Badge className="bg-blue-500">กำลังทำ</Badge>;
-    case 'pending':
-      return <Badge variant="secondary">รอดำเนินการ</Badge>;
-    case 'overdue':
-      return <Badge variant="destructive">เลยกำหนด</Badge>;
-    default:
-      return <Badge variant="outline">{status}</Badge>;
+    case 'completed': return <Badge className="bg-green-500">เสร็จสิ้น</Badge>;
+    case 'in_progress': return <Badge className="bg-blue-500">กำลังทำ</Badge>;
+    case 'pending': return <Badge variant="secondary">รอดำเนินการ</Badge>;
+    case 'overdue': return <Badge variant="destructive">เลยกำหนด</Badge>;
+    default: return <Badge variant="outline">{status}</Badge>;
   }
 };
 
 const getPriorityBadge = (priority: string) => {
   switch (priority) {
-    case 'high':
-      return <Badge variant="destructive">สูง</Badge>;
-    case 'medium':
-      return <Badge className="bg-yellow-500">กลาง</Badge>;
-    case 'low':
-      return <Badge variant="secondary">ต่ำ</Badge>;
-    default:
-      return <Badge variant="outline">{priority}</Badge>;
+    case 'high': return <Badge variant="destructive">สูง</Badge>;
+    case 'medium': return <Badge className="bg-yellow-500">กลาง</Badge>;
+    case 'low': return <Badge variant="secondary">ต่ำ</Badge>;
+    default: return <Badge variant="outline">{priority}</Badge>;
   }
 };
 
 export default function ScheduleTasks() {
+  const { toast } = useToast();
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  
   const [searchTerm, setSearchTerm] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  
   const [newTask, setNewTask] = useState({
     studentId: '',
     task: '',
@@ -69,24 +67,119 @@ export default function ScheduleTasks() {
     description: '',
   });
 
-  const filteredTasks = mockTasks.filter(
+  const fetchTasksData = async () => {
+    try {
+      setIsLoading(true);
+      const response = await api.get('/index.php?page=get-schedule-tasks');
+      if (response.data.status === 'success') {
+        setTasks(response.data.data.tasks || []);
+        setStudents(response.data.data.students || []);
+      }
+    } catch (error) {
+      toast({ title: 'ข้อผิดพลาด', description: 'ไม่สามารถโหลดข้อมูลงานได้', variant: 'destructive' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchTasksData();
+  }, []);
+
+  const handleEditClick = (task: Task) => {
+    setNewTask({
+      studentId: task.studentId,
+      task: task.task,
+      dueDate: task.dueDate,
+      priority: task.priority,
+      description: (task as any).description || '',
+    });
+    setEditingTaskId(task.id);
+    setIsDialogOpen(true);
+  };
+
+  const handleSave = async () => {
+    if (!newTask.studentId || !newTask.task || !newTask.dueDate) {
+      toast({ title: 'แจ้งเตือน', description: 'กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน', variant: 'destructive' });
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      if (editingTaskId) {
+        const response = await api.post('/index.php?page=update_schedule_task', { ...newTask, id: editingTaskId });
+        if (response.data.status === 'success') {
+          toast({ title: 'สำเร็จ', description: 'แก้ไขงานเรียบร้อยแล้ว' });
+          setIsDialogOpen(false);
+          setEditingTaskId(null);
+          setNewTask({ studentId: '', task: '', dueDate: '', priority: 'medium', description: '' });
+          fetchTasksData();
+        } else {
+          toast({ title: 'ข้อผิดพลาด', description: response.data.message || 'ไม่สามารถแก้ไขงานได้', variant: 'destructive' });
+        }
+      } else {
+        const response = await api.post('/index.php?page=create_schedule_task', newTask);
+        if (response.data.status === 'success') {
+          toast({ title: 'สำเร็จ', description: 'มอบหมายงานใหม่เรียบร้อยแล้ว' });
+          setIsDialogOpen(false);
+          setNewTask({ studentId: '', task: '', dueDate: '', priority: 'medium', description: '' });
+          fetchTasksData();
+        } else {
+          toast({ title: 'ข้อผิดพลาด', description: response.data.message || 'ไม่สามารถสร้างงานได้', variant: 'destructive' });
+        }
+      }
+    } catch (error) {
+      toast({ title: 'ข้อผิดพลาด', description: 'ไม่สามารถบันทึกข้อมูลได้', variant: 'destructive' });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // 3. ฟังก์ชันอัปเดตสถานะเป็น "เสร็จสิ้น"
+  const handleCompleteTask = async (taskId: string) => {
+    try {
+      const response = await api.post('/index.php?page=update_task_status', { 
+        taskId: taskId, 
+        status: 'completed' 
+      });
+      if (response.data.status === 'success') {
+        toast({ title: 'สำเร็จ', description: 'อัปเดตสถานะงานเป็นเสร็จสิ้นแล้ว' });
+        fetchTasksData(); // โหลดข้อมูลตารางใหม่
+      }
+    } catch (error) {
+      toast({ title: 'ข้อผิดพลาด', description: 'ไม่สามารถอัปเดตสถานะได้', variant: 'destructive' });
+    }
+  };
+
+  // 4. ฟังก์ชันลบงาน
+  const handleDeleteTask = async (taskId: string) => {
+    if (!window.confirm("คุณแน่ใจหรือไม่ว่าต้องการลบงานนี้?")) return;
+    
+    try {
+      const response = await api.post('/index.php?page=delete_schedule_task', { id: taskId });
+      if (response.data.status === 'success') {
+        toast({ title: 'สำเร็จ', description: 'ลบงานเรียบร้อยแล้ว' });
+        fetchTasksData(); // โหลดข้อมูลตารางใหม่
+      } else {
+        toast({ title: 'ข้อผิดพลาด', description: response.data.message || 'ไม่สามารถลบงานได้', variant: 'destructive' });
+      }
+    } catch (error) {
+      toast({ title: 'ข้อผิดพลาด', description: 'เกิดข้อผิดพลาดในการลบงาน', variant: 'destructive' });
+    }
+  };
+
+  const filteredTasks = tasks.filter(
     (task) =>
-      task.studentName.includes(searchTerm) ||
-      task.studentId.includes(searchTerm) ||
-      task.task.includes(searchTerm)
+      task.studentName?.includes(searchTerm) ||
+      task.studentId?.includes(searchTerm) ||
+      task.task?.includes(searchTerm)
   );
 
   const stats = {
-    total: mockTasks.length,
-    completed: mockTasks.filter(t => t.status === 'completed').length,
-    inProgress: mockTasks.filter(t => t.status === 'in_progress').length,
-    overdue: mockTasks.filter(t => t.status === 'overdue').length,
-  };
-
-  const handleSave = () => {
-    console.log('Creating task:', newTask);
-    setIsDialogOpen(false);
-    setNewTask({ studentId: '', task: '', dueDate: '', priority: 'medium', description: '' });
+    total: tasks.length,
+    completed: tasks.filter(t => t.status === 'completed').length,
+    inProgress: tasks.filter(t => t.status === 'in_progress').length,
+    overdue: tasks.filter(t => t.status === 'overdue').length,
   };
 
   return (
@@ -97,19 +190,25 @@ export default function ScheduleTasks() {
             <h1 className="text-3xl font-bold tracking-tight">Schedule Task</h1>
             <p className="text-muted-foreground">มอบหมายงานให้นักศึกษาฝึกปฏิบัติ</p>
           </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <Dialog open={isDialogOpen} onOpenChange={(open) => {
+            setIsDialogOpen(open);
+            if (!open) {
+              setEditingTaskId(null);
+              setNewTask({ studentId: '', task: '', dueDate: '', priority: 'medium', description: '' });
+            }
+          }}>
             <DialogTrigger asChild>
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                สร้างงานใหม่
+              <Button onClick={() => {
+                setEditingTaskId(null);
+                setNewTask({ studentId: '', task: '', dueDate: '', priority: 'medium', description: '' });
+              }}>
+                <Plus className="mr-2 h-4 w-4" /> สร้างงานใหม่
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[500px]">
               <DialogHeader>
-                <DialogTitle>สร้างงานใหม่</DialogTitle>
-                <DialogDescription>
-                  มอบหมายงานให้นักศึกษาฝึกปฏิบัติ
-                </DialogDescription>
+                <DialogTitle>{editingTaskId ? "แก้ไขงาน" : "สร้างงานใหม่"}</DialogTitle>
+                <DialogDescription>{editingTaskId ? "แก้ไขรายละเอียดงานที่มอบหมายแล้ว" : "มอบหมายงานให้นักศึกษาฝึกปฏิบัติ"}</DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
@@ -118,12 +217,10 @@ export default function ScheduleTasks() {
                     value={newTask.studentId}
                     onValueChange={(value) => setNewTask({ ...newTask, studentId: value })}
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="เลือกนักศึกษา" />
-                    </SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="เลือกนักศึกษา" /></SelectTrigger>
                     <SelectContent>
-                      {mockStudents.map((student) => (
-                        <SelectItem key={student.id} value={student.id}>
+                      {students.map((student) => (
+                        <SelectItem key={student.id} value={String(student.id)}>
                           {student.id} - {student.name}
                         </SelectItem>
                       ))}
@@ -142,6 +239,7 @@ export default function ScheduleTasks() {
                   <Label>กำหนดส่ง</Label>
                   <Input
                     type="date"
+                    min={new Date().toISOString().split('T')[0]}
                     value={newTask.dueDate}
                     onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })}
                   />
@@ -152,9 +250,7 @@ export default function ScheduleTasks() {
                     value={newTask.priority}
                     onValueChange={(value) => setNewTask({ ...newTask, priority: value })}
                   >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="high">สูง</SelectItem>
                       <SelectItem value="medium">กลาง</SelectItem>
@@ -173,52 +269,45 @@ export default function ScheduleTasks() {
                 </div>
               </div>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  ยกเลิก
+                <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isSubmitting}>ยกเลิก</Button>
+                <Button onClick={handleSave} disabled={isSubmitting}>
+                  {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  สร้างงาน
                 </Button>
-                <Button onClick={handleSave}>สร้างงาน</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
         </div>
 
-        {/* Stats */}
+        {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">งานทั้งหมด</CardTitle>
               <CalendarDays className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.total}</div>
-            </CardContent>
+            <CardContent><div className="text-2xl font-bold">{stats.total}</div></CardContent>
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">เสร็จสิ้น</CardTitle>
               <CheckCircle className="h-4 w-4 text-green-500" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">{stats.completed}</div>
-            </CardContent>
+            <CardContent><div className="text-2xl font-bold text-green-600">{stats.completed}</div></CardContent>
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">กำลังทำ</CardTitle>
               <Clock className="h-4 w-4 text-blue-500" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-600">{stats.inProgress}</div>
-            </CardContent>
+            <CardContent><div className="text-2xl font-bold text-blue-600">{stats.inProgress}</div></CardContent>
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">เลยกำหนด</CardTitle>
               <AlertTriangle className="h-4 w-4 text-destructive" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-destructive">{stats.overdue}</div>
-            </CardContent>
+            <CardContent><div className="text-2xl font-bold text-destructive">{stats.overdue}</div></CardContent>
           </Card>
         </div>
 
@@ -238,39 +327,50 @@ export default function ScheduleTasks() {
             </div>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>รหัสนักศึกษา</TableHead>
-                  <TableHead>ชื่อ-นามสกุล</TableHead>
-                  <TableHead>งาน</TableHead>
-                  <TableHead>กำหนดส่ง</TableHead>
-                  <TableHead>ความสำคัญ</TableHead>
-                  <TableHead>สถานะ</TableHead>
-                  <TableHead>การดำเนินการ</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredTasks.map((task) => (
-                  <TableRow key={task.id}>
-                    <TableCell className="font-medium">{task.studentId}</TableCell>
-                    <TableCell>{task.studentName}</TableCell>
-                    <TableCell>{task.task}</TableCell>
-                    <TableCell>{task.dueDate}</TableCell>
-                    <TableCell>{getPriorityBadge(task.priority)}</TableCell>
-                    <TableCell>{getStatusBadge(task.status)}</TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm">แก้ไข</Button>
-                        {task.status !== 'completed' && (
-                          <Button size="sm">เสร็จสิ้น</Button>
-                        )}
-                      </div>
-                    </TableCell>
+            {isLoading ? (
+              <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>รหัสนักศึกษา</TableHead>
+                    <TableHead>ชื่อ-นามสกุล</TableHead>
+                    <TableHead>งาน</TableHead>
+                    <TableHead>กำหนดส่ง</TableHead>
+                    <TableHead>ความสำคัญ</TableHead>
+                    <TableHead>สถานะ</TableHead>
+                    <TableHead>การดำเนินการ</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filteredTasks.length > 0 ? (
+                    filteredTasks.map((task) => (
+                      <TableRow key={task.id}>
+                        <TableCell className="font-medium">{task.studentId}</TableCell>
+                        <TableCell>{task.studentName}</TableCell>
+                        <TableCell>{task.task}</TableCell>
+                        <TableCell>{task.dueDate}</TableCell>
+                        <TableCell>{getPriorityBadge(task.priority)}</TableCell>
+                        <TableCell>{getStatusBadge(task.status)}</TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm" onClick={() => handleEditClick(task)}>แก้ไข</Button>
+                            <Button variant="destructive" size="sm" onClick={() => handleDeleteTask(task.id)}>ลบ</Button>
+                            {task.status !== 'completed' && (
+                              <Button size="sm" onClick={() => handleCompleteTask(task.id)}>เสร็จสิ้น</Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">ไม่พบข้อมูลงาน</TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
       </div>

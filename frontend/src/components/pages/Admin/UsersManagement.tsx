@@ -94,7 +94,7 @@ export default function UsersManagement() {
   );
 
   const handleToggleStatus = (id: string) => {
-    setUsers(users.map((u) => 
+    setUsers(users.map((u) =>
       u.id === id ? { ...u, status: u.status === "active" ? "inactive" : "active" } : u
     ));
     toast({ title: "อัปเดตสถานะสำเร็จ" });
