@@ -49,7 +49,7 @@ export default function RolesManagement() {
 
   const fetchUsers = async () => {
     try {
-      const response = await api.get<ApiUserResponse[]>("/get_role_users.php");
+      const response = await api.get<ApiUserResponse[]>("/components/Admin/get_role_users.php");
       setUsers(response.data);
     } catch (error) {
       toast({ title: "โหลดข้อมูลล้มเหลว", variant: "destructive" });
@@ -61,7 +61,7 @@ export default function RolesManagement() {
   const handleAssignRole = async () => {
     if (!selectedUser || !newRole) return;
     try {
-      await api.post("/manage_role.php", { userId: selectedUser.id, newRole, newSubRole });
+      await api.post("/components/Admin/manage_role.php", { userId: selectedUser.id, newRole, newSubRole });
       toast({ title: "มอบหมาย Role สำเร็จ" });
       setIsDialogOpen(false); fetchUsers(); 
     } catch (error) {

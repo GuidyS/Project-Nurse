@@ -33,9 +33,12 @@ export default function Approvals() {
 
   const fetchApprovals = async () => {
     try {
-      // ดึงจาก API หรือระบบของไดน่าในอนาคต
-      const response = await api.get("/get_approvals.php");
-      if (Array.isArray(response.data)) setApprovals(response.data);
+      const response = await api.get("/components/Admin/get_approval_requests.php");
+      if (response.data.status === 'success' && Array.isArray(response.data.data)) {
+        setApprovals(response.data.data);
+      } else if (Array.isArray(response.data)) {
+        setApprovals(response.data);
+      }
     } catch (error) {
       console.error("Failed to fetch approvals", error);
     }
@@ -47,7 +50,13 @@ export default function Approvals() {
 
   const handleAction = async (id: string, action: "approved" | "rejected") => {
     try {
-      await api.post("/manage_approval.php", { approval_id: id, status: action });
+      // เรียกใช้ API ตามการกระทำ
+      const endpoint = action === "approved" 
+          ? "/components/Admin/approve_request.php" 
+          : "/components/Admin/reject_request.php";
+          
+      await api.post(endpoint, { id: id, reviewNote: "" });
+      
       setApprovals(approvals.map(app => app.id === id ? { ...app, status: action } : app));
       toast({ title: action === "approved" ? "อนุมัติสำเร็จ" : "ปฏิเสธคำขอ" });
     } catch (error) {

@@ -50,7 +50,7 @@ export default function UsersManagement() {
 
   const fetchUsers = async () => {
     try {
-      const response = await api.get("/get_users.php");
+      const response = await api.get("/components/Admin/get_users.php");
       setUsers(response.data);
     } catch (error) {
       toast({ title: "โหลดข้อมูลล้มเหลว", variant: "destructive" });
@@ -68,7 +68,7 @@ export default function UsersManagement() {
 
   const handleDeleteUser = async (id: string) => {
     try {
-      await api.delete(`/delete_user.php?id=${id}`);
+      await api.delete(`/components/Admin/delete_user.php?id=${id}`);
       setUsers(users.filter((u) => u.id !== id));
       toast({ title: "ลบผู้ใช้สำเร็จ" });
     } catch (error) {
@@ -79,7 +79,7 @@ export default function UsersManagement() {
   const handleToggleStatus = async (user: User) => {
     const newStatus = user.status === "active" ? "inactive" : "active";
     try {
-      await api.post("/toggle_user_status.php", { id: user.id, status: newStatus });
+      await api.post("/components/Admin/toggle_user_status.php", { id: user.id, status: newStatus });
       setUsers(users.map((u) => 
         u.id === user.id ? { ...u, status: newStatus } : u
       ));

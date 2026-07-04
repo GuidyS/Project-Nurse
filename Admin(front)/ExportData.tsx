@@ -56,7 +56,7 @@ export default function ExportData() {
     toast({ title: "กำลังเตรียมข้อมูล", description: "ระบบกำลังสร้างไฟล์ กรุณารอสักครู่..." });
 
     try {
-      const apiEndpoint = `/export_${selectedCategory}.php`;
+      const apiEndpoint = `/components/Admin/export_${selectedCategory}.php`;
       const response = await api.post(apiEndpoint, {
         fields: selectedFields,
         format: format,

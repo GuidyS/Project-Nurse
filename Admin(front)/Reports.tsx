@@ -7,7 +7,6 @@ import { useToast } from "@/hooks/use-toast";
 import { FileText, Download, Calendar, Users, GraduationCap, TrendingUp, DollarSign, BookOpen, Clock, PieChart } from "lucide-react";
 import api from "@/lib/axios";
 
-// เพิ่ม Interface ให้ตรงกับที่ Backend ส่งมา
 interface ApiTemplateResponse {
   id: string;
   name: string;
@@ -35,10 +34,9 @@ export default function Reports() {
   const [stats, setStats] = useState({ total: 0, downloaded: 0, pending: 0, errors: 0 });
   const { toast } = useToast();
 
-  // 1. ดึงสถิติและรายชื่อรายงานจาก Database ของจริง
   const fetchTemplates = async () => {
     try {
-      const response = await api.get("/admin_reports.php?action=get_templates");
+      const response = await api.get("/components/Admin/admin_reports.php?action=get_templates");
       if (response.data.status === "success") {
         const mappedTemplates = response.data.data.templates.map((tpl: ApiTemplateResponse) => ({
           ...tpl,
@@ -61,24 +59,20 @@ export default function Reports() {
     (report) => selectedCategory === "ทั้งหมด" || report.category === selectedCategory
   );
 
-  // 2. ฟังก์ชันกดสร้างรายงานและดาวน์โหลดไฟล์ CSV จริงๆ
   const handleGenerateReport = async (report: ReportTemplate) => {
     toast({ title: "กำลังสร้างรายงาน", description: `ระบบกำลังดึงข้อมูล ${report.name} (ปี ${academicYear})...` });
 
     try {
-      // 💡 เช็คว่ารายงานนี้ Backend จะส่งกลับมาเป็นไฟล์ (Blob) หรือเป็นข้อความ (JSON)
-      const isFileDownload = report.name.includes('ยุทธศาสตร์');
+      const isFileDownload = report.name.includes('ยุทธศาสตร์') || report.name.includes('ภาพรวมผลการเรียน');
 
-      const response = await api.post("/admin_reports.php?action=generate", {
+      const response = await api.post("/components/Admin/admin_reports.php?action=generate", {
         reportName: report.name,
         academicYear: academicYear
       }, {
-        // ถ้าเป็นไฟล์ ต้องบอก Axios ให้รับข้อมูลแบบ blob
         responseType: isFileDownload ? 'blob' : 'json' 
       });
 
       if (isFileDownload) {
-        // สร้างระบบดาวน์โหลดไฟล์จำลองให้ Browser เด้งโหลดไฟล์
         const url = window.URL.createObjectURL(new Blob([response.data]));
         const link = document.createElement('a');
         link.href = url;
@@ -92,7 +86,6 @@ export default function Reports() {
         toast({ title: "แจ้งเตือน", description: response.data.message || "ประมวลผลสำเร็จ" });
       }
 
-      // ดึงสถิติใหม่เพื่ออัปเดตตัวเลขหน้าจอ
       fetchTemplates(); 
     } catch (error) {
       toast({ title: "เกิดข้อผิดพลาด", description: "ไม่สามารถสร้างรายงานได้", variant: "destructive" });
@@ -155,7 +148,6 @@ export default function Reports() {
         ))}
       </div>
 
-      {/* สถิติอ้างอิงจาก Database จริง */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">สถิติภาพรวมจากฐานข้อมูล</CardTitle>

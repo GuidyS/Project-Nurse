@@ -56,7 +56,7 @@ export default function AuditLog() {
   useEffect(() => {
     const fetchLogs = async () => {
       try {
-        const response = await api.get("/get_audit_logs.php");
+        const response = await api.get("/components/Admin/get_audit_logs.php");
         if (Array.isArray(response.data)) {
           setLogs(response.data);
         } else {

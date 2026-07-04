@@ -14,7 +14,7 @@ const importTypes = [
   { value: "teachers", label: "ข้อมูลอาจารย์", icon: Users, description: "รายชื่อบุคลากร" },
   { value: "courses", label: "ข้อมูลรายวิชา", icon: BookOpen, description: "วิชาและหลักสูตร" },
   { value: "projects", label: "แผนงบประมาณ", icon: FolderKanban, description: "แผนโครงการและงบประจำปี" },
-  { value: "grades", label: "ผลการเรียน/เกรด", icon: GraduationCap, description: "ผลการลงทะเบียนเรียนและเกรด" }, // ⭐ เพิ่มเมนูผลการเรียน
+  { value: "grades", label: "ผลการเรียน/เกรด", icon: GraduationCap, description: "ผลการลงทะเบียนเรียนและเกรด" }, 
 ];
 
 interface ImportHistory {
@@ -36,7 +36,7 @@ export default function ImportData() {
 
   const fetchHistory = async () => {
     try {
-      const response = await api.get("/get_import_history.php"); 
+      const response = await api.get("/components/Admin/get_import_history.php"); 
       if (Array.isArray(response.data)) setImportHistory(response.data);
     } catch (error) {
       console.error(error);
@@ -58,7 +58,7 @@ export default function ImportData() {
     setIsUploading(true);
     
     try {
-      const response = await api.post("/upload_data.php", formData, {
+      const response = await api.post("/components/Admin/upload_data.php", formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
         onUploadProgress: (p) => setUploadProgress(Math.round((p.loaded * 100) / (p.total || 100)))
       });
