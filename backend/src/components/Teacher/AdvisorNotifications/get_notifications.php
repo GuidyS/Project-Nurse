@@ -19,7 +19,7 @@ try {
     $db = new Connect();
 
     // เช็คระบบโครงสร้างความปลอดภัยก่อนว่ารันตารางแจ้งเตือนไว้หรือยัง
-    $table_check = $db->query("SHOW TABLES LIKE 'notifications'")->rowCount();
+    $table_check = $db->query("SHOW TABLES LIKE 'avisor_notifications'")->rowCount();
     if ($table_check === 0) {
         echo json_encode([
             "status" => "success",

@@ -23,14 +23,14 @@ try {
 
     if ($action_type === 'all') {
         // 1. กรณีคลิกอ่านทั้งหมด
-        $sql = "UPDATE notifications SET is_read = 1 WHERE user_id = :user_id AND is_read = 0";
+        $sql = "UPDATE avisor_notifications SET is_read = 1 WHERE user_id = :user_id AND is_read = 0";
         $stmt = $db->prepare($sql);
         $stmt->execute([':user_id' => $user_id]);
         echo json_encode(["status" => "success", "message" => "ทำเครื่องหมายอ่านทั้งหมดสำเร็จ"]);
         exit();
     } else if ($action_type === 'single' && $notification_id) {
         // 2. กรณีคลิกอ่านเฉพาะรายการเดียว
-        $sql = "UPDATE notifications SET is_read = 1 WHERE notification_id = :noti_id AND user_id = :user_id";
+        $sql = "UPDATE avisor_notifications SET is_read = 1 WHERE notification_id = :noti_id AND user_id = :user_id";
         $stmt = $db->prepare($sql);
         $stmt->execute([
             ':noti_id' => $notification_id,

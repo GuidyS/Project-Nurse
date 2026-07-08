@@ -102,6 +102,17 @@
                 require_once 'components/Teacher/Advises/get_advises.php';
                 break;
 
+            // AdviseNotes (บันทึกการให้คำปรึกษา)
+            case 'get-advise-notes':
+                require_once 'components/Teacher/AdviseNotes/get_advise_notes.php';
+                break;
+            case 'get-advise-students':
+                require_once 'components/Teacher/AdviseNotes/get_advise_students.php';
+                break;
+            case 'save-advise-note':
+                require_once 'components/Teacher/AdviseNotes/save_advise_note.php';
+                break;
+
             // AdvisorNotifications (การแจ้งเตือนของอาจารย์)
             case 'get-advisor-notifications':
                 require_once 'components/Teacher/AdvisorNotifications/get_notifications.php';
