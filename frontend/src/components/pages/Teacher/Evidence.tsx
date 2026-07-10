@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CheckSquare, Upload, FileImage, FileText, Download, Search, Eye, Loader2 } from 'lucide-react';
+import { CheckSquare, Upload, FileImage, FileText, Download, Search, Eye, Loader2, Trash2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
@@ -140,6 +140,22 @@ export default function Evidence() {
       toast({ title: "ข้อผิดพลาด", description: "ไม่สามารถยืนยันหลักฐานได้", variant: "destructive" });
     }
   };
+  
+  const handleDelete = async (id: string) => {
+    if (!confirm("คุณแน่ใจหรือไม่ว่าต้องการลบหลักฐานนี้?")) return;
+    
+    try {
+      const response = await api.post('/index.php?page=delete-evidence', { id });
+      if (response.data.status === 'success') {
+        toast({ title: "สำเร็จ", description: "ลบหลักฐานเรียบร้อยแล้ว" });
+        fetchEvidence();
+      } else {
+        toast({ title: "ข้อผิดพลาด", description: response.data.message || "ไม่สามารถลบได้", variant: "destructive" });
+      }
+    } catch (error) {
+      toast({ title: "ข้อผิดพลาด", description: "ไม่สามารถลบหลักฐานได้", variant: "destructive" });
+    }
+  };
   //ฟังค์ชัน ดู
 
   const getFileUrl = (urlPath: string) => {
@@ -154,7 +170,8 @@ export default function Evidence() {
       toast({ title: "ข้อผิดพลาด", description: "ไม่พบที่อยู่ไฟล์หลักฐาน", variant: "destructive" });
       return;
     }
-    window.open(getFileUrl(url), '_blank');
+    const viewUrl = getFileUrl(url) + '&action=view';
+    window.open(viewUrl, '_blank');
   };
 
   const handleDownload = (url: string, title: string) => {
@@ -162,8 +179,11 @@ export default function Evidence() {
       toast({ title: "ข้อผิดพลาด", description: "ไม่พบที่อยู่ไฟล์หลักฐาน", variant: "destructive" });
       return;
     }
+    
+    const downloadUrl = getFileUrl(url) + '&action=download';
+    
     const link = document.createElement('a');
-    link.href = getFileUrl(url);
+    link.href = downloadUrl;
     link.setAttribute('download', title || 'download');
     link.setAttribute('target', '_blank');
     document.body.appendChild(link);
@@ -365,6 +385,10 @@ export default function Evidence() {
                             ยืนยัน
                           </Button>
                         )}
+                        <Button variant="destructive" size="sm" onClick={() => handleDelete(evidence.id)}>
+                          <Trash2 className="mr-1 h-3 w-3" />
+                          ลบ
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>

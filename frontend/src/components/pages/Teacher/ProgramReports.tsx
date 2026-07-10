@@ -1,81 +1,89 @@
+import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { TrendingUp, Download, BarChart3, Loader2 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
+import { TrendingUp, Download, BarChart3 } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import api from '@/lib/axios';
-import { toast } from 'sonner';
-
-type OutcomeItem = {
-  name: string;
-  target: number;
-  achieved: number;
-  description: string;
-};
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
 
 export default function ProgramReports() {
   const [selectedYear, setSelectedYear] = useState('all');
-  const [ploData, setPloData] = useState<OutcomeItem[]>([]);
-  const [yloData, setYloData] = useState<OutcomeItem[]>([]);
+  const [yearlyData, setYearlyData] = useState<any[]>([]);
+  const [radarData, setRadarData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const load = async () => {
-      try {
-        setLoading(true);
-        const res = await api.get('/index.php?page=get-plo-ylo-report');
-        if (res.data.status === 'success') {
-          setPloData(res.data.data.ploData || []);
-          setYloData(res.data.data.yloData || []);
-        } else {
-          toast.error(res.data.message || 'ไม่สามารถโหลดรายงานหลักสูตรได้');
-        }
-      } catch {
-        toast.error('ไม่สามารถเชื่อมต่อ API รายงานหลักสูตรได้');
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
+    fetchData();
   }, []);
 
-  const radarData = useMemo(
-    () => ploData.map((item) => ({
-      subject: item.name,
-      achieved: item.achieved,
-      target: item.target,
-      fullMark: 100,
-    })),
-    [ploData]
-  );
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get('/components/Teacher/ProgramReports/get_program_reports.php');
+      if (response.data.status === 'success') {
+        let yData = response.data.data.yearlyData;
+        let rData = response.data.data.radarData;
 
-  const handleExport = () => {
-    const payload = {
-      report: 'PLO/YLO/CLO Program Report',
-      selectedYear,
-      generatedAt: new Date().toISOString(),
-      ploData,
-      yloData,
-    };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `program-report-${selectedYear}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
-    toast.success('ส่งออกรายงานหลักสูตรแล้ว');
+        // Overwrite mockup data only if API returned actual data
+        if (yData && yData.length > 0) {
+          setYearlyData(yData);
+        }
+        
+        if (rData && rData.length > 0) {
+          setRadarData(rData);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching report data:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-[50vh] text-muted-foreground gap-2">
-        <Loader2 className="h-5 w-5 animate-spin" />
-        กำลังโหลดรายงานหลักสูตร...
-      </div>
-    );
-  }
+  const filteredYearlyData = selectedYear === 'all' 
+    ? yearlyData 
+    : yearlyData.filter(d => d.year === `ปี ${selectedYear}`);
+
+  const filteredRadarData = selectedYear === 'all'
+    ? radarData
+    : [
+        { subject: 'PLO1: ความรู้', A: filteredYearlyData[0]?.plo1 || 0, fullMark: 100 },
+        { subject: 'PLO2: ทักษะ', A: filteredYearlyData[0]?.plo2 || 0, fullMark: 100 },
+        { subject: 'PLO3: จริยธรรม', A: filteredYearlyData[0]?.plo3 || 0, fullMark: 100 },
+        { subject: 'PLO4: สื่อสาร', A: filteredYearlyData[0]?.plo4 || 0, fullMark: 100 },
+        { subject: 'PLO5: เทคโนโลยี', A: filteredYearlyData[0]?.plo5 || 0, fullMark: 100 },
+      ];
+
+  const handleExport = () => {
+    try {
+      const headers = ['ชั้นปี', 'PLO1', 'PLO2', 'PLO3', 'PLO4', 'PLO5'];
+      const csvRows = [headers.join(',')];
+      
+      filteredYearlyData.forEach(row => {
+        csvRows.push([
+          row.year,
+          row.plo1 || 0,
+          row.plo2 || 0,
+          row.plo3 || 0,
+          row.plo4 || 0,
+          row.plo5 || 0
+        ].join(','));
+      });
+      
+      const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + csvRows.join('\n');
+      const encodedUri = encodeURI(csvContent);
+      
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `รายงาน_PLO_${selectedYear === 'all' ? 'รวม' : 'ปี_'+selectedYear}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('Error exporting data:', error);
+    }
+  };
 
   return (
     <>
@@ -83,7 +91,7 @@ export default function ProgramReports() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">รายงาน PLO/YLO/CLO</h1>
-            <p className="text-muted-foreground">รายงานผลลัพธ์การเรียนรู้ของหลักสูตรทุกชั้นปี (FR033)</p>
+            <p className="text-muted-foreground">รายงานผลลัพธ์การเรียนรู้ของหลักสูตรทุกชั้นปี</p>
           </div>
           <Button variant="outline" onClick={handleExport}>
             <Download className="mr-2 h-4 w-4" />
@@ -93,12 +101,7 @@ export default function ProgramReports() {
 
         {/* Year Selection */}
         <Card>
-          <CardHeader>
-            <CardDescription>
-              ตัวกรองชั้นปีจะเชื่อมกับข้อมูลรายชั้นปีใน Phase ถัดไป ปัจจุบันแสดงข้อมูลหลักสูตรรวมจาก API
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+          <CardContent className="pt-6">
             <Select value={selectedYear} onValueChange={setSelectedYear}>
               <SelectTrigger className="w-[200px]">
                 <SelectValue placeholder="เลือกชั้นปี" />
@@ -116,15 +119,14 @@ export default function ProgramReports() {
 
         {/* Stats */}
         <div className="grid gap-4 md:grid-cols-5">
-          {ploData.slice(0, 5).map((plo) => (
-            <Card key={plo.name}>
+          {['PLO1', 'PLO2', 'PLO3', 'PLO4', 'PLO5'].map((plo, index) => (
+            <Card key={plo}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">{plo.name}</CardTitle>
+                <CardTitle className="text-sm font-medium">{plo}</CardTitle>
                 <TrendingUp className="h-4 w-4 text-green-500" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{plo.achieved}%</div>
-                <p className="text-xs text-muted-foreground">เป้าหมาย {plo.target}%</p>
+                <div className="text-2xl font-bold">{filteredRadarData[index]?.A || 0}%</div>
               </CardContent>
             </Card>
           ))}
@@ -136,21 +138,30 @@ export default function ProgramReports() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <BarChart3 className="h-5 w-5" />
-                PLO เป้าหมายเทียบผลลัพธ์
+                PLO รายชั้นปี
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={ploData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis domain={[0, 100]} />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="achieved" name="ผลลัพธ์จริง" fill="#3b82f6" />
-                  <Bar dataKey="target" name="เป้าหมาย" fill="#22c55e" />
-                </BarChart>
-              </ResponsiveContainer>
+              {filteredYearlyData && filteredYearlyData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={filteredYearlyData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="year" />
+                    <YAxis domain={[0, 100]} />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="plo1" name="PLO1" fill="#3b82f6" />
+                    <Bar dataKey="plo2" name="PLO2" fill="#22c55e" />
+                    <Bar dataKey="plo3" name="PLO3" fill="#f59e0b" />
+                    <Bar dataKey="plo4" name="PLO4" fill="#8b5cf6" />
+                    <Bar dataKey="plo5" name="PLO5" fill="#ec4899" />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex h-[300px] items-center justify-center text-muted-foreground">
+                  ไม่มีข้อมูลสำหรับแสดงกราฟ
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -162,43 +173,23 @@ export default function ProgramReports() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <RadarChart data={radarData}>
-                  <PolarGrid />
-                  <PolarAngleAxis dataKey="subject" />
-                  <PolarRadiusAxis domain={[0, 100]} />
-                  <Radar name="ผลลัพธ์จริง" dataKey="achieved" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.5} />
-                  <Radar name="เป้าหมาย" dataKey="target" stroke="#22c55e" fill="#22c55e" fillOpacity={0.2} />
-                  <Legend />
-                </RadarChart>
-              </ResponsiveContainer>
+              {filteredRadarData && filteredRadarData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={300}>
+                  <RadarChart data={filteredRadarData}>
+                    <PolarGrid />
+                    <PolarAngleAxis dataKey="subject" />
+                    <PolarRadiusAxis domain={[0, 100]} />
+                    <Radar name="ผลลัพธ์" dataKey="A" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.5} />
+                  </RadarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex h-[300px] items-center justify-center text-muted-foreground">
+                  ไม่มีข้อมูลสำหรับแสดงกราฟ
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>ข้อมูล YLO</CardTitle>
-            <CardDescription>ผลลัพธ์การเรียนรู้ระดับปีจาก API เดียวกับรายงาน PLO/YLO</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-3 md:grid-cols-2">
-              {yloData.length === 0 ? (
-                <p className="text-sm text-muted-foreground">ไม่มีข้อมูล YLO</p>
-              ) : (
-                yloData.map((ylo) => (
-                  <div key={ylo.name} className="rounded-lg border p-4">
-                    <div className="flex items-center justify-between">
-                      <p className="font-medium">{ylo.name}</p>
-                      <span className="text-sm text-muted-foreground">{ylo.achieved}% / {ylo.target}%</span>
-                    </div>
-                    <p className="mt-2 text-sm text-muted-foreground">{ylo.description}</p>
-                  </div>
-                ))
-              )}
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </>
   );

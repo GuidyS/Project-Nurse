@@ -1,3 +1,4 @@
+import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -7,10 +8,25 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MessageSquare, Plus, Search, Calendar, FileText, Loader2 } from 'lucide-react';
-import { useState, useEffect } from 'react';
-import api from '@/lib/axios';
-import { useToast } from '@/hooks/use-toast';
+import { MessageSquare, Plus, Search, Calendar, FileText } from 'lucide-react';
+import { useState } from 'react';
+
+// Mock data
+const mockNotes = [
+  { id: '1', studentId: '64010001', studentName: 'สมชาย ใจดี', date: '2024-01-15', topic: 'แนะนำการลงทะเบียน', type: 'academic', summary: 'นักศึกษาสอบถามเกี่ยวกับการลงทะเบียนวิชาเลือก แนะนำให้พิจารณาตามความสนใจและเวลาที่มี' },
+  { id: '2', studentId: '64010002', studentName: 'สมหญิง รักเรียน', date: '2024-01-10', topic: 'ปัญหาผลการเรียน', type: 'warning', summary: 'GPA ตกลงมาในเทอมที่แล้ว แนะนำให้เข้าร่วมกลุ่มติวและพบอาจารย์ประจำวิชา' },
+  { id: '3', studentId: '65010002', studentName: 'มานี ขยัน', date: '2024-01-08', topic: 'เสี่ยงรีไทร์', type: 'critical', summary: 'GPA ต่ำกว่า 2.00 สองเทอมติด ต้องติดตามใกล้ชิดและประสานงานกับผู้ปกครอง' },
+  { id: '4', studentId: '66010002', studentName: 'ปิยะ มุ่งมั่น', date: '2024-01-05', topic: 'ปรับตัวปีหนึ่ง', type: 'academic', summary: 'นักศึกษาใหม่มีปัญหาในการปรับตัว แนะนำให้เข้าร่วมกิจกรรมชมรมและพบเพื่อนใหม่' },
+];
+
+const mockStudents = [
+  { id: '64010001', name: 'สมชาย ใจดี' },
+  { id: '64010002', name: 'สมหญิง รักเรียน' },
+  { id: '65010001', name: 'มานะ ตั้งใจ' },
+  { id: '65010002', name: 'มานี ขยัน' },
+  { id: '66010001', name: 'ปิติ สุขใจ' },
+  { id: '66010002', name: 'ปิยะ มุ่งมั่น' },
+];
 
 const getTypeBadge = (type: string) => {
   switch (type) {
@@ -27,18 +43,9 @@ const getTypeBadge = (type: string) => {
   }
 };
 
-export default function AdviseNotes() {
-  const { toast } = useToast();
+export default function AdviceNotes() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-
-  const [notes, setNotes] = useState<any[]>([]);
-  const [stats, setStats] = useState({ total: 0, thisMonth: 0, warning: 0, critical: 0 });
-  const [students, setStudents] = useState<any[]>([]);
-  const [viewNote, setViewNote] = useState<any>(null);
-
   const [newNote, setNewNote] = useState({
     studentId: '',
     topic: '',
@@ -46,67 +53,21 @@ export default function AdviseNotes() {
     summary: '',
   });
 
-  // ดึงประวัติบันทึก + สถิติ
-  const fetchNotes = async (withSpinner = true) => {
-    if (withSpinner) setIsLoading(true);
-    try {
-      const res = await api.get('/index.php?page=get-advise-notes');
-      if (res.data.status === 'success') {
-        setNotes(res.data.data.notes || []);
-        setStats(res.data.data.stats || { total: 0, thisMonth: 0, warning: 0, critical: 0 });
-      }
-    } catch {
-      toast({ title: 'ข้อผิดพลาด', description: 'ไม่สามารถโหลดประวัติการให้คำปรึกษาได้', variant: 'destructive' });
-    } finally {
-      if (withSpinner) setIsLoading(false);
-    }
-  };
-
-  // ดึงรายชื่อนักศึกษาในความดูแล (สำหรับ dropdown)
-  const fetchStudents = async () => {
-    try {
-      const res = await api.get('/index.php?page=get-advise-students');
-      if (res.data.status === 'success') setStudents(res.data.data || []);
-    } catch { /* dropdown ว่างแต่หน้าใช้งานได้ */ }
-  };
-
-  useEffect(() => {
-    fetchNotes();
-    fetchStudents();
-  }, []);
-
-  const filteredNotes = notes.filter(
+  const filteredNotes = mockNotes.filter(
     (note) =>
-      String(note.studentName ?? '').includes(searchTerm) ||
-      String(note.studentId ?? '').includes(searchTerm) ||
-      String(note.topic ?? '').includes(searchTerm)
+      note.studentName.includes(searchTerm) ||
+      note.studentId.includes(searchTerm) ||
+      note.topic.includes(searchTerm)
   );
 
-  const handleSave = async () => {
-    if (!newNote.studentId || !newNote.topic || !newNote.summary) {
-      toast({ title: 'แจ้งเตือน', description: 'กรุณากรอกข้อมูลให้ครบถ้วน', variant: 'destructive' });
-      return;
-    }
-    setIsSaving(true);
-    try {
-      const res = await api.post('/index.php?page=save-advise-note', newNote);
-      if (res.data.status === 'success') {
-        toast({ title: 'สำเร็จ', description: 'บันทึกการให้คำปรึกษาเรียบร้อยแล้ว' });
-        setIsDialogOpen(false);
-        setNewNote({ studentId: '', topic: '', type: 'academic', summary: '' });
-        fetchNotes(false); // อัปเดตรายการทันที
-      } else {
-        toast({ title: 'ข้อผิดพลาด', description: res.data.message, variant: 'destructive' });
-      }
-    } catch {
-      toast({ title: 'ข้อผิดพลาด', description: 'ไม่สามารถบันทึกข้อมูลได้', variant: 'destructive' });
-    } finally {
-      setIsSaving(false);
-    }
+  const handleSave = () => {
+    console.log('Saving note:', newNote);
+    setIsDialogOpen(false);
+    setNewNote({ studentId: '', topic: '', type: 'academic', summary: '' });
   };
 
   return (
-    <>
+    <MainLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
@@ -120,8 +81,7 @@ export default function AdviseNotes() {
                 เพิ่มบันทึก
               </Button>
             </DialogTrigger>
-            {/* กันกล่องปิดเองเวลาคลิกนอก dropdown */}
-            <DialogContent className="sm:max-w-[600px]" onInteractOutside={(e) => e.preventDefault()}>
+            <DialogContent className="sm:max-w-[600px]">
               <DialogHeader>
                 <DialogTitle>เพิ่มบันทึกการให้คำปรึกษา</DialogTitle>
                 <DialogDescription>
@@ -139,8 +99,8 @@ export default function AdviseNotes() {
                       <SelectValue placeholder="เลือกนักศึกษา" />
                     </SelectTrigger>
                     <SelectContent>
-                      {students.map((student) => (
-                        <SelectItem key={student.id} value={String(student.id)}>
+                      {mockStudents.map((student) => (
+                        <SelectItem key={student.id} value={student.id}>
                           {student.id} - {student.name}
                         </SelectItem>
                       ))}
@@ -188,10 +148,7 @@ export default function AdviseNotes() {
                 <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
                   ยกเลิก
                 </Button>
-                <Button onClick={handleSave} disabled={isSaving}>
-                  {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  บันทึก
-                </Button>
+                <Button onClick={handleSave}>บันทึก</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -205,7 +162,7 @@ export default function AdviseNotes() {
               <FileText className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.total}</div>
+              <div className="text-2xl font-bold">{mockNotes.length}</div>
             </CardContent>
           </Card>
           <Card>
@@ -214,7 +171,7 @@ export default function AdviseNotes() {
               <Calendar className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.thisMonth}</div>
+              <div className="text-2xl font-bold">4</div>
             </CardContent>
           </Card>
           <Card>
@@ -223,7 +180,7 @@ export default function AdviseNotes() {
               <MessageSquare className="h-4 w-4 text-yellow-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-yellow-600">{stats.warning}</div>
+              <div className="text-2xl font-bold text-yellow-600">1</div>
             </CardContent>
           </Card>
           <Card>
@@ -232,7 +189,7 @@ export default function AdviseNotes() {
               <MessageSquare className="h-4 w-4 text-destructive" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-destructive">{stats.critical}</div>
+              <div className="text-2xl font-bold text-destructive">1</div>
             </CardContent>
           </Card>
         </div>
@@ -253,62 +210,38 @@ export default function AdviseNotes() {
             </div>
           </CardHeader>
           <CardContent>
-            {isLoading ? (
-              <div className="flex justify-center py-10"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
-            ) : filteredNotes.length === 0 ? (
-              <div className="text-center py-10 text-muted-foreground border-2 border-dashed rounded-lg">
-                ยังไม่มีบันทึกการให้คำปรึกษา — กดปุ่ม "เพิ่มบันทึก" เพื่อเริ่มต้น
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>วันที่</TableHead>
-                    <TableHead>รหัสนักศึกษา</TableHead>
-                    <TableHead>ชื่อ-นามสกุล</TableHead>
-                    <TableHead>หัวข้อ</TableHead>
-                    <TableHead>ประเภท</TableHead>
-                    <TableHead>การดำเนินการ</TableHead>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>วันที่</TableHead>
+                  <TableHead>รหัสนักศึกษา</TableHead>
+                  <TableHead>ชื่อ-นามสกุล</TableHead>
+                  <TableHead>หัวข้อ</TableHead>
+                  <TableHead>ประเภท</TableHead>
+                  <TableHead>การดำเนินการ</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredNotes.map((note) => (
+                  <TableRow key={note.id}>
+                    <TableCell>{note.date}</TableCell>
+                    <TableCell className="font-medium">{note.studentId}</TableCell>
+                    <TableCell>{note.studentName}</TableCell>
+                    <TableCell>{note.topic}</TableCell>
+                    <TableCell>{getTypeBadge(note.type)}</TableCell>
+                    <TableCell>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm">ดูรายละเอียด</Button>
+                        <Button variant="outline" size="sm">แก้ไข</Button>
+                      </div>
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredNotes.map((note) => (
-                    <TableRow key={note.id}>
-                      <TableCell>{note.date}</TableCell>
-                      <TableCell className="font-medium font-mono">{note.studentId}</TableCell>
-                      <TableCell>{note.studentName}</TableCell>
-                      <TableCell>{note.topic}</TableCell>
-                      <TableCell>{getTypeBadge(note.type)}</TableCell>
-                      <TableCell>
-                        <Button variant="outline" size="sm" onClick={() => setViewNote(note)}>ดูรายละเอียด</Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
+                ))}
+              </TableBody>
+            </Table>
           </CardContent>
         </Card>
       </div>
-
-      {/* Dialog ดูรายละเอียด */}
-      <Dialog open={!!viewNote} onOpenChange={(o) => !o && setViewNote(null)}>
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle>{viewNote?.topic}</DialogTitle>
-            <DialogDescription>
-              {viewNote?.studentId} — {viewNote?.studentName} · วันที่ {viewNote?.date}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 py-2">
-            <div>{viewNote && getTypeBadge(viewNote.type)}</div>
-            <p className="text-sm leading-relaxed whitespace-pre-wrap">{viewNote?.summary}</p>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setViewNote(null)}>ปิด</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+    </MainLayout>
   );
 }

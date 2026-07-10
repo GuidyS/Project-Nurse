@@ -57,6 +57,7 @@ export default function ScheduleTasks() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   
   const [newTask, setNewTask] = useState({
     studentId: '',
@@ -66,7 +67,6 @@ export default function ScheduleTasks() {
     description: '',
   });
 
-  // 1. ดึงข้อมูลจาก API เมื่อเปิดหน้า
   const fetchTasksData = async () => {
     try {
       setIsLoading(true);
@@ -86,7 +86,18 @@ export default function ScheduleTasks() {
     fetchTasksData();
   }, []);
 
-  // 2. ฟังก์ชันสร้างงานใหม่
+  const handleEditClick = (task: Task) => {
+    setNewTask({
+      studentId: task.studentId,
+      task: task.task,
+      dueDate: task.dueDate,
+      priority: task.priority,
+      description: (task as any).description || '',
+    });
+    setEditingTaskId(task.id);
+    setIsDialogOpen(true);
+  };
+
   const handleSave = async () => {
     if (!newTask.studentId || !newTask.task || !newTask.dueDate) {
       toast({ title: 'แจ้งเตือน', description: 'กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน', variant: 'destructive' });
@@ -95,15 +106,30 @@ export default function ScheduleTasks() {
 
     try {
       setIsSubmitting(true);
-      const response = await api.post('/index.php?page=create-schedule-task', newTask);
-      if (response.data.status === 'success') {
-        toast({ title: 'สำเร็จ', description: 'มอบหมายงานใหม่เรียบร้อยแล้ว' });
-        setIsDialogOpen(false);
-        setNewTask({ studentId: '', task: '', dueDate: '', priority: 'medium', description: '' });
-        fetchTasksData(); // โหลดข้อมูลตารางใหม่
+      if (editingTaskId) {
+        const response = await api.post('/index.php?page=update-schedule-task', { ...newTask, id: editingTaskId });
+        if (response.data.status === 'success') {
+          toast({ title: 'สำเร็จ', description: 'แก้ไขงานเรียบร้อยแล้ว' });
+          setIsDialogOpen(false);
+          setEditingTaskId(null);
+          setNewTask({ studentId: '', task: '', dueDate: '', priority: 'medium', description: '' });
+          fetchTasksData();
+        } else {
+          toast({ title: 'ข้อผิดพลาด', description: response.data.message || 'ไม่สามารถแก้ไขงานได้', variant: 'destructive' });
+        }
+      } else {
+        const response = await api.post('/index.php?page=create-schedule-task', newTask);
+        if (response.data.status === 'success') {
+          toast({ title: 'สำเร็จ', description: 'มอบหมายงานใหม่เรียบร้อยแล้ว' });
+          setIsDialogOpen(false);
+          setNewTask({ studentId: '', task: '', dueDate: '', priority: 'medium', description: '' });
+          fetchTasksData();
+        } else {
+          toast({ title: 'ข้อผิดพลาด', description: response.data.message || 'ไม่สามารถสร้างงานได้', variant: 'destructive' });
+        }
       }
     } catch (error) {
-      toast({ title: 'ข้อผิดพลาด', description: 'ไม่สามารถสร้างงานได้', variant: 'destructive' });
+      toast({ title: 'ข้อผิดพลาด', description: 'ไม่สามารถบันทึกข้อมูลได้', variant: 'destructive' });
     } finally {
       setIsSubmitting(false);
     }
@@ -112,7 +138,7 @@ export default function ScheduleTasks() {
   // 3. ฟังก์ชันอัปเดตสถานะเป็น "เสร็จสิ้น"
   const handleCompleteTask = async (taskId: string) => {
     try {
-      const response = await api.post('/index.php?page=update-task-status', {
+      const response = await api.post('/index.php?page=update-task-status', { 
         taskId: taskId, 
         status: 'completed' 
       });
@@ -122,6 +148,23 @@ export default function ScheduleTasks() {
       }
     } catch (error) {
       toast({ title: 'ข้อผิดพลาด', description: 'ไม่สามารถอัปเดตสถานะได้', variant: 'destructive' });
+    }
+  };
+
+  // 4. ฟังก์ชันลบงาน
+  const handleDeleteTask = async (taskId: string) => {
+    if (!window.confirm("คุณแน่ใจหรือไม่ว่าต้องการลบงานนี้?")) return;
+    
+    try {
+      const response = await api.post('/index.php?page=delete-schedule-task', { id: taskId });
+      if (response.data.status === 'success') {
+        toast({ title: 'สำเร็จ', description: 'ลบงานเรียบร้อยแล้ว' });
+        fetchTasksData(); // โหลดข้อมูลตารางใหม่
+      } else {
+        toast({ title: 'ข้อผิดพลาด', description: response.data.message || 'ไม่สามารถลบงานได้', variant: 'destructive' });
+      }
+    } catch (error) {
+      toast({ title: 'ข้อผิดพลาด', description: 'เกิดข้อผิดพลาดในการลบงาน', variant: 'destructive' });
     }
   };
 
@@ -147,16 +190,25 @@ export default function ScheduleTasks() {
             <h1 className="text-3xl font-bold tracking-tight">Schedule Task</h1>
             <p className="text-muted-foreground">มอบหมายงานให้นักศึกษาฝึกปฏิบัติ</p>
           </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <Dialog open={isDialogOpen} onOpenChange={(open) => {
+            setIsDialogOpen(open);
+            if (!open) {
+              setEditingTaskId(null);
+              setNewTask({ studentId: '', task: '', dueDate: '', priority: 'medium', description: '' });
+            }
+          }}>
             <DialogTrigger asChild>
-              <Button>
+              <Button onClick={() => {
+                setEditingTaskId(null);
+                setNewTask({ studentId: '', task: '', dueDate: '', priority: 'medium', description: '' });
+              }}>
                 <Plus className="mr-2 h-4 w-4" /> สร้างงานใหม่
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[500px]">
               <DialogHeader>
-                <DialogTitle>สร้างงานใหม่</DialogTitle>
-                <DialogDescription>มอบหมายงานให้นักศึกษาฝึกปฏิบัติ</DialogDescription>
+                <DialogTitle>{editingTaskId ? "แก้ไขงาน" : "สร้างงานใหม่"}</DialogTitle>
+                <DialogDescription>{editingTaskId ? "แก้ไขรายละเอียดงานที่มอบหมายแล้ว" : "มอบหมายงานให้นักศึกษาฝึกปฏิบัติ"}</DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
@@ -168,7 +220,7 @@ export default function ScheduleTasks() {
                     <SelectTrigger><SelectValue placeholder="เลือกนักศึกษา" /></SelectTrigger>
                     <SelectContent>
                       {students.map((student) => (
-                        <SelectItem key={student.id} value={student.id}>
+                        <SelectItem key={student.id} value={String(student.id)}>
                           {student.id} - {student.name}
                         </SelectItem>
                       ))}
@@ -187,6 +239,7 @@ export default function ScheduleTasks() {
                   <Label>กำหนดส่ง</Label>
                   <Input
                     type="date"
+                    min={new Date().toISOString().split('T')[0]}
                     value={newTask.dueDate}
                     onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })}
                   />
@@ -301,7 +354,8 @@ export default function ScheduleTasks() {
                         <TableCell>{getStatusBadge(task.status)}</TableCell>
                         <TableCell>
                           <div className="flex gap-2">
-                            <Button variant="outline" size="sm">แก้ไข</Button>
+                            <Button variant="outline" size="sm" onClick={() => handleEditClick(task)}>แก้ไข</Button>
+                            <Button variant="destructive" size="sm" onClick={() => handleDeleteTask(task.id)}>ลบ</Button>
                             {task.status !== 'completed' && (
                               <Button size="sm" onClick={() => handleCompleteTask(task.id)}>เสร็จสิ้น</Button>
                             )}

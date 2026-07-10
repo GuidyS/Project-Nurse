@@ -4,7 +4,6 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 require_once __DIR__ . '/../../../config/config.php';
-require_once __DIR__ . '/../../middlewares/auth_middleware.php';
 
 header("Content-Type: application/json; charset=UTF-8");
 
@@ -78,7 +77,7 @@ try {
     ];
 
     $sql_students = "SELECT student_id, CONCAT(student_id, ' - ', first_name_th, ' ', last_name_th) as display_name
-                     FROM student WHERE status = 'Studying' ORDER BY student_id ASC";
+                     FROM student WHERE status = 'Active' ORDER BY student_id ASC";
     $studentList = $db->query($sql_students)->fetchAll(PDO::FETCH_ASSOC);
 
     echo json_encode([

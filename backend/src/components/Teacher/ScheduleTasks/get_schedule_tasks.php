@@ -2,7 +2,7 @@
 header('Content-Type: application/json');
 
 // ใช้ไฟล์ Config กลางของโปรเจกต์คุณ (แก้ปัญหาเรื่องการประกาศ PDO ดิบๆ)
-require_once __DIR__ . '/../../config/config.php';
+require_once __DIR__ . '/../../../config/config.php';
 
 try {
     $db = new Connect();
@@ -16,7 +16,8 @@ try {
             t.task_name AS task, 
             t.due_date AS dueDate, 
             t.status, 
-            t.priority 
+            t.priority,
+            t.description
         FROM schedule_tasks t
         JOIN student s ON t.student_id = s.student_id
         ORDER BY t.due_date ASC

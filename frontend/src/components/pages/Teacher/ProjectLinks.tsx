@@ -6,7 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { TrendingUp, Save, Link } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import api from '@/lib/axios';
+import api from '@/lib/axios'; 
+
+interface TargetOption {
+  code: string;
+  description: string;
+}
 
 interface LinkMatrix {
   [projectId: string]: {
@@ -18,45 +23,50 @@ interface LinkMatrix {
 
 export default function ProjectLinks() {
   const [projects, setProjects] = useState<any[]>([]);
-  const [plos, setPlos] = useState<string[]>([]);
-  const [ylos, setYlos] = useState<string[]>([]);
-  const [clos, setClos] = useState<string[]>([]);
+  const [plos, setPlos] = useState<TargetOption[]>([]);
+  const [ylos, setYlos] = useState<TargetOption[]>([]);
+  const [clos, setClos] = useState<TargetOption[]>([]);
   const [links, setLinks] = useState<LinkMatrix>({});
   
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  // 1. โหลดข้อมูลเมทริกซ์การเชื่อมโยงจากหลังบ้าน
   useEffect(() => {
+    // ดึงข้อมูลผ่าน routing index.php หรือ path ตรง ขึ้นอยู่กับวิธีจัดตั้งค่าหน้าอื่นๆ ของคุณ
     api.get('/index.php?page=get-project-links')
       .then(res => {
-        const data = res.data;
-        if (data.status === 'success') {
-          setProjects(data.data.projects);
-          setPlos(data.data.plos);
-          setYlos(data.data.ylos);
-          setClos(data.data.clos);
-          setLinks(data.data.links);
-          if (data.data.projects.length > 0) {
-            setSelectedProjectId(data.data.projects[0].id.toString());
+        const payload = res.data !== undefined ? res.data : res;
+        
+        if (payload?.status === 'success') {
+          const data = payload.data || {};
+          setProjects(data.projects || []);
+          setPlos(data.plos || []);
+          setYlos(data.ylos || []);
+          setClos(data.clos || []);
+          setLinks(data.links || {});
+          
+          if (data.projects && data.projects.length > 0) {
+            setSelectedProjectId(data.projects[0].id.toString());
           }
         }
-        setLoading(false);
       })
       .catch(err => {
         console.error("เกิดข้อผิดพลาดในการโหลดเมทริกซ์:", err);
+      })
+      .finally(() => {
         setLoading(false);
       });
   }, []);
 
-  // 2. จัดการเมื่อมีการติ๊กเลือก Checkbox ในตาราง
   const handleCheckboxChange = (type: 'plos' | 'ylos' | 'clos', code: string, checked: boolean) => {
     if (!selectedProjectId) return;
 
     setLinks(prev => {
       const currentProjectLinks = prev[selectedProjectId] || { plos: [], ylos: [], clos: [] };
-      let updatedList = [...currentProjectLinks[type]];
+      const currentList = Array.isArray(currentProjectLinks[type]) ? currentProjectLinks[type] : [];
+      
+      let updatedList = [...currentList];
 
       if (checked) {
         if (!updatedList.includes(code)) updatedList.push(code);
@@ -74,26 +84,29 @@ export default function ProjectLinks() {
     });
   };
 
-  // 3. ฟังก์ชันส่งข้อมูลความเชื่อมโยงกลับไปบันทึกลงฐานข้อมูล
   const handleSave = () => {
     if (!selectedProjectId) return;
     setIsSaving(true);
 
-    api.post('/index.php?page=create-project-links', {
-        projectId: selectedProjectId,
-        links: links[selectedProjectId] || { plos: [], ylos: [], clos: [] }
-      })
+    const payloadData = {
+      project_id: selectedProjectId,
+      links: links[selectedProjectId] || { plos: [], ylos: [], clos: [] }
+    };
+
+    api.post('/index.php?page=save-project-links', payloadData)
       .then(res => {
-        const data = res.data;
-        if (data.status === 'success') {
+        const payload = res.data !== undefined ? res.data : res;
+        if (payload?.status === 'success') {
           alert('บันทึกข้อมูลการเชื่อมโยงเป้าหมายเรียบร้อยแล้ว!');
         } else {
-          alert('เกิดข้อผิดพลาด: ' + data.message);
+          alert('เกิดข้อผิดพลาด: ' + (payload?.message || 'ไม่ทราบสาเหตุ'));
         }
-        setIsSaving(false);
       })
       .catch(err => {
         console.error("บันทึกผิดพลาด:", err);
+        alert('เกิดข้อผิดพลาดในการเชื่อมต่อกับเซิร์ฟเวอร์');
+      })
+      .finally(() => {
         setIsSaving(false);
       });
   };
@@ -103,12 +116,18 @@ export default function ProjectLinks() {
   }
 
   const currentProjectName = projects.find(p => p.id.toString() === selectedProjectId)?.name || '';
-  const currentLinks = links[selectedProjectId] || { plos: [], ylos: [], clos: [] };
+  
+  const rawLinks: LinkMatrix[string] = links[selectedProjectId] || { plos: [], ylos: [], clos: [] };
+  const currentLinks = {
+    plos: Array.isArray(rawLinks.plos) ? rawLinks.plos : [],
+    ylos: Array.isArray(rawLinks.ylos) ? rawLinks.ylos : [],
+    clos: Array.isArray(rawLinks.clos) ? rawLinks.clos : []
+  };
 
   return (
     <>
       <div className="grid gap-6 md:grid-cols-3">
-        {/* คอลัมน์ซ้าย: รายชื่อโครงการ */}
+        {/* เมนูเลือกโครงการฝั่งซ้าย */}
         <div className="md:col-span-1 space-y-4">
           <Card>
             <CardHeader>
@@ -137,51 +156,53 @@ export default function ProjectLinks() {
             </CardContent>
           </Card>
 
-          {/* สรุปเป้าหมายที่เชื่อมโยงอยู่ปัจจุบัน */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm font-semibold">สรุปผลลัพธ์ที่เชื่อมโยง</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="rounded-lg border p-3">
-                <h4 className="text-xs font-semibold mb-2 text-muted-foreground">PLO</h4>
-                <div className="flex flex-wrap gap-1.5">
-                  {currentLinks.plos.length > 0 ? (
-                    currentLinks.plos.map(code => <Badge key={code} variant="secondary">{code}</Badge>)
-                  ) : (
-                    <span className="text-xs text-muted-foreground">ยังไม่มีการเชื่อมโยง</span>
-                  )}
+          {/* การแสดงผลสรุปที่เชื่อมโยง */}
+          {selectedProjectId && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm font-semibold">สรุปผลลัพธ์ที่เชื่อมโยง</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="rounded-lg border p-3">
+                  <h4 className="text-xs font-semibold mb-2 text-muted-foreground">PLO</h4>
+                  <div className="flex flex-wrap gap-1.5">
+                    {currentLinks.plos.length > 0 ? (
+                      currentLinks.plos.map(code => <Badge key={code} variant="secondary">{code}</Badge>)
+                    ) : (
+                      <span className="text-xs text-muted-foreground">ยังไม่มีการเชื่อมโยง</span>
+                    )}
+                  </div>
                 </div>
-              </div>
-              <div className="rounded-lg border p-3">
-                <h4 className="text-xs font-semibold mb-2 text-muted-foreground">YLO</h4>
-                <div className="flex flex-wrap gap-1.5">
-                  {currentLinks.ylos.length > 0 ? (
-                    currentLinks.ylos.map(code => <Badge key={code} variant="secondary">{code}</Badge>)
-                  ) : (
-                    <span className="text-xs text-muted-foreground">ยังไม่มีการเชื่อมโยง</span>
-                  )}
+                <div className="rounded-lg border p-3">
+                  <h4 className="text-xs font-semibold mb-2 text-muted-foreground">YLO</h4>
+                  <div className="flex flex-wrap gap-1.5">
+                    {currentLinks.ylos.length > 0 ? (
+                      currentLinks.ylos.map(code => <Badge key={code} variant="secondary">{code}</Badge>)
+                    ) : (
+                      <span className="text-xs text-muted-foreground">ยังไม่มีการเชื่อมโยง</span>
+                    )}
+                  </div>
                 </div>
-              </div>
-              <div className="rounded-lg border p-3">
-                <h4 className="text-xs font-semibold mb-2 text-muted-foreground">CLO</h4>
-                <div className="flex flex-wrap gap-1.5">
-                  {currentLinks.clos.length > 0 ? (
-                    currentLinks.clos.map(code => <Badge key={code} variant="secondary">{code}</Badge>)
-                  ) : (
-                    <span className="text-xs text-muted-foreground">ยังไม่มีการเชื่อมโยง</span>
-                  )}
+                <div className="rounded-lg border p-3">
+                  <h4 className="text-xs font-semibold mb-2 text-muted-foreground">CLO</h4>
+                  <div className="flex flex-wrap gap-1.5">
+                    {currentLinks.clos.length > 0 ? (
+                      currentLinks.clos.map(code => <Badge key={code} variant="secondary">{code}</Badge>)
+                    ) : (
+                      <span className="text-xs text-muted-foreground">ยังไม่มีการเชื่อมโยง</span>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
-        {/* คอลัมน์ขวา: ตารางจับคู่ความเชื่อมโยง Matrix */}
+        {/* ตารางแสดง Checkbox สำหรับจัดเก็บพิกัดเป้าหมาย */}
         <div className="md:col-span-2">
           <Card className="h-full flex flex-col">
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
-              <div>
+              <div className="flex-1 mr-4">
                 <CardTitle className="text-xl flex items-center gap-2">
                   <Link className="h-5 w-5" />
                   เมทริกซ์การเชื่อมโยงเป้าหมาย
@@ -196,78 +217,87 @@ export default function ProjectLinks() {
               </Button>
             </CardHeader>
             <CardContent className="flex-1 overflow-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[120px]">ประเภทผลลัพธ์</TableHead>
-                    <TableHead>เป้าหมายระดับหลักสูตรและรายวิชา</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {/* ตารางส่วน PLO */}
-                  <TableRow>
-                    <TableCell className="font-bold align-top pt-4">PLO</TableCell>
-                    <TableCell>
-                      <div className="grid grid-cols-2 gap-4">
-                        {plos.map((plo) => (
-                          <div key={plo} className="flex items-start space-x-2 p-1.5 rounded hover:bg-muted/50">
-                            <Checkbox
-                              id={`plo-${plo}`}
-                              checked={currentLinks.plos.includes(plo)}
-                              onCheckedChange={(checked) => handleCheckboxChange('plos', plo, !!checked)}
-                            />
-                            <label id={`label-plo-${plo}`} htmlFor={`plo-${plo}`} className="text-sm leading-none cursor-pointer font-medium select-none">
-                              {plo}
-                            </label>
-                          </div>
-                        ))}
-                      </div>
-                    </TableCell>
-                  </TableRow>
+              {selectedProjectId ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[100px]">ประเภท</TableHead>
+                      <TableHead>เป้าหมายระดับหลักสูตรและรายวิชา</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {/* PLO Row */}
+                    <TableRow>
+                      <TableCell className="font-bold align-top pt-4">PLO</TableCell>
+                      <TableCell>
+                        <div className="space-y-2">
+                          {plos.map((plo) => (
+                            <div key={plo.code} className="flex items-start space-x-3 p-2 rounded hover:bg-muted/50 transition-colors">
+                              <Checkbox
+                                id={`plo-${plo.code}`}
+                                checked={currentLinks.plos?.includes(plo.code) || false}
+                                onCheckedChange={(checked) => handleCheckboxChange('plos', plo.code, !!checked)}
+                                className="mt-0.5"
+                              />
+                              <label htmlFor={`plo-${plo.code}`} className="text-sm leading-tight cursor-pointer font-medium select-none text-foreground">
+                                {plo.description}
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                      </TableCell>
+                    </TableRow>
 
-                  {/* ตารางส่วน YLO */}
-                  <TableRow>
-                    <TableCell className="font-bold align-top pt-4">YLO</TableCell>
-                    <TableCell>
-                      <div className="grid grid-cols-2 gap-4">
-                        {ylos.map((ylo) => (
-                          <div key={ylo} className="flex items-start space-x-2 p-1.5 rounded hover:bg-muted/50">
-                            <Checkbox
-                              id={`ylo-${ylo}`}
-                              checked={currentLinks.ylos.includes(ylo)}
-                              onCheckedChange={(checked) => handleCheckboxChange('ylos', ylo, !!checked)}
-                            />
-                            <label id={`label-ylo-${ylo}`} htmlFor={`ylo-${ylo}`} className="text-sm leading-none cursor-pointer font-medium select-none">
-                              {ylo}
-                            </label>
-                          </div>
-                        ))}
-                      </div>
-                    </TableCell>
-                  </TableRow>
+                    {/* YLO Row */}
+                    <TableRow>
+                      <TableCell className="font-bold align-top pt-4">YLO</TableCell>
+                      <TableCell>
+                        <div className="space-y-2">
+                          {ylos.map((ylo) => (
+                            <div key={ylo.code} className="flex items-start space-x-3 p-2 rounded hover:bg-muted/50 transition-colors">
+                              <Checkbox
+                                id={`ylo-${ylo.code}`}
+                                checked={currentLinks.ylos?.includes(ylo.code) || false}
+                                onCheckedChange={(checked) => handleCheckboxChange('ylos', ylo.code, !!checked)}
+                                className="mt-0.5"
+                              />
+                              <label htmlFor={`ylo-${ylo.code}`} className="text-sm leading-tight cursor-pointer font-medium select-none text-foreground">
+                                {ylo.description}
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                      </TableCell>
+                    </TableRow>
 
-                  {/* ตารางส่วน CLO */}
-                  <TableRow>
-                    <TableCell className="font-bold align-top pt-4">CLO</TableCell>
-                    <TableCell>
-                      <div className="grid grid-cols-2 gap-4">
-                        {clos.map((clo) => (
-                          <div key={clo} className="flex items-start space-x-2 p-1.5 rounded hover:bg-muted/50">
-                            <Checkbox
-                              id={`clo-${clo}`}
-                              checked={currentLinks.clos.includes(clo)}
-                              onCheckedChange={(checked) => handleCheckboxChange('clos', clo, !!checked)}
-                            />
-                            <label id={`label-clo-${clo}`} htmlFor={`clo-${clo}`} className="text-sm leading-none cursor-pointer font-medium select-none">
-                              {clo}
-                            </label>
-                          </div>
-                        ))}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
+                    {/* CLO Row */}
+                    <TableRow>
+                      <TableCell className="font-bold align-top pt-4">CLO</TableCell>
+                      <TableCell>
+                        <div className="space-y-2">
+                          {clos.map((clo) => (
+                            <div key={clo.code} className="flex items-start space-x-3 p-2 rounded hover:bg-muted/50 transition-colors">
+                              <Checkbox
+                                id={`clo-${clo.code}`}
+                                checked={currentLinks.clos?.includes(clo.code) || false}
+                                onCheckedChange={(checked) => handleCheckboxChange('clos', clo.code, !!checked)}
+                                className="mt-0.5"
+                              />
+                              <label htmlFor={`clo-${clo}`} className="text-sm leading-tight cursor-pointer font-medium select-none text-foreground">
+                                {clo.description}
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="text-center text-muted-foreground p-10">
+                  กรุณาเลือกโครงการจากด้านซ้ายมือ
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

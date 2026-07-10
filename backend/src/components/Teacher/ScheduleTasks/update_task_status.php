@@ -1,6 +1,6 @@
 <?php
 header('Content-Type: application/json');
-// require_once 'auth_middleware.php';
+require_once __DIR__ . '/../../../config/config.php';
 
 $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);

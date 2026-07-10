@@ -1,12 +1,21 @@
+import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Users, Search, AlertTriangle, CheckCircle, MessageSquare, Loader2 } from 'lucide-react';
-import { useState, useEffect } from 'react';
-import api from '@/lib/axios';
-import { useToast } from '@/hooks/use-toast';
+import { Users, Search, AlertTriangle, CheckCircle, MessageSquare } from 'lucide-react';
+import { useState } from 'react';
+
+// Mock data for advisees
+const mockAdvisees = [
+  { id: '1', studentId: '64010001', name: 'สมชาย ใจดี', year: 3, gpa: 3.45, status: 'normal', lastContact: '2024-01-15', needsAdvice: false },
+  { id: '2', studentId: '64010002', name: 'สมหญิง รักเรียน', year: 3, gpa: 2.85, status: 'warning', lastContact: '2024-01-10', needsAdvice: true },
+  { id: '3', studentId: '65010001', name: 'มานะ ตั้งใจ', year: 2, gpa: 3.78, status: 'normal', lastContact: '2024-01-12', needsAdvice: false },
+  { id: '4', studentId: '65010002', name: 'มานี ขยัน', year: 2, gpa: 1.95, status: 'critical', lastContact: '2024-01-08', needsAdvice: true },
+  { id: '5', studentId: '66010001', name: 'ปิติ สุขใจ', year: 1, gpa: 3.25, status: 'normal', lastContact: '2024-01-14', needsAdvice: false },
+  { id: '6', studentId: '66010002', name: 'ปิยะ มุ่งมั่น', year: 1, gpa: 2.45, status: 'warning', lastContact: '2024-01-05', needsAdvice: true },
+];
 
 const getStatusBadge = (status: string) => {
   switch (status) {
@@ -21,48 +30,25 @@ const getStatusBadge = (status: string) => {
   }
 };
 
-export default function Advises() {
-  const { toast } = useToast();
+export default function Advisees() {
   const [searchTerm, setSearchTerm] = useState('');
-  const [advisees, setAdvisees] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchAdvisees = async () => {
-      try {
-        setIsLoading(true);
-        const res = await api.get('/index.php?page=get-advises');
-        if (res.data.status === 'success') {
-          setAdvisees(res.data.data || []);
-        } else {
-          toast({ title: 'ข้อผิดพลาด', description: res.data.message, variant: 'destructive' });
-        }
-      } catch (error) {
-        toast({ title: 'ข้อผิดพลาด', description: 'ไม่สามารถโหลดข้อมูลนักศึกษาได้', variant: 'destructive' });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchAdvisees();
-  }, []);
-
-  // String(... ?? '') กันค่า null/ตัวเลข ไม่ให้หน้าจอพังตอนค้นหา
-  const filteredAdvisees = advisees.filter(
+  const filteredAdvisees = mockAdvisees.filter(
     (student) =>
-      String(student.name ?? '').includes(searchTerm) ||
-      String(student.studentId ?? '').includes(searchTerm)
+      student.name.includes(searchTerm) ||
+      student.studentId.includes(searchTerm)
   );
 
   const stats = {
-    total: advisees.length,
-    maxCapacity: 12, // (เกณฑ์สัดส่วน อาจารย์ 1 คน ต่อ นศ. 12 คน)
-    needsAdvice: advisees.filter(s => s.needsAdvice).length,
-    critical: advisees.filter(s => s.status === 'critical').length,
+    total: mockAdvisees.length,
+    maxCapacity: 12,
+    needsAdvice: mockAdvisees.filter(s => s.needsAdvice).length,
+    critical: mockAdvisees.filter(s => s.status === 'critical').length,
   };
 
   return (
-    <>
-      <div className="space-y-6 animate-fade-in">
+    <MainLayout>
+      <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">นักศึกษาในที่ปรึกษา</h1>
           <p className="text-muted-foreground">จัดการนักศึกษาที่อยู่ในความดูแล (สัดส่วน 1:12)</p>
@@ -103,11 +89,11 @@ export default function Advises() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">สถานะปกติ</CardTitle>
-              <CheckCircle className="h-4 w-4 text-green-500" />
+              <CheckCircle className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-600">
-                {advisees.filter(s => s.status === 'normal').length}
+                {mockAdvisees.filter(s => s.status === 'normal').length}
               </div>
               <p className="text-xs text-muted-foreground">คน</p>
             </CardContent>
@@ -130,49 +116,40 @@ export default function Advises() {
             </div>
           </CardHeader>
           <CardContent>
-            {isLoading ? (
-              <div className="flex justify-center items-center py-10">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              </div>
-            ) : filteredAdvisees.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg">
-                ไม่มีข้อมูลนักศึกษาในความดูแล
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>รหัสนักศึกษา</TableHead>
-                    <TableHead>ชื่อ-นามสกุล</TableHead>
-                    <TableHead className="text-center">ชั้นปี</TableHead>
-                    <TableHead className="text-center">GPA</TableHead>
-                    <TableHead className="text-center">สถานะ</TableHead>
-                    <TableHead className="text-center">ติดต่อล่าสุด</TableHead>
-                    <TableHead className="text-center">การดำเนินการ</TableHead>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>รหัสนักศึกษา</TableHead>
+                  <TableHead>ชื่อ-นามสกุล</TableHead>
+                  <TableHead>ชั้นปี</TableHead>
+                  <TableHead>GPA</TableHead>
+                  <TableHead>สถานะ</TableHead>
+                  <TableHead>ติดต่อล่าสุด</TableHead>
+                  <TableHead>การดำเนินการ</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredAdvisees.map((student) => (
+                  <TableRow key={student.id}>
+                    <TableCell className="font-medium">{student.studentId}</TableCell>
+                    <TableCell>{student.name}</TableCell>
+                    <TableCell>ปี {student.year}</TableCell>
+                    <TableCell>{student.gpa.toFixed(2)}</TableCell>
+                    <TableCell>{getStatusBadge(student.status)}</TableCell>
+                    <TableCell>{student.lastContact}</TableCell>
+                    <TableCell>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm">ดูโปรไฟล์</Button>
+                        <Button size="sm">บันทึกคำปรึกษา</Button>
+                      </div>
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredAdvisees.map((student) => (
-                    <TableRow key={student.id}>
-                      <TableCell className="font-medium font-mono">{student.studentId}</TableCell>
-                      <TableCell>{student.name}</TableCell>
-                      <TableCell className="text-center">ปี {student.year}</TableCell>
-                      <TableCell className="text-center font-semibold">{student.gpa.toFixed(2)}</TableCell>
-                      <TableCell className="text-center">{getStatusBadge(student.status)}</TableCell>
-                      <TableCell className="text-center text-muted-foreground">{student.lastContact}</TableCell>
-                      <TableCell className="text-center">
-                        <Button size="sm" onClick={() => { window.location.href = "/?page=advise-notes"; }}>
-                          บันทึกคำปรึกษา
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
+                ))}
+              </TableBody>
+            </Table>
           </CardContent>
         </Card>
       </div>
-    </>
+    </MainLayout>
   );
 }

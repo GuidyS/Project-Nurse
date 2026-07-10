@@ -201,10 +201,10 @@
 
             // Grades
             case 'get-grading-data':
-                require_once 'components/Teacher/grading/get_grading_data.php';
+                require_once 'components/Teacher/Grading/get_grading_data.php';
                 break;
             case 'save-grading-data':
-                require_once 'components/Teacher/grading/save_grading_data.php';
+                require_once 'components/Teacher/Grading/save_grading_data.php';
                 break;
 
             // Dashboard
