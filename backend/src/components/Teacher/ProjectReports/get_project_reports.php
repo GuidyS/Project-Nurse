@@ -21,20 +21,27 @@ try {
     $progressData = [];
 
     if ($requestedProjectId) {
-        // ตาราง project ปัจจุบันยังไม่มีคอลัมน์งบประมาณ/ความคืบหน้า — อ่านจาก mapping_json ถ้ามี ไม่งั้นคืน 0
-        $stmt = $pdo->prepare("SELECT mapping_json FROM project WHERE project_id = :id");
+        // งบประมาณจริงจากตาราง project_budget_years (รายปี) / ความคืบหน้าจาก mapping_json.meta
+        $stmt = $pdo->prepare("SELECT fiscal_year, IFNULL(budget_allocated,0) AS allocated, IFNULL(budget_spent,0) AS spent
+                               FROM project_budget_years WHERE project_id = :id ORDER BY fiscal_year ASC");
         $stmt->execute([':id' => $requestedProjectId]);
-        $project = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        if ($project && !empty($project['mapping_json'])) {
-            $m = json_decode($project['mapping_json'], true) ?: [];
-            $stats['totalBudget'] = (float)($m['total_budget'] ?? 0);
-            $stats['totalSpent']  = (float)($m['total_spent'] ?? 0);
-            $stats['remaining']   = $stats['totalBudget'] - $stats['totalSpent'];
-            $stats['progress']    = (int)($m['overall_progress'] ?? 0);
-            $budgetData   = $m['budget_chart'] ?? [];
-            $progressData = $m['progress_chart'] ?? [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $b) {
+            $stats['totalBudget'] += (float)$b['allocated'];
+            $stats['totalSpent']  += (float)$b['spent'];
+            $budgetData[] = [
+                "name"   => "ปี " . $b['fiscal_year'],
+                "budget" => (float)$b['allocated'],
+                "spent"  => (float)$b['spent'],
+            ];
         }
+        $stats['remaining'] = $stats['totalBudget'] - $stats['totalSpent'];
+
+        $pm = $pdo->prepare("SELECT mapping_json FROM project WHERE project_id = :id");
+        $pm->execute([':id' => $requestedProjectId]);
+        $m = json_decode($pm->fetchColumn() ?: '{}', true) ?: [];
+        $meta = $m['meta'] ?? [];
+        $stats['progress'] = (int)($meta['progress'] ?? 0);
+        $progressData = $meta['progress_chart'] ?? [];
     }
 
     echo json_encode([

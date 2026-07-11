@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { TrendingUp, Save, Link } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import api from '@/lib/axios';
+import { useToast } from '@/hooks/use-toast';
 
 interface LinkMatrix {
   [projectId: string]: {
@@ -16,6 +18,7 @@ interface LinkMatrix {
 }
 
 export default function ProjectLinks() {
+  const { toast } = useToast();
   const [projects, setProjects] = useState<any[]>([]);
   const [plos, setPlos] = useState<string[]>([]);
   const [ylos, setYlos] = useState<string[]>([]);
@@ -26,11 +29,10 @@ export default function ProjectLinks() {
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  // 1. โหลดข้อมูลเมทริกซ์การเชื่อมโยงจากหลังบ้าน
+  // 1. โหลดข้อมูลเมทริกซ์การเชื่อมโยงจากหลังบ้าน (ผ่าน axios กลางของโปรเจกต์)
   useEffect(() => {
-    fetch('/api/get_project_links.php')
-      .then(res => res.json())
-      .then(res => {
+    api.get('/index.php?page=get-project-links')
+      .then(({ data: res }) => {
         if (res.status === 'success') {
           setProjects(res.data.projects);
           setPlos(res.data.plos);
@@ -45,6 +47,7 @@ export default function ProjectLinks() {
       })
       .catch(err => {
         console.error("เกิดข้อผิดพลาดในการโหลดเมทริกซ์:", err);
+        toast({ title: 'ข้อผิดพลาด', description: 'ไม่สามารถโหลดข้อมูลการเชื่อมโยงได้', variant: 'destructive' });
         setLoading(false);
       });
   }, []);
@@ -78,25 +81,21 @@ export default function ProjectLinks() {
     if (!selectedProjectId) return;
     setIsSaving(true);
 
-    fetch('/api/save_project_links.php', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        project_id: selectedProjectId,
-        links: links[selectedProjectId] || { plos: [], ylos: [], clos: [] }
-      })
+    api.post('/index.php?page=create-project-links', {
+      projectId: selectedProjectId,
+      links: links[selectedProjectId] || { plos: [], ylos: [], clos: [] }
     })
-      .then(res => res.json())
-      .then(res => {
+      .then(({ data: res }) => {
         if (res.status === 'success') {
-          alert('บันทึกข้อมูลการเชื่อมโยงเป้าหมายเรียบร้อยแล้ว!');
+          toast({ title: 'สำเร็จ', description: 'บันทึกการเชื่อมโยงเป้าหมายเรียบร้อยแล้ว' });
         } else {
-          alert('เกิดข้อผิดพลาด: ' + res.message);
+          toast({ title: 'ข้อผิดพลาด', description: res.message, variant: 'destructive' });
         }
         setIsSaving(false);
       })
       .catch(err => {
         console.error("บันทึกผิดพลาด:", err);
+        toast({ title: 'ข้อผิดพลาด', description: 'ไม่สามารถบันทึกได้', variant: 'destructive' });
         setIsSaving(false);
       });
   };

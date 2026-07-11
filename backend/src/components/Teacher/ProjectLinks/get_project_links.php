@@ -24,25 +24,32 @@ try {
         $pid = $row['id'];
         $projects[] = ['id' => $pid, 'name' => $row['name']];
 
-        // ถ้ามีข้อมูล JSON ถูกบันทึกไว้ ให้ถอดรหัสออกมา
+        // การเชื่อมโยงเก็บใน mapping_json.links (แยก namespace ไม่ชนกับ meta ของโครงการ)
         if (!empty($row['mapping_json'])) {
-            $decoded = json_decode($row['mapping_json'], true);
+            $decoded = json_decode($row['mapping_json'], true) ?: [];
+            $links = $decoded['links'] ?? $decoded; // fallback ข้อมูลเก่าที่เก็บแบบแบน
             $matrix[$pid] = [
-                'plos' => $decoded['plos'] ?? [],
-                'ylos' => $decoded['ylos'] ?? [],
-                'clos' => $decoded['clos'] ?? []
+                'plos' => $links['plos'] ?? [],
+                'ylos' => $links['ylos'] ?? [],
+                'clos' => $links['clos'] ?? []
             ];
         } else {
-            // ถ้ายังไม่มีการผูกข้อมูล ให้ส่งอาเรย์ว่างไป
             $matrix[$pid] = ['plos' => [], 'ylos' => [], 'clos' => []];
         }
     }
 
-    // 3. กำหนดรายชื่อ PLO, YLO, CLO พื้นฐาน (เนื่องจากตารางถูกลบไปแล้ว)
-    // *หากในอนาคตมีตาราง curriculum_framework ให้ดึงจากที่นั่นแทนได้ครับ*
-    $plos = ['PLO1', 'PLO2', 'PLO3', 'PLO4', 'PLO5'];
+    // 3. รายชื่อ PLO จากโครงสร้างหลักสูตรจริง (curriculum_framework) — YLO/CLO ใช้ชุดมาตรฐาน
+    $plos = [];
+    $fw = $db->query("SELECT mapping_json FROM curriculum_framework WHERE is_active = 1 LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    if ($fw && !empty($fw['mapping_json'])) {
+        $fw_data = json_decode($fw['mapping_json'], true) ?: [];
+        foreach (($fw_data['plos'] ?? []) as $p) {
+            if (!empty($p['plo_id'])) $plos[] = $p['plo_id'];
+        }
+    }
+    if (empty($plos)) $plos = ['PLO1', 'PLO2', 'PLO3', 'PLO4', 'PLO5'];
     $ylos = ['YLO1', 'YLO2', 'YLO3', 'YLO4'];
-    $clos = ['CLO1', 'CLO2', 'CLO3', 'CLO4'];
+    $clos = ['CLO1', 'CLO2', 'CLO3', 'CLO4', 'CLO5'];
 
     echo json_encode([
         "status" => "success",

@@ -1,6 +1,6 @@
 <?php
 if (session_status() === PHP_SESSION_NONE) session_start();
-require_once __DIR__ . '/../../config/config.php';
+require_once __DIR__ . '/../../../config/config.php';
 
 header("Access-Control-Allow-Origin: http://localhost:5173");
 header("Access-Control-Allow-Credentials: true");
@@ -14,21 +14,27 @@ try {
     // รับข้อมูล JSON จาก React
     $input = json_decode(file_get_contents('php://input'), true);
 
-    if (!isset($input['projectId']) || !isset($input['links'])) {
+    $projectId = $input['projectId'] ?? $input['project_id'] ?? null;
+    if (!$projectId || !isset($input['links'])) {
         throw new Exception("ข้อมูลไม่ครบถ้วนสำหรับการบันทึก");
     }
 
-    $projectId = $input['projectId'];
-    $links = $input['links']; // หน้าตาที่รับมาคือ: { plos: [...], ylos: [...], clos: [...] }
+    $links = $input['links']; // { plos: [...], ylos: [...], clos: [...] }
 
-    // แปลงข้อมูล Array เป็น JSON String (รองรับภาษาไทย)
-    $mapping_json_string = json_encode($links, JSON_UNESCAPED_UNICODE);
+    // อ่าน mapping_json เดิมมาก่อน แล้วบันทึกใต้ key 'links' เพื่อไม่ทับข้อมูล meta อื่นของโครงการ
+    $cur = $db->prepare("SELECT mapping_json FROM project WHERE project_id = ?");
+    $cur->execute([$projectId]);
+    $existing = json_decode($cur->fetchColumn() ?: '{}', true) ?: [];
+    $existing['links'] = [
+        'plos' => array_values($links['plos'] ?? []),
+        'ylos' => array_values($links['ylos'] ?? []),
+        'clos' => array_values($links['clos'] ?? []),
+    ];
 
-    // ทำการอัปเดตข้อมูล JSON ลงในคอลัมน์ mapping_json
     $sql = "UPDATE project SET mapping_json = :mapping_json WHERE project_id = :project_id";
     $stmt = $db->prepare($sql);
     $stmt->execute([
-        ':mapping_json' => $mapping_json_string,
+        ':mapping_json' => json_encode($existing, JSON_UNESCAPED_UNICODE),
         ':project_id' => $projectId
     ]);
 

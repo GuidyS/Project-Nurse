@@ -91,6 +91,9 @@
             case 'teacher-dashboard':
                 require_once 'components/Teacher/Dashboard/get_dashboard_stats.php';
                 break;
+            case 'get-dean-dashboard':
+                require_once 'components/Teacher/DeanDashboard/get_dean_dashboard.php';
+                break;
             case 'teacher-courses':
                 require_once 'components/Teacher/CoursesPage/get_my_courses.php';
                 break;
@@ -233,6 +236,24 @@
             // MyCourses
             case 'get-teacher-courses-overview':
                 require_once 'components/Teacher/MyCourses/get_teacher_courses_overview.php';
+                break;
+
+            // MyProjects (โครงการของฉัน)
+            case 'get-my-projects':
+                require_once 'components/Teacher/MyProjects/get_my_projects.php';
+                break;
+
+            // PLO/YLO Report + ProgramReports
+            case 'get-plo-ylo-report':
+                require_once 'components/Teacher/PLOYLO/get_plo_ylo_report.php';
+                break;
+
+            // Students list / detail (ฝั่งอาจารย์)
+            case 'get-students-list':
+                require_once 'components/Teacher/StudentsList/get_students_list.php';
+                break;
+            case 'get-student-detail':
+                require_once 'components/Teacher/StudentsList/get_student_detail.php';
                 break;
 
             // PracticalStudents (นักศึกษาฝึกปฏิบัติ)

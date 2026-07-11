@@ -159,7 +159,7 @@ const Index = () => {
       "evidence", "my-courses", "performance", "practical-students",
       "program-reports", "schedule-tasks", "projectspage", "my-projects", "project-docs",
       "project-links", "project-reports", "advise-notes", "advisor-notifications", "advises",
-      "students", "transfer-requests"
+      "students", "students-info", "transfer-requests"
     ];
     
     if (teacherPages.includes(activeItem)) {

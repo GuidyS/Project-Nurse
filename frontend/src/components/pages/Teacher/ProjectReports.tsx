@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FileText, Download, BarChart3, DollarSign } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import api from '@/lib/axios';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend } from 'recharts';
 
 export default function ProjectReports() {
@@ -16,12 +17,11 @@ export default function ProjectReports() {
   
   const [loading, setLoading] = useState(true);
 
-  // ฟังก์ชันดึงข้อมูลรายงานจาก API
+  // ฟังก์ชันดึงข้อมูลรายงานจาก API (ผ่าน axios กลางของโปรเจกต์)
   const fetchReportData = (projectId = '') => {
     setLoading(true);
-    fetch(`/api/get_project_reports.php${projectId ? `?project_id=${projectId}` : ''}`)
-      .then(res => res.json())
-      .then(res => {
+    api.get(`/index.php?page=get-project-reports${projectId ? `&project_id=${projectId}` : ''}`)
+      .then(({ data: res }) => {
         if (res.status === 'success') {
           setProjects(res.data.projects);
           if (!selectedProject && res.data.selectedProjectId) {
@@ -51,7 +51,20 @@ export default function ProjectReports() {
   };
 
   const handleExport = (format: string) => {
-    alert(`กำลังเตรียมดาวน์โหลดไฟล์ ${format.toUpperCase()}...`);
+    if (format === 'pdf') { window.print(); return; }
+    const projName = projects.find(p => p.id.toString() === selectedProject)?.name || '';
+    const rows: string[][] = [
+      ['รายงานสรุปโครงการ', projName],
+      ['งบประมาณรวม', String(stats.totalBudget), 'ใช้ไปแล้ว', String(stats.totalSpent), 'คงเหลือ', String(stats.remaining), 'ความคืบหน้า(%)', String(stats.progress)],
+      [],
+      ['ปีงบประมาณ', 'ได้รับจัดสรร', 'ใช้จริง'],
+      ...budgetData.map((b: any) => [String(b.name), String(b.budget), String(b.spent ?? '')]),
+    ];
+    const csv = '﻿' + rows.map(r => r.map(c => `"${c ?? ''}"`).join(',')).join('\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = 'project_report.csv'; a.click();
+    URL.revokeObjectURL(url);
   };
 
   const formatCurrency = (num: number) => {

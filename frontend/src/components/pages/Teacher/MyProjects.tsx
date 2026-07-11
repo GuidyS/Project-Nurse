@@ -186,9 +186,9 @@ export default function MyProjects({ onItemClick }: MyProjectsProps) {
                     <Progress value={project.progress} />
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="outline">จัดการเอกสาร</Button>
-                    <Button variant="outline">เชื่อมโยง PLO/YLO/CLO</Button>
-                    <Button>ดูรายละเอียด</Button>
+                    <Button variant="outline" onClick={() => { window.location.href = "/?page=project-docs"; }}>จัดการเอกสาร</Button>
+                    <Button variant="outline" onClick={() => { window.location.href = "/?page=project-links"; }}>เชื่อมโยง PLO/YLO/CLO</Button>
+                    <Button onClick={() => { window.location.href = "/?page=projectspage"; }}>ดูรายละเอียด</Button>
                   </div>
                 </CardContent>
               </Card>
