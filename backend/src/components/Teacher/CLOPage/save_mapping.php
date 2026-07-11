@@ -1,13 +1,23 @@
 <?php
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 //require_once __DIR__ . '/../../../middlewares/auth_middleware.php';
 
 $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
+$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
 // รับก้อน JSON ที่ React ส่งมา (ผ่าน Axios หรือ Fetch POST)
 $input = json_decode(file_get_contents("php://input"), true);
 
 try {
+    if (!isset($_SESSION['user_id'])) {
+        http_response_code(401);
+        echo json_encode(["status" => "error", "message" => "Unauthorized"]);
+        exit();
+    }
+
     // เช็คว่ามีส่ง subject_code และ clos มาหรือไม่
     if (!empty($input['subject_code']) && isset($input['clos'])) {
         

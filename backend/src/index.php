@@ -193,6 +193,12 @@
             case 'verify-evidence':
                 require_once 'components/Teacher/Evidence/verify_evidence.php';
                 break;
+            case 'delete-evidence':
+                require_once 'components/Teacher/Evidence/delete_evidence.php';
+                break;
+            case 'download-file':
+                require_once 'components/Teacher/Evidence/download_file.php';
+                break;
 
             // FiveYearSummary
             case 'get-five-year-summary':
@@ -201,10 +207,10 @@
 
             // Grades
             case 'get-grading-data':
-                require_once 'components/Teacher/Grading/get_grading_data.php';
+                require_once 'components/Teacher/grading/get_grading_data.php';
                 break;
             case 'save-grading-data':
-                require_once 'components/Teacher/Grading/save_grading_data.php';
+                require_once 'components/Teacher/grading/save_grading_data.php';
                 break;
 
             // Dashboard
@@ -277,12 +283,18 @@
             case 'create-project-doc':
                 require_once 'components/Teacher/ProjectDocs/create_project_doc.php';
                 break;
+            case 'upload-project-file':
+                require_once 'components/Teacher/ProjectDocs/upload_project_file.php';
+                break;
 
             // ProjectLinks
             case 'get-project-links':
                 require_once 'components/Teacher/ProjectLinks/get_project_links.php';
                 break;
             case 'create-project-links':
+                require_once 'components/Teacher/ProjectLinks/save_project_links.php';
+                break;
+            case 'save-project-links':
                 require_once 'components/Teacher/ProjectLinks/save_project_links.php';
                 break;
 
@@ -303,7 +315,7 @@
                 break;
 
             // Students
-            case 'get-students':
+            case 'get-teacher-students':
                 require_once 'components/Teacher/Students/get_students.php';
                 break;
 

@@ -29,7 +29,13 @@ $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
 try {
     // 1. ดึงข้อมูลโครงการทั้งหมดที่มีในระบบ เพื่อทำ Dropdown ให้เลือก
-    $stmt = $pdo->query("SELECT MAX(id) as id, project as name FROM project_documents GROUP BY project ORDER BY id DESC");
+    $stmt = $pdo->query("
+        SELECT
+            project_id AS id,
+            COALESCE(NULLIF(project_name_th, ''), NULLIF(project_name_en, ''), CONCAT('Project #', project_id)) AS name
+        FROM project
+        ORDER BY project_id DESC
+    ");
     $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     // หากยังไม่มีโปรเจกต์ใดๆ ส่งค่าว่างกลับไปเพื่อไม่ให้ Frontend พัง
@@ -52,32 +58,56 @@ try {
                          ? (int)$_GET['project_id'] 
                          : $projects[0]['id'];
 
-    // =====================================================================
-    // 3. ข้อมูลกราฟและสถิติ (Mock Data เพื่อแสดงผลกราฟในเบื้องต้น)
-    // =====================================================================
+    // 3. ดึงงบประมาณและความคืบหน้าจากตารางจริง
+    $budgetStmt = $pdo->prepare("
+        SELECT
+            COALESCE(fiscal_year, 0) AS fiscal_year,
+            COALESCE(budget_allocated, 0) AS budget,
+            COALESCE(budget_spent, 0) AS spent
+        FROM project_budget_years
+        WHERE project_id = :project_id
+        ORDER BY fiscal_year ASC, project_budget_years_id ASC
+    ");
+    $budgetStmt->execute([':project_id' => $selectedProjectId]);
+    $budgetRows = $budgetStmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // 3.1 สถิติภาพรวม
+    $budgetData = array_map(function ($row) {
+        return [
+            "month" => $row['fiscal_year'] ? (string)$row['fiscal_year'] : "-",
+            "budget" => (float)$row['budget'],
+            "spent" => (float)$row['spent']
+        ];
+    }, $budgetRows);
+
+    $progressStmt = $pdo->prepare("
+        SELECT
+            period_label,
+            planned_percent,
+            actual_percent
+        FROM project_progress_logs
+        WHERE project_id = :project_id
+        ORDER BY COALESCE(logged_at, created_at) ASC, id ASC
+    ");
+    $progressStmt->execute([':project_id' => $selectedProjectId]);
+    $progressRows = $progressStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $progressData = array_map(function ($row) {
+        return [
+            "week" => $row['period_label'],
+            "planned" => (float)$row['planned_percent'],
+            "actual" => (float)$row['actual_percent']
+        ];
+    }, $progressRows);
+
+    $totalBudget = array_reduce($budgetData, fn($sum, $row) => $sum + $row['budget'], 0);
+    $totalSpent = array_reduce($budgetData, fn($sum, $row) => $sum + $row['spent'], 0);
+    $progress = empty($progressData) ? 0 : max(array_map(fn($row) => $row['actual'], $progressData));
+
     $stats = [
-        "totalBudget" => 500000,
-        "totalSpent" => 250000,
-        "remaining" => 250000,
-        "progress" => 65
-    ];
-
-    // 3.2 ข้อมูลกราฟแท่ง (งบประมาณรายเดือน)
-    $budgetData = [
-        ["month" => "ม.ค.", "budget" => 100000, "spent" => 90000],
-        ["month" => "ก.พ.", "budget" => 100000, "spent" => 95000],
-        ["month" => "มี.ค.", "budget" => 150000, "spent" => 65000],
-        ["month" => "เม.ย.", "budget" => 150000, "spent" => 0]
-    ];
-
-    // 3.3 ข้อมูลกราฟเส้น (ความคืบหน้ารายสัปดาห์)
-    $progressData = [
-        ["week" => "สัปดาห์ 1", "planned" => 10, "actual" => 12],
-        ["week" => "สัปดาห์ 2", "planned" => 25, "actual" => 20],
-        ["week" => "สัปดาห์ 3", "planned" => 40, "actual" => 35],
-        ["week" => "สัปดาห์ 4", "planned" => 60, "actual" => 65],
+        "totalBudget" => $totalBudget,
+        "totalSpent" => $totalSpent,
+        "remaining" => $totalBudget - $totalSpent,
+        "progress" => (int)round($progress)
     ];
 
     // ส่งออกข้อมูลทั้งหมดในรูปแบบ JSON

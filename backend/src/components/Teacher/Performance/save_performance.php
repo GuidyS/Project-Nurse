@@ -46,15 +46,16 @@ try {
     $userId = $_SESSION['user_id'];
 
     $sql_insert = "INSERT INTO approval_requests
-        (request_type, requester_user_id, target_ref_type, target_ref_id, title, description, status, created_at)
+        (request_type, requester_user_id, target_ref_type, target_ref_id, title, description, payload_json, status, created_at)
         VALUES
-        ('performance_eval', :user_id, 'student', :student_id, 'การประเมิน Performance', :description, 'approved', NOW())";
+        ('performance_eval', :user_id, 'student', :student_id, 'การประเมิน Performance', :description, :payload_json, 'approved', NOW())";
 
     $stmt = $db->prepare($sql_insert);
     $stmt->execute([
         ':user_id' => $userId,
         ':student_id' => $studentId,
         ':description' => $scoreDataJson,
+        ':payload_json' => $scoreDataJson,
     ]);
 
     echo json_encode(["status" => "success", "message" => "บันทึกผลการประเมินเรียบร้อยแล้ว"]);

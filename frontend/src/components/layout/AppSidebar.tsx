@@ -26,6 +26,28 @@ interface SidebarProps {
   activeItem: string;
 }
 
+const readStoredUser = () => {
+  try {
+    return JSON.parse(localStorage.getItem('user') || '{}');
+  } catch {
+    return {};
+  }
+};
+
+const getDisplayName = (user: any) => {
+  const username = typeof user.username === 'string' ? user.username.trim() : '';
+  const candidates = [
+    user.full_name_th,
+    [user.first_name_th, user.last_name_th].filter(Boolean).join(' '),
+    [user.first_name_en, user.last_name_en].filter(Boolean).join(' '),
+    user.name,
+  ]
+    .map((value) => (typeof value === 'string' ? value.trim() : ''))
+    .filter((value) => value && value !== username);
+
+  return candidates[0] || username || "ไม่ระบุชื่อ";
+};
+
 // const roleConfigs: RoleConfig[] = [
 //   {
 //     label: 'ผู้ดูแลระบบ',
@@ -177,6 +199,9 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
   const [menuSections, setMenuSections] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [sidebarUser, setSidebarUser] = useState<any>(() => readStoredUser());
+  const { state } = useSidebar();
+  const collapsed = state === 'collapsed';
 
   const fetchUnreadCount = async () => {
     try {
@@ -193,8 +218,6 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
   useEffect(() => {
     const fetchMenus = async () => {
       try {
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
-
         // เรียก API (ตรวจสอบ Path ให้ตรงกับที่วาง index.php ไว้)
         const res = await api.get(`/index.php?page=sidebar`);
         
@@ -208,7 +231,27 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
       }
     };
 
+    const fetchUserProfile = async () => {
+      try {
+        const response = await api.get("/index.php?page=profile");
+        if (response.data?.status !== "success" || !response.data?.data) return;
+
+        const currentUser = readStoredUser();
+        const mergedUser = {
+          ...currentUser,
+          ...response.data.data,
+          name: getDisplayName({ ...currentUser, ...response.data.data }),
+        };
+
+        localStorage.setItem('user', JSON.stringify(mergedUser));
+        setSidebarUser(mergedUser);
+      } catch (error) {
+        setSidebarUser(readStoredUser());
+      }
+    };
+
     fetchMenus();
+    fetchUserProfile();
 
     fetchUnreadCount();
     const intervalId = setInterval(fetchUnreadCount, 30000);
@@ -221,25 +264,21 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
     };
   }, []);
 
-  if (isLoading) return <div className="p-4">กำลังโหลดเมนู...</div>;
-
   // ฟังก์ชันแปลง String เป็น Component
   const getIcon = (iconName: string) => {
     const IconComponent = (Icons as any)[iconName];
     return IconComponent || Icons.HelpCircle; // ถ้าหาไม่เจอให้ใช้ HelpCircle แทน
   };
 
-  const { state } = useSidebar();
-  const collapsed = state === 'collapsed';
-
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
-  const userName = user.name || "ไม่ระบุชื่อ";
+  const userName = getDisplayName(sidebarUser);
 
   // ดึงตัวอักษรตัวแรกจากชื่อ (เช่น 'สมชาย' จะได้ 'ส') 
   // หากไม่มีชื่อจะใช้ 'U' เป็นค่าเริ่มต้น
   const userInitial = userName.trim().charAt(0) || 'U';
 
-  const userPermissions = user.permissions || [];
+  const userPermissions = sidebarUser.permissions || [];
+
+  if (isLoading) return <div className="p-4">กำลังโหลดเมนู...</div>;
 
   // เพิ่มฟังก์ชัน Logout ตรงนี้
   const handleLogout = () => {

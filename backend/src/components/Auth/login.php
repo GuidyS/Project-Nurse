@@ -42,11 +42,13 @@ try {
 
     if ($user && password_verify($password, $user['password_hash'])) {
 
-        // --- ส่วนที่เพิ่มกลับเข้ามา: กำหนดค่าชื่อ ($name) ---
-        $name = ($user['role_id'] == 3) 
-            ? $user['s_fname'] . ' ' . $user['s_lname']
-            : $user['f_fname'] . ' ' . $user['f_lname'];
-        // ----------------------------------------------
+        $nameParts = ($user['role_id'] == 3)
+            ? [$user['s_title'] ?? '', $user['s_fname'] ?? '', $user['s_lname'] ?? '']
+            : [$user['f_title'] ?? '', $user['f_fname'] ?? '', $user['f_lname'] ?? ''];
+        $name = trim(implode(' ', array_filter($nameParts, fn($part) => trim((string)$part) !== '')));
+        if ($name === '') {
+            $name = $user['username'];
+        }
         
         // ดึงสิทธิ์จากทั้ง Role และ Position มารวมกัน (UNION)
         $perm_sql = "SELECT DISTINCT p.permission_name 
@@ -86,6 +88,9 @@ try {
                 "user_id" => (int)$user['user_id'],
                 "username" => $user['username'],
                 "name" => $name,
+                "title" => ($user['role_id'] == 3) ? ($user['s_title'] ?? '') : ($user['f_title'] ?? ''),
+                "first_name_th" => ($user['role_id'] == 3) ? ($user['s_fname'] ?? '') : ($user['f_fname'] ?? ''),
+                "last_name_th" => ($user['role_id'] == 3) ? ($user['s_lname'] ?? '') : ($user['f_lname'] ?? ''),
                 "role_id" => (int)$user['role_id'],
                 "position_id" => (int)($user['main_position_id'] ?? 0),
                 "permissions" => $permissions // ส่ง Array เช่น ["manage_course_grading", "view_advisory_student_12"]

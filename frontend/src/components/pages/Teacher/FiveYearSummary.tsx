@@ -1,13 +1,44 @@
-import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Download, TrendingUp, TrendingDown, Minus, BarChart3, FileText, Loader2 } from 'lucide-react';
+import { Download, TrendingUp, TrendingDown, Minus, BarChart3, FileText, Loader2, AlertCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, BarChart, Bar } from 'recharts';
 import api from '@/lib/axios';
+import axios from 'axios';
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable'; // ใช้การ import แบบนี้เพื่อหลีกเลี่ยงการใช้ (doc as any)
+
+interface YearlyDataItem {
+  year: string;
+  graduates: number;
+  employmentRate: number;
+  avgGPA: number;
+  plo1: number;
+  plo2: number;
+  plo3: number;
+  plo4: number;
+  plo5: number;
+}
+
+interface CourseDataItem {
+  code: string;
+  name: string;
+  trend: 'up' | 'down' | 'stable';
+  [yearKey: string]: string | number;
+}
+
+interface FiveYearSummaryResponse {
+  status: 'success' | 'error';
+  message?: string;
+  data?: {
+    yearlyData: YearlyDataItem[];
+    courseData: CourseDataItem[];
+  };
+}
 
 const getTrendIcon = (trend: string) => {
   switch (trend) {
@@ -22,36 +53,132 @@ const getTrendIcon = (trend: string) => {
 
 export default function FiveYearSummary() {
   const [selectedProgram, setSelectedProgram] = useState('all');
-  const [yearlyData, setYearlyData] = useState<any[]>([]);
-  const [courseData, setCourseData] = useState<any[]>([]);
+  const [yearlyData, setYearlyData] = useState<YearlyDataItem[]>([]);
+  const [courseData, setCourseData] = useState<CourseDataItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let isMounted = true;
+
     const fetchFiveYearSummary = async () => {
+      setIsLoading(true);
+      setError(null);
       try {
-        setIsLoading(true);
-        const response = await api.get('/index.php?page=get-five-year-summary');
-        if (response.data && response.data.status === 'success') {
-          setYearlyData(response.data.data.yearlyData || []);
-          setCourseData(response.data.data.courseData || []);
+        const response = await api.get<FiveYearSummaryResponse>('/index.php?page=get-five-year-summary');
+
+        if (response.data?.status === 'success' && response.data.data) {
+          if (isMounted) {
+            setYearlyData(response.data.data.yearlyData || []);
+            setCourseData(response.data.data.courseData || []);
+          }
+        } else {
+          throw new Error(response.data?.message || 'ไม่สามารถโหลดข้อมูลได้');
         }
-      } catch (error) {
-        console.error('Failed to fetch five year summary data:', error);
+      } catch (err: unknown) { // จัดการ Error ด้วย unknown ป้องกัน any
+        console.error('Failed to fetch five year summary data:', err);
+        if (isMounted) {
+          let errorMessage = 'เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ';
+          
+          if (axios.isAxiosError(err)) {
+            errorMessage = err.response?.data?.message || err.message;
+          } else if (err instanceof Error) {
+            errorMessage = err.message;
+          }
+          
+          setError(errorMessage);
+        }
       } finally {
-        setIsLoading(false);
+        if (isMounted) setIsLoading(false);
       }
     };
+
     fetchFiveYearSummary();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
+  const years = yearlyData.map(d => d.year);
+
   const handleExport = (format: string) => {
-    console.log('Exporting as:', format);
+    if (format === 'excel') {
+      const wb = XLSX.utils.book_new();
+      
+      const wsYearly = XLSX.utils.json_to_sheet(yearlyData.map(y => ({
+        'ปีการศึกษา': y.year,
+        'บัณฑิต': y.graduates,
+        'มีงานทำ (%)': y.employmentRate,
+        'GPA เฉลี่ย': Number(y.avgGPA || 0).toFixed(2),
+        'PLO1': `${y.plo1}%`,
+        'PLO2': `${y.plo2}%`,
+        'PLO3': `${y.plo3}%`,
+        'PLO4': `${y.plo4}%`,
+        'PLO5': `${y.plo5}%`
+      })));
+      XLSX.utils.book_append_sheet(wb, wsYearly, "Yearly Summary");
+
+      const wsCourses = XLSX.utils.json_to_sheet(courseData.map(c => {
+        // ใช้ Record<string, string | number> แทน any
+        const rowData: Record<string, string | number> = { 
+          'รหัสวิชา': c.code, 
+          'ชื่อวิชา': c.name 
+        };
+        
+        years.forEach(y => { 
+          rowData[`ปี ${y}`] = Number(c['y' + y] || 0).toFixed(2); 
+        });
+        
+        rowData['แนวโน้ม'] = c.trend === 'up' ? 'ดีขึ้น' : c.trend === 'down' ? 'ลดลง' : 'คงที่';
+        return rowData;
+      }));
+      XLSX.utils.book_append_sheet(wb, wsCourses, "Course Summary");
+
+      XLSX.writeFile(wb, "Five_Year_Summary_Report.xlsx");
+
+    } else if (format === 'pdf') {
+      const doc = new jsPDF('landscape');
+      
+      doc.text("Five Year Summary Report", 14, 15);
+      doc.text("Yearly Summary", 14, 25);
+      
+      // ใช้ autoTable ที่ import มาตรงๆ แทนการแคสต์ (doc as any).autoTable
+      autoTable(doc, {
+        startY: 30,
+        head: [['Year', 'Graduates', 'Employed(%)', 'Avg GPA', 'PLO1', 'PLO2', 'PLO3', 'PLO4', 'PLO5']],
+        body: yearlyData.map(y => [
+          y.year, 
+          y.graduates, 
+          `${y.employmentRate}%`, 
+          Number(y.avgGPA || 0).toFixed(2),
+          `${y.plo1}%`, 
+          `${y.plo2}%`, 
+          `${y.plo3}%`, 
+          `${y.plo4}%`, 
+          `${y.plo5}%`
+        ]),
+      });
+
+      doc.save("Five_Year_Summary_Report.pdf");
+    }
   };
 
   if (isLoading) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex h-[60vh] flex-col items-center justify-center gap-2 text-destructive">
+        <AlertCircle className="h-8 w-8" />
+        <p>{error}</p>
+        <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+          ลองใหม่อีกครั้ง
+        </Button>
       </div>
     );
   }
@@ -66,7 +193,7 @@ export default function FiveYearSummary() {
   }));
 
   const totalGraduates = yearlyData.reduce((acc, y) => acc + Number(y.graduates || 0), 0);
-  
+
   const avgEmploymentRate = yearlyData.length > 0
     ? (yearlyData.reduce((acc, y) => acc + Number(y.employmentRate || 0), 0) / yearlyData.length).toFixed(1)
     : '0.0';
@@ -75,20 +202,16 @@ export default function FiveYearSummary() {
     ? (yearlyData.reduce((acc, y) => acc + Number(y.avgGPA || 0), 0) / yearlyData.length).toFixed(2)
     : '0.00';
 
-  const years = yearlyData.map(d => d.year);
-
-  // คำนวณแนวโน้ม PLO เฉลี่ยรวม
   const getPloTrend = () => {
     if (yearlyData.length < 2) {
-      return { 
-        text: 'คงที่', 
-        icon: <Minus className="h-6 w-6 text-muted-foreground" />, 
-        color: 'text-muted-foreground', 
-        subtitle: 'ยังไม่มีข้อมูลเพียงพอ' 
+      return {
+        text: 'คงที่',
+        icon: <Minus className="h-6 w-6 text-muted-foreground" />,
+        color: 'text-muted-foreground',
+        subtitle: 'ยังไม่มีข้อมูลเพียงพอ'
       };
     }
 
-    // หาเฉลี่ย PLO รวมของแต่ละปี
     const avgPlos = yearlyData.map(y => {
       const sum = Number(y.plo1 || 0) + Number(y.plo2 || 0) + Number(y.plo3 || 0) + Number(y.plo4 || 0) + Number(y.plo5 || 0);
       return sum / 5;
@@ -98,34 +221,34 @@ export default function FiveYearSummary() {
     const previous = avgPlos[avgPlos.length - 2];
 
     if (latest === 0 && previous === 0) {
-      return { 
-        text: 'ไม่มีข้อมูล', 
-        icon: <Minus className="h-6 w-6 text-muted-foreground" />, 
-        color: 'text-muted-foreground', 
-        subtitle: 'ยังไม่มีประวัติการประเมิน PLO' 
+      return {
+        text: 'ไม่มีข้อมูล',
+        icon: <Minus className="h-6 w-6 text-muted-foreground" />,
+        color: 'text-muted-foreground',
+        subtitle: 'ยังไม่มีประวัติการประเมิน PLO'
       };
     }
 
     if (latest > previous) {
-      return { 
-        text: 'ดีขึ้น', 
-        icon: <TrendingUp className="h-6 w-6 text-green-500" />, 
-        color: 'text-green-600', 
-        subtitle: 'ผลลัพธ์การเรียนรู้เฉลี่ยดีขึ้น' 
+      return {
+        text: 'ดีขึ้น',
+        icon: <TrendingUp className="h-6 w-6 text-green-500" />,
+        color: 'text-green-600',
+        subtitle: 'ผลลัพธ์การเรียนรู้เฉลี่ยดีขึ้น'
       };
     } else if (latest < previous) {
-      return { 
-        text: 'ลดลง', 
-        icon: <TrendingDown className="h-6 w-6 text-destructive" />, 
-        color: 'text-destructive', 
-        subtitle: 'ผลลัพธ์การเรียนรู้เฉลี่ยลดลง' 
+      return {
+        text: 'ลดลง',
+        icon: <TrendingDown className="h-6 w-6 text-destructive" />,
+        color: 'text-destructive',
+        subtitle: 'ผลลัพธ์การเรียนรู้เฉลี่ยลดลง'
       };
     } else {
-      return { 
-        text: 'คงที่', 
-        icon: <Minus className="h-6 w-6 text-muted-foreground" />, 
-        color: 'text-muted-foreground', 
-        subtitle: 'ผลลัพธ์การเรียนรู้ทรงตัว' 
+      return {
+        text: 'คงที่',
+        icon: <Minus className="h-6 w-6 text-muted-foreground" />,
+        color: 'text-muted-foreground',
+        subtitle: 'ผลลัพธ์การเรียนรู้ทรงตัว'
       };
     }
   };
@@ -162,7 +285,6 @@ export default function FiveYearSummary() {
           </div>
         </div>
 
-        {/* Summary Stats */}
         <div className="grid gap-4 md:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -211,7 +333,6 @@ export default function FiveYearSummary() {
           </Card>
         </div>
 
-        {/* Charts */}
         <div className="grid gap-4 md:grid-cols-2">
           <Card>
             <CardHeader>
@@ -262,7 +383,6 @@ export default function FiveYearSummary() {
           </Card>
         </div>
 
-        {/* Course Summary Table */}
         <Card>
           <CardHeader>
             <CardTitle>สรุปผลรายวิชา 5 ปี</CardTitle>
@@ -317,7 +437,6 @@ export default function FiveYearSummary() {
           </CardContent>
         </Card>
 
-        {/* Yearly Summary Table */}
         <Card>
           <CardHeader>
             <CardTitle>ตารางสรุปรายปี</CardTitle>
@@ -348,7 +467,7 @@ export default function FiveYearSummary() {
                         {year.employmentRate}%
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-center">{year.avgGPA.toFixed(2)}</TableCell>
+                    <TableCell className="text-center">{Number(year.avgGPA || 0).toFixed(2)}</TableCell>
                     <TableCell className="text-center">{year.plo1}%</TableCell>
                     <TableCell className="text-center">{year.plo2}%</TableCell>
                     <TableCell className="text-center">{year.plo3}%</TableCell>

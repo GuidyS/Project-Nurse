@@ -1,4 +1,3 @@
-import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -93,7 +92,7 @@ export default function ProjectLinks() {
       links: links[selectedProjectId] || { plos: [], ylos: [], clos: [] }
     };
 
-    api.post('/index.php?page=save-project-links', payloadData)
+    api.post('/index.php?page=create-project-links', payloadData)
       .then(res => {
         const payload = res.data !== undefined ? res.data : res;
         if (payload?.status === 'success') {
@@ -283,7 +282,7 @@ export default function ProjectLinks() {
                                 onCheckedChange={(checked) => handleCheckboxChange('clos', clo.code, !!checked)}
                                 className="mt-0.5"
                               />
-                              <label htmlFor={`clo-${clo}`} className="text-sm leading-tight cursor-pointer font-medium select-none text-foreground">
+                              <label htmlFor={`clo-${clo.code}`} className="text-sm leading-tight cursor-pointer font-medium select-none text-foreground">
                                 {clo.description}
                               </label>
                             </div>

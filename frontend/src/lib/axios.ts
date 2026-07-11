@@ -14,6 +14,15 @@ api.interceptors.response.use(
     // 🎯 ดักจับเมื่อ Session ฝั่ง PHP Server หมดอายุขัย (Response 401)
     if (error.response && error.response.status === 401) {
       console.warn("Session หมดอายุ หรือยังไม่ได้เข้าสู่ระบบ");
+
+      const requestUrl = error.config?.url || "";
+      const isOptionalSettingsRequest =
+        requestUrl.includes("page=get-notification-settings") ||
+        requestUrl.includes("page=save-notification-settings");
+
+      if (isOptionalSettingsRequest) {
+        return Promise.reject(error);
+      }
       
       // 💡 1. เช็คก่อนว่า "เคยมีประวัติการล็อกอิน" ค้างอยู่ในระบบหรือไม่ ก่อนที่จะถูกล้าง
       const wasLoggedIn = localStorage.getItem('user') !== null;

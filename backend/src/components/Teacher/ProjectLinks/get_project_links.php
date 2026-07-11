@@ -5,7 +5,8 @@ if (session_status() === PHP_SESSION_NONE) session_start();
 $possible_paths = [
     __DIR__ . '/config/config.php',
     __DIR__ . '/../config/config.php',
-    __DIR__ . '/../../config/config.php'
+    __DIR__ . '/../../config/config.php',
+    __DIR__ . '/../../../config/config.php'
 ];
 foreach ($possible_paths as $path) {
     if (file_exists($path)) {
@@ -29,7 +30,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit();
 try {
     $db = new Connect();
 
-    $stmt = $db->query("SELECT project_id AS id, project_name_th AS name, mapping_json FROM project ORDER BY project_id ASC");
+    $stmt = $db->query("
+        SELECT
+            project_id AS id,
+            COALESCE(NULLIF(project_name_th, ''), NULLIF(project_name_en, ''), CONCAT('Project #', project_id)) AS name
+        FROM project
+        ORDER BY project_id ASC
+    ");
     $projects_raw = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     $projects = [];
@@ -39,40 +46,85 @@ try {
         $pid = $row['id'];
         $projects[] = ['id' => $pid, 'name' => $row['name']];
 
-        if (!empty($row['mapping_json'])) {
-            $decoded = json_decode($row['mapping_json'], true);
-            $matrix[$pid] = [
-                'plos' => $decoded['plos'] ?? [],
-                'ylos' => $decoded['ylos'] ?? [],
-                'clos' => $decoded['clos'] ?? []
-            ];
-        } else {
-            $matrix[$pid] = ['plos' => [], 'ylos' => [], 'clos' => []];
+        $matrix[$pid] = ['plos' => [], 'ylos' => [], 'clos' => []];
+    }
+
+    $linkStmt = $db->query("SELECT project_id, outcome_type, outcome_code FROM project_outcome_links ORDER BY project_id, outcome_type, outcome_code");
+    foreach ($linkStmt->fetchAll(PDO::FETCH_ASSOC) as $link) {
+        $projectId = $link['project_id'];
+        if (!isset($matrix[$projectId])) {
+            $matrix[$projectId] = ['plos' => [], 'ylos' => [], 'clos' => []];
+        }
+
+        $key = $link['outcome_type'] . 's';
+        if (isset($matrix[$projectId][$key])) {
+            $matrix[$projectId][$key][] = $link['outcome_code'];
         }
     }
 
-    // --- Mockup ข้อมูลชุดตัวเลือกเป้าหมายแบบมีคำอธิบายประกอบ ---
-    $plos = [
-        ['code' => 'PLO1', 'description' => 'PLO1: ประยุกต์ใช้ความรู้ด้านวิทยาการคอมพิวเตอร์และเทคโนโลยีสารสนเทศในการแก้ปัญหา'],
-        ['code' => 'PLO2', 'description' => 'PLO2: ออกแบบและพัฒนาซอฟต์แวร์ตามหลักวิศวกรรมซอฟต์แวร์ที่เป็นมาตรฐาน'],
-        ['code' => 'PLO3', 'description' => 'PLO3: สื่อสารและทำงานร่วมกับผู้อื่นในสภาพแวดล้อมที่หลากหลายได้อย่างมีประสิทธิภาพ'],
-        ['code' => 'PLO4', 'description' => 'PLO4: มีจรรยาบรรณวิชาชีพและความรับผิดชอบต่อสังคม'],
-        ['code' => 'PLO5', 'description' => 'PLO5: ใฝ่รู้และสามารถเรียนรู้เทคโนโลยีใหม่ๆ ด้วยตนเองอย่างต่อเนื่อง']
-    ];
+    $plos = [];
+    $ylosByCode = [];
+    $closByCode = [];
 
-    $ylos = [
-        ['code' => 'YLO1', 'description' => 'YLO1: สร้างพื้นฐานการคิดเชิงคำนวณและการเขียนโปรแกรมเบื้องต้น'],
-        ['code' => 'YLO2', 'description' => 'YLO2: พัฒนาแอปพลิเคชันขนาดเล็กและจัดการระบบฐานข้อมูลได้'],
-        ['code' => 'YLO3', 'description' => 'YLO3: ประยุกต์เทคโนโลยีขั้นสูงในการแก้โจทย์ปัญหาเชิงอุตสาหกรรม'],
-        ['code' => 'YLO4', 'description' => 'YLO4: สร้างสรรค์งานวิจัยหรือนวัตกรรมซอฟต์แวร์พร้อมใช้']
-    ];
+    $frameworkStmt = $db->query("SELECT mapping_json FROM curriculum_framework WHERE is_active = 1 LIMIT 1");
+    $framework = $frameworkStmt->fetch(PDO::FETCH_ASSOC);
+    $mappingData = $framework && !empty($framework['mapping_json']) ? json_decode($framework['mapping_json'], true) : [];
 
-    $clos = [
-        ['code' => 'CLO1', 'description' => 'CLO1: อธิบายสถาปัตยกรรมและโครงสร้างของเทคโนโลยีที่ใช้ในโครงการได้'],
-        ['code' => 'CLO2', 'description' => 'CLO2: พัฒนาและติดตั้งระบบตามข้อกำหนดของโครงงานวิชาชีพ'],
-        ['code' => 'CLO3', 'description' => 'CLO3: วิเคราะห์ ประเมินผล และทดสอบประสิทธิภาพของระบบที่สร้างขึ้น'],
-        ['code' => 'CLO4', 'description' => 'CLO4: นำเสนอผลงานและจัดทำเอกสารประกอบทางเทคนิคได้อย่างถูกต้อง']
-    ];
+    foreach (($mappingData['plos'] ?? []) as $plo) {
+        $code = $plo['plo_id'] ?? null;
+        if ($code) {
+            $plos[] = [
+                'code' => $code,
+                'description' => $plo['plo_name'] ?? $code
+            ];
+        }
+
+        foreach (($plo['ylo_descriptions'] ?? []) as $yearKey => $description) {
+            $code = strtoupper(str_replace('YEAR_', 'YLO', strtoupper($yearKey)));
+            $ylosByCode[$code] = [
+                'code' => $code,
+                'description' => $code . ': ' . $description
+            ];
+        }
+    }
+
+    foreach (($mappingData['clos'] ?? []) as $clo) {
+        $code = $clo['subject_code'] ?? null;
+        if ($code) {
+            $closByCode[$code] = [
+                'code' => $code,
+                'description' => $code . ': ' . ($clo['subject_name'] ?? $code)
+            ];
+        }
+    }
+
+    $ylos = array_values($ylosByCode);
+    $clos = array_values($closByCode);
+
+    $ploCodes = array_column($plos, 'code');
+    $yloCodes = array_column($ylos, 'code');
+    $cloCodes = array_column($clos, 'code');
+
+    foreach ($matrix as $projectLinks) {
+        foreach ($projectLinks['plos'] as $code) {
+            if (!in_array($code, $ploCodes, true)) {
+                $plos[] = ['code' => $code, 'description' => $code . ' (legacy mapping)'];
+                $ploCodes[] = $code;
+            }
+        }
+        foreach ($projectLinks['ylos'] as $code) {
+            if (!in_array($code, $yloCodes, true)) {
+                $ylos[] = ['code' => $code, 'description' => $code . ' (legacy mapping)'];
+                $yloCodes[] = $code;
+            }
+        }
+        foreach ($projectLinks['clos'] as $code) {
+            if (!in_array($code, $cloCodes, true)) {
+                $clos[] = ['code' => $code, 'description' => $code . ' (legacy mapping)'];
+                $cloCodes[] = $code;
+            }
+        }
+    }
 
     echo json_encode([
         "status" => "success",

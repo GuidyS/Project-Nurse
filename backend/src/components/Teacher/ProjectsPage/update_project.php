@@ -25,7 +25,11 @@ try {
         $sql = "UPDATE project 
                 SET project_name_th = :name_th, 
                     project_name_en = :name_en, 
-                    description = :desc 
+                    description = :desc,
+                    academic_year = :academic_year,
+                    status = :status,
+                    start_date = :start_date,
+                    end_date = :end_date
                 WHERE project_id = :id";
         
         $stmt = $pdo->prepare($sql);
@@ -33,6 +37,10 @@ try {
             ':name_th' => $input['project_name_th'],
             ':name_en' => $input['project_name_en'] ?? '',
             ':desc' => $input['description'] ?? '',
+            ':academic_year' => $input['academic_year'] ?? null,
+            ':status' => $input['status'] ?? 'active',
+            ':start_date' => $input['start_date'] ?? null,
+            ':end_date' => $input['end_date'] ?? null,
             ':id' => $input['project_id']
         ]);
 

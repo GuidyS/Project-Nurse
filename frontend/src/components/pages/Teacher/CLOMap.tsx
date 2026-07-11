@@ -64,11 +64,17 @@ export default function CLOMap() {
       if (response.data.status === 'success') {
         toast({ title: "สำเร็จ", description: "บันทึกข้อมูล CLO Map เรียบร้อยแล้ว" });
         setIsEditing(false);
+        await fetchMapData();
       } else {
-        throw new Error(response.data.message);
+        toast({
+          title: "ล้มเหลว",
+          description: response.data?.message || "ไม่สามารถบันทึกข้อมูลได้",
+          variant: "destructive",
+        });
       }
-    } catch (error: any) {
-      toast({ title: "ล้มเหลว", description: error.message || "ไม่สามารถบันทึกข้อมูลได้", variant: "destructive" });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "ไม่สามารถบันทึกข้อมูลได้";
+      toast({ title: "ล้มเหลว", description: message, variant: "destructive" });
     }
   };
 

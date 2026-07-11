@@ -5,7 +5,8 @@ if (session_status() === PHP_SESSION_NONE) session_start();
 $possible_paths = [
     __DIR__ . '/config/config.php',
     __DIR__ . '/../config/config.php',
-    __DIR__ . '/../../config/config.php'
+    __DIR__ . '/../../config/config.php',
+    __DIR__ . '/../../../config/config.php'
 ];
 foreach ($possible_paths as $path) {
     if (file_exists($path)) {
@@ -36,16 +37,42 @@ try {
     }
 
     $projectId = $input['project_id'];
-    $links = $input['links']; 
+    $links = $input['links'];
 
-    $mapping_json_string = json_encode($links, JSON_UNESCAPED_UNICODE);
+    $normalizedLinks = [
+        'plos' => array_values(array_unique(array_filter($links['plos'] ?? [], 'is_string'))),
+        'ylos' => array_values(array_unique(array_filter($links['ylos'] ?? [], 'is_string'))),
+        'clos' => array_values(array_unique(array_filter($links['clos'] ?? [], 'is_string'))),
+    ];
 
-    $sql = "UPDATE project SET mapping_json = :mapping_json WHERE project_id = :project_id";
-    $stmt = $db->prepare($sql);
-    $stmt->execute([
-        ':mapping_json' => $mapping_json_string,
+    $db->beginTransaction();
+
+    $deleteStmt = $db->prepare("DELETE FROM project_outcome_links WHERE project_id = :project_id");
+    $deleteStmt->execute([':project_id' => $projectId]);
+
+    $insertStmt = $db->prepare("
+        INSERT INTO project_outcome_links (project_id, outcome_type, outcome_code)
+        VALUES (:project_id, :outcome_type, :outcome_code)
+    ");
+
+    foreach (['plos' => 'plo', 'ylos' => 'ylo', 'clos' => 'clo'] as $payloadKey => $outcomeType) {
+        foreach ($normalizedLinks[$payloadKey] as $code) {
+            $insertStmt->execute([
+                ':project_id' => $projectId,
+                ':outcome_type' => $outcomeType,
+                ':outcome_code' => $code
+            ]);
+        }
+    }
+
+    $mappingJsonString = json_encode($normalizedLinks, JSON_UNESCAPED_UNICODE);
+    $updateStmt = $db->prepare("UPDATE project SET mapping_json = :mapping_json WHERE project_id = :project_id");
+    $updateStmt->execute([
+        ':mapping_json' => $mappingJsonString,
         ':project_id' => $projectId
     ]);
+
+    $db->commit();
 
     echo json_encode([
         "status" => "success",
@@ -53,6 +80,9 @@ try {
     ]);
 
 } catch (Exception $e) {
+    if (isset($db) && $db->inTransaction()) {
+        $db->rollBack();
+    }
     http_response_code(500);
     echo json_encode(["status" => "error", "message" => $e->getMessage()]);
 }

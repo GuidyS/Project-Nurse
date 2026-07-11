@@ -208,8 +208,8 @@ try {
 
                 foreach ($uploadedPaths as $uploadedPath) {
                     $portfolioStmt = $db->prepare("
-                        INSERT INTO portfolio (student_id, title, type, description, file_name, file_path)
-                        VALUES (:student_id, :title, :type, :description, :file_name, :file_path)
+                        INSERT INTO portfolio (student_id, title, type, description, file_name, file_path, mime_type, file_category)
+                        VALUES (:student_id, :title, :type, :description, :file_name, :file_path, :mime_type, :file_category)
                     ");
                     $portfolioStmt->execute([
                         ':student_id' => $u_info['username'],
@@ -217,7 +217,9 @@ try {
                         ':type' => $meta['type'],
                         ':description' => 'อัปโหลดโดยผู้ดูแลระบบจากหน้าจัดการผู้ใช้',
                         ':file_name' => basename($uploadedPath),
-                        ':file_path' => $uploadedPath
+                        ':file_path' => $uploadedPath,
+                        ':mime_type' => 'application/pdf',
+                        ':file_category' => 'document'
                     ]);
                 }
             }

@@ -29,36 +29,18 @@ try {
             ar.target_ref_id,
             ar.title,
             ar.description,
+            ar.payload_json,
             ar.status,
             ar.review_note,
             ar.reviewed_at,
             ar.created_at,
             requester.username AS requester_username,
             reviewer.username AS reviewer_username,
-            CONCAT(COALESCE(f.title, ''), COALESCE(f.first_name_th, ''), ' ', COALESCE(f.last_name_th, '')) AS requester_full_name,
-            gcr.student_id AS grade_student_id,
-            gcr.subject_code AS grade_subject_code,
-            gcr.current_grade,
-            gcr.requested_grade,
-            str.student_id AS transfer_student_id,
-            str.from_advisor_user_id,
-            str.to_advisor_user_id,
-            par.project_id,
-            par.project_name,
-            par.academic_year,
-            par.budget_requested,
-            dar.document_ref,
-            dar.document_title,
-            dar.document_type,
-            dar.file_path
+            CONCAT(COALESCE(f.title, ''), COALESCE(f.first_name_th, ''), ' ', COALESCE(f.last_name_th, '')) AS requester_full_name
         FROM approval_requests ar
         LEFT JOIN users requester ON ar.requester_user_id = requester.user_id
         LEFT JOIN users reviewer ON ar.reviewed_by = reviewer.user_id
         LEFT JOIN faculty f ON requester.user_id = f.faculty_id
-        LEFT JOIN grade_change_requests gcr ON ar.approval_request_id = gcr.approval_request_id
-        LEFT JOIN student_transfer_requests str ON ar.approval_request_id = str.approval_request_id
-        LEFT JOIN project_approval_requests par ON ar.approval_request_id = par.approval_request_id
-        LEFT JOIN document_approval_requests dar ON ar.approval_request_id = dar.approval_request_id
         $where
         ORDER BY
             CASE ar.status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END,
@@ -73,45 +55,54 @@ try {
             $requesterName = $row['requester_username'] ?: 'ไม่ระบุผู้ร้องขอ';
         }
 
-        $detail = [];
+        $payload = [];
+        if (!empty($row['payload_json'])) {
+            $decodedPayload = json_decode($row['payload_json'], true);
+            $payload = is_array($decodedPayload) ? $decodedPayload : [];
+        } elseif (!empty($row['description']) && json_decode($row['description'], true) !== null) {
+            $decodedPayload = json_decode($row['description'], true);
+            $payload = is_array($decodedPayload) ? $decodedPayload : [];
+        }
+
+        $detail = $payload;
         $targetRefType = $row['target_ref_type'];
         $targetRefId = $row['target_ref_id'];
 
         if ($row['request_type'] === 'grade_change') {
             $detail = [
-                'studentId' => $row['grade_student_id'],
-                'subjectCode' => $row['grade_subject_code'],
-                'currentGrade' => $row['current_grade'],
-                'requestedGrade' => $row['requested_grade'],
+                'studentId' => $payload['student_id'] ?? null,
+                'subjectCode' => $payload['subject_code'] ?? null,
+                'currentGrade' => $payload['current_grade'] ?? null,
+                'requestedGrade' => $payload['requested_grade'] ?? null,
             ];
             $targetRefType = 'assessment';
-            $targetRefId = trim(($row['grade_student_id'] ?? '') . '-' . ($row['grade_subject_code'] ?? ''), '-');
+            $targetRefId = trim(($payload['student_id'] ?? '') . '-' . ($payload['subject_code'] ?? ''), '-') ?: $targetRefId;
         } elseif ($row['request_type'] === 'student_transfer') {
             $detail = [
-                'studentId' => $row['transfer_student_id'],
-                'fromAdvisorUserId' => $row['from_advisor_user_id'],
-                'toAdvisorUserId' => $row['to_advisor_user_id'],
+                'studentId' => $payload['student_id'] ?? null,
+                'fromAdvisorUserId' => $payload['from_advisor_user_id'] ?? null,
+                'toAdvisorUserId' => $payload['to_advisor_user_id'] ?? null,
             ];
             $targetRefType = 'student';
-            $targetRefId = $row['transfer_student_id'];
+            $targetRefId = $payload['student_id'] ?? $targetRefId;
         } elseif ($row['request_type'] === 'project_request') {
             $detail = [
-                'projectId' => $row['project_id'],
-                'projectName' => $row['project_name'],
-                'academicYear' => $row['academic_year'],
-                'budgetRequested' => $row['budget_requested'],
+                'projectId' => $payload['project_id'] ?? null,
+                'projectName' => $payload['project_name'] ?? null,
+                'academicYear' => $payload['academic_year'] ?? null,
+                'budgetRequested' => $payload['budget_requested'] ?? null,
             ];
             $targetRefType = 'project';
-            $targetRefId = $row['project_id'] ?: $row['project_name'];
+            $targetRefId = $payload['project_id'] ?? ($payload['project_name'] ?? $targetRefId);
         } elseif ($row['request_type'] === 'document_approve') {
             $detail = [
-                'documentRef' => $row['document_ref'],
-                'documentTitle' => $row['document_title'],
-                'documentType' => $row['document_type'],
-                'filePath' => $row['file_path'],
+                'documentRef' => $payload['document_ref'] ?? null,
+                'documentTitle' => $payload['document_title'] ?? null,
+                'documentType' => $payload['document_type'] ?? null,
+                'filePath' => $payload['file_path'] ?? null,
             ];
             $targetRefType = 'document';
-            $targetRefId = $row['document_ref'];
+            $targetRefId = $payload['document_ref'] ?? $targetRefId;
         }
 
         return [

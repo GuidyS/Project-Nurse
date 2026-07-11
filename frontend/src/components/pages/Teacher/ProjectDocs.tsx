@@ -1,4 +1,3 @@
-import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -6,6 +5,11 @@ import { Button } from '@/components/ui/button';
 import { FileText, Upload, Download, Eye, Plus, X } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react'; 
 import api from '@/lib/axios';
+
+interface ProjectOption {
+  id: number;
+  name: string;
+}
 
 const getTypeBadge = (type: string) => {
   switch (type) {
@@ -36,6 +40,7 @@ const getStatusBadge = (status: string) => {
 export default function ProjectDocs() {
   // --- States ---
   const [docs, setDocs] = useState<any[]>([]);
+  const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   
   // State สำหรับควบคุมการเปิด-ปิด Modal สร้างเอกสาร
@@ -44,7 +49,7 @@ export default function ProjectDocs() {
   // State สำหรับเก็บข้อมูลจากฟอร์ม
   const [formData, setFormData] = useState({
     name: '',
-    project: '',
+    project_id: '',
     type: 'proposal',
     date: ''
   });
@@ -62,7 +67,14 @@ export default function ProjectDocs() {
     api.get('/index.php?page=get-project-docs')
       .then((res) => {
         if (res.data.status === 'success') {
-          setDocs(res.data.data);
+          const payload = res.data.data;
+          if (Array.isArray(payload)) {
+            setDocs(payload);
+            setProjects([]);
+          } else {
+            setDocs(payload.docs || []);
+            setProjects(payload.projects || []);
+          }
         } else {
           console.error(res.data.message);
         }
@@ -88,7 +100,7 @@ export default function ProjectDocs() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.project || !formData.date) {
+    if (!formData.name || !formData.project_id || !formData.date) {
       alert("กรุณากรอกข้อมูลให้ครบถ้วนทุกช่องครับ");
       return;
     }
@@ -98,7 +110,7 @@ export default function ProjectDocs() {
       const res = await api.post('/index.php?page=create-project-doc', formData);
       if (res.data.status === 'success') {
         alert(res.data.message);
-        setFormData({ name: '', project: '', type: 'proposal', date: '' });
+        setFormData({ name: '', project_id: '', type: 'proposal', date: '' });
         setIsCreateOpen(false);
         fetchDocuments();
       } else {
@@ -131,7 +143,7 @@ export default function ProjectDocs() {
     uploadData.append('document_id', selectedDocId.toString());
 
     try {
-      const response = await api.post('/upload_project_file.php', uploadData, {
+      const response = await api.post('/index.php?page=upload-project-file', uploadData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       
@@ -150,7 +162,8 @@ export default function ProjectDocs() {
     }
   };
 
-  const API_BASE_URL = 'http://localhost'; 
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+  const getFileUrl = (filePath: string) => `${API_BASE_URL}/${filePath.replace(/^\/+/, '')}`;
 
   if (loading && docs.length === 0) {
     return <div className="p-6 text-center text-muted-foreground">กำลังโหลดข้อมูลเอกสารจากฐานข้อมูล...</div>;
@@ -291,7 +304,7 @@ export default function ProjectDocs() {
                             size="sm"
                             title="ดูเอกสาร"
                             disabled={!doc.file_path}
-                            onClick={() => window.open(`${API_BASE_URL}/${doc.file_path}`, '_blank')}
+                                onClick={() => window.open(getFileUrl(doc.file_path), '_blank')}
                           >
                             <Eye className="h-3 w-3" />
                           </Button>
@@ -305,7 +318,7 @@ export default function ProjectDocs() {
                             onClick={() => {
                               if (doc.file_path) {
                                 const link = document.createElement('a');
-                                link.href = `${API_BASE_URL}/${doc.file_path}`;
+                                link.href = getFileUrl(doc.file_path);
                                 link.download = doc.name; 
                                 document.body.appendChild(link);
                                 link.click();
@@ -359,15 +372,20 @@ export default function ProjectDocs() {
 
                 <div className="space-y-2">
                   <label className="text-sm font-medium leading-none">โครงการที่เกี่ยวข้อง</label>
-                  <input
-                    type="text"
-                    name="project"
-                    value={formData.project}
+                  <select
+                    name="project_id"
+                    value={formData.project_id}
                     onChange={handleInputChange}
-                    placeholder="เช่น โครงการพัฒนาระบบ AI สำหรับการศึกษา"
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                     required
-                  />
+                  >
+                    <option value="">เลือกโครงการ</option>
+                    {projects.map((project) => (
+                      <option key={project.id} value={project.id}>
+                        {project.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="space-y-2">
