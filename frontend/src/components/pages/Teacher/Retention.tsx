@@ -45,7 +45,7 @@ export default function Retention() {
       try {
         setLoading(true);
         setError("");
-        const res = await api.get("/index.php?page=get-dean-dashboard");
+        const res = await api.get("/index.php?page=get-retention");
         if (res.data.status === "success") {
           setData(res.data.data);
         } else {

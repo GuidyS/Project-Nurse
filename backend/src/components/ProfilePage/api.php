@@ -37,7 +37,17 @@ try {
             $stmt->execute(['id' => $u_info['username']]);
             $profile = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
 
-            $docStmt = $db->prepare("SELECT title, type, file_name, file_path FROM portfolio WHERE student_id = :id AND file_path LIKE '%.pdf' ORDER BY created_at DESC");
+            $docStmt = $db->prepare("
+                SELECT title, type, file_name, file_path
+                FROM portfolio
+                WHERE student_id = :id
+                  AND (
+                    mime_type = 'application/pdf'
+                    OR file_name LIKE '%.pdf'
+                    OR file_path LIKE '%.pdf'
+                  )
+                ORDER BY created_at DESC
+            ");
             $docStmt->execute(['id' => $u_info['username']]);
             $profile['pdf_documents'] = $docStmt->fetchAll(PDO::FETCH_ASSOC);
 

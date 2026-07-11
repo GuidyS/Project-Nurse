@@ -107,6 +107,24 @@ return (
             )}
           </div>
         </div>
+        
+        {/* Summary */}
+        <div className="grid gap-4 md:grid-cols-4 lg:grid-cols-8">
+          {plos.map((plo) => {
+            const count = Object.values(cloMap).filter(plos => plos.includes(plo)).length;
+            return (
+              <Card key={plo}>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg">{plo}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{count}</div>
+                  <p className="text-sm text-muted-foreground">รายวิชาที่ครอบคลุม</p>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
 
         {/* CLO Map Table */}
         <Card>
@@ -152,24 +170,6 @@ return (
             </Table>
           </CardContent>
         </Card>
-
-        {/* Summary */}
-        <div className="grid gap-4 md:grid-cols-4 lg:grid-cols-6">
-          {plos.map((plo) => {
-            const count = Object.values(cloMap).filter(plos => plos.includes(plo)).length;
-            return (
-              <Card key={plo}>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg">{plo}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{count}</div>
-                  <p className="text-sm text-muted-foreground">รายวิชาที่ครอบคลุม</p>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
       </div>
     </>
   );

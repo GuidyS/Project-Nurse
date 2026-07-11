@@ -26,6 +26,9 @@
             case 'reset-password':
                 require_once 'components/Auth/reset-password.php';
                 break;
+            case 'change-password':
+                require_once 'components/Auth/change-password.php';
+                break;
             case 'profile':
                 require_once 'components/ProfilePage/api.php';
                 break;
@@ -221,6 +224,11 @@
             // DeanDashboard
             case 'get-dean-dashboard':
                 require_once 'components/Teacher/DeanDashboard/get_dean_dashboard.php';
+                break;
+
+            // Retention
+            case 'get-retention':
+                require_once 'components/Teacher/Retention/get_retention.php';
                 break;
 
             // PLOYLOReport

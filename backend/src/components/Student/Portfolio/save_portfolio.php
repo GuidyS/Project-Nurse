@@ -19,6 +19,8 @@ try {
     
     $fileName = null;
     $filePath = null;
+    $mimeType = null;
+    $fileCategory = 'document';
 
     // ระบบจัดการไฟล์อัปโหลด
     if (isset($_FILES['file']) && $_FILES['file']['error'] === UPLOAD_ERR_OK) {
@@ -35,6 +37,9 @@ try {
             throw new Exception("นามสกุลไฟล์ไม่รองรับ");
         }
 
+        $mimeType = mime_content_type($file['tmp_name']) ?: null;
+        $fileCategory = in_array($ext, ['jpg', 'jpeg', 'png']) ? 'image' : 'document';
+
         $newFileName = "PORT_" . $student_id . "_" . time() . "_" . uniqid() . "." . $ext;
         $destPath = $uploadDir . $newFileName;
 
@@ -47,8 +52,8 @@ try {
     }
 
     $db = new Connect();
-    $sql = "INSERT INTO portfolio (student_id, title, type, description, file_name, file_path) 
-            VALUES (:sid, :title, :type, :desc, :fname, :fpath)";
+    $sql = "INSERT INTO portfolio (student_id, title, type, description, file_name, file_path, mime_type, file_category) 
+            VALUES (:sid, :title, :type, :desc, :fname, :fpath, :mime_type, :file_category)";
     
     $stmt = $db->prepare($sql);
     $stmt->execute([
@@ -57,7 +62,9 @@ try {
         ':type' => $type,
         ':desc' => $description,
         ':fname' => $fileName,
-        ':fpath' => $filePath
+        ':fpath' => $filePath,
+        ':mime_type' => $mimeType,
+        ':file_category' => $fileCategory
     ]);
 
     echo json_encode(["status" => "success", "message" => "เพิ่มผลงานสำเร็จ"]);

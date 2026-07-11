@@ -17,7 +17,7 @@ try {
     $db = new Connect();
     
     // ดึงที่อยู่ไฟล์เพื่อลบออกจาก Server ก่อน
-    $stmt = $db->prepare("SELECT file_path FROM portfolio WHERE id = :id AND student_id = :sid");
+    $stmt = $db->prepare("SELECT file_path FROM portfolio WHERE portfolio_id = :id AND student_id = :sid");
     $stmt->execute([':id' => $item_id, ':sid' => $student_id]);
     $item = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -29,7 +29,7 @@ try {
     }
 
     // ลบข้อมูลออกจากฐานข้อมูล
-    $delStmt = $db->prepare("DELETE FROM portfolio WHERE id = :id AND student_id = :sid");
+    $delStmt = $db->prepare("DELETE FROM portfolio WHERE portfolio_id = :id AND student_id = :sid");
     $delStmt->execute([':id' => $item_id, ':sid' => $student_id]);
 
     echo json_encode(["status" => "success", "message" => "ลบผลงานสำเร็จ"]);

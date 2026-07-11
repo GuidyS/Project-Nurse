@@ -15,7 +15,7 @@ if (!$student_id) {
 
 try {
     $db = new Connect();
-    $sql = "SELECT id, title, type, description, DATE_FORMAT(created_at, '%Y-%m-%d') as date, file_name 
+    $sql = "SELECT portfolio_id AS id, title, type, description, DATE_FORMAT(created_at, '%Y-%m-%d') as date, file_name 
             FROM portfolio 
             WHERE student_id = :student_id 
             ORDER BY created_at DESC";

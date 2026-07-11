@@ -47,7 +47,6 @@ import UsersManagement from "@/components/pages/Admin/UsersManagement";
 import Dashboard from "@/components/pages/Teacher/Dashboard";
 import DeanDashboard from "@/components/pages/Teacher/DeanDashboard";
 import Retention from "@/components/pages/Teacher/Retention";
-import Home from '@/components/pages/Teacher/Home';
 
 const Index = () => {
   const [activeItem, setActiveItem] = useState(() => {

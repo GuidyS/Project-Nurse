@@ -1,10 +1,20 @@
 <?php
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 require_once __DIR__ . '/../../../config/config.php';
 header("Content-Type: application/json");
 
 try {
+    if (!isset($_SESSION['user_id'])) {
+        http_response_code(401);
+        echo json_encode(["status" => "error", "message" => "Unauthorized"], JSON_UNESCAPED_UNICODE);
+        exit();
+    }
+
     $db = new Connect();
     $method = $_SERVER['REQUEST_METHOD'];
+    $actorUserId = (int)$_SESSION['user_id'];
     $positionMap = [
         'dean' => 1,
         'instructor' => 2,
@@ -42,12 +52,12 @@ try {
                 "primaryPosition" => $primaryPosition,
                 "secondaryPositions" => array_values(array_unique($secondaryPositions))
             ]
-        ]);
+        ], JSON_UNESCAPED_UNICODE);
         exit;
     }
 
     $data = json_decode(file_get_contents("php://input"), true) ?: [];
-    
+
     $userId = $data['userId'] ?? null;
     $newRole = $data['newRole'] ?? null; // admin, teacher, student
     $primaryPosition = $data['primaryPosition'] ?? ($data['newSubRole'] ?? null);
@@ -55,9 +65,19 @@ try {
 
     if (!$userId || !$newRole) throw new Exception("ข้อมูลไม่ครบถ้วน");
 
+    // กันผู้ดูแลแก้ role/position ของตัวเอง
+    if ((int)$userId === $actorUserId) {
+        http_response_code(403);
+        echo json_encode([
+            "status" => "error",
+            "message" => "ไม่สามารถเปลี่ยน Role หรือตำแหน่งของบัญชีตัวเองได้ กรุณาให้ผู้ดูแลระบบคนอื่นดำเนินการแทน",
+        ], JSON_UNESCAPED_UNICODE);
+        exit();
+    }
+
     // แปลง Role
     $roleId = ($newRole == 'admin') ? 1 : (($newRole == 'teacher') ? 2 : 3);
-    
+
     $db->beginTransaction();
 
     // 1. อัปเดตตาราง users
@@ -93,9 +113,9 @@ try {
     }
 
     $db->commit();
-    echo json_encode(["status" => "success", "message" => "อัปเดต Role สำเร็จ"]);
+    echo json_encode(["status" => "success", "message" => "อัปเดต Role สำเร็จ"], JSON_UNESCAPED_UNICODE);
 } catch (Exception $e) {
-    if ($db->inTransaction()) $db->rollBack();
+    if (isset($db) && $db->inTransaction()) $db->rollBack();
     http_response_code(400);
-    echo json_encode(["status" => "error", "message" => $e->getMessage()]);
+    echo json_encode(["status" => "error", "message" => $e->getMessage()], JSON_UNESCAPED_UNICODE);
 }

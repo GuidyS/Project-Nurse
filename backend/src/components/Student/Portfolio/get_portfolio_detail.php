@@ -37,7 +37,7 @@ try {
     
     // คิวรีดึงข้อมูลเฉพาะชิ้น โดยดักเงื่อนไข student_id ควบคู่ไปด้วยเสมอเพื่อความปลอดภัยสูงสุด
     $sql = "SELECT 
-                id, 
+                portfolio_id AS id, 
                 title, 
                 type, 
                 description, 
@@ -45,7 +45,7 @@ try {
                 file_path as filePath,
                 DATE_FORMAT(created_at, '%Y-%m-%d %H:%i') as date 
             FROM portfolio 
-            WHERE id = :id AND student_id = :student_id 
+            WHERE portfolio_id = :id AND student_id = :student_id 
             LIMIT 1";
             
     $stmt = $db->prepare($sql);

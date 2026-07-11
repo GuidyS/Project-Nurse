@@ -25,6 +25,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
+import { PASSWORD_POLICY_HINT, validatePasswordPolicy } from "@/lib/passwordPolicy";
 
 const SettingsPage = () => {
   const { toast } = useToast();
@@ -74,6 +75,7 @@ const SettingsPage = () => {
     new: "",
     confirm: "",
   });
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   useEffect(() => {
     applyTheme(settings.theme);
@@ -134,7 +136,15 @@ const SettingsPage = () => {
     }
   };
 
-  const handleChangePassword = () => {
+  const handleChangePassword = async () => {
+    if (!passwords.current || !passwords.new || !passwords.confirm) {
+      toast({
+        title: "ข้อมูลไม่ครบ",
+        description: "กรุณากรอกรหัสผ่านให้ครบทุกช่อง",
+        variant: "destructive",
+      });
+      return;
+    }
     if (passwords.new !== passwords.confirm) {
       toast({
         title: "รหัสผ่านไม่ตรงกัน",
@@ -143,19 +153,61 @@ const SettingsPage = () => {
       });
       return;
     }
-    if (passwords.new.length < 8) {
+    if (passwords.new.length < 12) {
       toast({
         title: "รหัสผ่านสั้นเกินไป",
-        description: "รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร",
+        description: PASSWORD_POLICY_HINT,
         variant: "destructive",
       });
       return;
     }
-    toast({
-      title: "เปลี่ยนรหัสผ่านสำเร็จ",
-      description: "รหัสผ่านของคุณได้รับการเปลี่ยนแล้ว",
-    });
-    setPasswords({ current: "", new: "", confirm: "" });
+    const policyError = validatePasswordPolicy(passwords.new);
+    if (policyError) {
+      toast({
+        title: "รหัสผ่านไม่ผ่านนโยบาย",
+        description: policyError,
+        variant: "destructive",
+      });
+      return;
+    }
+    if (passwords.current === passwords.new) {
+      toast({
+        title: "รหัสผ่านซ้ำ",
+        description: "รหัสผ่านใหม่ต้องต่างจากรหัสผ่านปัจจุบัน",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      const res = await api.post("/index.php?page=change-password", {
+        current_password: passwords.current,
+        new_password: passwords.new,
+        confirm_password: passwords.confirm,
+      });
+
+      if (res.data?.status !== "success") {
+        throw new Error(res.data?.message || "ไม่สามารถเปลี่ยนรหัสผ่านได้");
+      }
+
+      toast({
+        title: "เปลี่ยนรหัสผ่านสำเร็จ",
+        description: res.data?.message || "รหัสผ่านของคุณได้รับการเปลี่ยนแล้ว",
+      });
+      setPasswords({ current: "", new: "", confirm: "" });
+    } catch (error: unknown) {
+      const message =
+        (error as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ||
+        (error instanceof Error ? error.message : "ไม่สามารถเปลี่ยนรหัสผ่านได้");
+      toast({
+        title: "เปลี่ยนรหัสผ่านไม่สำเร็จ",
+        description: message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsChangingPassword(false);
+    }
   };
 
   return (
@@ -372,7 +424,7 @@ const SettingsPage = () => {
                   type={showNewPassword ? "text" : "password"}
                   value={passwords.new}
                   onChange={(e) => setPasswords({ ...passwords, new: e.target.value })}
-                  placeholder="กรอกรหัสผ่านใหม่ (อย่างน้อย 8 ตัวอักษร)"
+                  placeholder="กรอกรหัสผ่านใหม่ (อย่างน้อย 12 ตัวอักษร + ตัวเลข)"
                 />
                 <Button
                   type="button"
@@ -388,6 +440,7 @@ const SettingsPage = () => {
                   )}
                 </Button>
               </div>
+              <p className="text-xs text-muted-foreground">{PASSWORD_POLICY_HINT}</p>
             </div>
 
             <div className="space-y-2">
@@ -401,9 +454,13 @@ const SettingsPage = () => {
               />
             </div>
 
-            <Button onClick={handleChangePassword} className="w-full sm:w-auto">
+            <Button
+              onClick={handleChangePassword}
+              className="w-full sm:w-auto"
+              disabled={isChangingPassword}
+            >
               <Lock className="h-4 w-4 mr-2" />
-              เปลี่ยนรหัสผ่าน
+              {isChangingPassword ? "กำลังเปลี่ยนรหัสผ่าน..." : "เปลี่ยนรหัสผ่าน"}
             </Button>
           </CardContent>
         </Card>

@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -61,6 +60,20 @@ export default function RolesManagement() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { toast } = useToast();
 
+  const currentUserId = (() => {
+    try {
+      const raw = localStorage.getItem("user");
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      return parsed?.user_id != null ? String(parsed.user_id) : null;
+    } catch {
+      return null;
+    }
+  })();
+
+  const isSelfUser = (userId: string) =>
+    currentUserId != null && String(userId) === String(currentUserId);
+
 // ดึงข้อมูลผู้ใช้จาก API ตัวเดียวกัน
   const fetchUsers = async () => {
     try {
@@ -81,6 +94,14 @@ export default function RolesManagement() {
 
   const handleAssignRole = async () => {
     if (!selectedUser || !newRole) return;
+    if (isSelfUser(selectedUser.id)) {
+      toast({
+        title: "ไม่สามารถแก้ไขบัญชีตัวเองได้",
+        description: "กรุณาให้ผู้ดูแลระบบคนอื่นเปลี่ยน Role หรือตำแหน่งแทน",
+        variant: "destructive",
+      });
+      return;
+    }
     if (newRole === "teacher" && !primaryPosition) {
       toast({ title: "กรุณาเลือกตำแหน่งหลัก", variant: "destructive" });
       return;
@@ -97,8 +118,12 @@ export default function RolesManagement() {
       toast({ title: "มอบหมาย Role สำเร็จ" });
       setIsDialogOpen(false);
       fetchUsers(); // โหลดข้อมูลใหม่เพื่อให้ UI อัปเดต
-    } catch (error) {
-      toast({ title: "เกิดข้อผิดพลาด", variant: "destructive" });
+    } catch (error: any) {
+      toast({
+        title: "เกิดข้อผิดพลาด",
+        description: error.response?.data?.message || "ไม่สามารถอัปเดต Role ได้",
+        variant: "destructive",
+      });
     }
   };
 
@@ -125,6 +150,15 @@ export default function RolesManagement() {
   };
 
   const openAssignDialog = async (user: UserWithRole) => {
+    if (isSelfUser(user.id)) {
+      toast({
+        title: "ไม่สามารถแก้ไขบัญชีตัวเองได้",
+        description: "กรุณาให้ผู้ดูแลระบบคนอื่นเปลี่ยน Role หรือตำแหน่งแทน",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setSelectedUser(user);
     setNewRole(user.currentRole);
     setPrimaryPosition(user.teacherSubRole || "");
@@ -225,10 +259,14 @@ export default function RolesManagement() {
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="outline" size="sm" onClick={() => openAssignDialog(user)} className="gap-2">
-                        <UserCog className="h-4 w-4" />
-                        จัดการ Role
-                      </Button>
+                      {isSelfUser(user.id) ? (
+                        <Badge variant="secondary">ผู้ดูแลระบบ</Badge>
+                      ) : (
+                        <Button variant="outline" size="sm" onClick={() => openAssignDialog(user)} className="gap-2">
+                          <UserCog className="h-4 w-4" />
+                          จัดการ Role
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
