@@ -46,10 +46,11 @@ export default function Advises() {
     fetchAdvisees();
   }, []);
 
+  // String(... ?? '') กันค่า null/ตัวเลข ไม่ให้หน้าจอพังตอนค้นหา
   const filteredAdvisees = advisees.filter(
     (student) =>
-      student.name.includes(searchTerm) ||
-      student.studentId.includes(searchTerm)
+      String(student.name ?? '').includes(searchTerm) ||
+      String(student.studentId ?? '').includes(searchTerm)
   );
 
   const stats = {
@@ -160,10 +161,9 @@ export default function Advises() {
                       <TableCell className="text-center">{getStatusBadge(student.status)}</TableCell>
                       <TableCell className="text-center text-muted-foreground">{student.lastContact}</TableCell>
                       <TableCell className="text-center">
-                        <div className="flex justify-center gap-2">
-                          <Button variant="outline" size="sm">ดูโปรไฟล์</Button>
-                          <Button size="sm">บันทึกคำปรึกษา</Button>
-                        </div>
+                        <Button size="sm" onClick={() => { window.location.href = "/?page=advise-notes"; }}>
+                          บันทึกคำปรึกษา
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}

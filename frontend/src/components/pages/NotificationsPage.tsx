@@ -44,25 +44,29 @@ interface Notification {
   channel: "in-app" | "email" | "both";
   direction: "received" | "sent";
   recipient: string;
+  sender?: string;
   isRead: boolean;
   createdAt: string;
 }
 
 type NotificationCategory = "general" | "student" | "request" | "grade" | "project";
 
-interface Student {
+interface Recipient {
   id: number;
   name: string;
-  studentId: string;
+  identifier: string; // รองรับทั้งรหัสนศ., รหัสอจ., username
+  role_id: number;
 }
 
 const NotificationsPage = () => {
   const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
   const canSendNotifications = Number(currentUser.role_id) !== 3;
+  const roleId = Number(currentUser.role_id);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [students, setStudents] = useState<Student[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [selectedStudents, setSelectedStudents] = useState<number[]>([]);
+  const [recipients, setRecipients] = useState<Recipient[]>([]);
+  const [selectedRecipients, setSelectedRecipients] = useState<number[]>([]);
+  const [recipientSearch, setRecipientSearch] = useState("");
   const [notificationTitle, setNotificationTitle] = useState("");
   const [notificationMessage, setNotificationMessage] = useState("");
   const [notificationChannel, setNotificationChannel] =
@@ -71,8 +75,9 @@ const NotificationsPage = () => {
     useState<Notification["type"]>("info");
   const [notificationCategory, setNotificationCategory] =
     useState<NotificationCategory>("student");
-  const [studentSearch, setStudentSearch] = useState("");
   const [isSending, setIsSending] = useState(false);
+  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
+  const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
   const { toast } = useToast();
 
   const unreadCount = notifications.filter(
@@ -83,23 +88,60 @@ const NotificationsPage = () => {
   ).length;
   const sentCount = notifications.filter((n) => n.direction === "sent").length;
 
-  const filteredStudents = useMemo(
-    () => students.filter((student) => student.studentId.includes(studentSearch)),
-    [students, studentSearch]
+  const filteredRecipients = useMemo(
+    () => recipients.filter((rec) => 
+      rec.identifier.toLowerCase().includes(recipientSearch.toLowerCase()) || 
+      rec.name.toLowerCase().includes(recipientSearch.toLowerCase())
+    ),
+    [recipients, recipientSearch]
   );
 
-  const allFilteredSelected =
-    filteredStudents.length > 0 &&
-    filteredStudents.every((student) => selectedStudents.includes(student.id));
+  const allFilteredSelected = filteredRecipients.length > 0 && filteredRecipients.every((rec) => selectedRecipients.includes(rec.id));
+
+  // 🎯 ฟังก์ชันกรอง "ประเภทแจ้งเตือน" ตาม Role
+  const getTypeOptions = () => {
+    if (roleId === 1) {
+      // Admin: เน้นเรื่องประกาศระบบทั่วไป ไม่มีเรื่องคำร้องขอ (Request)
+      return [
+        { value: "info", label: "ทั่วไป (Info)" },
+        { value: "warning", label: "ประกาศเตือน (Warning)" },
+        { value: "success", label: "สำเร็จ (Success)" },
+      ];
+    }
+    // Teacher: มีเรื่องคำขอ/ส่งเอกสารเพิ่มเข้ามา
+    return [
+      { value: "info", label: "ทั่วไป" },
+      { value: "warning", label: "เตือน" },
+      { value: "success", label: "สำเร็จ" },
+      { value: "request", label: "คำขอ / ส่งเอกสาร" },
+    ];
+  };
+
+  // 🎯 ฟังก์ชันกรอง "หมวดการตั้งค่า" ตาม Role
+  const getCategoryOptions = () => {
+    if (roleId === 1) {
+      // Admin: มีแค่หมวดประกาศทั่วไปของระบบ
+      return [
+        { value: "general", label: "ประกาศทั่วไป / ระบบ" },
+      ];
+    }
+    // Teacher: มีหมวดหมู่เกี่ยวกับการเรียนการสอนครบถ้วน
+    return [
+      { value: "student", label: "เรื่องนักศึกษาทั่วไป" },
+      { value: "request", label: "เอกสาร / คำร้องต่างๆ" },
+      { value: "grade", label: "เรื่องเกรด / ผลการเรียน" },
+      { value: "project", label: "เรื่องโครงการ" },
+    ];
+  };
 
   const resetForm = () => {
     setNotificationTitle("");
     setNotificationMessage("");
     setNotificationChannel("both");
     setNotificationType("info");
-    setNotificationCategory("student");
-    setSelectedStudents([]);
-    setStudentSearch("");
+    setNotificationCategory(roleId === 1 ? "general" : "student");
+    setSelectedRecipients([]);
+    setRecipientSearch
   };
 
   const loadNotifications = async () => {
@@ -126,27 +168,21 @@ const NotificationsPage = () => {
     }
   };
 
-  const loadStudents = async () => {
+  const loadRecipients = async () => {
     try {
-      const response = await api.get("/index.php?page=get-notification-students");
-      const data = Array.isArray(response.data)
-        ? response.data
-        : response.data?.data;
-      setStudents(Array.isArray(data) ? data : []);
+      const response = await api.get("/index.php?page=get-notification-students"); // เรียกไฟล์เดิมที่คุณอัปเดตโค้ดข้างบน
+      const data = Array.isArray(response.data) ? response.data : response.data?.data;
+      setRecipients(Array.isArray(data) ? data : []);
     } catch (error) {
-      setStudents([]);
-      toast({
-        title: "โหลดรายชื่อนักศึกษาไม่สำเร็จ",
-        description: "ไม่สามารถโหลดรายชื่อนักศึกษาสำหรับแจ้งเตือนได้",
-        variant: "destructive",
-      });
+      setRecipients([]);
+      toast({ title: "โหลดรายชื่อผู้รับไม่สำเร็จ", variant: "destructive" });
     }
   };
 
   useEffect(() => {
     loadNotifications();
     if (canSendNotifications) {
-      loadStudents();
+      loadRecipients();
     }
   }, [canSendNotifications]);
 
@@ -206,6 +242,7 @@ const NotificationsPage = () => {
       setNotifications((prev) =>
         prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
       );
+      window.dispatchEvent(new Event("updateNotificationBadge"));
     } catch (error) {
       toast({ title: "อ่านแจ้งเตือนไม่สำเร็จ", variant: "destructive" });
     }
@@ -216,6 +253,7 @@ const NotificationsPage = () => {
       await api.post("/index.php?page=mark-notification-read", {});
       setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
       toast({ title: "อ่านทั้งหมดแล้ว" });
+      window.dispatchEvent(new Event("updateNotificationBadge"));
     } catch (error) {
       toast({ title: "อ่านทั้งหมดไม่สำเร็จ", variant: "destructive" });
     }
@@ -226,32 +264,33 @@ const NotificationsPage = () => {
       await api.post("/index.php?page=delete-notification", { id });
       setNotifications((prev) => prev.filter((n) => n.id !== id));
       toast({ title: "ลบแจ้งเตือนสำเร็จ" });
+      window.dispatchEvent(new Event("updateNotificationBadge"));
     } catch (error) {
       toast({ title: "ลบแจ้งเตือนไม่สำเร็จ", variant: "destructive" });
     }
   };
 
-  const toggleStudent = (studentId: number) => {
-    setSelectedStudents((prev) =>
-      prev.includes(studentId)
-        ? prev.filter((id) => id !== studentId)
-        : [...prev, studentId]
-    );
+  const handleCardClick = (notification: Notification) => {
+    setSelectedNotification(notification);
+    setIsDetailDialogOpen(true); // เปิดหน้าต่างดูรายละเอียด
+
+    // หากเป็นการแจ้งเตือนที่เราได้รับและยังไม่ได้อ่าน ให้ปรับสถานะเป็นอ่านแล้วโดยอัตโนมัติ
+    if (notification.direction === "received" && !notification.isRead) {
+      markAsRead(notification.id);
+    }
   };
 
-  const selectAllStudents = () => {
-    const filteredStudentIds = filteredStudents.map((s) => s.id);
+  const toggleRecipient = (userId: number) => {
+    setSelectedRecipients((prev) => prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]);
+  };
 
+  const selectAllRecipients = () => {
+    const filteredIds = filteredRecipients.map((s) => s.id);
     if (allFilteredSelected) {
-      setSelectedStudents((prev) =>
-        prev.filter((id) => !filteredStudentIds.includes(id))
-      );
-      return;
+      setSelectedRecipients((prev) => prev.filter((id) => !filteredIds.includes(id)));
+    } else {
+      setSelectedRecipients((prev) => Array.from(new Set([...prev, ...filteredIds])));
     }
-
-    setSelectedStudents((prev) =>
-      Array.from(new Set([...prev, ...filteredStudentIds]))
-    );
   };
 
   const sendNotification = async () => {
@@ -264,7 +303,7 @@ const NotificationsPage = () => {
       return;
     }
 
-    if (!notificationTitle.trim() || !notificationMessage.trim() || selectedStudents.length === 0) {
+    if (!notificationTitle.trim() || !notificationMessage.trim() || selectedRecipients.length === 0) {
       toast({
         title: "กรุณากรอกข้อมูลให้ครบ",
         description: "ต้องระบุหัวข้อ เนื้อหา และเลือกนักศึกษาอย่างน้อย 1 คน",
@@ -282,9 +321,9 @@ const NotificationsPage = () => {
         channel: notificationChannel,
         type: notificationType,
         category: notificationCategory,
-        student_ids: selectedStudents,
+        recipient_ids: selectedRecipients,
       });
-      const sent = Number(response.data?.sent ?? selectedStudents.length);
+      const sent = Number(response.data?.sent ?? selectedRecipients.length);
       const skipped = Number(response.data?.skipped ?? 0);
 
       await loadNotifications();
@@ -324,6 +363,12 @@ const NotificationsPage = () => {
     }
   };
 
+  const getRoleBadge = (roleId: number) => {
+    if (roleId === 1) return <Badge className="bg-destructive hover:bg-destructive text-[10px] h-4">Admin</Badge>;
+    if (roleId === 2) return <Badge className="bg-blue-500 hover:bg-blue-600 text-[10px] h-4">อาจารย์</Badge>;
+    return <Badge className="bg-emerald-500 hover:bg-emerald-600 text-[10px] h-4">นักศึกษา</Badge>;
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -337,7 +382,7 @@ const NotificationsPage = () => {
             )}
           </h1>
           <p className="text-muted-foreground mt-1">
-            จัดการและส่งการแจ้งเตือนให้นักศึกษา (FR010, FR016)
+            จัดการและส่งการแจ้งเตือนให้นักศึกษา
           </p>
         </div>
         <div className="flex gap-2">
@@ -413,10 +458,12 @@ const NotificationsPage = () => {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="info">ทั่วไป</SelectItem>
-                          <SelectItem value="warning">เตือน</SelectItem>
-                          <SelectItem value="success">สำเร็จ</SelectItem>
-                          <SelectItem value="request">คำขอ</SelectItem>
+                          {/* 🎯 เรียกใช้ฟังก์ชันดึงตัวเลือกประเภทตาม Role */}
+                          {getTypeOptions().map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -433,11 +480,12 @@ const NotificationsPage = () => {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="general">ทั่วไป</SelectItem>
-                          <SelectItem value="student">นักศึกษา</SelectItem>
-                          <SelectItem value="request">คำขอนักศึกษา</SelectItem>
-                          <SelectItem value="grade">เกรด</SelectItem>
-                          <SelectItem value="project">โครงการ</SelectItem>
+                          {/* 🎯 เรียกใช้ฟังก์ชันดึงตัวเลือกหมวดหมู่ตาม Role */}
+                          {getCategoryOptions().map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -445,47 +493,39 @@ const NotificationsPage = () => {
 
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <Label>เลือกนักศึกษา ({selectedStudents.length} คน)</Label>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={selectAllStudents}
-                        disabled={filteredStudents.length === 0}
-                      >
+                      <Label>เลือกผู้รับการแจ้งเตือน ({selectedRecipients.length} คน)</Label>
+                      <Button variant="ghost" size="sm" onClick={selectAllRecipients} disabled={filteredRecipients.length === 0}>
                         {allFilteredSelected ? "ยกเลิกทั้งหมด" : "เลือกทั้งหมด"}
                       </Button>
                     </div>
                     <Input
-                      inputMode="numeric"
-                      maxLength={10}
-                      placeholder="ค้นหารหัสนักศึกษา"
-                      value={studentSearch}
-                      onChange={(e) =>
-                        setStudentSearch(e.target.value.replace(/\D/g, "").slice(0, 10))
-                      }
+                      placeholder="ค้นหาชื่อ หรือ รหัสประจำตัว/Username..."
+                      value={recipientSearch}
+                      onChange={(e) => setRecipientSearch(e.target.value)}
                     />
                     <div className="border rounded-lg max-h-[200px] overflow-y-auto">
-                      {filteredStudents.length > 0 ? (
-                        filteredStudents.map((student) => (
+                      {filteredRecipients.length > 0 ? (
+                        filteredRecipients.map((rec) => (
                           <label
-                            key={student.id}
+                            key={rec.id}
                             className="flex items-center gap-3 p-3 hover:bg-muted cursor-pointer border-b last:border-0"
                           >
                             <Checkbox
-                              checked={selectedStudents.includes(student.id)}
-                              onCheckedChange={() => toggleStudent(student.id)}
+                              checked={selectedRecipients.includes(rec.id)}
+                              onCheckedChange={() => toggleRecipient(rec.id)}
                             />
-                            <div>
-                              <p className="text-sm font-medium">{student.name}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {student.studentId}
-                              </p>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between">
+                                <p className="text-sm font-medium truncate">{rec.name}</p>
+                                {getRoleBadge(rec.role_id)}
+                              </div>
+                              <p className="text-xs text-muted-foreground">{rec.identifier}</p>
                             </div>
                           </label>
                         ))
                       ) : (
-                        <div className="p-3 text-sm text-muted-foreground">
-                          ไม่พบนักศึกษาที่ตรงกับรหัสที่ค้นหา
+                        <div className="p-3 text-sm text-center text-muted-foreground">
+                          ไม่พบผู้รับที่ตรงกับการค้นหา
                         </div>
                       )}
                     </div>
@@ -554,8 +594,12 @@ const NotificationsPage = () => {
               filteredNotifications(tab).map((notification) => (
                 <div
                   key={notification.id}
-                  className={`bg-card rounded-xl shadow-card p-4 flex items-start gap-4 transition-colors ${
-                    !notification.isRead ? "border-l-4 border-l-primary" : ""
+                  onClick={() => handleCardClick(notification)} 
+                  // 🎯 เพิ่ม border border-transparent และ hover:border-primary/60 เพื่อทำกรอบสีเมื่อเอาเมาส์วาง
+                  className={`bg-card rounded-xl shadow-card p-4 flex items-start gap-4 transition-all cursor-pointer hover:bg-muted/50 hover:shadow-md border border-transparent hover:border-primary/60 ${
+                    !notification.isRead 
+                      ? "border-l-4 border-l-primary" // ขอบซ้ายหนา 4px กรณีที่ยังไม่อ่าน
+                      : "opacity-90 border-border/40" // ขอบจางๆ กรณีที่อ่านแล้ว
                   }`}
                 >
                   <div className="p-2 bg-muted rounded-lg flex-shrink-0">
@@ -578,7 +622,11 @@ const NotificationsPage = () => {
                         <Clock className="h-3 w-3" />
                         {notification.createdAt}
                       </span>
-                      <span>ถึง: {notification.recipient}</span>
+                      <span>
+                        {notification.direction === 'sent' 
+                          ? `ถึง: ${notification.recipient}` 
+                          : `จาก: ${notification.sender || 'ระบบ'}`}
+                      </span>
                     </div>
                   </div>
                   <div className="flex items-center gap-1">
@@ -586,8 +634,11 @@ const NotificationsPage = () => {
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8"
-                        onClick={() => markAsRead(notification.id)}
+                        className="h-8 w-8 hover:bg-primary/20 hover:text-primary z-10"
+                        onClick={(e) => {
+                          e.stopPropagation(); // 🎯 5. ดักจับ Event ไม่ให้การกดปุ่ม "ติ๊กอ่านแล้ว" ทะลุไปเปิดหน้าต่างรายละเอียด
+                          markAsRead(notification.id);
+                        }}
                       >
                         <Check className="h-4 w-4" />
                       </Button>
@@ -595,8 +646,11 @@ const NotificationsPage = () => {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 text-destructive"
-                      onClick={() => deleteNotification(notification.id)}
+                      className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive z-10"
+                      onClick={(e) => {
+                        e.stopPropagation(); // 🎯 ดักจับ Event ไม่ให้การกดปุ่ม "ลบ" ทะลุไปเปิดหน้าต่างรายละเอียด
+                        deleteNotification(notification.id);
+                      }}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -617,6 +671,49 @@ const NotificationsPage = () => {
           </TabsContent>
         ))}
       </Tabs>
+
+      <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {selectedNotification && getTypeIcon(selectedNotification.type)}
+              รายละเอียดการแจ้งเตือน
+            </DialogTitle>
+          </DialogHeader>
+          
+          {selectedNotification && (
+            <div className="space-y-4 py-4">
+              <div className="flex items-center gap-2">
+                {getTypeBadge(selectedNotification.type)}
+                {getChannelBadge(selectedNotification.channel)}
+              </div>
+              
+              <h3 className="text-xl font-semibold text-foreground leading-tight">
+                {selectedNotification.title}
+              </h3>
+              
+              <div className="bg-muted/50 p-4 rounded-xl border border-border">
+                <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
+                  {selectedNotification.message}
+                </p>
+              </div>
+              
+              <div className="flex flex-col gap-1.5 text-xs text-muted-foreground mt-4 p-3 bg-card border rounded-lg">
+                <span className="flex items-center gap-1.5">
+                  <Clock className="h-3.5 w-3.5" /> 
+                  เวลา: {selectedNotification.createdAt}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <Users className="h-3.5 w-3.5" /> 
+                  {selectedNotification.direction === 'sent' 
+                    ? `ผู้รับ: ${selectedNotification.recipient}` 
+                    : `ผู้ส่ง: ${selectedNotification.sender || 'ระบบ'}`}
+                </span>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

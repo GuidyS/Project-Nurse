@@ -1,10 +1,12 @@
-import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FileText, Download, BarChart3, DollarSign } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend } from 'recharts';
+
+// เรียกใช้โมดูลอินสแตนซ์ Axios ที่กำหนดค่าพอร์ตกลางไว้แล้ว
+import api from '@/lib/axios';
 
 export default function ProjectReports() {
   const [projects, setProjects] = useState<any[]>([]);
@@ -16,29 +18,30 @@ export default function ProjectReports() {
   
   const [loading, setLoading] = useState(true);
 
-  // ฟังก์ชันดึงข้อมูลรายงานจาก API
-  const fetchReportData = (projectId = '') => {
+  // ฟังก์ชันดึงข้อมูลรายงานจาก API (แก้ไขให้ใช้ Axios Instance)
+  const fetchReportData = async (projectId = '') => {
     setLoading(true);
-    fetch(`/api/get_project_reports.php${projectId ? `?project_id=${projectId}` : ''}`)
-      .then(res => res.json())
-      .then(res => {
-        if (res.status === 'success') {
-          setProjects(res.data.projects);
-          if (!selectedProject && res.data.selectedProjectId) {
-            setSelectedProject(res.data.selectedProjectId.toString());
-          }
-          setStats(res.data.stats);
-          setBudgetData(res.data.budgetData);
-          setProgressData(res.data.progressData);
-        } else {
-          console.error(res.message);
+    try {
+      // เรียกข้อมูลผ่านหน้า index.php ของ Backend ตามรูปแบบ API ที่ใช้อยู่ทั่วไป
+      const response = await api.get(`/index.php?page=get-project-reports${projectId ? `&project_id=${projectId}` : ''}`);
+      const res = response.data;
+      
+      if (res.status === 'success') {
+        setProjects(res.data.projects);
+        if (!selectedProject && res.data.selectedProjectId) {
+          setSelectedProject(res.data.selectedProjectId.toString());
         }
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error("เกิดข้อผิดพลาดในการโหลดรายงาน:", err);
-        setLoading(false);
-      });
+        setStats(res.data.stats);
+        setBudgetData(res.data.budgetData);
+        setProgressData(res.data.progressData);
+      } else {
+        console.error(res.message);
+      }
+    } catch (err) {
+      console.error("เกิดข้อผิดพลาดในการโหลดรายงาน:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {

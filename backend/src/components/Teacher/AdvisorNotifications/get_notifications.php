@@ -18,28 +18,19 @@ try {
 
     $db = new Connect();
 
-    // เช็คระบบโครงสร้างความปลอดภัยก่อนว่ารันตารางแจ้งเตือนไว้หรือยัง
-    $table_check = $db->query("SHOW TABLES LIKE 'notifications'")->rowCount();
-    if ($table_check === 0) {
-        echo json_encode([
-            "status" => "success",
-            "data" => ["notifications" => [], "unreadCount" => 0]
-        ]);
-        exit();
-    }
-
     // ดึงข้อมูลการแจ้งเตือนรายบุคคล แยกส่วนวัน/เวลา ออกมาด้วยฟังก์ชัน DATE_FORMAT
     $sql = "SELECT 
                 notification_id as id,
                 type,
                 title,
                 message,
-                student_id as studentId,
+                JSON_UNQUOTE(JSON_EXTRACT(payload_json, '$.student_id')) as studentId,
                 is_read,
                 DATE_FORMAT(created_at, '%Y-%m-%d') as date,
                 DATE_FORMAT(created_at, '%H:%i') as time
-            FROM avisor_notifications
+            FROM notifications
             WHERE user_id = :user_id
+              AND JSON_UNQUOTE(JSON_EXTRACT(payload_json, '$.module')) = 'advisor'
             ORDER BY created_at DESC";
             
     $stmt = $db->prepare($sql);

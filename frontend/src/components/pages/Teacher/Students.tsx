@@ -5,16 +5,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Users, Search, Download, GraduationCap } from 'lucide-react';
-import { useState } from 'react';
-
-// Mock data
-const mockStudents = [
-  { id: '1', studentId: '64010001', name: 'สมชาย ใจดี', year: 3, course: 'NUR101, NUR201', gpa: 3.45, status: 'active' },
-  { id: '2', studentId: '64010002', name: 'สมหญิง รักเรียน', year: 3, course: 'NUR101', gpa: 3.78, status: 'active' },
-  { id: '3', studentId: '65010001', name: 'มานะ ตั้งใจ', year: 2, course: 'NUR101, NUR201', gpa: 3.22, status: 'active' },
-  { id: '4', studentId: '65010002', name: 'มานี ขยัน', year: 2, course: 'NUR201', gpa: 2.95, status: 'warning' },
-  { id: '5', studentId: '66010001', name: 'ปิติ สุขใจ', year: 1, course: 'NUR101', gpa: 3.55, status: 'active' },
-];
+import { useState, useEffect } from 'react';
+import api from '@/lib/axios';
+import { useToast } from '@/hooks/use-toast';
 
 const getStatusBadge = (status: string) => {
   switch (status) {
@@ -28,13 +21,68 @@ const getStatusBadge = (status: string) => {
 };
 
 export default function Students() {
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
+  const [students, setStudents] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const filteredStudents = mockStudents.filter(
+  useEffect(() => {
+    const fetchStudents = async () => {
+      try {
+        setIsLoading(true);
+        const res = await api.get('/index.php?page=get-teacher-students');
+        if (res.data.status === 'success') {
+          setStudents(res.data.data || []);
+        } else {
+          toast({ title: 'ข้อผิดพลาด', description: res.data.message, variant: 'destructive' });
+        }
+      } catch (error) {
+        toast({ title: 'ข้อผิดพลาด', description: 'ไม่สามารถโหลดข้อมูลนักศึกษาได้', variant: 'destructive' });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchStudents();
+  }, []);
+
+  const filteredStudents = students.filter(
     (student) =>
       student.name.includes(searchTerm) ||
       student.studentId.includes(searchTerm)
   );
+
+  const handleExport = () => {
+    try {
+      const headers = ['รหัสนักศึกษา', 'ชื่อ-นามสกุล', 'ชั้นปี', 'เกรดเฉลี่ย', 'สถานะ'];
+      const csvRows = [headers.join(',')];
+      
+      filteredStudents.forEach(student => {
+        csvRows.push([
+          student.studentId,
+          student.name,
+          student.year || '-',
+          student.gpa || '-',
+          student.status === 'active' ? 'ปกติ' : (student.status === 'warning' ? 'ต้องติดตาม' : student.status)
+        ].join(','));
+      });
+      
+      const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + csvRows.join('\n');
+      const encodedUri = encodeURI(csvContent);
+      
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `รายชื่อนักศึกษา.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('Error exporting data:', error);
+    }
+  };
+
+  if (isLoading) {
+    return <div className="flex items-center justify-center p-8">กำลังโหลดข้อมูล...</div>;
+  }
 
   return (
     <>
@@ -44,7 +92,7 @@ export default function Students() {
             <h1 className="text-3xl font-bold tracking-tight">รายชื่อนักศึกษา</h1>
             <p className="text-muted-foreground">นักศึกษาที่ลงทะเบียนในรายวิชาที่สอน</p>
           </div>
-          <Button variant="outline">
+          <Button variant="outline" onClick={handleExport}>
             <Download className="mr-2 h-4 w-4" />
             ส่งออกรายชื่อ
           </Button>
@@ -58,7 +106,7 @@ export default function Students() {
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{mockStudents.length}</div>
+              <div className="text-2xl font-bold">{students.length}</div>
             </CardContent>
           </Card>
           <Card>
@@ -68,7 +116,7 @@ export default function Students() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-600">
-                {mockStudents.filter(s => s.status === 'active').length}
+                {students.filter(s => s.status === 'active').length}
               </div>
             </CardContent>
           </Card>
@@ -79,7 +127,7 @@ export default function Students() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-yellow-600">
-                {mockStudents.filter(s => s.status === 'warning').length}
+                {students.filter(s => s.status === 'warning').length}
               </div>
             </CardContent>
           </Card>

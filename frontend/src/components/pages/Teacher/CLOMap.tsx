@@ -64,11 +64,17 @@ export default function CLOMap() {
       if (response.data.status === 'success') {
         toast({ title: "สำเร็จ", description: "บันทึกข้อมูล CLO Map เรียบร้อยแล้ว" });
         setIsEditing(false);
+        await fetchMapData();
       } else {
-        throw new Error(response.data.message);
+        toast({
+          title: "ล้มเหลว",
+          description: response.data?.message || "ไม่สามารถบันทึกข้อมูลได้",
+          variant: "destructive",
+        });
       }
-    } catch (error: any) {
-      toast({ title: "ล้มเหลว", description: error.message || "ไม่สามารถบันทึกข้อมูลได้", variant: "destructive" });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "ไม่สามารถบันทึกข้อมูลได้";
+      toast({ title: "ล้มเหลว", description: message, variant: "destructive" });
     }
   };
 
@@ -100,6 +106,24 @@ return (
               </Button>
             )}
           </div>
+        </div>
+        
+        {/* Summary */}
+        <div className="grid gap-4 md:grid-cols-4 lg:grid-cols-8">
+          {plos.map((plo) => {
+            const count = Object.values(cloMap).filter(plos => plos.includes(plo)).length;
+            return (
+              <Card key={plo}>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg">{plo}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{count}</div>
+                  <p className="text-sm text-muted-foreground">รายวิชาที่ครอบคลุม</p>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
 
         {/* CLO Map Table */}
@@ -146,24 +170,6 @@ return (
             </Table>
           </CardContent>
         </Card>
-
-        {/* Summary */}
-        <div className="grid gap-4 md:grid-cols-4 lg:grid-cols-6">
-          {plos.map((plo) => {
-            const count = Object.values(cloMap).filter(plos => plos.includes(plo)).length;
-            return (
-              <Card key={plo}>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg">{plo}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{count}</div>
-                  <p className="text-sm text-muted-foreground">รายวิชาที่ครอบคลุม</p>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
       </div>
     </>
   );

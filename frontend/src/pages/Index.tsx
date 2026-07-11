@@ -47,7 +47,6 @@ import UsersManagement from "@/components/pages/Admin/UsersManagement";
 import Dashboard from "@/components/pages/Teacher/Dashboard";
 import DeanDashboard from "@/components/pages/Teacher/DeanDashboard";
 import Retention from "@/components/pages/Teacher/Retention";
-import Home from '@/components/pages/Teacher/Home';
 
 const Index = () => {
   const [activeItem, setActiveItem] = useState(() => {
@@ -133,11 +132,11 @@ const Index = () => {
     if (adminPages.includes(activeItem)) {
       if (roleId !== 1) return <UnauthorizedView />;
       switch (activeItem) {
-        case "approvals": return <TransferRequests />;                                 //*
+        case "approvals": return <Approvals />;                                 //*
         case "audit-log": return <AuditLog />;                                     //*                                 
         case "export-data": return <ExportData />;                                 //*
         case "import-data": return <ImportData />;                                 //*
-        case "reports": return <PracticalStudents />;                                        
+        case "reports": return <Reports />;                                        
         case "roles-management": return <RolesManagement />;                       //*
         case "users-management": return <UsersManagement />;                       //*
       }
@@ -156,11 +155,11 @@ const Index = () => {
     // 5. 🔒 หมวดสิทธิ์อาจารย์และคณะกรรมการ (Teacher - Role 2) หรือ Admin
     const teacherPages = [
       "teacher-dashboard", "courses", "five-year-summary", "clo-management", "clos",
-      "plo-ylo-report", "course-report", "documents", "assign-instructors", "clo-map",
+      "plo-ylo-report", "course-report", "course-students", "documents", "assign-instructors", "clo-map",
       "evidence", "grades", "my-courses", "performance", "practical-students",
       "program-reports", "schedule-tasks", "projectspage", "my-projects", "project-docs",
       "project-links", "project-reports", "advise-notes", "advisor-notifications", "advises",
-      "students", "transfer-requests"
+      "students", "students-info", "transfer-requests"
     ];
     
     if (teacherPages.includes(activeItem)) {
@@ -171,7 +170,7 @@ const Index = () => {
         case "five-year-summary": return <FiveYearSummary />;                       //*
         case "clo-management": return <CLOManagement />;                            //*
         case "clos": return <CLOPage />; // แก้ไขให้ใช้ CLOPage หน้าเดียว                //*
-        case "plo-ylo-report": return <PLOYLOReport />;
+        case "plo-ylo-report": return <PLOYLOReport />;                                  //*
         case "course-report": return <CourseReports />;                             //*
         case "course-students": return <CourseStudents />;                          //* /* ผลการประเมิน CLO รายบุคคล */ /* อจ.ติ้กว่าเด็กคนไหนผ่านบ้าง */
         case "documents": return <Documents />;                                     //*
@@ -182,14 +181,14 @@ const Index = () => {
         case "my-courses": return <MyCourses />;                                    //*
         case "performance": return <Performance />;
         case "practical-students": return <PracticalStudents />;                    //* /* ดูรายชื่อนศ.และประเมินผลการฝึกปฏิบัติของเด็กได้*/ /* อจ.ปฏิบัติ */
-        case "program-reports": return <ProgramReports />;                          
+        case "program-reports": return <ProgramReports />;                          //*
         case "schedule-tasks": return <ScheduleTasks />;                            //*
         case "projectspage": return <ProjectsPage />;                               //*
         case "my-projects": return <MyProjects />;                                  //*
         case "project-docs": return <ProjectDocs />;                                //*
         case "project-links": return <ProjectLinks />;                              //*
         case "project-reports": return <ProjectReports />;                          //*
-        case "advise-notes": return <AdviseNotes />;
+        case "advise-notes": return <AdviseNotes />;                                      //*
         case "advisor-notifications": return <AdvisorNotifications />;
         case "advises": return <Advises />;
         case "students": return <Students />;                                       /* รายชื่อเด็กทั้งระบบ */
@@ -199,7 +198,7 @@ const Index = () => {
     }
 
     // 6. 🔒 หมวดสิทธิ์นักศึกษา (Student - Role 3) หรือ Admin
-    const studentPages = ["transcript"];
+    const studentPages = ["transcript", "portfolio"];
     if (studentPages.includes(activeItem)) {
       if (roleId !== 1 && roleId !== 3) return <UnauthorizedView />;
       switch (activeItem) {

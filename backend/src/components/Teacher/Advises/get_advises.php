@@ -26,46 +26,34 @@ try {
     // 2. เช็คก่อนว่าในฐานข้อมูลมีการสร้างตาราง advice_log ไว้หรือยัง
     $has_advice_log = $db->query("SHOW TABLES LIKE 'advice_log'")->rowCount() > 0;
 
-    // 3. เริ่มสร้างคำสั่ง SQL
+    // 3. ดึงนักศึกษาในความดูแล พร้อม GPA จริง และวันที่ให้คำปรึกษาล่าสุดจาก advice_log
     $sql = "
-        SELECT 
-            s.student_id as id, 
-            s.student_id as studentId, 
+        SELECT
+            s.student_id as id,
+            IF(s.student_code LIKE 'TEMP-%', s.student_id, s.student_code) as studentId,
             CONCAT(IFNULL(s.title,''), s.first_name_th, ' ', s.last_name_th) as name,
-            IFNULL(s.year, 1) as year,
-            0.00 as gpa,
-            'normal' as status,
-            false as needsAdvice
-    ";
-
-    // 💡 ถ้ามีตารางประวัติคำปรึกษา ให้เชื่อมข้อมูลมา (ใช้ al. นำหน้าป้องกันการยืมคอลัมน์)
-    if ($has_advice_log) {
-        $sql .= ", (
-            SELECT DATE_FORMAT(MAX(al.created_at), '%Y-%m-%d') 
-            FROM advice_log al 
-            WHERE al.student_id = s.student_id AND al.advisor_id = :faculty_id
-        ) as lastContact ";
-    } else {
-        // ถ้ายังไม่มีตารางนี้ ให้ส่งเครื่องหมายขีด (-) กลับไปโชว์ที่หน้าจอ React ก่อน
-        $sql .= ", '-' as lastContact ";
-    }
-
-    $sql .= "
+            IFNULL(s.year_level, 1) as year,
+            IFNULL(s.gpa, 0) as gpa,
+            (SELECT DATE_FORMAT(MAX(al.created_at), '%Y-%m-%d')
+             FROM advice_log al
+             WHERE al.student_id = s.student_id AND al.advisor_id = :advisor_uid) as lastContact
         FROM student s
         JOIN student_advisor_mapping sam ON s.student_id = sam.student_id
         WHERE sam.faculty_id = :faculty_id
-        ORDER BY s.year DESC, s.student_id ASC
+        ORDER BY s.year_level DESC, s.student_id ASC
     ";
-    
+
     $stmt = $db->prepare($sql);
-    $stmt->execute([':faculty_id' => $my_faculty_id]);
+    $stmt->execute([':faculty_id' => $my_faculty_id, ':advisor_uid' => $user_id]);
     $advisees = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // 4. จัด Format ให้ตรงกับที่ UI หน้าบ้านรอรับ
+    // 4. คำนวณสถานะจาก GPA จริง (< 2.00 วิกฤต, < 2.50 ต้องติดตาม)
     foreach ($advisees as &$student) {
-        $student['gpa'] = (float)$student['gpa'];
-        $student['needsAdvice'] = (bool)$student['needsAdvice'];
-        $student['lastContact'] = $student['lastContact'] ? $student['lastContact'] : '-'; 
+        $gpa = (float)$student['gpa'];
+        $student['gpa'] = $gpa;
+        $student['status'] = ($gpa > 0 && $gpa < 2.00) ? 'critical' : (($gpa > 0 && $gpa < 2.50) ? 'warning' : 'normal');
+        $student['needsAdvice'] = $student['status'] !== 'normal';
+        $student['lastContact'] = $student['lastContact'] ? $student['lastContact'] : '-';
     }
 
     echo json_encode([
