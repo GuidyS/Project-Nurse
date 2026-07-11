@@ -31,8 +31,8 @@ try {
     $evidenceList = [];     
 
     foreach ($rows as $row) {
-        // แกะกล่อง JSON ที่เราซ่อนไว้ในคอลัมน์ file_path
-        $meta = json_decode($row['file_path'], true);
+        // แกะกล่อง JSON ที่เราซ่อนไว้ในคอลัมน์ file_path (กัน NULL ไม่ให้ PHP เตือน)
+        $meta = json_decode($row['file_path'] ?? '', true);
         
         if (is_array($meta)) {
             $type = $meta['type'] ?? 'document';
