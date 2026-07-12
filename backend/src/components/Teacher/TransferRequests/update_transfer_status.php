@@ -1,7 +1,9 @@
 <?php
 header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Headers: Content-Type');
+header("Access-Control-Allow-Origin: http://localhost:5173");
+header("Access-Control-Allow-Credentials: true");
+header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type, Authorization");
 
 $data = json_decode(file_get_contents('php://input'), true);
 
@@ -28,13 +30,20 @@ try {
         $req = $stmtReq->fetch(PDO::FETCH_ASSOC);
 
         if ($req) {
-            // อัปเดตตาราง student หลัก
-            $stmtStud = $pdo->prepare("UPDATE student SET instructor_id = :new_adv WHERE student_id = :std_id");
-            $stmtStud->execute([':new_adv' => $req['to_advisor_id'], ':std_id' => $req['student_id']]);
+            // ตรวจสอบว่านักศึกษาคนนี้มีข้อมูลที่ปรึกษาในระบบหรือยัง
+            $stmtCheck = $pdo->prepare("SELECT mapping_id FROM student_advisor_mapping WHERE student_id = :std_id");
+            $stmtCheck->execute([':std_id' => $req['student_id']]);
+            $existing = $stmtCheck->fetch(PDO::FETCH_ASSOC);
 
-            // อัปเดตตาราง student_advisor_mapping 
-            $stmtMap = $pdo->prepare("UPDATE student_advisor_mapping SET faculty_id = :new_adv WHERE student_id = :std_id");
-            $stmtMap->execute([':new_adv' => $req['to_advisor_id'], ':std_id' => $req['student_id']]);
+            if ($existing) {
+                // ถ้ามีอยู่แล้ว ให้อัปเดต
+                $stmtMap = $pdo->prepare("UPDATE student_advisor_mapping SET faculty_id = :new_adv WHERE student_id = :std_id");
+                $stmtMap->execute([':new_adv' => $req['to_advisor_id'], ':std_id' => $req['student_id']]);
+            } else {
+                // ถ้ายังไม่มี ให้แทรกเข้าไปใหม่
+                $stmtInsert = $pdo->prepare("INSERT INTO student_advisor_mapping (student_id, faculty_id, advisor_type, academic_year) VALUES (:std_id, :new_adv, 'General', YEAR(CURRENT_DATE))");
+                $stmtInsert->execute([':new_adv' => $req['to_advisor_id'], ':std_id' => $req['student_id']]);
+            }
         }
     }
 

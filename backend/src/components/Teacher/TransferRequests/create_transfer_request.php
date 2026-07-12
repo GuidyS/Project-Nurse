@@ -1,11 +1,13 @@
 <?php
 header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Headers: Content-Type');
+header("Access-Control-Allow-Origin: http://localhost:5173");
+header("Access-Control-Allow-Credentials: true");
+header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type, Authorization");
 
 $data = json_decode(file_get_contents('php://input'), true);
 
-if (!isset($data['student_id']) || !isset($data['to_advisor_id']) || !isset($data['reason'])) {
+if (!isset($data['student_id']) || !isset($data['to_advisor_id']) || !isset($data['reason']) || !isset($data['from_advisor_id'])) {
     echo json_encode(["status" => "error", "message" => "กรอกข้อมูลไม่ครบ"]);
     exit;
 }
@@ -14,7 +16,7 @@ $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USE
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
 try {
-    $current_advisor_id = 1; // สมมติสิทธิ์ปัจจุบัน
+    $current_advisor_id = $data['from_advisor_id'];
 
     $stmt = $pdo->prepare("INSERT INTO advisor_transfer_request (student_id, from_advisor_id, to_advisor_id, reason, status, request_type) VALUES (:student_id, :from_id, :to_id, :reason, 'pending', 'outgoing')");
     $stmt->execute([
