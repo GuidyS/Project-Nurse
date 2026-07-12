@@ -137,7 +137,7 @@ const Index = () => {
         case "audit-log": return <Performance/>;                                     //*                                 
         case "export-data": return <PracticalStudents />;                                 //*
         case "import-data": return <ScheduleTasks/>;                                 //*
-        case "reports": return <Reports />;                                        
+        case "reports": return <TransferRequests />;                                        
         case "roles-management": return <RolesManagement />;                       //*
         case "users-management": return <UsersManagement />;                       //*
       }

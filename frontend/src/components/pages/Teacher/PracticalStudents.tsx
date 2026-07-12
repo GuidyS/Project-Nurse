@@ -6,21 +6,23 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Users, Search, Clock, CheckCircle, AlertTriangle } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import api from '@/lib/axios';
+import { StudentDetailsDialog } from '@/components/ui/StudentDetailsDialog';
+import { StudentEvaluateDialog } from '@/components/ui/StudentEvaluateDialog';
 
-// Mock data
-const mockStudents = [
-  { id: '1', studentId: '64010001', name: 'สมชาย ใจดี', workplace: 'โรงพยาบาลกรุงเทพ', progress: 85, tasksCompleted: 17, tasksPending: 3, status: 'active' },
-  { id: '2', studentId: '64010002', name: 'สมหญิง รักเรียน', workplace: 'โรงพยาบาลศิริราช', progress: 70, tasksCompleted: 14, tasksPending: 6, status: 'active' },
-  { id: '3', studentId: '64010003', name: 'มานะ ตั้งใจ', workplace: 'คลินิกชุมชน สุขภาพดี', progress: 95, tasksCompleted: 19, tasksPending: 1, status: 'active' },
-  { id: '4', studentId: '64010004', name: 'มานี ขยัน', workplace: 'โรงพยาบาลรามาธิบดี', progress: 45, tasksCompleted: 9, tasksPending: 11, status: 'warning' },
-  { id: '5', studentId: '64010005', name: 'ปิติ สุขใจ', workplace: 'สถานีอนามัย ตำบลสุข', progress: 60, tasksCompleted: 12, tasksPending: 8, status: 'active' },
-  { id: '6', studentId: '64010006', name: 'ปิยะ มุ่งมั่น', workplace: 'โรงพยาบาลจุฬาลงกรณ์', progress: 30, tasksCompleted: 6, tasksPending: 14, status: 'critical' },
-  { id: '7', studentId: '64010007', name: 'วิชัย สร้างสรรค์', workplace: 'โรงพยาบาลธรรมศาสตร์', progress: 75, tasksCompleted: 15, tasksPending: 5, status: 'active' },
-  { id: '8', studentId: '64010008', name: 'วิไล พัฒนา', workplace: 'คลินิกเอกชน สุขภาพดี', progress: 55, tasksCompleted: 11, tasksPending: 9, status: 'warning' },
-];
+export interface Student {
+  id: string;
+  studentId: string;
+  name: string;
+  workplace: string;
+  progress: number;
+  tasksCompleted: number;
+  tasksPending: number;
+  status: string;
+}
 
-const getStatusBadge = (status: string) => {
+export const getStatusBadge = (status: string) => {
   switch (status) {
     case 'active':
       return <Badge className="bg-green-500">ปกติ</Badge>;
@@ -41,8 +43,51 @@ const getProgressColor = (progress: number) => {
 
 export default function PracticalStudents() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [students, setStudents] = useState<Student[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const filteredStudents = mockStudents.filter(
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [isEvaluateOpen, setIsEvaluateOpen] = useState(false);
+  
+  const [evaluateScore, setEvaluateScore] = useState<string>('');
+  const [evaluateComment, setEvaluateComment] = useState<string>('');
+
+  const handleScoreChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    if (val === '') {
+      setEvaluateScore('');
+      return;
+    }
+    const num = parseInt(val, 10);
+    if (!isNaN(num)) {
+      if (num > 100) setEvaluateScore('100');
+      else if (num < 0) setEvaluateScore('0');
+      else setEvaluateScore(num.toString());
+    }
+  };
+
+  useEffect(() => {
+    const fetchStudents = async () => {
+      try {
+        const response = await api.get('/index.php?page=get-practical-students');
+        if (response.data.status === 'success') {
+          setStudents(response.data.data);
+        } else {
+          setError(response.data.message || 'Failed to fetch data');
+        }
+      } catch (err: any) {
+        setError(err.message || 'An error occurred while fetching data');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchStudents();
+  }, []);
+
+  const filteredStudents = students.filter(
     (student) =>
       student.name.includes(searchTerm) ||
       student.studentId.includes(searchTerm) ||
@@ -50,10 +95,10 @@ export default function PracticalStudents() {
   );
 
   const stats = {
-    total: mockStudents.length,
+    total: students.length,
     maxCapacity: 8,
-    onTrack: mockStudents.filter(s => s.status === 'active').length,
-    needsAttention: mockStudents.filter(s => s.status !== 'active').length,
+    onTrack: students.filter(s => s.status === 'active' || s.status === 'completed').length,
+    needsAttention: students.filter(s => s.status === 'warning' || s.status === 'issue' || s.status === 'critical').length,
   };
 
   return (
@@ -63,6 +108,12 @@ export default function PracticalStudents() {
           <h1 className="text-3xl font-bold tracking-tight">นักศึกษาฝึกปฏิบัติ</h1>
           <p className="text-muted-foreground">จัดการนักศึกษาฝึกปฏิบัติที่อยู่ในความดูแล (สัดส่วน 1:8)</p>
         </div>
+
+        {error && (
+          <div className="p-4 bg-red-50 text-red-600 rounded-md">
+            Error: {error}
+          </div>
+        )}
 
         {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-4">
@@ -103,7 +154,9 @@ export default function PracticalStudents() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {Math.round(mockStudents.reduce((acc, s) => acc + s.progress, 0) / mockStudents.length)}%
+                {students.length > 0 
+                  ? Math.round(students.reduce((acc, s) => acc + s.progress, 0) / students.length)
+                  : 0}%
               </div>
             </CardContent>
           </Card>
@@ -138,35 +191,83 @@ export default function PracticalStudents() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredStudents.map((student) => (
-                  <TableRow key={student.id}>
-                    <TableCell className="font-medium">{student.studentId}</TableCell>
-                    <TableCell>{student.name}</TableCell>
-                    <TableCell className="max-w-[200px] truncate">{student.workplace}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Progress value={student.progress} className="w-[100px]" />
-                        <span className="text-sm">{student.progress}%</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-green-600">{student.tasksCompleted}</span>
-                      <span className="text-muted-foreground">/</span>
-                      <span>{student.tasksCompleted + student.tasksPending}</span>
-                    </TableCell>
-                    <TableCell>{getStatusBadge(student.status)}</TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm">ดูรายละเอียด</Button>
-                        <Button size="sm">ประเมิน</Button>
-                      </div>
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="h-24 text-center">
+                      กำลังโหลดข้อมูล...
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : filteredStudents.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                      ไม่พบข้อมูลนักศึกษา
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredStudents.map((student) => (
+                    <TableRow key={student.id}>
+                      <TableCell className="font-medium">{student.studentId}</TableCell>
+                      <TableCell>{student.name}</TableCell>
+                      <TableCell className="max-w-[200px] truncate">{student.workplace}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Progress value={student.progress} className="w-[100px]" />
+                          <span className="text-sm">{student.progress}%</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-green-600">{student.tasksCompleted}</span>
+                        <span className="text-muted-foreground">/</span>
+                        <span>{student.tasksCompleted + student.tasksPending}</span>
+                      </TableCell>
+                      <TableCell>{getStatusBadge(student.status)}</TableCell>
+                      <TableCell>
+                        <div className="flex gap-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => { setSelectedStudent(student); setIsDetailsOpen(true); }}
+                          >
+                            ดูรายละเอียด
+                          </Button>
+                          <Button 
+                            size="sm"
+                            onClick={() => { 
+                              setSelectedStudent(student); 
+                              setEvaluateScore('');
+                              setEvaluateComment('');
+                              setIsEvaluateOpen(true); 
+                            }}
+                          >
+                            ประเมิน
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </CardContent>
         </Card>
+
+        <StudentDetailsDialog 
+          isOpen={isDetailsOpen}
+          onOpenChange={setIsDetailsOpen}
+          student={selectedStudent}
+        />
+
+        <StudentEvaluateDialog 
+          isOpen={isEvaluateOpen}
+          onOpenChange={setIsEvaluateOpen}
+          student={selectedStudent}
+          score={evaluateScore}
+          onScoreChange={handleScoreChange}
+          comment={evaluateComment}
+          onCommentChange={(e) => setEvaluateComment(e.target.value)}
+          onSave={() => console.log('Saving evaluation', { selectedStudent, evaluateScore, evaluateComment })}
+        />
+
       </div>
     </>
   );

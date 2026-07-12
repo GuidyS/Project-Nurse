@@ -4,27 +4,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { UserCheck, UserPlus, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
-import { useState } from 'react';
-
-// Mock data
-const mockIncomingRequests = [
-  { id: '1', studentId: '64010005', studentName: 'วิชัย มานะ', fromAdvisor: 'อ.สมศักดิ์ รักดี', reason: 'ต้องการเปลี่ยนสาขา', date: '2024-01-08', status: 'pending' },
-  { id: '2', studentId: '65010003', studentName: 'สุดา ตั้งใจ', fromAdvisor: 'อ.มานี สุขใจ', reason: 'อาจารย์ที่ปรึกษาลาออก', date: '2024-01-05', status: 'pending' },
-];
-
-const mockOutgoingRequests = [
-  { id: '3', studentId: '64010002', studentName: 'สมหญิง รักเรียน', toAdvisor: 'อ.วิชัย ใจดี', reason: 'นักศึกษาต้องการที่ปรึกษาสาขาเฉพาะทาง', date: '2024-01-10', status: 'approved' },
-  { id: '4', studentId: '66010001', studentName: 'ปิติ สุขใจ', toAdvisor: 'อ.สมศรี มุ่งมั่น', reason: 'ย้ายหลักสูตร', date: '2024-01-12', status: 'pending' },
-];
-
-const mockHistory = [
-  { id: '5', studentId: '63010001', studentName: 'อนันต์ พัฒนา', type: 'incoming', otherAdvisor: 'อ.สมชาย เก่งกาจ', date: '2023-12-15', status: 'approved' },
-  { id: '6', studentId: '63010002', studentName: 'อรุณ แสงทอง', type: 'outgoing', otherAdvisor: 'อ.มานะ สร้างสรรค์', date: '2023-11-20', status: 'rejected' },
-];
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { UserCheck, UserPlus, Clock, CheckCircle, XCircle, AlertCircle, Plus } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import api from '@/lib/axios';
 
 const getStatusBadge = (status: string) => {
   switch (status) {
@@ -40,25 +26,105 @@ const getStatusBadge = (status: string) => {
 };
 
 export default function TransferRequests() {
+  const [incomingRequests, setIncomingRequests] = useState<any[]>([]);
+  const [outgoingRequests, setOutgoingRequests] = useState<any[]>([]);
+  const [historyRequests, setHistoryRequests] = useState<any[]>([]);
+  const [dropdowns, setDropdowns] = useState<{students: any[], advisors: any[]}>({students: [], advisors: []});
+
   const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
+  const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
 
-  const handleApprove = (id: string) => {
-    console.log('Approving request:', id);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [newRequest, setNewRequest] = useState({ studentId: '', toAdvisorId: '', reason: '' });
+
+  const fetchData = async () => {
+    try {
+      const savedUser = localStorage.getItem('user');
+      let facultyId = '1';
+      if (savedUser) {
+        const userObj = JSON.parse(savedUser);
+        facultyId = userObj.faculty_id || userObj.id || userObj.username || '1';
+      }
+
+      const res = await api.get(`/components/Teacher/TransferRequests/get_transfer_requests.php?faculty_id=${facultyId}`);
+      if (res.data.status === 'success') {
+        setIncomingRequests(res.data.data.incoming || []);
+        setOutgoingRequests(res.data.data.outgoing || []);
+        setHistoryRequests(res.data.data.history || []);
+        setDropdowns(res.data.data.dropdowns || {students: [], advisors: []});
+      }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  const handleReject = () => {
-    console.log('Rejecting with reason:', rejectReason);
-    setIsRejectDialogOpen(false);
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const handleApprove = async (id: string) => {
+    try {
+      await api.post('/components/Teacher/TransferRequests/update_transfer_status.php', { request_id: id, status: 'approved' });
+      fetchData();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const openRejectDialog = (id: string) => {
+    setSelectedRequestId(id);
     setRejectReason('');
+    setIsRejectDialogOpen(true);
+  };
+
+  const handleReject = async () => {
+    if (!selectedRequestId) return;
+    try {
+      await api.post('/components/Teacher/TransferRequests/update_transfer_status.php', { request_id: selectedRequestId, status: 'rejected' });
+      setIsRejectDialogOpen(false);
+      setSelectedRequestId(null);
+      fetchData();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleCreateRequest = async () => {
+    try {
+      const savedUser = localStorage.getItem('user');
+      let facultyId = '1';
+      if (savedUser) {
+        const userObj = JSON.parse(savedUser);
+        facultyId = userObj.faculty_id || userObj.id || userObj.username || '1';
+      }
+
+      await api.post('/components/Teacher/TransferRequests/create_transfer_request.php', {
+        student_id: newRequest.studentId,
+        to_advisor_id: newRequest.toAdvisorId,
+        reason: newRequest.reason,
+        from_advisor_id: facultyId
+      });
+      setIsCreateDialogOpen(false);
+      setNewRequest({ studentId: '', toAdvisorId: '', reason: '' });
+      fetchData();
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   return (
     <>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">ร้องขอรับมอบนักศึกษา</h1>
-          <p className="text-muted-foreground">จัดการคำขอรับมอบนักศึกษาระหว่างอาจารย์ที่ปรึกษา</p>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">ร้องขอรับมอบนักศึกษา</h1>
+            <p className="text-muted-foreground">จัดการคำขอรับมอบนักศึกษาระหว่างอาจารย์ที่ปรึกษา</p>
+          </div>
+          <Button onClick={() => setIsCreateDialogOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            สร้างคำขอย้าย
+          </Button>
         </div>
 
         {/* Stats */}
@@ -69,7 +135,7 @@ export default function TransferRequests() {
               <UserPlus className="h-4 w-4 text-green-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{mockIncomingRequests.filter(r => r.status === 'pending').length}</div>
+              <div className="text-2xl font-bold">{incomingRequests.length}</div>
               <p className="text-xs text-muted-foreground">รอดำเนินการ</p>
             </CardContent>
           </Card>
@@ -79,7 +145,7 @@ export default function TransferRequests() {
               <UserCheck className="h-4 w-4 text-blue-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{mockOutgoingRequests.filter(r => r.status === 'pending').length}</div>
+              <div className="text-2xl font-bold">{outgoingRequests.length}</div>
               <p className="text-xs text-muted-foreground">รอดำเนินการ</p>
             </CardContent>
           </Card>
@@ -90,7 +156,7 @@ export default function TransferRequests() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-600">
-                {[...mockIncomingRequests, ...mockOutgoingRequests, ...mockHistory].filter(r => r.status === 'approved').length}
+                {historyRequests.filter(r => r.status === 'approved').length}
               </div>
             </CardContent>
           </Card>
@@ -101,7 +167,7 @@ export default function TransferRequests() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-destructive">
-                {mockHistory.filter(r => r.status === 'rejected').length}
+                {historyRequests.filter(r => r.status === 'rejected').length}
               </div>
             </CardContent>
           </Card>
@@ -111,8 +177,8 @@ export default function TransferRequests() {
           <TabsList>
             <TabsTrigger value="incoming">
               คำขอเข้า
-              {mockIncomingRequests.filter(r => r.status === 'pending').length > 0 && (
-                <Badge className="ml-2 bg-primary">{mockIncomingRequests.filter(r => r.status === 'pending').length}</Badge>
+              {incomingRequests.length > 0 && (
+                <Badge className="ml-2 bg-primary">{incomingRequests.length}</Badge>
               )}
             </TabsTrigger>
             <TabsTrigger value="outgoing">คำขอออก</TabsTrigger>
@@ -139,57 +205,31 @@ export default function TransferRequests() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {mockIncomingRequests.map((request) => (
+                    {incomingRequests.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center text-muted-foreground py-6">
+                          ไม่มีคำขอเข้า
+                        </TableCell>
+                      </TableRow>
+                    ) : incomingRequests.map((request) => (
                       <TableRow key={request.id}>
                         <TableCell className="font-medium">{request.studentId}</TableCell>
                         <TableCell>{request.studentName}</TableCell>
-                        <TableCell>{request.fromAdvisor}</TableCell>
+                        <TableCell>{request.otherAdvisor}</TableCell>
                         <TableCell className="max-w-[200px] truncate">{request.reason}</TableCell>
                         <TableCell>{request.date}</TableCell>
                         <TableCell>{getStatusBadge(request.status)}</TableCell>
                         <TableCell>
-                          {request.status === 'pending' && (
-                            <div className="flex gap-2">
-                              <Button size="sm" onClick={() => handleApprove(request.id)}>
-                                <CheckCircle className="mr-1 h-3 w-3" />
-                                รับ
-                              </Button>
-                              <Dialog open={isRejectDialogOpen} onOpenChange={setIsRejectDialogOpen}>
-                                <DialogTrigger asChild>
-                                  <Button variant="outline" size="sm">
-                                    <XCircle className="mr-1 h-3 w-3" />
-                                    ปฏิเสธ
-                                  </Button>
-                                </DialogTrigger>
-                                <DialogContent>
-                                  <DialogHeader>
-                                    <DialogTitle>ปฏิเสธคำขอรับมอบ</DialogTitle>
-                                    <DialogDescription>
-                                      กรุณาระบุเหตุผลในการปฏิเสธ
-                                    </DialogDescription>
-                                  </DialogHeader>
-                                  <div className="grid gap-4 py-4">
-                                    <div className="grid gap-2">
-                                      <Label>เหตุผล</Label>
-                                      <Textarea
-                                        value={rejectReason}
-                                        onChange={(e) => setRejectReason(e.target.value)}
-                                        placeholder="ระบุเหตุผลในการปฏิเสธ..."
-                                      />
-                                    </div>
-                                  </div>
-                                  <DialogFooter>
-                                    <Button variant="outline" onClick={() => setIsRejectDialogOpen(false)}>
-                                      ยกเลิก
-                                    </Button>
-                                    <Button variant="destructive" onClick={handleReject}>
-                                      ยืนยันปฏิเสธ
-                                    </Button>
-                                  </DialogFooter>
-                                </DialogContent>
-                              </Dialog>
-                            </div>
-                          )}
+                          <div className="flex gap-2">
+                            <Button size="sm" onClick={() => handleApprove(request.id)}>
+                              <CheckCircle className="mr-1 h-3 w-3" />
+                              รับ
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => openRejectDialog(request.id)}>
+                              <XCircle className="mr-1 h-3 w-3" />
+                              ปฏิเสธ
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -218,11 +258,17 @@ export default function TransferRequests() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {mockOutgoingRequests.map((request) => (
+                    {outgoingRequests.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center text-muted-foreground py-6">
+                          ไม่มีคำขอออก
+                        </TableCell>
+                      </TableRow>
+                    ) : outgoingRequests.map((request) => (
                       <TableRow key={request.id}>
                         <TableCell className="font-medium">{request.studentId}</TableCell>
                         <TableCell>{request.studentName}</TableCell>
-                        <TableCell>{request.toAdvisor}</TableCell>
+                        <TableCell>{request.otherAdvisor}</TableCell>
                         <TableCell className="max-w-[200px] truncate">{request.reason}</TableCell>
                         <TableCell>{request.date}</TableCell>
                         <TableCell>{getStatusBadge(request.status)}</TableCell>
@@ -253,7 +299,13 @@ export default function TransferRequests() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {mockHistory.map((item) => (
+                    {historyRequests.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center text-muted-foreground py-6">
+                          ไม่มีประวัติ
+                        </TableCell>
+                      </TableRow>
+                    ) : historyRequests.map((item) => (
                       <TableRow key={item.id}>
                         <TableCell className="font-medium">{item.studentId}</TableCell>
                         <TableCell>{item.studentName}</TableCell>
@@ -273,6 +325,98 @@ export default function TransferRequests() {
             </Card>
           </TabsContent>
         </Tabs>
+
+        {/* Reject Dialog */}
+        <Dialog open={isRejectDialogOpen} onOpenChange={setIsRejectDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>ปฏิเสธคำขอรับมอบ</DialogTitle>
+              <DialogDescription>
+                กรุณาระบุเหตุผลในการปฏิเสธ
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label>เหตุผล</Label>
+                <Textarea
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  placeholder="ระบุเหตุผลในการปฏิเสธ..."
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsRejectDialogOpen(false)}>
+                ยกเลิก
+              </Button>
+              <Button variant="destructive" onClick={handleReject}>
+                ยืนยันปฏิเสธ
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Create Request Dialog */}
+        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>สร้างคำขอมอบนักศึกษา (ส่งออก)</DialogTitle>
+              <DialogDescription>
+                เลือกนักศึกษาและอาจารย์ปลายทางที่คุณต้องการมอบหมายให้
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label>นักศึกษา</Label>
+                <Select 
+                  value={newRequest.studentId} 
+                  onValueChange={(val) => setNewRequest({ ...newRequest, studentId: val })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="เลือกนักศึกษา..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {dropdowns.students.map(std => (
+                      <SelectItem key={std.id} value={std.id.toString()}>{std.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label>อาจารย์ปลายทาง</Label>
+                <Select 
+                  value={newRequest.toAdvisorId} 
+                  onValueChange={(val) => setNewRequest({ ...newRequest, toAdvisorId: val })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="เลือกอาจารย์..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {dropdowns.advisors.map(adv => (
+                      <SelectItem key={adv.id} value={adv.id.toString()}>{adv.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label>เหตุผลการขอย้าย</Label>
+                <Textarea
+                  value={newRequest.reason}
+                  onChange={(e) => setNewRequest({ ...newRequest, reason: e.target.value })}
+                  placeholder="ระบุเหตุผล..."
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+                ยกเลิก
+              </Button>
+              <Button onClick={handleCreateRequest} disabled={!newRequest.studentId || !newRequest.toAdvisorId}>
+                สร้างคำขอ
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </>
   );
