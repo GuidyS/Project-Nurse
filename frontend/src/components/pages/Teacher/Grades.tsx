@@ -60,11 +60,10 @@ export default function Grades() {
     fetchStudents();
   }, [selectedCourse]);
 
-  // ใช้ String(... ?? '') กันค่า null/ตัวเลข (studentId เป็น number) ไม่ให้ .includes พังจนหน้าจอดำ
   const filteredGrades = grades.filter(
     (grade) =>
-      String(grade.name ?? "").includes(searchTerm) ||
-      String(grade.studentId ?? "").includes(searchTerm)
+      grade.name.includes(searchTerm) ||
+      grade.studentId.includes(searchTerm)
   );
 
   const handleGradeChange = (id: string, newGrade: string) => {

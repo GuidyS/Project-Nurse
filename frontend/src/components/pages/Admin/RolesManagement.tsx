@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -21,14 +20,6 @@ interface UserWithRole {
   teacherSubRole?: string;
 }
 
-const mockUsersWithRoles: UserWithRole[] = [
-  { id: "1", email: "dean@faculty.edu", fullName: "ศ.ดร.สมศักดิ์ ใจดี", currentRole: "teacher", teacherSubRole: "dean" },
-  { id: "2", email: "instructor1@faculty.edu", fullName: "ผศ.ดร.มานี รักเรียน", currentRole: "teacher", teacherSubRole: "instructor" },
-  { id: "3", email: "advisor@faculty.edu", fullName: "รศ.ดร.ประยุทธ์ ช่วยเหลือ", currentRole: "teacher", teacherSubRole: "advisor" },
-  { id: "4", email: "student1@student.edu", fullName: "นายสมชาย เก่งมาก", currentRole: "student" },
-  { id: "5", email: "student2@student.edu", fullName: "นางสาวสมหญิง ขยันเรียน", currentRole: "student" },
-];
-
 const roles = [
   { value: "admin", label: "ผู้ดูแลระบบ", description: "สิทธิ์เต็มในการจัดการระบบ" },
   { value: "teacher", label: "อาจารย์", description: "สิทธิ์ในการจัดการข้อมูลการเรียนการสอน" },
@@ -38,12 +29,10 @@ const roles = [
 const teacherSubRoles = [
   { value: "dean", label: "คณบดี" },
   { value: "instructor", label: "อาจารย์ประจำ" },
-  { value: "course_instructor", label: "อาจารย์ประจำหลักสูตร" },
   { value: "project_manager", label: "อาจารย์รับผิดชอบโครงการ" },
   { value: "program_manager", label: "อาจารย์รับผิดชอบหลักสูตร" },
   { value: "advisor", label: "อาจารย์ที่ปรึกษา" },
   { value: "practical_instructor", label: "อาจารย์ภาคปฏิบัติ" },
-  { value: "dummy", label: "อาจารย์สมมติ" },
 ];
 
 const roleLabels: Record<string, string> = {
@@ -55,22 +44,35 @@ const roleLabels: Record<string, string> = {
 const subRoleLabels: Record<string, string> = {
   dean: "คณบดี",
   instructor: "อาจารย์ประจำ",
-  course_instructor: "อาจารย์ประจำหลักสูตร",
   project_manager: "อาจารย์รับผิดชอบโครงการ",
   program_manager: "อาจารย์รับผิดชอบหลักสูตร",
   advisor: "อาจารย์ที่ปรึกษา",
   practical_instructor: "อาจารย์ภาคปฏิบัติ",
-  dummy: "อาจารย์สมมติ",
 };
 
 export default function RolesManagement() {
-  const [users, setUsers] = useState<UserWithRole[]>(mockUsersWithRoles);
+  const [users, setUsers] = useState<UserWithRole[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedUser, setSelectedUser] = useState<UserWithRole | null>(null);
   const [newRole, setNewRole] = useState("");
-  const [newSubRole, setNewSubRole] = useState("");
+  const [primaryPosition, setPrimaryPosition] = useState("");
+  const [secondaryPositions, setSecondaryPositions] = useState<string[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { toast } = useToast();
+
+  const currentUserId = (() => {
+    try {
+      const raw = localStorage.getItem("user");
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      return parsed?.user_id != null ? String(parsed.user_id) : null;
+    } catch {
+      return null;
+    }
+  })();
+
+  const isSelfUser = (userId: string) =>
+    currentUserId != null && String(userId) === String(currentUserId);
 
 // ดึงข้อมูลผู้ใช้จาก API ตัวเดียวกัน
   const fetchUsers = async () => {
@@ -92,19 +94,36 @@ export default function RolesManagement() {
 
   const handleAssignRole = async () => {
     if (!selectedUser || !newRole) return;
+    if (isSelfUser(selectedUser.id)) {
+      toast({
+        title: "ไม่สามารถแก้ไขบัญชีตัวเองได้",
+        description: "กรุณาให้ผู้ดูแลระบบคนอื่นเปลี่ยน Role หรือตำแหน่งแทน",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (newRole === "teacher" && !primaryPosition) {
+      toast({ title: "กรุณาเลือกตำแหน่งหลัก", variant: "destructive" });
+      return;
+    }
     
     try {
       await api.post("/index.php?page=manage-role", {
         userId: selectedUser.id,
         newRole: newRole,
-        newSubRole: newSubRole
+        primaryPosition: newRole === "teacher" ? primaryPosition : null,
+        secondaryPositions: newRole === "teacher" ? secondaryPositions.filter((position) => position !== primaryPosition) : []
       });
 
       toast({ title: "มอบหมาย Role สำเร็จ" });
       setIsDialogOpen(false);
       fetchUsers(); // โหลดข้อมูลใหม่เพื่อให้ UI อัปเดต
-    } catch (error) {
-      toast({ title: "เกิดข้อผิดพลาด", variant: "destructive" });
+    } catch (error: any) {
+      toast({
+        title: "เกิดข้อผิดพลาด",
+        description: error.response?.data?.message || "ไม่สามารถอัปเดต Role ได้",
+        variant: "destructive",
+      });
     }
   };
 
@@ -115,11 +134,48 @@ export default function RolesManagement() {
   );
 
 
-  const openAssignDialog = (user: UserWithRole) => {
+  const handlePrimaryPositionChange = (value: string) => {
+    setPrimaryPosition(value);
+    setSecondaryPositions((prev) => prev.filter((position) => position !== value));
+  };
+
+  const toggleSecondaryPosition = (value: string) => {
+    if (value === primaryPosition) return;
+
+    setSecondaryPositions((prev) =>
+      prev.includes(value)
+        ? prev.filter((position) => position !== value)
+        : [...prev, value]
+    );
+  };
+
+  const openAssignDialog = async (user: UserWithRole) => {
+    if (isSelfUser(user.id)) {
+      toast({
+        title: "ไม่สามารถแก้ไขบัญชีตัวเองได้",
+        description: "กรุณาให้ผู้ดูแลระบบคนอื่นเปลี่ยน Role หรือตำแหน่งแทน",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setSelectedUser(user);
     setNewRole(user.currentRole);
-    setNewSubRole(user.teacherSubRole || "");
+    setPrimaryPosition(user.teacherSubRole || "");
+    setSecondaryPositions([]);
     setIsDialogOpen(true);
+
+    if (user.currentRole === "teacher") {
+      try {
+        const response = await api.get(`/index.php?page=manage-role&userId=${user.id}`);
+        if (response.data.status === "success") {
+          setPrimaryPosition(response.data.data.primaryPosition || user.teacherSubRole || "");
+          setSecondaryPositions(response.data.data.secondaryPositions || []);
+        }
+      } catch (error) {
+        toast({ title: "โหลดตำแหน่งผู้ใช้ล้มเหลว", variant: "destructive" });
+      }
+    }
   };
 
   return (
@@ -203,10 +259,14 @@ export default function RolesManagement() {
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="outline" size="sm" onClick={() => openAssignDialog(user)} className="gap-2">
-                        <UserCog className="h-4 w-4" />
-                        จัดการ Role
-                      </Button>
+                      {isSelfUser(user.id) ? (
+                        <Badge variant="secondary">ผู้ดูแลระบบ</Badge>
+                      ) : (
+                        <Button variant="outline" size="sm" onClick={() => openAssignDialog(user)} className="gap-2">
+                          <UserCog className="h-4 w-4" />
+                          จัดการ Role
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -226,7 +286,16 @@ export default function RolesManagement() {
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label>Role หลัก</Label>
-                <Select value={newRole} onValueChange={setNewRole}>
+                <Select
+                  value={newRole}
+                  onValueChange={(value) => {
+                    setNewRole(value);
+                    if (value !== "teacher") {
+                      setPrimaryPosition("");
+                      setSecondaryPositions([]);
+                    }
+                  }}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="เลือก Role" />
                   </SelectTrigger>
@@ -238,19 +307,46 @@ export default function RolesManagement() {
                 </Select>
               </div>
               {newRole === "teacher" && (
-                <div className="space-y-2">
-                  <Label>ตำแหน่งอาจารย์</Label>
-                  <Select value={newSubRole} onValueChange={setNewSubRole}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="เลือกตำแหน่ง" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {teacherSubRoles.map((subRole) => (
-                        <SelectItem key={subRole.value} value={subRole.value}>{subRole.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                <>
+                  <div className="space-y-2">
+                    <Label>ตำแหน่งหลัก</Label>
+                    <Select value={primaryPosition} onValueChange={handlePrimaryPositionChange}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="เลือกตำแหน่งหลัก" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {teacherSubRoles.map((subRole) => (
+                          <SelectItem key={subRole.value} value={subRole.value}>{subRole.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>ตำแหน่งรอง</Label>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {teacherSubRoles.map((subRole) => {
+                        const isPrimary = primaryPosition === subRole.value;
+                        const isSelected = secondaryPositions.includes(subRole.value);
+
+                        return (
+                          <Button
+                            key={subRole.value}
+                            type="button"
+                            variant={isSelected ? "default" : "outline"}
+                            disabled={isPrimary}
+                            className="justify-start"
+                            onClick={() => toggleSecondaryPosition(subRole.value)}
+                          >
+                            {subRole.label}
+                            {isPrimary ? " (ตำแหน่งหลัก)" : ""}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                    <p className="text-xs text-muted-foreground">เลือกได้หลายตำแหน่ง ตำแหน่งหลักจะไม่ถูกเลือกซ้ำเป็นตำแหน่งรอง</p>
+                  </div>
+                </>
               )}
             </div>
             <DialogFooter>

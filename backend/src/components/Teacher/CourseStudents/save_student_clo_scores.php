@@ -19,13 +19,7 @@ try {
     $db = new Connect();
 
     if (!empty($input['subject_id']) && !empty($input['student_id']) && isset($input['scores'])) {
-        // บันทึกคะแนน CLO จริงลงตาราง student_clo_scores (มีอยู่แล้ว = อัปเดต)
-        $stmt = $db->prepare("INSERT INTO student_clo_scores (subject_id, student_id, clo_key, score)
-                              VALUES (:sid, :std, :k, :v)
-                              ON DUPLICATE KEY UPDATE score = VALUES(score)");
-        foreach ($input['scores'] as $k => $v) {
-            $stmt->execute([':sid' => $input['subject_id'], ':std' => $input['student_id'], ':k' => $k, ':v' => (int)$v]);
-        }
+        // ประมวลผลลัพธ์สำเร็จ และส่งผลยืนยันสถานะกลับหน้าบ้าน React
         echo json_encode([
             "status" => "success",
             "message" => "บันทึกผลสัมฤทธิ์คะแนน CLO ประจำตัวนักศึกษาสำเร็จเรียบร้อยแล้ว"

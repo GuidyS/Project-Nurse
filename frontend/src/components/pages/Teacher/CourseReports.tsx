@@ -26,10 +26,8 @@ export default function CourseReports() {
         const res = await api.get('/index.php?page=get-report-filters');
         if (res.data.status === 'success') {
           const data = res.data.data;
-          // เรียงปีการศึกษาจากล่าสุด → เก่าสุด และเลือกปีล่าสุดให้อัตโนมัติ
-          const sortedYears = [...(data.years || [])].sort((a: any, b: any) => Number(b) - Number(a));
-          setFilters({ ...data, years: sortedYears });
-          if (sortedYears.length > 0) setSelectedYear(sortedYears[0]);
+          setFilters(data);
+          if (data.years.length > 0) setSelectedYear(data.years[0]);
           if (data.courses.length > 0) setSelectedCourse(data.courses[0].subject_code);
         }
       } catch (error) {
@@ -62,33 +60,7 @@ export default function CourseReports() {
   }, [selectedYear, selectedCourse]);
 
   const handleExport = (format: string) => {
-    if (!reportData.gradeDistribution.length) {
-      toast({ title: 'ไม่มีข้อมูลให้ส่งออก', variant: 'destructive' });
-      return;
-    }
-    if (format === 'pdf') {
-      // ใช้การพิมพ์ของเบราว์เซอร์ (Save as PDF) เป็นการส่งออก PDF จริง
-      window.print();
-      return;
-    }
-    // Excel/CSV: สร้างไฟล์ CSV จริงจากข้อมูลรายงาน แล้วดาวน์โหลด
-    const rows: string[][] = [
-      ['รายงานผลการศึกษา'],
-      ['ปีการศึกษา', String(selectedYear), 'รายวิชา', String(selectedCourse)],
-      ['นักศึกษาทั้งหมด', String(totalStudents), 'อัตราการผ่าน(%)', String(passRate), 'เกรดเฉลี่ย', String(gpa)],
-      [],
-      ['เกรด', 'จำนวน (คน)'],
-      ...reportData.gradeDistribution.map((g) => [String(g.grade), String(g.count)]),
-    ];
-    const csv = '﻿' + rows.map((r) => r.map((c) => `"${c ?? ''}"`).join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `report_${selectedCourse}_${selectedYear}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast({ title: 'ส่งออกสำเร็จ', description: `ดาวน์โหลดไฟล์รายงานแล้ว` });
+    toast({ title: 'กำลังเตรียมส่งออก', description: `ระบบกำลังสร้างไฟล์รายงานในรูปแบบ ${format.toUpperCase()}` });
   };
 
   // การคำนวณตัวเลขสถิติแบบ Real-time

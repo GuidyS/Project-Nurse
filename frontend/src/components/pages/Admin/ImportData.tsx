@@ -70,8 +70,7 @@ export default function ImportData() {
     setIsUploading(true);
     
     try {
-      const response = await api.post("/index.php?page=upload", formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+      const response = await api.post("/index.php?page=import-data", formData, {
         onUploadProgress: (p) => setUploadProgress(Math.round((p.loaded * 100) / (p.total || 100)))
       });
 
@@ -90,10 +89,21 @@ export default function ImportData() {
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
+  const handleFileSelect = (file?: File | null) => {
+    if (!file) return;
+
+    const allowedExtensions = [".xlsx", ".xls", ".csv"];
+    const isAllowed = allowedExtensions.some((extension) => file.name.toLowerCase().endsWith(extension));
+    if (!isAllowed) {
+      toast({ title: "ไฟล์ไม่ถูกต้อง", description: "กรุณาเลือกไฟล์ .xlsx, .xls หรือ .csv เท่านั้น", variant: "destructive" });
+      return;
     }
+
+    setSelectedFile(file);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    handleFileSelect(e.target.files?.[0]);
   };
 
   const getStatusBadge = (status: ImportHistory["status"]) => {
@@ -145,12 +155,18 @@ export default function ImportData() {
             <CardDescription>รองรับไฟล์ .xlsx, .xls, .csv (ขนาดไม่เกิน 10MB)</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="border-2 border-dashed border-border rounded-lg p-8 text-center">
-              <FileSpreadsheet className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <Label htmlFor="file-upload" className="cursor-pointer">
-                <span className="text-primary font-medium">คลิกเพื่อเลือกไฟล์</span>
-                <span className="text-muted-foreground"> หรือลากไฟล์มาวางที่นี่</span>
-              </Label>
+            <Label
+              htmlFor="file-upload"
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => {
+                event.preventDefault();
+                handleFileSelect(event.dataTransfer.files?.[0]);
+              }}
+              className="flex min-h-[220px] cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-muted-foreground/30 bg-muted/20 px-6 py-10 text-center transition-colors hover:border-primary/60 hover:bg-primary/5"
+            >
+
+                <Upload className="mb-3 h-10 w-10 text-primary" />
+              <p className="font-medium text-foreground">Choose a file or Drag it here</p>
               <Input
                 id="file-upload"
                 type="file"
@@ -159,11 +175,12 @@ export default function ImportData() {
                 onChange={handleFileChange}
               />
               {selectedFile && (
-                <p className="mt-4 text-sm text-foreground">
-                  ไฟล์ที่เลือก: <span className="font-medium">{selectedFile.name}</span>
-                </p>
+                <div className="mt-5 flex items-center gap-2 rounded-md bg-background px-4 py-2 text-sm text-foreground shadow-sm">
+                  <FileSpreadsheet className="h-4 w-4 text-primary" />
+                  <span className="font-medium">{selectedFile.name}</span>
+                </div>
               )}
-            </div>
+            </Label>
 
             {isUploading && (
               <div className="space-y-2">

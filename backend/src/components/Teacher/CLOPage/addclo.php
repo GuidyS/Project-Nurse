@@ -1,33 +1,78 @@
 <?php
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 //require_once __DIR__ . '/../../../middlewares/auth_middleware.php';
+require_once __DIR__ . '/clo_mapping_helpers.php';
 
-if (session_status() === PHP_SESSION_NONE) session_start();
 $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
+$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 $input = json_decode(file_get_contents("php://input"), true);
 
 if (!isset($_SESSION['user_id'])) {
     http_response_code(401);
+    echo json_encode(["status" => "error", "message" => "Unauthorized"]);
     exit();
 }
 
 try {
     
     if (!empty($input['subject_id']) && !empty($input['description'])) {
-        
-        
-        $sql = "INSERT INTO clo (subject_id, clo_code, description, ylo_id)
-                VALUES (:subject_id, :clo_code, :description, :ylo_id)";
+        $subjectStmt = $pdo->prepare("SELECT subject_code FROM subject WHERE subject_id = :subject_id LIMIT 1");
+        $subjectStmt->execute([':subject_id' => $input['subject_id']]);
+        $subject_code = $subjectStmt->fetchColumn();
 
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute([
-            ':subject_id' => $input['subject_id'],
-            ':clo_code' => $input['clo_code'] ?? null,
-            ':description' => $input['description'],
-            ':ylo_id' => $input['ylo_id'] ?? null
+        if (!$subject_code) {
+            http_response_code(404);
+            echo json_encode(["status" => "error", "message" => "ไม่พบรายวิชา"]);
+            exit();
+        }
+
+        $frameworkStmt = $pdo->query("SELECT id, mapping_json FROM curriculum_framework WHERE is_active = 1 LIMIT 1");
+        $framework = $frameworkStmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$framework) {
+            http_response_code(404);
+            echo json_encode(["status" => "error", "message" => "ไม่พบโครงสร้างหลักสูตรที่เปิดใช้งาน"]);
+            exit();
+        }
+
+        $mappingData = !empty($framework['mapping_json']) ? json_decode($framework['mapping_json'], true) : [];
+        if (!is_array($mappingData)) $mappingData = [];
+        if (!isset($mappingData['subject_mappings'])) $mappingData['subject_mappings'] = [];
+        if (!isset($mappingData['subject_mappings'][$subject_code])) $mappingData['subject_mappings'][$subject_code] = [];
+        if (!isset($mappingData['subject_mappings'][$subject_code]['clos']) || !is_array($mappingData['subject_mappings'][$subject_code]['clos'])) {
+            $mappingData['subject_mappings'][$subject_code]['clos'] = [];
+        }
+
+        $maxId = 0;
+        foreach (($mappingData['subject_mappings'] ?? []) as $subjectData) {
+            foreach (($subjectData['clos'] ?? []) as $clo) {
+                $maxId = max($maxId, (int)($clo['clo_id'] ?? 0));
+            }
+        }
+
+        // PLO มาจาก YLO ที่เลือกเท่านั้น; Sub PLO ติ๊กได้เฉพาะตัวที่ PLO แม่อยู่ในชุดของ YLO
+        $mapped_plos = derivePlosFromYlo($mappingData, $input['ylo_id'] ?? null);
+        $sub_plos = filterSubPlosByAllowedPlos($mappingData, $input['sub_plos'] ?? null, $mapped_plos);
+
+        $mappingData['subject_mappings'][$subject_code]['clos'][] = [
+            "clo_id" => $maxId + 1,
+            "clo_code" => $input['clo_code'] ?? null,
+            "description" => $input['description'],
+            "ylo_id" => $input['ylo_id'] ?? null,
+            "mapped_plos" => $mapped_plos,
+            "sub_plos" => $sub_plos
+        ];
+
+        $updateStmt = $pdo->prepare("UPDATE curriculum_framework SET mapping_json = :json WHERE id = :id");
+        $updateStmt->execute([
+            ':json' => json_encode($mappingData, JSON_UNESCAPED_UNICODE),
+            ':id' => $framework['id']
         ]);
 
-        echo json_encode(["status" => "success", "message" => "เพิ่ม CLO สำเร็จ"]);
+        echo json_encode(["status" => "success", "message" => "เพิ่ม CLO สำเร็จ"], JSON_UNESCAPED_UNICODE);
     } else {
         http_response_code(400);
         echo json_encode(["status" => "error", "message" => "ข้อมูลไม่ครบ"]);

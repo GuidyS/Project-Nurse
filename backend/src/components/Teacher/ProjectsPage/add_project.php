@@ -25,15 +25,28 @@ if (!isset($_SESSION['user_id'])) {
 try {
     //  VALIDATION: เช็คว่ากรอกชื่อโครงการมาไหม
     if (!empty($input['project_name_th'])) {
+        $facultyStmt = $pdo->prepare("SELECT faculty_id FROM faculty WHERE faculty_id = ? LIMIT 1");
+        $facultyStmt->execute([$_SESSION['user_id']]);
+        $facultyId = $facultyStmt->fetchColumn() ?: null;
         
-        $sql = "INSERT INTO project (project_name_th, project_name_en, description) 
-                VALUES (:name_th, :name_en, :desc)";
+        $sql = "INSERT INTO project (
+                    project_name_th, project_name_en, description,
+                    responsible_faculty_id, academic_year, status, start_date, end_date
+                ) VALUES (
+                    :name_th, :name_en, :desc,
+                    :responsible_faculty_id, :academic_year, :status, :start_date, :end_date
+                )";
         
         $stmt = $pdo->prepare($sql);
         $stmt->execute([
             ':name_th' => $input['project_name_th'],
             ':name_en' => $input['project_name_en'] ?? '',
-            ':desc' => $input['description'] ?? ''
+            ':desc' => $input['description'] ?? '',
+            ':responsible_faculty_id' => $facultyId,
+            ':academic_year' => $input['academic_year'] ?? null,
+            ':status' => $input['status'] ?? 'active',
+            ':start_date' => $input['start_date'] ?? null,
+            ':end_date' => $input['end_date'] ?? null
         ]);
 
         echo json_encode(["status" => "success", "message" => "เพิ่มโครงการสำเร็จ"]);

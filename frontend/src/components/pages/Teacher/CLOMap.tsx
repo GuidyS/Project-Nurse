@@ -64,11 +64,17 @@ export default function CLOMap() {
       if (response.data.status === 'success') {
         toast({ title: "สำเร็จ", description: "บันทึกข้อมูล CLO Map เรียบร้อยแล้ว" });
         setIsEditing(false);
+        await fetchMapData();
       } else {
-        throw new Error(response.data.message);
+        toast({
+          title: "ล้มเหลว",
+          description: response.data?.message || "ไม่สามารถบันทึกข้อมูลได้",
+          variant: "destructive",
+        });
       }
-    } catch (error: any) {
-      toast({ title: "ล้มเหลว", description: error.message || "ไม่สามารถบันทึกข้อมูลได้", variant: "destructive" });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "ไม่สามารถบันทึกข้อมูลได้";
+      toast({ title: "ล้มเหลว", description: message, variant: "destructive" });
     }
   };
 
@@ -101,8 +107,8 @@ return (
             )}
           </div>
         </div>
-
-        {/* Summary (การ์ดสรุปจำนวนวิชาต่อ PLO — อยู่ด้านบนตาราง) */}
+        
+        {/* Summary */}
         <div className="grid gap-4 md:grid-cols-4 lg:grid-cols-8">
           {plos.map((plo) => {
             const count = Object.values(cloMap).filter(plos => plos.includes(plo)).length;
@@ -164,7 +170,6 @@ return (
             </Table>
           </CardContent>
         </Card>
-
       </div>
     </>
   );

@@ -5,27 +5,10 @@
 -- =====================================================================
 USE `MYSQL_DATABASE`;
 
--- ---------- 1) ตาราง clo (สำหรับหน้า CLOPage) ----------
-DROP TABLE IF EXISTS `clo`;
-CREATE TABLE `clo` (
-  `clo_id`     INT AUTO_INCREMENT PRIMARY KEY,
-  `subject_id` INT NOT NULL,
-  `description` TEXT,
-  `ylo_id`     VARCHAR(30),
-  `clo_code`   VARCHAR(30),
-  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-INSERT INTO `clo` (`subject_id`,`description`,`ylo_id`,`clo_code`) VALUES
-  (1,'อธิบายหลักไวยากรณ์และคำศัพท์ภาษาอังกฤษพื้นฐานได้','YLO1','CLO1'),
-  (1,'สื่อสารภาษาอังกฤษในสถานการณ์ทั่วไปได้','YLO1','CLO2');
+-- ---------- 1) (ยกเลิก) ตาราง clo — โค้ด main อ่าน CLO จาก curriculum_framework แล้ว ----------
 
 -- ---------- 2) enrollment (การลงทะเบียนเรียน) ----------
 -- ล้างคะแนน CLO รายบุคคลที่เคยทดสอบไว้ (ถ้าตารางมีอยู่)
-SET @has_scores := (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='MYSQL_DATABASE' AND table_name='student_clo_scores');
-SET @sql := IF(@has_scores>0, 'DELETE FROM student_clo_scores', 'SELECT 1');
-PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
-
 DELETE FROM `enrollment`;
 INSERT INTO `enrollment` (`student_id`,`subject_id`,`academic_year`,`semester`,`section`,`grade`,`status`) VALUES
   (6603400001,1,2567,1,1,'A','Active'),
@@ -62,6 +45,6 @@ UPDATE `curriculum_framework` SET `mapping_json` = JSON_SET(
 
 -- ---------- ตรวจผล ----------
 SELECT (SELECT COUNT(*) FROM enrollment) AS enrollment_rows,
-       (SELECT COUNT(*) FROM clo) AS clo_rows,
+       0 AS clo_rows,
        JSON_EXTRACT(mapping_json,'$.subject_mappings."103-111".instructor_id') AS instr_103111
 FROM curriculum_framework WHERE is_active=1;

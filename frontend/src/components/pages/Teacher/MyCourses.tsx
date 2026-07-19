@@ -140,7 +140,9 @@ export default function MyCourses() {
                     <Progress value={course.cloProgress} />
                   </div>
                   <div className="flex gap-2 pt-2">
-                    <Button variant="outline" className="flex-1" onClick={() => { window.location.href = "/?page=clos"; }}>จัดการ CLO</Button>
+                    {/* ปุ่มสามารถปรับ URL ให้ลิงก์ไปหน้าตัดเกรด หรือกำหนด CLO ได้ภายหลัง */}
+                    <Button variant="outline" className="flex-1">จัดการ CLO</Button>
+                    <Button className="flex-1">ให้คะแนน</Button>
                   </div>
                 </CardContent>
               </Card>

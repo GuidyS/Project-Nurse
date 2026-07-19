@@ -1,114 +1,105 @@
 <?php
-if (session_status() == PHP_SESSION_NONE) {
-    session_start();
-}
-
+if (session_status() == PHP_SESSION_NONE) { session_start(); }
 require_once __DIR__ . '/../../config/config.php';
 
 if (!isset($_SESSION['user_id'])) {
     http_response_code(401);
-    echo json_encode(["status" => "error", "message" => "Unauthorized: No session found"]);
-    exit;
+    echo json_encode(["status" => "error", "message" => "Unauthorized"]); exit;
 }
 
 $id = $_SESSION['user_id'];
-$username = $_SESSION['username'] ?? null;
 $db = new Connect;
 
-try {
-    // 🧑‍🎓 [ขั้นตอนที่ 1] ลองตรวจสอบก่อนว่าผู้ใช้งานคนนี้มีประวัติต่อยู่ในตาราง student หรือไม่
-    // โดยเช็คจากรหัสนักศึกษา (username) หรือ user_id 
-    $sql_student = "SELECT student_id, title, first_name_th, last_name_th, email, phone, year_level AS year
-                    FROM student 
-                    WHERE student_id = :student_id_1 OR student_id = :student_id_2 LIMIT 1";
-    $stmt_student = $db->prepare($sql_student);
-    $stmt_student->execute([
-        'student_id_1' => (float)$username,
-        'student_id_2' => (float)$id
-    ]);
-    $student = $stmt_student->fetch(PDO::FETCH_ASSOC);
+function normalizePdfPaths($value): array {
+    if (empty($value)) {
+        return [];
+    }
 
-    // 🎯 ถ้าเจอข้อมูลในตารางนักศึกษา ให้ส่งก้อน JSON นักศึกษากลับไปทันที
-    if ($student) {
-        echo json_encode([
-            "status" => "success",
-            "data" => [
-                "id" => $student['student_id'],
-                "title" => $student['title'],
-                "first_name" => $student['first_name_th'], // แมปตัวแปรให้ตรงกับ ProfilePage.tsx
-                "last_name" => $student['last_name_th'],
-                "email" => !empty($student['email']) ? $student['email'] : $student['student_id'] . "@siam.edu",
-                "phone" => !empty($student['phone']) ? $student['phone'] : "-",
-                "position" => "นักศึกษา ชั้นปีที่ " . ($student['year'] ?? "1"),
-                "program" => "หลักสูตรพยาบาลศาสตรบัณฑิต",
-                "faculty" => "พยาบาลศาสตร์"
-            ]
-        ]);
+    $decoded = json_decode($value, true);
+    if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+        return array_values(array_filter($decoded, fn($path) => is_string($path) && trim($path) !== ''));
+    }
+
+    return [trim($value)];
+}
+
+try {
+    $method = $_SERVER['REQUEST_METHOD'];
+
+    // 🔍 [GET] ดึงข้อมูลมาโชว์ที่หน้า Profile
+    if ($method === 'GET') {
+        $stmt = $db->prepare("SELECT username, role_id FROM users WHERE user_id = :id");
+        $stmt->execute([':id' => $id]);
+        $u_info = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($u_info['role_id'] == 3) {
+            $stmt = $db->prepare("SELECT * FROM student WHERE student_id = :id LIMIT 1");
+            $stmt->execute(['id' => $u_info['username']]);
+            $profile = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+
+            $docStmt = $db->prepare("
+                SELECT title, type, file_name, file_path
+                FROM portfolio
+                WHERE student_id = :id
+                  AND (
+                    mime_type = 'application/pdf'
+                    OR file_name LIKE '%.pdf'
+                    OR file_path LIKE '%.pdf'
+                  )
+                ORDER BY created_at DESC
+            ");
+            $docStmt->execute(['id' => $u_info['username']]);
+            $profile['pdf_documents'] = $docStmt->fetchAll(PDO::FETCH_ASSOC);
+
+            echo json_encode(["status" => "success", "role" => "student", "data" => $profile]);
+        } else {
+            $stmt = $db->prepare("SELECT * FROM faculty WHERE faculty_id = :id LIMIT 1");
+            $stmt->execute(['id' => $u_info['username']]);
+            $profile = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+            $profile['pdf_documents'] = [];
+
+            $facultyDocs = [
+                'nursing_council_file' => 'ไฟล์บัตรสภาการพยาบาล',
+                'license_file' => 'ไฟล์ใบอนุญาต',
+                'teaching_cert_file' => 'ไฟล์ใบรับรองการสอน'
+            ];
+
+            foreach ($facultyDocs as $field => $title) {
+                foreach (normalizePdfPaths($profile[$field] ?? null) as $index => $filePath) {
+                    $profile['pdf_documents'][] = [
+                        'title' => $index === 0 ? $title : $title . ' #' . ($index + 1),
+                        'type' => 'document',
+                        'file_name' => basename($filePath),
+                        'file_path' => $filePath
+                    ];
+                }
+            }
+
+            echo json_encode(["status" => "success", "role" => "teacher", "data" => $profile]);
+        }
         exit;
     }
 
-    // 🧑‍🏫 [ขั้นตอนที่ 2] ถ้าไม่พบในตารางนักศึกษา แปลว่าเป็น "อาจารย์/บุคลากร" ให้ดึงข้อมูลฝั่งอาจารย์ตามปกติ
-    $sql_faculty = "SELECT f.*, u.username 
-                    FROM users u
-                    JOIN faculty f ON u.username = f.faculty_id
-                    WHERE u.user_id = :id";
+    // 📝 [POST] อัปเดตข้อมูลของตัวเองผ่านหน้า Profile
+    if ($method === 'POST') {
+        $input = json_decode(file_get_contents("php://input"), true);
+        $stmt = $db->prepare("SELECT username, role_id FROM users WHERE user_id = :id");
+        $stmt->execute([':id' => $id]);
+        $u_info = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    $stmt_fac = $db->prepare($sql_faculty);
-    $stmt_fac->execute(['id' => $id]);
-    $result = $stmt_fac->fetch(PDO::FETCH_ASSOC);
-
-    if ($result) {
-        // เช็คตำแหน่งวิชาการจากตาราง user_position
-        $sql_pos = "SELECT position_id FROM user_position WHERE user_id = :id AND is_primary = 1 LIMIT 1";
-        $stmt_pos = $db->prepare($sql_pos);
-        $stmt_pos->execute(['id' => $id]);
-        $pos_row = $stmt_pos->fetch(PDO::FETCH_ASSOC);
-        $position_id = $pos_row ? (int)$pos_row['position_id'] : null;
-
-        $pos_names = [
-            1 => 'คณบดี', 
-            2 => 'อาจารย์ประจำหลักสูตร', 
-            3 => 'อาจารย์ที่ปรึกษา', 
-            4 => 'อาจารย์ปฏิบัติ', 
-            5 => 'อาจารย์ผู้รับผิดชอบหลักสูตร', 
-            6 => 'อาจารย์ผู้รับผิดชอบโครงการ'
-        ];
-        $display_position = $pos_names[$position_id] ?? "อาจารย์พยาบาล";
-
-        echo json_encode([
-            "status" => "success",
-            "data" => [
-                "id" => $result['faculty_id'],
-                "title" => $result['title'],
-                "first_name" => $result['first_name_th'],
-                "last_name" => $result['last_name_th'],
-                "email" => $result['username'] . "@siam.edu",
-                "phone" => $result['phone_number'] ?? "-",
-                "position" => $display_position,
-                "program" => "-",
-                "faculty" => "พยาบาลศาสตร์"
-            ]
-        ]);
-    } else {
-        // 💡 [Fallback สุดท้าย] ถ้าไม่เจอข้อมูลจากทั้งสองตารางเลย ให้ส่งค่าจำลองของรหัสที่ล็อกอินอยู่ เพื่อป้องกันหน้าจอขาวค้าง
-        echo json_encode([
-            "status" => "success",
-            "data" => [
-                "id" => $username ?? $id,
-                "title" => "นักศึกษา",
-                "first_name" => "ทดสอบระบบ",
-                "last_name" => "พยาบาลศาสตร์",
-                "email" => ($username ?? $id) . "@siam.edu",
-                "phone" => "-",
-                "position" => "ผู้ใช้งานระบบจำลอง",
-                "program" => "หลักสูตรพยาบาลศาสตรบัณฑิต",
-                "faculty" => "พยาบาลศาสตร์"
-            ]
-        ]);
+        if ($u_info['role_id'] == 3) {
+            $sql = "UPDATE student SET first_name_en = ?, last_name_en = ?, gender = ?, birth_date = ?, email = ?, phone = ?, home_phone = ?, home_address = ?, hometown_province = ? WHERE student_id = ?";
+            $db->prepare($sql)->execute([$input['first_name_en']??null, $input['last_name_en']??null, $input['gender']??null, $input['birth_date']??null, $input['email']??null, $input['phone']??null, $input['home_phone']??null, $input['home_address']??null, $input['hometown_province']??null, $u_info['username']]);
+        } else {
+            $sql = "UPDATE faculty SET first_name_en = ?, last_name_en = ?, gender = ?, birth_date = ?, email = ?, phone = ?, current_address = ?, nursing_council_no = ? WHERE faculty_id = ?";
+            $db->prepare($sql)->execute([$input['first_name_en']??null, $input['last_name_en']??null, $input['gender']??null, $input['birth_date']??null, $input['email']??null, $input['phone']??null, $input['current_address']??null, $input['nursing_council_no']??null, $u_info['username']]);
+        }
+        echo json_encode(["status" => "success"]);
+        exit;
     }
 
 } catch (Exception $e) {
     http_response_code(500);
     echo json_encode(["status" => "error", "message" => $e->getMessage()]);
 }
-exit;
+?>

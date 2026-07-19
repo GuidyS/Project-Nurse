@@ -20,7 +20,7 @@ if (!isset($_SESSION['user_id'])) {
 
 $input = json_decode(file_get_contents("php://input"), true);
 
-if (!$input || empty($input['student_ids']) || empty($input['title'])) {
+if (!$input || empty($input['recipient_ids']) || empty($input['title'])) {
     http_response_code(400);
     echo json_encode(["status" => "error", "message" => "Missing required fields"]);
     exit();
@@ -131,14 +131,11 @@ try {
     $sentCount = 0;
     $skippedCount = 0;
 
-    foreach ($input['student_ids'] as $student_user_id) {
-        $settingsStmt->execute([':user_id' => $student_user_id]);
+    foreach ($input['recipient_ids'] as $recipient_user_id) {
+        $settingsStmt->execute([':user_id' => $recipient_user_id]);
         $settings = $settingsStmt->fetch(PDO::FETCH_ASSOC) ?: [
-            'email_notifications' => 1,
-            'push_notifications' => 1,
-            'grade_notifications' => 1,
-            'project_notifications' => 1,
-            'student_notifications' => 1,
+            'email_notifications' => 1, 'push_notifications' => 1,
+            'grade_notifications' => 1, 'project_notifications' => 1, 'student_notifications' => 1,
         ];
 
         if (!canReceiveNotification($settings, $category)) {
@@ -153,7 +150,7 @@ try {
         }
 
         $stmt->execute([
-            ':user_id' => $student_user_id,
+            ':user_id' => $recipient_user_id,
             ':sender_user_id' => $_SESSION['user_id'],
             ':title' => $input['title'],
             ':message' => $input['message'] ?? '',

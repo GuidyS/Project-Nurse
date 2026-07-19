@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import api from "@/lib/axios";
 import { cn } from "@/lib/utils";
+import { PASSWORD_POLICY_HINT, validatePasswordPolicy } from "@/lib/passwordPolicy";
 
 interface RegisterPageProps {
   onBackToLogin: () => void;
@@ -42,6 +43,11 @@ const RegisterPage = ({ onBackToLogin }: RegisterPageProps) => {
     }
     if (!password.trim()) {
       nextErrors.password = "กรุณากรอก Password";
+    } else {
+      const policyError = validatePasswordPolicy(password);
+      if (policyError) {
+        nextErrors.password = policyError;
+      }
     }
     if (!confirmPassword.trim()) {
       nextErrors.confirmPassword = "กรุณากรอก Confirm Password";
@@ -186,6 +192,9 @@ const RegisterPage = ({ onBackToLogin }: RegisterPageProps) => {
             </div>
             {errors.password && (
               <p className="text-sm font-medium text-destructive">{errors.password}</p>
+            )}
+            {!errors.password && (
+              <p className="text-xs text-muted-foreground">{PASSWORD_POLICY_HINT}</p>
             )}
           </div>
 

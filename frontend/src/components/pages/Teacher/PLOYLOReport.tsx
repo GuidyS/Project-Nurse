@@ -1,107 +1,104 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TrendingUp, Download, BarChart3, Target, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Legend } from 'recharts';
 import api from '@/lib/axios';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 
-interface LOItem {
+type PloItem = {
   name: string;
-  description: string;
   target: number;
   achieved: number;
-}
+  description: string;
+};
 
 export default function PLOYLOReport() {
-  const { toast } = useToast();
-  const [ploData, setPloData] = useState<LOItem[]>([]);
-  const [yloData, setYloData] = useState<LOItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [selectedCourse, setSelectedCourse] = useState('all');
+  const [ploData, setPloData] = useState<PloItem[]>([]);
+  const [yloData, setYloData] = useState<PloItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchReport = async () => {
+    const load = async () => {
       try {
-        setIsLoading(true);
+        setLoading(true);
         const res = await api.get('/index.php?page=get-plo-ylo-report');
         if (res.data.status === 'success') {
-          setPloData(res.data.data.plos || []);
-          setYloData(res.data.data.ylos || []);
+          setPloData(res.data.data.ploData || []);
+          setYloData(res.data.data.yloData || []);
+        } else {
+          toast.error(res.data.message || 'ไม่สามารถโหลดรายงาน PLO/YLO ได้');
         }
       } catch {
-        toast({ title: 'ข้อผิดพลาด', description: 'ไม่สามารถโหลดรายงาน PLO/YLO ได้', variant: 'destructive' });
+        toast.error('ไม่สามารถเชื่อมต่อ API รายงาน PLO/YLO ได้');
       } finally {
-        setIsLoading(false);
+        setLoading(false);
       }
     };
-    fetchReport();
+    load();
   }, []);
 
-  const handleExport = (format: string) => {
-    if (format === 'pdf') { window.print(); return; }
-    const rows: string[][] = [
-      ['รายงานวิเคราะห์ PLO/YLO'],
-      ['ประเภท', 'รหัส', 'คำอธิบาย', 'เป้าหมาย(%)', 'ผลลัพธ์จริง(%)', 'สถานะ'],
-      ...ploData.map(p => ['PLO', p.name, p.description, String(p.target), String(p.achieved), p.achieved >= p.target ? 'บรรลุ' : 'ไม่บรรลุ']),
-      ...yloData.map(y => ['YLO', y.name, y.description, String(y.target), String(y.achieved), y.achieved >= y.target ? 'บรรลุ' : 'ไม่บรรลุ']),
-    ];
-    const csv = '﻿' + rows.map(r => r.map(c => `"${c ?? ''}"`).join(',')).join('\n');
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
-    const a = document.createElement('a');
-    a.href = url; a.download = 'plo_ylo_report.csv'; a.click();
-    URL.revokeObjectURL(url);
+  const radarData = useMemo(
+    () => ploData.map(p => ({ subject: p.name, A: p.achieved, B: p.target, fullMark: 100 })),
+    [ploData]
+  );
+
+  const handleExport = () => {
+    toast.info('กำลังเตรียมส่งออกรายงาน PLO/YLO...');
   };
 
-  if (isLoading) {
-    return <div className="flex h-[60vh] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-[50vh] text-muted-foreground gap-2">
+        <Loader2 className="h-5 w-5 animate-spin" />
+        กำลังโหลดรายงาน PLO/YLO...
+      </div>
+    );
   }
 
-  const radarData = ploData.map(p => ({ subject: p.name, A: p.achieved, B: p.target, fullMark: 100 }));
-  const achievedCount = [...ploData, ...yloData].filter(x => x.achieved >= x.target).length;
-  const totalCount = ploData.length + yloData.length;
-
   return (
-    <>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">รายงานวิเคราะห์ PLO/YLO</h1>
-            <p className="text-muted-foreground">เปรียบเทียบเป้าหมายกับผลลัพธ์การเรียนรู้ของหลักสูตร</p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => handleExport('excel')}>
-              <Download className="mr-2 h-4 w-4" /> Excel
-            </Button>
-            <Button variant="outline" onClick={() => handleExport('pdf')}>
-              <Download className="mr-2 h-4 w-4" /> PDF
-            </Button>
-          </div>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">รายงาน PLO/YLO</h1>
+          <p className="text-muted-foreground">รายงานผลลัพธ์การเรียนรู้จากฐานข้อมูล (FR011)</p>
         </div>
+        <Button variant="outline" onClick={handleExport}>
+          <Download className="mr-2 h-4 w-4" />
+          ส่งออกรายงาน
+        </Button>
+      </div>
 
-        {/* สรุปภาพรวม */}
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">ตัวชี้วัดทั้งหมด</CardTitle></CardHeader>
-            <CardContent><div className="text-2xl font-bold">{totalCount}</div><p className="text-xs text-muted-foreground">PLO {ploData.length} + YLO {yloData.length}</p></CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">บรรลุเป้าหมาย</CardTitle></CardHeader>
-            <CardContent><div className="text-2xl font-bold text-green-600">{achievedCount}</div><p className="text-xs text-muted-foreground">ตัวชี้วัด</p></CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">ยังไม่บรรลุ</CardTitle></CardHeader>
-            <CardContent><div className="text-2xl font-bold text-destructive">{totalCount - achievedCount}</div><p className="text-xs text-muted-foreground">ตัวชี้วัด</p></CardContent>
-          </Card>
-        </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>เลือกรายวิชา</CardTitle>
+          <CardDescription>ตัวกรองรายวิชาจะเชื่อมใน Phase ถัดไป — ปัจจุบันแสดงข้อมูลทั้งหลักสูตร</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Select value={selectedCourse} onValueChange={setSelectedCourse}>
+            <SelectTrigger className="w-[300px]">
+              <SelectValue placeholder="เลือกรายวิชา" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">ทุกรายวิชา / ทั้งหลักสูตร</SelectItem>
+            </SelectContent>
+          </Select>
+        </CardContent>
+      </Card>
 
-        {/* Charts */}
-        <div className="grid gap-4 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2"><Target className="h-5 w-5" /> ผลลัพธ์ PLO</CardTitle>
-              <CardDescription>เปรียบเทียบเป้าหมายและผลลัพธ์จริง</CardDescription>
-            </CardHeader>
-            <CardContent>
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Target className="h-5 w-5" />
+              ผลลัพธ์ PLO
+            </CardTitle>
+            <CardDescription>เปรียบเทียบเป้าหมายและผลลัพธ์จริง</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {ploData.length > 0 ? (
               <ResponsiveContainer width="100%" height={300}>
                 <RadarChart data={radarData}>
                   <PolarGrid />
@@ -112,15 +109,22 @@ export default function PLOYLOReport() {
                   <Legend />
                 </RadarChart>
               </ResponsiveContainer>
-            </CardContent>
-          </Card>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-12">ไม่มีข้อมูล PLO</p>
+            )}
+          </CardContent>
+        </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2"><BarChart3 className="h-5 w-5" /> ผลลัพธ์ YLO</CardTitle>
-              <CardDescription>ผลลัพธ์การเรียนรู้รายชั้นปี</CardDescription>
-            </CardHeader>
-            <CardContent>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" />
+              ผลลัพธ์ YLO
+            </CardTitle>
+            <CardDescription>ผลลัพธ์การเรียนรู้รายปี</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {yloData.length > 0 ? (
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={yloData}>
                   <CartesianGrid strokeDasharray="3 3" />
@@ -132,38 +136,52 @@ export default function PLOYLOReport() {
                   <Bar dataKey="target" name="เป้าหมาย" fill="#22c55e" />
                 </BarChart>
               </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* PLO/YLO Details */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2"><TrendingUp className="h-5 w-5" /> รายละเอียดตัวชี้วัด</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {[...ploData, ...yloData].map((lo) => (
-                <div key={lo.name} className="flex items-center justify-between rounded-lg border p-4">
-                  <div>
-                    <p className="font-medium">{lo.name}: {lo.description}</p>
-                    <p className="text-sm text-muted-foreground">
-                      เป้าหมาย: {lo.target}% | ผลลัพธ์: {lo.achieved}%
-                    </p>
-                  </div>
-                  <div className={`flex items-center gap-2 text-base font-semibold ${lo.achieved >= lo.target ? 'text-green-600' : 'text-destructive'}`}>
-                    {lo.achieved >= lo.target ? (
-                      <><CheckCircle2 className="h-5 w-5 shrink-0" /><span>บรรลุ</span></>
-                    ) : (
-                      <><XCircle className="h-5 w-5 shrink-0" /><span>ไม่บรรลุ</span></>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-12">ไม่มีข้อมูล YLO</p>
+            )}
           </CardContent>
         </Card>
       </div>
-    </>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5" />
+            รายละเอียด PLO
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {ploData.length === 0 ? (
+              <p className="text-sm text-muted-foreground">ไม่มีข้อมูล PLO ในระบบ</p>
+            ) : (
+              ploData.map((plo) => (
+                <div key={plo.name} className="flex items-center justify-between rounded-lg border p-4">
+                  <div>
+                    <p className="font-medium">{plo.name}: {plo.description}</p>
+                    <p className="text-sm text-muted-foreground">
+                      เป้าหมาย: {plo.target}% | ผลลัพธ์: {plo.achieved}%
+                    </p>
+                  </div>
+                  <div className={`flex items-center gap-2 text-base font-semibold ${plo.achieved >= plo.target ? 'text-green-600' : 'text-destructive'}`}>
+                    {plo.achieved >= plo.target ? (
+                      <>
+                        <CheckCircle2 className="h-5 w-5 shrink-0" />
+                        <span>บรรลุ</span>
+                      </>
+                    ) : (
+                      <>
+                        <XCircle className="h-5 w-5 shrink-0" />
+                        <span>ไม่บรรลุ</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

@@ -3,6 +3,7 @@ import {
   ChevronLeft,
   LogOut,
 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { 
@@ -16,6 +17,7 @@ import {
   SidebarTrigger,
   useSidebar
 } from '@/components/ui/sidebar';
+import { toast } from 'sonner';
 import { useState, useEffect } from 'react';
 import api from '@/lib/axios';
 
@@ -23,6 +25,28 @@ interface SidebarProps {
   onItemClick: (item: string) => void;
   activeItem: string;
 }
+
+const readStoredUser = () => {
+  try {
+    return JSON.parse(localStorage.getItem('user') || '{}');
+  } catch {
+    return {};
+  }
+};
+
+const getDisplayName = (user: any) => {
+  const username = typeof user.username === 'string' ? user.username.trim() : '';
+  const candidates = [
+    user.full_name_th,
+    [user.first_name_th, user.last_name_th].filter(Boolean).join(' '),
+    [user.first_name_en, user.last_name_en].filter(Boolean).join(' '),
+    user.name,
+  ]
+    .map((value) => (typeof value === 'string' ? value.trim() : ''))
+    .filter((value) => value && value !== username);
+
+  return candidates[0] || username || "ไม่ระบุชื่อ";
+};
 
 // const roleConfigs: RoleConfig[] = [
 //   {
@@ -174,61 +198,71 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
 
   const [menuSections, setMenuSections] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [sidebarUser, setSidebarUser] = useState<any>(() => readStoredUser());
   const { state } = useSidebar();
+  const collapsed = state === 'collapsed';
 
-  const defaultMenuSections = [
-    {
-      sectionTitle: "Teacher",
-      items: [
-          { title: "Dashboard", url: "dashboard", icon: "LayoutDashboard" },
-          { title: "รายวิชาที่สอน", url: "courses", icon: "BookOpen" },
-          { title: "รายวิชาที่รับผิดชอบ", url: "my-courses", icon: "BookOpenCheck" },
-          { title: "รายงาน PLO/YLO", url: "plo-ylo-report", icon: "BarChart3" },
-          { title: "จัดการโครงการ", url: "projectspage", icon: "FolderKanban" },
-        ],
-      },
-  ];
-
-  const getFallbackMenuSections = (roleId?: number) => {
-    if (roleId === 4) {
-      return [
-        {
-          sectionTitle: "Student",
-          items: [
-            { title: "Transcript", url: "transcript", icon: "FileText" },
-            { title: "ข้อมูลส่วนตัว", url: "profile", icon: "User" },
-          ],
-        },
-      ];
+  const fetchUnreadCount = async () => {
+    try {
+      const response = await api.get("/index.php?page=get-notifications");
+      const data = Array.isArray(response.data) ? response.data : (response.data?.data || []);
+      // กรองเฉพาะการแจ้งเตือนที่ได้รับและยังไม่ได้อ่าน
+      const count = data.filter((n: any) => n.direction === "received" && !n.isRead).length;
+      setUnreadCount(count);
+    } catch (error) {
+      console.error("Failed to fetch unread notifications count");
     }
-
-    return defaultMenuSections;
   };
 
   useEffect(() => {
     const fetchMenus = async () => {
       try {
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
-        const fallbackMenuSections = getFallbackMenuSections(Number(user.role_id));
-
         // เรียก API (ตรวจสอบ Path ให้ตรงกับที่วาง index.php ไว้)
         const res = await api.get(`/index.php?page=sidebar`);
         
         console.log("Menu Data:", res.data); // ลองเปิด console ดูว่าข้อมูลมาไหม
-        setMenuSections(Array.isArray(res.data) && res.data.length > 0 ? res.data : fallbackMenuSections);
+        setMenuSections(res.data);
       } catch (error) {
         console.error("Failed to fetch menus:", error);
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
-        setMenuSections(getFallbackMenuSections(Number(user.role_id)));
+        toast.error("โหลดเมนูไม่สำเร็จ");
       } finally {
         setIsLoading(false); // มั่นใจว่า Loading จะหายไปแน่นอน
       }
     };
 
-    fetchMenus();
-  }, []);
+    const fetchUserProfile = async () => {
+      try {
+        const response = await api.get("/index.php?page=profile");
+        if (response.data?.status !== "success" || !response.data?.data) return;
 
-  if (isLoading) return <div className="p-4">กำลังโหลดเมนู...</div>;
+        const currentUser = readStoredUser();
+        const mergedUser = {
+          ...currentUser,
+          ...response.data.data,
+          name: getDisplayName({ ...currentUser, ...response.data.data }),
+        };
+
+        localStorage.setItem('user', JSON.stringify(mergedUser));
+        setSidebarUser(mergedUser);
+      } catch (error) {
+        setSidebarUser(readStoredUser());
+      }
+    };
+
+    fetchMenus();
+    fetchUserProfile();
+
+    fetchUnreadCount();
+    const intervalId = setInterval(fetchUnreadCount, 30000);
+
+    window.addEventListener("updateNotificationBadge", fetchUnreadCount);
+
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener("updateNotificationBadge", fetchUnreadCount);
+    };
+  }, []);
 
   // ฟังก์ชันแปลง String เป็น Component
   const getIcon = (iconName: string) => {
@@ -236,18 +270,15 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
     return IconComponent || Icons.HelpCircle; // ถ้าหาไม่เจอให้ใช้ HelpCircle แทน
   };
 
-  const collapsed = state === 'collapsed';
-
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
-  const rawUserName = typeof user.name === "string" ? user.name : "";
-  const isBrokenEncoding = /(?:Ã|Â|à¸|à¹)/.test(rawUserName);
-  const userName = rawUserName && !isBrokenEncoding ? rawUserName : user.username || "ไม่ระบุชื่อ";
+  const userName = getDisplayName(sidebarUser);
 
   // ดึงตัวอักษรตัวแรกจากชื่อ (เช่น 'สมชาย' จะได้ 'ส') 
   // หากไม่มีชื่อจะใช้ 'U' เป็นค่าเริ่มต้น
   const userInitial = userName.trim().charAt(0) || 'U';
 
-  const userPermissions = user.permissions || [];
+  const userPermissions = sidebarUser.permissions || [];
+
+  if (isLoading) return <div className="p-4">กำลังโหลดเมนู...</div>;
 
   // เพิ่มฟังก์ชัน Logout ตรงนี้
   const handleLogout = () => {
@@ -269,8 +300,6 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
     { title: "ข้อมูลส่วนตัว", url: "profile", icon: "User", permission: "PROFILE_VIEW_SELF" },
     { title: "การตั้งค่า", url: "settings", icon: "Settings", permission: "SYSTEM_SETTINGS" },
   ];
-
-  const visibleBottomMenuItems = bottomMenuItems;
 
   return (
     <Sidebar 
@@ -376,7 +405,6 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
       </SidebarContent>
 
       {/* --- Bottom Menu Section --- */}
-      {visibleBottomMenuItems.length > 0 && (
       <div className="mt-auto border-t border-sidebar-border p-4">
         <SidebarMenu>
           {bottomMenuItems
@@ -384,6 +412,7 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
             .map((item) => {
               const Icon = getIcon(item.icon);
               const isActive = activeItem === item.url;
+              const isNotification = item.url === "notifications";
 
               return (
                 <SidebarMenuItem key={item.url}>
@@ -407,13 +436,28 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
                       isActive && "active"
                     )} />
                     {!collapsed && <span>{item.title}</span>}
+
+                    {/* 🎯 5. ส่วนแสดงตัวเลข Badge แจ้งเตือนสีแดง */}
+                    {isNotification && unreadCount > 0 && (
+                      collapsed ? (
+                        // กรณีหุบ Sidebar: โชว์เป็นวงกลมเล็กๆ ซ้อนบนไอคอน
+                        <span className="absolute top-1 right-2 flex h-3 w-3 items-center justify-center rounded-full bg-destructive text-[8px] font-bold text-destructive-foreground ring-2 ring-sidebar">
+                          {unreadCount > 9 ? '9+' : unreadCount}
+                        </span>
+                      ) : (
+                        // กรณีขยาย Sidebar: โชว์เป็น Badge ตัวเลขต่อท้ายข้อความ
+                        <Badge variant="destructive" className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full px-1 text-[10px]">
+                          {unreadCount > 99 ? '99+' : unreadCount}
+                        </Badge>
+                      )
+                    )}
+
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               );
             })}
         </SidebarMenu>
       </div>
-      )}
 
       {/* --- User Profile & Logout --- */}
       <SidebarFooter className="border-t border-sidebar-border p-4">

@@ -16,7 +16,8 @@ try {
             t.task_name AS task, 
             t.due_date AS dueDate, 
             t.status, 
-            t.priority 
+            t.priority,
+            t.description
         FROM schedule_tasks t
         JOIN student s ON t.student_id = s.student_id
         ORDER BY t.due_date ASC

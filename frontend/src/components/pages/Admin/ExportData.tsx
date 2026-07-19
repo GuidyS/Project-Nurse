@@ -10,30 +10,76 @@ import { useToast } from "@/hooks/use-toast";
 import { Download, FileSpreadsheet, FileText, Users, BookOpen, FolderKanban, GraduationCap, Calendar } from "lucide-react";
 import api from "@/lib/axios";
 
-const exportCategories = [
-  { 
-    value: "students", 
-    label: "ข้อมูลนักศึกษา", 
+type ExportField = { key: string; label: string };
+
+const exportCategories: {
+  value: string;
+  label: string;
+  icon: typeof Users;
+  fields: ExportField[];
+}[] = [
+  {
+    value: "students",
+    label: "ข้อมูลนักศึกษา",
     icon: Users,
-    fields: ["รหัสนักศึกษา", "ชื่อ-นามสกุล", "คณะ", "สาขา", "ชั้นปี", "GPA", "สถานะ", "อาจารย์ที่ปรึกษา"]
+    fields: [
+      { key: "student_id", label: "รหัสนักศึกษา" },
+      { key: "full_name_th", label: "ชื่อ-นามสกุล" },
+      { key: "nickname", label: "ชื่อเล่น" },
+      { key: "gender", label: "เพศ" },
+      { key: "year_level", label: "ชั้นปี" },
+      { key: "gpa", label: "GPA" },
+      { key: "status", label: "สถานะ" },
+      { key: "email", label: "อีเมล" },
+      { key: "phone", label: "เบอร์โทร" },
+      { key: "admission_year", label: "ปีที่เข้าศึกษา" },
+      { key: "hometown_province", label: "ภูมิลำเนา" },
+    ],
   },
-  { 
-    value: "teachers", 
-    label: "ข้อมูลอาจารย์", 
+  {
+    value: "teachers",
+    label: "ข้อมูลอาจารย์",
     icon: GraduationCap,
-    fields: ["รหัสอาจารย์", "ชื่อ-นามสกุล", "ตำแหน่งวิชาการ", "สาขา", "อีเมล", "เบอร์โทร", "ตำแหน่งบริหาร"]
+    fields: [
+      { key: "faculty_id", label: "รหัสอาจารย์" },
+      { key: "full_name_th", label: "ชื่อ-นามสกุล" },
+      { key: "gender", label: "เพศ" },
+      { key: "email", label: "อีเมล" },
+      { key: "phone", label: "เบอร์โทร" },
+      { key: "current_address", label: "ที่อยู่ปัจจุบัน" },
+      { key: "nursing_council_no", label: "เลขใบประกอบวิชาชีพ" },
+      { key: "license_expiry", label: "วันหมดอายุใบอนุญาต" },
+      { key: "status", label: "สถานะ" },
+    ],
   },
-  { 
-    value: "courses", 
-    label: "ข้อมูลรายวิชา", 
+  {
+    value: "courses",
+    label: "ข้อมูลรายวิชา",
     icon: BookOpen,
-    fields: ["รหัสวิชา", "ชื่อวิชา", "หน่วยกิต", "ผู้สอน", "หลักสูตร", "จำนวนนักศึกษา", "CLO"]
+    fields: [
+      { key: "subject_code", label: "รหัสวิชา" },
+      { key: "subject_name_th", label: "ชื่อวิชา (ไทย)" },
+      { key: "subject_name_en", label: "ชื่อวิชา (อังกฤษ)" },
+      { key: "credit", label: "หน่วยกิต" },
+      { key: "credit_desc", label: "หน่วยกิต (รายละเอียด)" },
+      { key: "subject_type", label: "ประเภทวิชา" },
+      { key: "department", label: "ภาควิชา" },
+      { key: "year_level", label: "ชั้นปี" },
+      { key: "semester", label: "ภาคเรียน" },
+    ],
   },
-  { 
-    value: "projects", 
-    label: "ข้อมูลโครงการ", 
+  {
+    value: "projects",
+    label: "ข้อมูลโครงการ",
     icon: FolderKanban,
-    fields: ["รหัสโครงการ", "ชื่อโครงการ", "ผู้รับผิดชอบ", "งบประมาณ", "สถานะ", "PLO/YLO"]
+    fields: [
+      { key: "project_id", label: "รหัสโครงการ" },
+      { key: "project_name_th", label: "ชื่อโครงการ (ไทย)" },
+      { key: "project_name_en", label: "ชื่อโครงการ (อังกฤษ)" },
+      { key: "description", label: "รายละเอียด" },
+      { key: "responsible_faculty_id", label: "อาจารย์ผู้รับผิดชอบ" },
+      { key: "academic_year", label: "ปีการศึกษา" },
+    ],
   },
 ];
 
@@ -61,7 +107,7 @@ export default function ExportData() {
       if (selectedFields.length === currentCategory.fields.length) {
         setSelectedFields([]);
       } else {
-        setSelectedFields([...currentCategory.fields]);
+        setSelectedFields(currentCategory.fields.map((f) => f.key));
       }
     }
   };
@@ -212,13 +258,13 @@ export default function ExportData() {
                 {currentCategory ? (
                   <div className="grid gap-3 sm:grid-cols-2">
                     {currentCategory.fields.map((field) => (
-                      <div key={field} className="flex items-center space-x-2">
+                      <div key={field.key} className="flex items-center space-x-2">
                         <Checkbox
-                          id={field}
-                          checked={selectedFields.includes(field)}
-                          onCheckedChange={() => handleFieldToggle(field)}
+                          id={field.key}
+                          checked={selectedFields.includes(field.key)}
+                          onCheckedChange={() => handleFieldToggle(field.key)}
                         />
-                        <Label htmlFor={field} className="cursor-pointer">{field}</Label>
+                        <Label htmlFor={field.key} className="cursor-pointer">{field.label}</Label>
                       </div>
                     ))}
                   </div>

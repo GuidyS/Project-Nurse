@@ -44,7 +44,6 @@ export default function Documents() {
   const [newDocument, setNewDocument] = useState<Partial<DocumentItem>>({
     name: '', type: '', course: '',
   });
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
 
   // 🌟 ดึงข้อมูลจาก API เมื่อเปิดหน้าเว็บ
   const fetchDocuments = async () => {
@@ -64,13 +63,12 @@ export default function Documents() {
 
   useEffect(() => { fetchDocuments(); }, []);
 
-  // ใช้ String(... ?? '') กันค่า null/undefined ไม่ให้ .toLowerCase พังจนหน้าจอดำ
   const filteredDocuments = documents.filter((doc) => {
     const searchLower = searchTerm.toLowerCase();
     return (
-      String(doc.name ?? "").toLowerCase().includes(searchLower) ||
-      String(doc.type ?? "").toLowerCase().includes(searchLower) ||
-      String(doc.course ?? "").toLowerCase().includes(searchLower)
+      doc.name.toLowerCase().includes(searchLower) ||
+      doc.type.toLowerCase().includes(searchLower) ||
+      doc.course.toLowerCase().includes(searchLower)
     );
   });
 
@@ -82,17 +80,11 @@ export default function Documents() {
     }
     
     try {
-      const fd = new FormData();
-      fd.append('name', newDocument.name || '');
-      fd.append('type', newDocument.type || '');
-      fd.append('course', newDocument.course || '');
-      if (uploadFile) fd.append('file', uploadFile);
-      const response = await api.post('/index.php?page=upload-document', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      const response = await api.post('/index.php?page=upload-document', newDocument);
       if (response.data.status === 'success') {
-        toast({ title: "สำเร็จ", description: uploadFile ? "อัปโหลดไฟล์เรียบร้อยแล้ว" : "บันทึกข้อมูลเอกสารเรียบร้อยแล้ว" });
+        toast({ title: "สำเร็จ", description: "บันทึกข้อมูลเอกสารเรียบร้อยแล้ว" });
         setIsDialogOpen(false);
         setNewDocument({ name: '', type: '', course: '' });
-        setUploadFile(null);
         fetchDocuments(); // รีเฟรชข้อมูล
       }
     } catch (error) {
@@ -170,7 +162,7 @@ export default function Documents() {
                 </div>
                 <div className="grid gap-2">
                   <Label>ไฟล์</Label>
-                  <Input type="file" onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)} />
+                  <Input type="file" />
                 </div>
               </div>
               <DialogFooter>
@@ -274,22 +266,8 @@ export default function Documents() {
                       <TableCell>{getStatusBadge(doc.status)}</TableCell>
                       <TableCell>
                         <div className="flex gap-2">
-                          <Button variant="outline" size="icon" className="h-8 w-8"
-                            onClick={() => toast({ title: doc.name, description: `ประเภท: ${doc.type} · รายวิชา: ${doc.course} · อัปโหลด: ${doc.uploadedAt} · ขนาด: ${doc.size} · สถานะ: ${doc.status}` })}>
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button variant="outline" size="icon" className="h-8 w-8"
-                            onClick={() => {
-                              const fp = (doc as any).file_path;
-                              if (fp) {
-                                const base = import.meta.env.VITE_API_BASE_URL || '';
-                                window.open(`${base}/${fp}`, '_blank');
-                              } else {
-                                toast({ title: "ไม่มีไฟล์แนบ", description: "เอกสารนี้บันทึกเฉพาะข้อมูล ไม่มีไฟล์จริง", variant: "destructive" });
-                              }
-                            }}>
-                            <Download className="h-4 w-4" />
-                          </Button>
+                          <Button variant="outline" size="icon" className="h-8 w-8"><Eye className="h-4 w-4" /></Button>
+                          <Button variant="outline" size="icon" className="h-8 w-8"><Download className="h-4 w-4" /></Button>
                           <Button variant="outline" size="icon" className="h-8 w-8 hover:bg-red-100 hover:text-red-600 border-red-200" onClick={() => { setDeleteId(doc.id); setIsDeleteOpen(true); }}>
                             <Trash2 className="h-4 w-4" />
                           </Button>

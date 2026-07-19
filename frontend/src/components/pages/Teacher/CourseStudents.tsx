@@ -4,9 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Search, Target, Loader2, Save } from 'lucide-react';
+import { Search, Target, Loader2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import api from '@/lib/axios';
 import { useToast } from '@/hooks/use-toast';
@@ -32,11 +30,6 @@ export default function CourseStudents() {
   const [isLoadingCourses, setIsLoadingCourses] = useState(true);
   const [isLoadingStudents, setIsLoadingStudents] = useState(false);
 
-  // ให้เกรด CLO
-  const [gradingStudent, setGradingStudent] = useState<any>(null);
-  const [scoreInputs, setScoreInputs] = useState<Record<string, number>>({});
-  const [isSaving, setIsSaving] = useState(false);
-
   // 1. ดึงรายวิชาทั้งหมดที่อาจารย์ล็อกอินคนนี้สอน
   useEffect(() => {
     const fetchMyCourses = async () => {
@@ -60,58 +53,30 @@ export default function CourseStudents() {
   }, []);
 
   // 2. ดึงข้อมูลนักศึกษาและหัวข้อ CLO เมื่ออาจารย์สลับรายวิชา
-  const fetchStudentsCLO = async () => {
+  useEffect(() => {
     if (!selectedCourse) return;
-    setIsLoadingStudents(true);
-    try {
-      const res = await api.get(`/index.php?page=get-course-students-clo&subject_id=${selectedCourse}`);
-      if (res.data.status === 'success') {
-        setStudents(res.data.data.students || []);
-        setCloHeaders(res.data.data.clo_headers || []);
+
+    const fetchStudentsCLO = async () => {
+      setIsLoadingStudents(true);
+      try {
+        const res = await api.get(`/index.php?page=get-course-students-clo&subject_id=${selectedCourse}`);
+        if (res.data.status === 'success') {
+          setStudents(res.data.data.students || []);
+          setCloHeaders(res.data.data.clo_headers || []);
+        }
+      } catch (error) {
+        toast({ title: 'ข้อผิดพลาด', description: 'ไม่สามารถโหลดข้อมูลคะแนน CLO ได้', variant: 'destructive' });
+      } finally {
+        setIsLoadingStudents(false);
       }
-    } catch (error) {
-      toast({ title: 'ข้อผิดพลาด', description: 'ไม่สามารถโหลดข้อมูลคะแนน CLO ได้', variant: 'destructive' });
-    } finally {
-      setIsLoadingStudents(false);
-    }
-  };
-  useEffect(() => { fetchStudentsCLO(); }, [selectedCourse]);
+    };
+    fetchStudentsCLO();
+  }, [selectedCourse]);
 
-  const openGrading = (student: any) => {
-    const init: Record<string, number> = {};
-    cloHeaders.forEach((h) => { init[h] = Number(student.scores?.[h] ?? 0); });
-    setScoreInputs(init);
-    setGradingStudent(student);
-  };
-
-  const saveGrading = async () => {
-    if (!gradingStudent) return;
-    setIsSaving(true);
-    try {
-      const res = await api.post('/index.php?page=save-student-clo-scores', {
-        subject_id: Number(selectedCourse),
-        student_id: gradingStudent.studentId,
-        scores: scoreInputs,
-      });
-      if (res.data.status === 'success') {
-        toast({ title: 'บันทึกสำเร็จ', description: 'บันทึกคะแนน CLO เรียบร้อยแล้ว' });
-        setGradingStudent(null);
-        fetchStudentsCLO();
-      } else {
-        toast({ title: 'ข้อผิดพลาด', description: res.data.message, variant: 'destructive' });
-      }
-    } catch {
-      toast({ title: 'ข้อผิดพลาด', description: 'ไม่สามารถบันทึกคะแนนได้', variant: 'destructive' });
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  // ใช้ String(... ?? '') กันค่า null/ตัวเลข (studentId เป็น number) ไม่ให้ .includes พังจนหน้าจอดำ
   const filteredStudents = students.filter(
     (student) =>
-      String(student.name ?? "").includes(searchTerm) ||
-      String(student.studentId ?? "").includes(searchTerm)
+      student.name.includes(searchTerm) ||
+      student.studentId.includes(searchTerm)
   );
 
   return (
@@ -204,7 +169,7 @@ export default function CourseStudents() {
                         <TableCell>{getStatusBadge(student.status)}</TableCell>
                         <TableCell>
                           <HasPermission permission="manage_course_grading">
-                            <Button size="sm" variant="outline" onClick={() => openGrading(student)}>ให้เกรด CLO</Button>
+                            <Button size="sm" variant="outline">ให้เกรด CLO</Button>
                           </HasPermission>
                         </TableCell>
                       </TableRow>
@@ -216,31 +181,6 @@ export default function CourseStudents() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Dialog ให้เกรด CLO */}
-      <Dialog open={!!gradingStudent} onOpenChange={(o) => !o && setGradingStudent(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>ให้เกรด CLO — {gradingStudent?.name}</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-3 py-2">
-            {cloHeaders.map((h) => (
-              <div key={h} className="flex items-center gap-3">
-                <Label className="w-24">{h}</Label>
-                <Input type="number" min={0} max={100} value={scoreInputs[h] ?? 0}
-                  onChange={(e) => setScoreInputs({ ...scoreInputs, [h]: Number(e.target.value) })} />
-                <span className="text-sm text-muted-foreground">%</span>
-              </div>
-            ))}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setGradingStudent(null)}>ยกเลิก</Button>
-            <Button onClick={saveGrading} disabled={isSaving}>
-              {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}บันทึก
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </>
   );
 }

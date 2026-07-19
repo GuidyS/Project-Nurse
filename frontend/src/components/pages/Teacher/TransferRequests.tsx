@@ -1,291 +1,422 @@
+import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { UserPlus } from 'lucide-react';
+import { UserCheck, UserPlus, Clock, CheckCircle, XCircle, AlertCircle, Plus } from 'lucide-react';
 import { useState, useEffect } from 'react';
-// 🔧 1. นำเข้า api จาก axios
 import api from '@/lib/axios';
+
+const getStatusBadge = (status: string) => {
+  switch (status) {
+    case 'pending':
+      return <Badge className="bg-yellow-500">รอดำเนินการ</Badge>;
+    case 'approved':
+      return <Badge className="bg-green-500">อนุมัติ</Badge>;
+    case 'rejected':
+      return <Badge variant="destructive">ปฏิเสธ</Badge>;
+    default:
+      return <Badge variant="secondary">{status}</Badge>;
+  }
+};
 
 export default function TransferRequests() {
   const [incomingRequests, setIncomingRequests] = useState<any[]>([]);
   const [outgoingRequests, setOutgoingRequests] = useState<any[]>([]);
-  const [history, setHistory] = useState<any[]>([]);
-  const [dropdowns, setDropdowns] = useState({ students: [], advisors: [] });
-  
-  const [loading, setLoading] = useState(true);
-  const [openDialog, setOpenDialog] = useState(false);
+  const [historyRequests, setHistoryRequests] = useState<any[]>([]);
+  const [dropdowns, setDropdowns] = useState<{students: any[], advisors: any[]}>({students: [], advisors: []});
 
-  // Form States
-  const [selectedStudent, setSelectedStudent] = useState('');
-  const [selectedAdvisor, setSelectedAdvisor] = useState('');
-  const [reason, setReason] = useState('');
+  const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+  const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
 
-  // 🔧 2. ปรับฟังก์ชันดึงข้อมูลให้ใช้ api.get
-  const fetchRequests = () => {
-    setLoading(true);
-    api.get('/index.php?page=get-transfer-requests')
-      .then(res => {
-        if (res.data.status === 'success') {
-          setIncomingRequests(res.data.data.incoming || []);
-          setOutgoingRequests(res.data.data.outgoing || []);
-          setHistory(res.data.data.history || []);
-          setDropdowns(res.data.data.dropdowns || { students: [], advisors: [] });
-        }
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error("โหลดข้อมูลผิดพลาด:", err);
-        setLoading(false);
-      });
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [newRequest, setNewRequest] = useState({ studentId: '', toAdvisorId: '', reason: '' });
+
+  const fetchData = async () => {
+    try {
+      const savedUser = localStorage.getItem('user');
+      let facultyId = '1';
+      if (savedUser) {
+        const userObj = JSON.parse(savedUser);
+        facultyId = userObj.faculty_id || userObj.id || userObj.username || '1';
+      }
+
+      const res = await api.get(`/components/Teacher/TransferRequests/get_transfer_requests.php?faculty_id=${facultyId}`);
+      if (res.data.status === 'success') {
+        setIncomingRequests(res.data.data.incoming || []);
+        setOutgoingRequests(res.data.data.outgoing || []);
+        setHistoryRequests(res.data.data.history || []);
+        setDropdowns(res.data.data.dropdowns || {students: [], advisors: []});
+      }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   useEffect(() => {
-    fetchRequests();
+    fetchData();
   }, []);
 
-  // 🔧 3. ปรับฟังก์ชันอัปเดตสถานะให้ใช้ api.post
-  const handleAction = (id: number, status: 'approved' | 'rejected') => {
-    api.post('/index.php?page=update-transfer-status', { 
-      request_id: id, 
-      status: status 
-    })
-      .then(res => {
-        if (res.data.status === 'success') {
-          alert('ดำเนินการเสร็จสิ้น');
-          fetchRequests();
-        } else {
-          alert('เกิดข้อผิดพลาด: ' + res.data.message);
-        }
-      })
-      .catch(err => {
-        console.error("อัปเดตผิดพลาด:", err);
-        alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
-      });
-  };
-
-  // 🔧 4. ปรับฟังก์ชันสร้างคำขอให้ใช้ api.post
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if(!selectedStudent || !selectedAdvisor || !reason) {
-      alert("กรุณากรอกข้อมูลให้ครบถ้วน");
-      return;
-    }
-
-    api.post('/index.php?page=create-transfer-request', {
-      student_id: selectedStudent,
-      to_advisor_id: selectedAdvisor,
-      reason: reason
-    })
-      .then(res => {
-        if (res.data.status === 'success') {
-          alert('ส่งคำขอสลับเปลี่ยนสำเร็จ');
-          setOpenDialog(false);
-          setSelectedStudent('');
-          setSelectedAdvisor('');
-          setReason('');
-          fetchRequests();
-        } else {
-          alert('เกิดข้อผิดพลาด: ' + res.data.message);
-        }
-      })
-      .catch(err => {
-        console.error("สร้างคำขอผิดพลาด:", err);
-        alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
-      });
-  };
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'pending': return <Badge variant="outline" className="text-yellow-600 bg-yellow-50">รอพิจารณา</Badge>;
-      case 'approved': return <Badge variant="outline" className="text-green-600 bg-green-50">อนุมัติแล้ว</Badge>;
-      case 'rejected': return <Badge variant="outline" className="text-red-600 bg-red-50">ปฏิเสธ</Badge>;
-      default: return <Badge variant="secondary">{status}</Badge>;
+  const handleApprove = async (id: string) => {
+    try {
+      await api.post('/components/Teacher/TransferRequests/update_transfer_status.php', { request_id: id, status: 'approved' });
+      fetchData();
+    } catch (err) {
+      console.error(err);
     }
   };
 
-  if (loading) return <div className="p-6 text-center text-muted-foreground">กำลังโหลดรายการคำขอ...</div>;
+  const openRejectDialog = (id: string) => {
+    setSelectedRequestId(id);
+    setRejectReason('');
+    setIsRejectDialogOpen(true);
+  };
+
+  const handleReject = async () => {
+    if (!selectedRequestId) return;
+    try {
+      await api.post('/components/Teacher/TransferRequests/update_transfer_status.php', { request_id: selectedRequestId, status: 'rejected' });
+      setIsRejectDialogOpen(false);
+      setSelectedRequestId(null);
+      fetchData();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleCreateRequest = async () => {
+    try {
+      const savedUser = localStorage.getItem('user');
+      let facultyId = '1';
+      if (savedUser) {
+        const userObj = JSON.parse(savedUser);
+        facultyId = userObj.faculty_id || userObj.id || userObj.username || '1';
+      }
+
+      await api.post('/components/Teacher/TransferRequests/create_transfer_request.php', {
+        student_id: newRequest.studentId,
+        to_advisor_id: newRequest.toAdvisorId,
+        reason: newRequest.reason,
+        from_advisor_id: facultyId
+      });
+      setIsCreateDialogOpen(false);
+      setNewRequest({ studentId: '', toAdvisorId: '', reason: '' });
+      fetchData();
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   return (
     <>
-      <div className="space-y-6 animate-fade-in">
-        <div className="flex items-center justify-between">
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">จัดการคำขอสลับเปลี่ยนนักศึกษา</h1>
-            <p className="text-muted-foreground">อนุมัติคำขอรับเข้าหรือส่งคำขอโอนย้ายนักศึกษาในความดูแล</p>
+            <h1 className="text-3xl font-bold tracking-tight">ร้องขอรับมอบนักศึกษา</h1>
+            <p className="text-muted-foreground">จัดการคำขอรับมอบนักศึกษาระหว่างอาจารย์ที่ปรึกษา</p>
           </div>
+          <Button onClick={() => setIsCreateDialogOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            สร้างคำขอย้าย
+          </Button>
+        </div>
 
-          <Dialog open={openDialog} onOpenChange={setOpenDialog}>
-            <DialogTrigger asChild>
-              <Button>
-                <UserPlus className="mr-2 h-4 w-4" />
-                สร้างคำขอส่งออก
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>สร้างคำขอสลับเปลี่ยนอาจารย์ที่ปรึกษา</DialogTitle>
-                <DialogDescription>เลือกนักศึกษาและอาจารย์ปลายทางที่ต้องการโอนย้ายดูแล</DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4 py-2">
-                <div className="space-y-2">
-                  <Label>เลือกนักศึกษา</Label>
-                  <Select value={selectedStudent} onValueChange={setSelectedStudent}>
-                    <SelectTrigger><SelectValue placeholder="เลือกนักศึกษา" /></SelectTrigger>
-                    <SelectContent>
-                      {dropdowns.students.map((s: any) => (
-                        <SelectItem key={s.id} value={s.id.toString()}>รหัส: {s.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>โอนย้ายไปให้อาจารย์</Label>
-                  <Select value={selectedAdvisor} onValueChange={setSelectedAdvisor}>
-                    <SelectTrigger><SelectValue placeholder="เลือกอาจารย์ปลายทาง" /></SelectTrigger>
-                    <SelectContent>
-                      {dropdowns.advisors.map((a: any) => (
-                        <SelectItem key={a.id} value={a.id.toString()}>อาจารย์ ID: {a.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>เหตุผลการย้าย</Label>
-                  <Textarea value={reason} onChange={e => setReason(e.target.value)} placeholder="ระบุเหตุผลความจำเป็น..." required />
-                </div>
-                <DialogFooter>
-                  <Button type="submit">ส่งคำขอ</Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
+        {/* Stats */}
+        <div className="grid gap-4 md:grid-cols-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">คำขอเข้า</CardTitle>
+              <UserPlus className="h-4 w-4 text-green-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{incomingRequests.length}</div>
+              <p className="text-xs text-muted-foreground">รอดำเนินการ</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">คำขอออก</CardTitle>
+              <UserCheck className="h-4 w-4 text-blue-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{outgoingRequests.length}</div>
+              <p className="text-xs text-muted-foreground">รอดำเนินการ</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">อนุมัติแล้ว</CardTitle>
+              <CheckCircle className="h-4 w-4 text-green-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">
+                {historyRequests.filter(r => r.status === 'approved').length}
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">ปฏิเสธ</CardTitle>
+              <XCircle className="h-4 w-4 text-destructive" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-destructive">
+                {historyRequests.filter(r => r.status === 'rejected').length}
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         <Tabs defaultValue="incoming" className="space-y-4">
           <TabsList>
-            <TabsTrigger value="incoming">คำขอรับเข้า ({incomingRequests.length})</TabsTrigger>
-            <TabsTrigger value="outgoing">คำขอส่งออก ({outgoingRequests.length})</TabsTrigger>
-            <TabsTrigger value="history">ประวัติการทำรายการ ({history.length})</TabsTrigger>
+            <TabsTrigger value="incoming">
+              คำขอเข้า
+              {incomingRequests.length > 0 && (
+                <Badge className="ml-2 bg-primary">{incomingRequests.length}</Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="outgoing">คำขอออก</TabsTrigger>
+            <TabsTrigger value="history">ประวัติ</TabsTrigger>
           </TabsList>
 
-          {/* ตารางคำขอรับเข้า */}
           <TabsContent value="incoming">
             <Card>
-              <CardContent className="pt-6">
+              <CardHeader>
+                <CardTitle>คำขอรับมอบนักศึกษาเข้า</CardTitle>
+                <CardDescription>นักศึกษาที่อาจารย์ท่านอื่นขอมอบมาให้</CardDescription>
+              </CardHeader>
+              <CardContent>
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>รหัสนักศึกษา</TableHead>
-                      <TableHead>จากอาจารย์ (ID)</TableHead>
+                      <TableHead>ชื่อ-นามสกุล</TableHead>
+                      <TableHead>จากอาจารย์</TableHead>
                       <TableHead>เหตุผล</TableHead>
-                      <TableHead>วันที่ส่งคำขอ</TableHead>
+                      <TableHead>วันที่</TableHead>
+                      <TableHead>สถานะ</TableHead>
                       <TableHead>การดำเนินการ</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {incomingRequests.length === 0 ? (
-                      <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">ไม่มีคำขอรับเข้าในขณะนี้</TableCell></TableRow>
-                    ) : (
-                      incomingRequests.map((req) => (
-                        <TableRow key={req.id}>
-                          <TableCell className="font-medium">{req.studentId}</TableCell>
-                          <TableCell>{req.otherAdvisor}</TableCell>
-                          <TableCell>{req.reason}</TableCell>
-                          <TableCell>{req.date}</TableCell>
-                          <TableCell>
-                            <div className="flex gap-2">
-                              <Button size="sm" variant="default" className="bg-green-600 hover:bg-green-700" onClick={() => handleAction(req.id, 'approved')}>อนุมัติ</Button>
-                              <Button size="sm" variant="destructive" onClick={() => handleAction(req.id, 'rejected')}>ปฏิเสธ</Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center text-muted-foreground py-6">
+                          ไม่มีคำขอเข้า
+                        </TableCell>
+                      </TableRow>
+                    ) : incomingRequests.map((request) => (
+                      <TableRow key={request.id}>
+                        <TableCell className="font-medium">{request.studentId}</TableCell>
+                        <TableCell>{request.studentName}</TableCell>
+                        <TableCell>{request.otherAdvisor}</TableCell>
+                        <TableCell className="max-w-[200px] truncate">{request.reason}</TableCell>
+                        <TableCell>{request.date}</TableCell>
+                        <TableCell>{getStatusBadge(request.status)}</TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            <Button size="sm" onClick={() => handleApprove(request.id)}>
+                              <CheckCircle className="mr-1 h-3 w-3" />
+                              รับ
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => openRejectDialog(request.id)}>
+                              <XCircle className="mr-1 h-3 w-3" />
+                              ปฏิเสธ
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
                   </TableBody>
                 </Table>
               </CardContent>
             </Card>
           </TabsContent>
 
-          {/* ตารางคำขอส่งออก */}
           <TabsContent value="outgoing">
             <Card>
-              <CardContent className="pt-6">
+              <CardHeader>
+                <CardTitle>คำขอมอบนักศึกษาออก</CardTitle>
+                <CardDescription>นักศึกษาที่ขอมอบให้อาจารย์ท่านอื่น</CardDescription>
+              </CardHeader>
+              <CardContent>
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>รหัสนักศึกษา</TableHead>
-                      <TableHead>ไปยังอาจารย์ (ID)</TableHead>
+                      <TableHead>ชื่อ-นามสกุล</TableHead>
+                      <TableHead>ถึงอาจารย์</TableHead>
                       <TableHead>เหตุผล</TableHead>
-                      <TableHead>วันที่ส่งคำขอ</TableHead>
+                      <TableHead>วันที่</TableHead>
                       <TableHead>สถานะ</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {outgoingRequests.length === 0 ? (
-                      <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">ไม่มีคำขอส่งออกในขณะนี้</TableCell></TableRow>
-                    ) : (
-                      outgoingRequests.map((req) => (
-                        <TableRow key={req.id}>
-                          <TableCell className="font-medium">{req.studentId}</TableCell>
-                          <TableCell>{req.otherAdvisor}</TableCell>
-                          <TableCell>{req.reason}</TableCell>
-                          <TableCell>{req.date}</TableCell>
-                          <TableCell>{getStatusBadge(req.status)}</TableCell>
-                        </TableRow>
-                      ))
-                    )}
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center text-muted-foreground py-6">
+                          ไม่มีคำขอออก
+                        </TableCell>
+                      </TableRow>
+                    ) : outgoingRequests.map((request) => (
+                      <TableRow key={request.id}>
+                        <TableCell className="font-medium">{request.studentId}</TableCell>
+                        <TableCell>{request.studentName}</TableCell>
+                        <TableCell>{request.otherAdvisor}</TableCell>
+                        <TableCell className="max-w-[200px] truncate">{request.reason}</TableCell>
+                        <TableCell>{request.date}</TableCell>
+                        <TableCell>{getStatusBadge(request.status)}</TableCell>
+                      </TableRow>
+                    ))}
                   </TableBody>
                 </Table>
               </CardContent>
             </Card>
           </TabsContent>
 
-          {/* ตารางประวัติการทำรายการ */}
           <TabsContent value="history">
             <Card>
-              <CardContent className="pt-6">
+              <CardHeader>
+                <CardTitle>ประวัติการรับมอบ</CardTitle>
+                <CardDescription>ประวัติการรับมอบนักศึกษาทั้งหมด</CardDescription>
+              </CardHeader>
+              <CardContent>
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>รหัสนักศึกษา</TableHead>
+                      <TableHead>ชื่อ-นามสกุล</TableHead>
                       <TableHead>ประเภท</TableHead>
-                      <TableHead>อาจารย์คู่กรณี (ID)</TableHead>
+                      <TableHead>อาจารย์</TableHead>
                       <TableHead>วันที่</TableHead>
-                      <TableHead>สถานะผลลัพธ์</TableHead>
+                      <TableHead>สถานะ</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {history.length === 0 ? (
-                      <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">ไม่มีประวัติรายการ</TableCell></TableRow>
-                    ) : (
-                      history.map((req) => (
-                        <TableRow key={req.id}>
-                          <TableCell className="font-medium">{req.studentId}</TableCell>
-                          <TableCell>
-                            <Badge variant={req.type === 'incoming' ? 'default' : 'secondary'}>
-                              {req.type === 'incoming' ? 'รับเข้า' : 'มอบออก'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>{req.otherAdvisor}</TableCell>
-                          <TableCell>{req.date}</TableCell>
-                          <TableCell>{getStatusBadge(req.status)}</TableCell>
-                        </TableRow>
-                      ))
-                    )}
+                    {historyRequests.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center text-muted-foreground py-6">
+                          ไม่มีประวัติ
+                        </TableCell>
+                      </TableRow>
+                    ) : historyRequests.map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell className="font-medium">{item.studentId}</TableCell>
+                        <TableCell>{item.studentName}</TableCell>
+                        <TableCell>
+                          <Badge variant={item.type === 'incoming' ? 'default' : 'secondary'}>
+                            {item.type === 'incoming' ? 'รับเข้า' : 'มอบออก'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{item.otherAdvisor}</TableCell>
+                        <TableCell>{item.date}</TableCell>
+                        <TableCell>{getStatusBadge(item.status)}</TableCell>
+                      </TableRow>
+                    ))}
                   </TableBody>
                 </Table>
               </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
+
+        {/* Reject Dialog */}
+        <Dialog open={isRejectDialogOpen} onOpenChange={setIsRejectDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>ปฏิเสธคำขอรับมอบ</DialogTitle>
+              <DialogDescription>
+                กรุณาระบุเหตุผลในการปฏิเสธ
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label>เหตุผล</Label>
+                <Textarea
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  placeholder="ระบุเหตุผลในการปฏิเสธ..."
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsRejectDialogOpen(false)}>
+                ยกเลิก
+              </Button>
+              <Button variant="destructive" onClick={handleReject}>
+                ยืนยันปฏิเสธ
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Create Request Dialog */}
+        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>สร้างคำขอมอบนักศึกษา (ส่งออก)</DialogTitle>
+              <DialogDescription>
+                เลือกนักศึกษาและอาจารย์ปลายทางที่คุณต้องการมอบหมายให้
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label>นักศึกษา</Label>
+                <Select 
+                  value={newRequest.studentId} 
+                  onValueChange={(val) => setNewRequest({ ...newRequest, studentId: val })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="เลือกนักศึกษา..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {dropdowns.students.map(std => (
+                      <SelectItem key={std.id} value={std.id.toString()}>{std.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label>อาจารย์ปลายทาง</Label>
+                <Select 
+                  value={newRequest.toAdvisorId} 
+                  onValueChange={(val) => setNewRequest({ ...newRequest, toAdvisorId: val })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="เลือกอาจารย์..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {dropdowns.advisors.map(adv => (
+                      <SelectItem key={adv.id} value={adv.id.toString()}>{adv.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label>เหตุผลการขอย้าย</Label>
+                <Textarea
+                  value={newRequest.reason}
+                  onChange={(e) => setNewRequest({ ...newRequest, reason: e.target.value })}
+                  placeholder="ระบุเหตุผล..."
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+                ยกเลิก
+              </Button>
+              <Button onClick={handleCreateRequest} disabled={!newRequest.studentId || !newRequest.toAdvisorId}>
+                สร้างคำขอ
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </>
   );

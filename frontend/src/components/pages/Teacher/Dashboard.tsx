@@ -27,7 +27,7 @@ export default function Dashboard() {
       try {
         setLoading(true);
         setError("");
-        const { data } = await api.get("?page=teacher-dashboard");
+        const { data } = await api.get("/index.php?page=teacher-dashboard");
         if (data.status === "success") {
           setStats(data.data);
         } else {

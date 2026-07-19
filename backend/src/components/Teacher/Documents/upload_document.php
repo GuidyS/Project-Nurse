@@ -3,28 +3,11 @@
 require_once __DIR__ . '/../../middlewares/auth_middleware.php';
 
 $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
-$input = json_decode(file_get_contents("php://input"), true) ?: [];
-// รองรับทั้ง JSON และ multipart/form-data (กรณีแนบไฟล์จริง)
-$name   = $input['name']   ?? $_POST['name']   ?? '';
-$type   = $input['type']   ?? $_POST['type']   ?? '';
-$course = $input['course'] ?? $_POST['course'] ?? '';
-
-// ถ้ามีไฟล์แนบจริง ให้เก็บไฟล์ลงโฟลเดอร์ uploads/documents แล้วบันทึก path จริง
-$size = "-";
-$filePath = null;
-if (isset($_FILES['file']) && $_FILES['file']['error'] === UPLOAD_ERR_OK) {
-    $dir = __DIR__ . '/../../../uploads/documents';
-    if (!is_dir($dir)) { mkdir($dir, 0777, true); }
-    $safe = uniqid('doc_') . '_' . preg_replace('/[^A-Za-z0-9._-]/u', '_', $_FILES['file']['name']);
-    move_uploaded_file($_FILES['file']['tmp_name'], $dir . '/' . $safe);
-    $filePath = 'uploads/documents/' . $safe;
-    $bytes = (int)$_FILES['file']['size'];
-    $size = $bytes >= 1048576 ? round($bytes / 1048576, 1) . ' MB' : max(1, round($bytes / 1024)) . ' KB';
-}
+$input = json_decode(file_get_contents("php://input"), true);
 
 try {
-    if ($name && $course && $type) {
-        $courseCode = $course;
+    if (!empty($input['name']) && !empty($input['course']) && !empty($input['type'])) {
+        $courseCode = $input['course'];
         
         $sql = "SELECT id, mapping_json FROM curriculum_framework WHERE is_active = 1 LIMIT 1";
         $stmt = $pdo->query($sql);
@@ -40,12 +23,11 @@ try {
             // สร้างเอกสารใหม่
             $new_doc = [
                 "id" => "doc_" . time() . "_" . rand(100, 999),
-                "name" => $name,
-                "type" => $type,
-                "uploadedAt" => date('Y-m-d'),
-                "size" => $size,
-                "status" => "pending",
-                "file_path" => $filePath
+                "name" => $input['name'],
+                "type" => $input['type'],
+                "uploadedAt" => date('Y-m-d'), // วันที่อัปโหลด
+                "size" => "1.2 MB", // (จำลองขนาดไฟล์)
+                "status" => "pending" // เอกสารใหม่ให้สถานะรอดำเนินการ
             ];
 
             // ดันเอกสารใหม่เข้า Array ของวิชานั้นๆ

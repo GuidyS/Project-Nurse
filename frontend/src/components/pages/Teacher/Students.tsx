@@ -1,26 +1,28 @@
+import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Users, Search, Download, GraduationCap, AlertTriangle, Loader2 } from 'lucide-react';
+import { Users, Search, Download, GraduationCap } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import api from '@/lib/axios';
 import { useToast } from '@/hooks/use-toast';
 
-const getRiskBadge = (risk: string) => {
-  switch (risk) {
-    case 'critical': return <Badge variant="destructive">วิกฤต</Badge>;
-    case 'warning': return <Badge className="bg-yellow-500">ต้องติดตาม</Badge>;
-    default: return <Badge className="bg-green-500">ปกติ</Badge>;
+const getStatusBadge = (status: string) => {
+  switch (status) {
+    case 'active':
+      return <Badge className="bg-green-500">ปกติ</Badge>;
+    case 'warning':
+      return <Badge className="bg-yellow-500">ต้องติดตาม</Badge>;
+    default:
+      return <Badge variant="secondary">{status}</Badge>;
   }
 };
 
 export default function Students() {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
-  const [yearFilter, setYearFilter] = useState('all');
   const [students, setStudents] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -28,10 +30,14 @@ export default function Students() {
     const fetchStudents = async () => {
       try {
         setIsLoading(true);
-        const res = await api.get('/index.php?page=get-students-list');
-        if (res.data.status === 'success') setStudents(res.data.data || []);
-      } catch {
-        toast({ title: 'ข้อผิดพลาด', description: 'ไม่สามารถโหลดรายชื่อนักศึกษาได้', variant: 'destructive' });
+        const res = await api.get('/index.php?page=get-teacher-students');
+        if (res.data.status === 'success') {
+          setStudents(res.data.data || []);
+        } else {
+          toast({ title: 'ข้อผิดพลาด', description: res.data.message, variant: 'destructive' });
+        }
+      } catch (error) {
+        toast({ title: 'ข้อผิดพลาด', description: 'ไม่สามารถโหลดข้อมูลนักศึกษาได้', variant: 'destructive' });
       } finally {
         setIsLoading(false);
       }
@@ -40,27 +46,42 @@ export default function Students() {
   }, []);
 
   const filteredStudents = students.filter(
-    (s) =>
-      (String(s.name ?? '').includes(searchTerm) || String(s.studentId ?? '').includes(searchTerm)) &&
-      (yearFilter === 'all' || String(s.year) === yearFilter)
+    (student) =>
+      student.name.includes(searchTerm) ||
+      student.studentId.includes(searchTerm)
   );
 
   const handleExport = () => {
-    const rows: string[][] = [
-      ['รหัสนักศึกษา', 'ชื่อ-นามสกุล', 'ชั้นปี', 'GPA', 'สถานะ'],
-      ...filteredStudents.map(s => [String(s.studentId), s.name, `ปี ${s.year}`, String(s.gpa), s.riskStatus === 'normal' ? 'ปกติ' : s.riskStatus === 'warning' ? 'ต้องติดตาม' : 'วิกฤต']),
-    ];
-    const csv = '﻿' + rows.map(r => r.map(c => `"${c ?? ''}"`).join(',')).join('\n');
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
-    const a = document.createElement('a');
-    a.href = url; a.download = 'students.csv'; a.click();
-    URL.revokeObjectURL(url);
+    try {
+      const headers = ['รหัสนักศึกษา', 'ชื่อ-นามสกุล', 'ชั้นปี', 'เกรดเฉลี่ย', 'สถานะ'];
+      const csvRows = [headers.join(',')];
+      
+      filteredStudents.forEach(student => {
+        csvRows.push([
+          student.studentId,
+          student.name,
+          student.year || '-',
+          student.gpa || '-',
+          student.status === 'active' ? 'ปกติ' : (student.status === 'warning' ? 'ต้องติดตาม' : student.status)
+        ].join(','));
+      });
+      
+      const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + csvRows.join('\n');
+      const encodedUri = encodeURI(csvContent);
+      
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `รายชื่อนักศึกษา.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('Error exporting data:', error);
+    }
   };
 
-  const yearOptions = Array.from(new Set(students.map(s => String(s.year)))).sort();
-
   if (isLoading) {
-    return <div className="flex h-96 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+    return <div className="flex items-center justify-center p-8">กำลังโหลดข้อมูล...</div>;
   }
 
   return (
@@ -69,7 +90,7 @@ export default function Students() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">รายชื่อนักศึกษา</h1>
-            <p className="text-muted-foreground">นักศึกษาทั้งหมดในระบบ ({students.length} คน)</p>
+            <p className="text-muted-foreground">นักศึกษาที่ลงทะเบียนในรายวิชาที่สอน</p>
           </div>
           <Button variant="outline" onClick={handleExport}>
             <Download className="mr-2 h-4 w-4" />
@@ -84,7 +105,9 @@ export default function Students() {
               <CardTitle className="text-sm font-medium">นักศึกษาทั้งหมด</CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent><div className="text-2xl font-bold">{students.length}</div></CardContent>
+            <CardContent>
+              <div className="text-2xl font-bold">{students.length}</div>
+            </CardContent>
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -92,25 +115,29 @@ export default function Students() {
               <GraduationCap className="h-4 w-4 text-green-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">{students.filter(s => s.riskStatus === 'normal').length}</div>
+              <div className="text-2xl font-bold text-green-600">
+                {students.filter(s => s.status === 'active').length}
+              </div>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">ต้องติดตาม/วิกฤต</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-yellow-500" />
+              <CardTitle className="text-sm font-medium">ต้องติดตาม</CardTitle>
+              <Users className="h-4 w-4 text-yellow-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-yellow-600">{students.filter(s => s.riskStatus !== 'normal').length}</div>
+              <div className="text-2xl font-bold text-yellow-600">
+                {students.filter(s => s.status === 'warning').length}
+              </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Table */}
+        {/* Students Table */}
         <Card>
           <CardHeader>
-            <CardTitle>นักศึกษาทั้งหมด</CardTitle>
-            <CardDescription>คลิก "ดูรายละเอียด" เพื่อดูข้อมูลรายบุคคล</CardDescription>
+            <CardTitle>รายชื่อนักศึกษา</CardTitle>
+            <CardDescription>นักศึกษาทั้งหมดที่ลงทะเบียนในรายวิชาที่สอน</CardDescription>
             <div className="flex items-center gap-2 pt-4">
               <Search className="h-4 w-4 text-muted-foreground" />
               <Input
@@ -119,53 +146,37 @@ export default function Students() {
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="max-w-sm"
               />
-              <Select value={yearFilter} onValueChange={setYearFilter}>
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="ชั้นปี" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">ทุกชั้นปี</SelectItem>
-                  {yearOptions.map(y => <SelectItem key={y} value={y}>ปี {y}</SelectItem>)}
-                </SelectContent>
-              </Select>
             </div>
           </CardHeader>
           <CardContent>
-            {filteredStudents.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg">
-                ไม่พบนักศึกษาตามเงื่อนไขที่ค้นหา
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>รหัสนักศึกษา</TableHead>
-                    <TableHead>ชื่อ-นามสกุล</TableHead>
-                    <TableHead className="text-center">ชั้นปี</TableHead>
-                    <TableHead className="text-center">GPA</TableHead>
-                    <TableHead className="text-center">สถานะ</TableHead>
-                    <TableHead className="text-center">การดำเนินการ</TableHead>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>รหัสนักศึกษา</TableHead>
+                  <TableHead>ชื่อ-นามสกุล</TableHead>
+                  <TableHead>ชั้นปี</TableHead>
+                  <TableHead>วิชาที่ลงทะเบียน</TableHead>
+                  <TableHead>GPA</TableHead>
+                  <TableHead>สถานะ</TableHead>
+                  <TableHead>การดำเนินการ</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredStudents.map((student) => (
+                  <TableRow key={student.id}>
+                    <TableCell className="font-medium">{student.studentId}</TableCell>
+                    <TableCell>{student.name}</TableCell>
+                    <TableCell>ปี {student.year}</TableCell>
+                    <TableCell>{student.course}</TableCell>
+                    <TableCell>{student.gpa.toFixed(2)}</TableCell>
+                    <TableCell>{getStatusBadge(student.status)}</TableCell>
+                    <TableCell>
+                      <Button variant="outline" size="sm">ดูรายละเอียด</Button>
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredStudents.map((s) => (
-                    <TableRow key={s.student_id}>
-                      <TableCell className="font-medium font-mono">{s.studentId}</TableCell>
-                      <TableCell>{s.name}</TableCell>
-                      <TableCell className="text-center">ปี {s.year}</TableCell>
-                      <TableCell className="text-center font-semibold">{Number(s.gpa).toFixed(2)}</TableCell>
-                      <TableCell className="text-center">{getRiskBadge(s.riskStatus)}</TableCell>
-                      <TableCell className="text-center">
-                        <Button variant="outline" size="sm"
-                          onClick={() => { window.location.href = `/?page=students-info&sid=${s.student_id}`; }}>
-                          ดูรายละเอียด
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
+                ))}
+              </TableBody>
+            </Table>
           </CardContent>
         </Card>
       </div>

@@ -24,14 +24,14 @@ try {
 
     // SQL: ดึงข้อมูลจากตาราง project
     if ($search) {
-        $sql = "SELECT project_id, project_name_th, project_name_en, description 
+        $sql = "SELECT project_id, project_name_th, project_name_en, description, responsible_faculty_id, academic_year, status, start_date, end_date
                 FROM project 
                 WHERE project_name_th LIKE :search OR project_name_en LIKE :search 
                 ORDER BY project_id DESC";
         $stmt = $pdo->prepare($sql);
         $stmt->execute([':search' => "%$search%"]);
     } else {
-        $sql = "SELECT project_id, project_name_th, project_name_en, description 
+        $sql = "SELECT project_id, project_name_th, project_name_en, description, responsible_faculty_id, academic_year, status, start_date, end_date
                 FROM project 
                 ORDER BY project_id DESC";
         $stmt = $pdo->prepare($sql);

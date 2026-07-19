@@ -1,6 +1,6 @@
 <?php
 if (session_status() === PHP_SESSION_NONE) session_start();
-require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/../../config/config.php';
 
 header("Access-Control-Allow-Origin: http://localhost:5173");
 header("Access-Control-Allow-Credentials: true");
@@ -20,10 +20,10 @@ try {
     // ดึงเด็กที่ลงทะเบียนวิชานี้ และเกรดจริงจากตาราง enrollment
     $sql = "
         SELECT 
-            e.enrollment_id as id,
-            s.student_id as studentId,
+            e.enrollment_id as id, 
+            s.student_id as studentId, 
             CONCAT(IFNULL(s.title,''), s.first_name_th, ' ', s.last_name_th) as name,
-            e.grade, e.midterm, e.final, e.assignment
+            e.grade
         FROM enrollment e
         JOIN student s ON e.student_id = s.student_id
         WHERE e.subject_id = ?

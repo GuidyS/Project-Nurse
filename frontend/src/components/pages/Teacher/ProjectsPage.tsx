@@ -127,7 +127,7 @@ const ProjectsPage = () => {
     if (!confirm("คุณแน่ใจหรือไม่ว่าต้องการลบโครงการนี้? ข้อมูลที่เกี่ยวข้องอาจถูกลบไปด้วย")) return;
 
     try {
-      const res = await api.post("/index.php?page=delete_project", { project_id: id });
+      const res = await api.post("/index.php?page=delete-project", { project_id: id });
       if (res.data.status === "success") {
         toast({ title: "ลบสำเร็จ", description: "ลบโครงการออกจากระบบแล้ว" });
         fetchProjects();

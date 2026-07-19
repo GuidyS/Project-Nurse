@@ -1,6 +1,6 @@
 <?php
 if (session_status() === PHP_SESSION_NONE) session_start();
-require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/../../config/config.php';
 
 header("Access-Control-Allow-Origin: http://localhost:5173");
 header("Access-Control-Allow-Credentials: true");
@@ -18,14 +18,11 @@ try {
     }
 
     // อัปเดตเกรดโดยอ้างอิงจาก enrollment_id ที่เราดึงมาจาก get_course_students.php
-    $sql = "UPDATE enrollment SET grade = :grade, midterm = :midterm, final = :final, assignment = :assignment WHERE enrollment_id = :id";
+    $sql = "UPDATE enrollment SET grade = :grade WHERE enrollment_id = :id";
     $stmt = $db->prepare($sql);
     $stmt->execute([
         ':id' => $input['id'],
-        ':grade' => $input['grade'],
-        ':midterm' => $input['midterm'] ?? null,
-        ':final' => $input['final'] ?? null,
-        ':assignment' => $input['assignment'] ?? null
+        ':grade' => $input['grade']
     ]);
     
     // ตรวจสอบว่าอัปเดตสำเร็จไหม

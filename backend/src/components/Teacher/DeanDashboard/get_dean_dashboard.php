@@ -8,8 +8,6 @@ header("Content-Type: application/json; charset=UTF-8");
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit(); }
 
-require_once __DIR__ . '/../../middlewares/auth_middleware.php';
-
 // เปิด/ปิดการโชว์ error message จริงตอน debug (ปิดเป็น false ตอนขึ้น production)
 define('APP_DEBUG', true);
 

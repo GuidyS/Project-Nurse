@@ -228,10 +228,9 @@ const CoursesPage = () => {
     }
   };
 
-  // ใช้ String(... ?? '') กันค่า null/ตัวเลข (studentId เป็น number) ไม่ให้ .includes พังจนหน้าจอดำ
   const filteredStudents = studentGrades.filter(
     (s) =>
-      String(s.name ?? "").includes(searchQuery) || String(s.studentId ?? "").includes(searchQuery)
+      s.name.includes(searchQuery) || s.studentId.includes(searchQuery)
   );
 
   const getGradeBadge = (grade: string) => {
@@ -256,7 +255,7 @@ const CoursesPage = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">รายวิชาที่สอน</h1>
-          <p className="text-muted-foreground mt-1">จัดการรายวิชาและดูรายชื่อนักศึกษา (FR009)</p>
+          <p className="text-muted-foreground mt-1">จัดการรายวิชาและบันทึกผลการเรียน (FR009)</p>
         </div>
       </div>
 
@@ -340,7 +339,9 @@ const CoursesPage = () => {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      {/* คณะฯ ไม่สามารถให้เกรดรายวิชาได้ — เปิดดูรายชื่อแบบอ่านอย่างเดียวเท่านั้น */}
+                      <DropdownMenuItem className="gap-2" onClick={() => openGradeDialog(course, false)}>
+                        <Edit className="h-4 w-4" /> บันทึก/แก้ไขผลการเรียน
+                      </DropdownMenuItem>
                       <DropdownMenuItem className="gap-2" onClick={() => openGradeDialog(course, true)}>
                         <Eye className="h-4 w-4" /> ดูรายชื่อนักศึกษา
                       </DropdownMenuItem>
