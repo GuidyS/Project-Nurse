@@ -17,27 +17,13 @@ try {
     if (!empty($input['id'])) {
         $portfolio_id = $input['id'];
 
-        // 1. ดึง file_path เก่าขึ้นมาแกะดูก่อน
-        $stmt_get = $pdo->prepare("SELECT file_path FROM portfolio WHERE portfolio_id = ?");
+        $stmt_get = $pdo->prepare("SELECT portfolio_id FROM portfolio WHERE portfolio_id = ?");
         $stmt_get->execute([$portfolio_id]);
-        $current_file_path = $stmt_get->fetchColumn();
+        $existing_id = $stmt_get->fetchColumn();
 
-        if ($current_file_path) {
-            $meta = json_decode($current_file_path, true);
-            
-            // ถ้าดึงมาแล้วไม่ใช่ JSON (เป็นไฟล์แบบเก่า) ให้สร้างโครงสร้างมารองรับเลย
-            if (!is_array($meta)) {
-                $meta = ["url" => $current_file_path, "title" => "หลักฐาน", "type" => "document"];
-            }
-
-            // 2. ปรับสถานะเป็น ตรวจสอบแล้ว (true)
-            $meta['verified'] = true;
-            $new_file_path_json = json_encode($meta, JSON_UNESCAPED_UNICODE);
-
-            // 3. เซฟทับกลับลงไป
-            $stmt_update = $pdo->prepare("UPDATE portfolio SET file_path = :new_path WHERE portfolio_id = :id");
+        if ($existing_id) {
+            $stmt_update = $pdo->prepare("UPDATE portfolio SET verified = 1 WHERE portfolio_id = :id");
             $stmt_update->execute([
-                ':new_path' => $new_file_path_json,
                 ':id' => $portfolio_id
             ]);
 
