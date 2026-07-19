@@ -11,6 +11,17 @@ function normalizeYearKeyFromYlo(?string $yloId): ?string
 
 function derivePlosFromYlo(array $mappingData, ?string $yloId): array
 {
+    // ใช้ ylo_plo_matrix (แก้ไขได้จากหน้า "แก้ไข YLO") เป็นแหล่งหลัก
+    if ($yloId && !empty($mappingData['ylo_plo_matrix'][$yloId]) && is_array($mappingData['ylo_plo_matrix'][$yloId])) {
+        $plos = [];
+        foreach ($mappingData['ylo_plo_matrix'][$yloId] as $ploId => $info) {
+            if (!empty($info['active'])) {
+                $plos[] = (string)$ploId;
+            }
+        }
+        return $plos;
+    }
+
     $yearKey = normalizeYearKeyFromYlo($yloId);
     if (!$yearKey) {
         return [];
@@ -78,6 +89,43 @@ function getPloCatalog(array $mappingData): array
     }
 
     return $plos;
+}
+
+function getSubPloCatalog(array $mappingData): array
+{
+    $catalog = [];
+    foreach (($mappingData['sub_plo_catalog'] ?? []) as $sub) {
+        if (empty($sub['code']) || empty($sub['plo'])) {
+            continue;
+        }
+        $catalog[] = [
+            'code' => (string)$sub['code'],
+            'plo' => (string)$sub['plo'],
+            'description' => (string)($sub['description'] ?? ''),
+        ];
+    }
+    return $catalog;
+}
+
+// กรอง sub_plos ให้เหลือเฉพาะตัวที่ PLO แม่อยู่ในชุด PLO ที่ derive จาก YLO (กติกา: บล็อก Sub นอก YLO)
+function filterSubPlosByAllowedPlos(array $mappingData, ?array $subPlos, array $allowedPlos): array
+{
+    if (!is_array($subPlos)) {
+        return [];
+    }
+    $parentByCode = [];
+    foreach (getSubPloCatalog($mappingData) as $sub) {
+        $parentByCode[$sub['code']] = $sub['plo'];
+    }
+    $allowed = array_flip($allowedPlos);
+    $result = [];
+    foreach ($subPlos as $code) {
+        $code = (string)$code;
+        if (isset($parentByCode[$code]) && isset($allowed[$parentByCode[$code]])) {
+            $result[] = $code;
+        }
+    }
+    return array_values(array_unique($result));
 }
 
 function mergeCourseMappedPlos(array $subjectData): array

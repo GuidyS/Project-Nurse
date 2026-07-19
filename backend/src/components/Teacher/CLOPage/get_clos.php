@@ -44,6 +44,7 @@ try {
                 "description" => $clo['description'] ?? ($clo['clo_description'] ?? ''),
                 "ylo_id" => $clo['ylo_id'] ?? null,
                 "mapped_plos" => $clo['mapped_plos'] ?? [],
+                "sub_plos" => $clo['sub_plos'] ?? [],
             ];
         }
 
@@ -52,12 +53,14 @@ try {
             "data" => [
                 "clos" => $clos,
                 "plos" => getPloCatalog($mappingData),
+                "ylo_matrix" => $mappingData['ylo_plo_matrix'] ?? new stdClass(),
+                "sub_plo_catalog" => getSubPloCatalog($mappingData),
             ],
         ], JSON_UNESCAPED_UNICODE);
         exit();
     }
 
-    echo json_encode(["status" => "success", "data" => ["clos" => [], "plos" => []]], JSON_UNESCAPED_UNICODE);
+    echo json_encode(["status" => "success", "data" => ["clos" => [], "plos" => [], "ylo_matrix" => new stdClass(), "sub_plo_catalog" => []]], JSON_UNESCAPED_UNICODE);
 } catch (Exception $e) {
     http_response_code(500);
     echo json_encode(["status" => "error", "message" => $e->getMessage()]);

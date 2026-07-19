@@ -46,16 +46,20 @@ try {
 
             foreach ($subjectData['clos'] as $index => $clo) {
                 if ((int)($clo['clo_id'] ?? 0) === $targetId) {
-                    $mapped_plos = buildCloMappedPlos(
+                    // PLO มาจาก YLO ที่เลือกเท่านั้น; Sub PLO ติ๊กได้เฉพาะตัวที่ PLO แม่อยู่ในชุดของ YLO
+                    $ylo_id = $input['ylo_id'] ?? ($clo['ylo_id'] ?? null);
+                    $mapped_plos = derivePlosFromYlo($mappingData, $ylo_id);
+                    $sub_plos = filterSubPlosByAllowedPlos(
                         $mappingData,
-                        $input['ylo_id'] ?? ($clo['ylo_id'] ?? null),
-                        $input['mapped_plos'] ?? ($clo['mapped_plos'] ?? null)
+                        $input['sub_plos'] ?? ($clo['sub_plos'] ?? null),
+                        $mapped_plos
                     );
 
                     $mappingData['subject_mappings'][$subjectCode]['clos'][$index]['description'] = $input['description'];
                     $mappingData['subject_mappings'][$subjectCode]['clos'][$index]['clo_code'] = $input['clo_code'] ?? null;
-                    $mappingData['subject_mappings'][$subjectCode]['clos'][$index]['ylo_id'] = $input['ylo_id'] ?? null;
+                    $mappingData['subject_mappings'][$subjectCode]['clos'][$index]['ylo_id'] = $ylo_id;
                     $mappingData['subject_mappings'][$subjectCode]['clos'][$index]['mapped_plos'] = $mapped_plos;
+                    $mappingData['subject_mappings'][$subjectCode]['clos'][$index]['sub_plos'] = $sub_plos;
                     $updated = true;
                     break 2;
                 }

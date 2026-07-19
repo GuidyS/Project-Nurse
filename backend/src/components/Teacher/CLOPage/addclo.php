@@ -53,18 +53,17 @@ try {
             }
         }
 
-        $mapped_plos = buildCloMappedPlos(
-            $mappingData,
-            $input['ylo_id'] ?? null,
-            $input['mapped_plos'] ?? null
-        );
+        // PLO มาจาก YLO ที่เลือกเท่านั้น; Sub PLO ติ๊กได้เฉพาะตัวที่ PLO แม่อยู่ในชุดของ YLO
+        $mapped_plos = derivePlosFromYlo($mappingData, $input['ylo_id'] ?? null);
+        $sub_plos = filterSubPlosByAllowedPlos($mappingData, $input['sub_plos'] ?? null, $mapped_plos);
 
         $mappingData['subject_mappings'][$subject_code]['clos'][] = [
             "clo_id" => $maxId + 1,
             "clo_code" => $input['clo_code'] ?? null,
             "description" => $input['description'],
             "ylo_id" => $input['ylo_id'] ?? null,
-            "mapped_plos" => $mapped_plos
+            "mapped_plos" => $mapped_plos,
+            "sub_plos" => $sub_plos
         ];
 
         $updateStmt = $pdo->prepare("UPDATE curriculum_framework SET mapping_json = :json WHERE id = :id");

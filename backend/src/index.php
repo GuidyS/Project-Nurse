@@ -159,6 +159,9 @@
             case 'delete-clo':
                 require_once 'components/Teacher/CLOPage/delete_clo.php';
                 break;
+            case 'save-ylo-matrix':
+                require_once 'components/Teacher/CLOPage/save_ylo_matrix.php';
+                break;
 
             // CourseReports
             case 'get-report-filters':
