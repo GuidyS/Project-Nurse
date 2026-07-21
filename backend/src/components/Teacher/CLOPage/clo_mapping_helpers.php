@@ -1,5 +1,16 @@
 <?php
 
+require_once __DIR__ . '/ylo_subplo_defaults.php';
+
+// คืน matrix จาก mapping_json ถ้ามี ไม่มีก็ใช้ค่าตั้งต้นจากไฟล์หลักสูตร (น้องในทีม pull ไปใช้ได้เลยไม่ต้อง seed DB)
+function getYloPloMatrix(array $mappingData): array
+{
+    if (!empty($mappingData['ylo_plo_matrix']) && is_array($mappingData['ylo_plo_matrix'])) {
+        return $mappingData['ylo_plo_matrix'];
+    }
+    return yloSubPloDefaults()['ylo_plo_matrix'] ?? [];
+}
+
 function normalizeYearKeyFromYlo(?string $yloId): ?string
 {
     if (!$yloId || !preg_match('/YLO(\d+)/i', $yloId, $matches)) {
@@ -11,10 +22,11 @@ function normalizeYearKeyFromYlo(?string $yloId): ?string
 
 function derivePlosFromYlo(array $mappingData, ?string $yloId): array
 {
-    // ใช้ ylo_plo_matrix (แก้ไขได้จากหน้า "แก้ไข YLO") เป็นแหล่งหลัก
-    if ($yloId && !empty($mappingData['ylo_plo_matrix'][$yloId]) && is_array($mappingData['ylo_plo_matrix'][$yloId])) {
+    // ใช้ ylo_plo_matrix (แก้ไขได้จากหน้า "แก้ไข YLO", ไม่มีใน DB ก็ใช้ค่าตั้งต้น) เป็นแหล่งหลัก
+    $matrix = getYloPloMatrix($mappingData);
+    if ($yloId && !empty($matrix[$yloId]) && is_array($matrix[$yloId])) {
         $plos = [];
-        foreach ($mappingData['ylo_plo_matrix'][$yloId] as $ploId => $info) {
+        foreach ($matrix[$yloId] as $ploId => $info) {
             if (!empty($info['active'])) {
                 $plos[] = (string)$ploId;
             }
@@ -93,8 +105,12 @@ function getPloCatalog(array $mappingData): array
 
 function getSubPloCatalog(array $mappingData): array
 {
+    $source = (!empty($mappingData['sub_plo_catalog']) && is_array($mappingData['sub_plo_catalog']))
+        ? $mappingData['sub_plo_catalog']
+        : (yloSubPloDefaults()['sub_plo_catalog'] ?? []);
+
     $catalog = [];
-    foreach (($mappingData['sub_plo_catalog'] ?? []) as $sub) {
+    foreach ($source as $sub) {
         if (empty($sub['code']) || empty($sub['plo'])) {
             continue;
         }

@@ -53,7 +53,7 @@ try {
             "data" => [
                 "clos" => $clos,
                 "plos" => getPloCatalog($mappingData),
-                "ylo_matrix" => $mappingData['ylo_plo_matrix'] ?? new stdClass(),
+                "ylo_matrix" => getYloPloMatrix($mappingData) ?: new stdClass(),
                 "sub_plo_catalog" => getSubPloCatalog($mappingData),
             ],
         ], JSON_UNESCAPED_UNICODE);
