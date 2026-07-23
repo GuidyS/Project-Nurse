@@ -1,6 +1,7 @@
 <?php
 if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/../../config/config.php';
+require_once __DIR__ . '/../CLOPage/curriculum_repository.php';
 
 header("Access-Control-Allow-Origin: http://localhost:5173");
 header("Access-Control-Allow-Credentials: true");
@@ -30,16 +31,19 @@ try {
     $my_faculty_id = $faculty['faculty_id'];
     $instructor_name = $faculty['name'];
 
-    // 2. ดึงโครงสร้างหลักสูตร (JSON) มาหาว่าสอนวิชาไหนบ้าง
-    $stmt_fw = $db->query("SELECT mapping_json FROM curriculum_framework WHERE is_active = 1 LIMIT 1");
-    $row_fw = $stmt_fw->fetch(PDO::FETCH_ASSOC);
-    $mappingData = $row_fw ? json_decode($row_fw['mapping_json'], true) : [];
-
+    // 2. วิชาที่มอบหมายให้อาจารย์ (relational ก่อน, fallback JSON)
+    $frameworkId = getActiveFrameworkId($db);
     $my_subject_codes = [];
-    if (isset($mappingData['subject_mappings'])) {
-        foreach ($mappingData['subject_mappings'] as $code => $data) {
+    $cloCounts = [];
+    if ($frameworkId && curriculumTablesReady($db) && curriculumHasRelationalData($db, $frameworkId)) {
+        $my_subject_codes = getInstructorSubjectCodes($db, $frameworkId, (string)$my_faculty_id);
+        $cloCounts = countClosBySubject($db, $frameworkId);
+    } else {
+        $mappingData = loadActiveMappingData($db);
+        foreach ($mappingData['subject_mappings'] ?? [] as $code => $data) {
             if (isset($data['instructor_id']) && $data['instructor_id'] == $my_faculty_id) {
                 $my_subject_codes[] = $code;
+                $cloCounts[$code] = count($data['clos'] ?? []);
             }
         }
     }
@@ -60,7 +64,7 @@ try {
     $courses = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     foreach ($courses as &$course) {
-        $course['cloCount'] = count($mappingData['subject_mappings'][$course['code']]['clos'] ?? []);
+        $course['cloCount'] = $cloCounts[$course['code']] ?? 0;
         $course['section'] = '01'; // Default
         $course['instructor'] = $instructor_name;
     }

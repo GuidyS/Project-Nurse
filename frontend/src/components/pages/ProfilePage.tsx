@@ -9,10 +9,12 @@ import {
   ShieldCheck,
   Activity,
   FileText,
-  ExternalLink
+  ExternalLink,
+  Image as ImageIcon,
+  AlertCircle,
 } from "lucide-react";
 
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -25,6 +27,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
@@ -73,10 +76,15 @@ export default function ProfilePage() {
   if (loading) return <div className="p-12 text-center text-muted-foreground animate-pulse">กำลังโหลดข้อมูลโปรไฟล์...</div>;
   if (!profileData) return <div className="p-12 text-center text-destructive">ไม่พบข้อมูลผู้ใช้งาน</div>;
 
-  const displayFullName = `${profileData.title || ""} ${profileData.first_name_th || ""} ${profileData.last_name_th || ""}`.trim();
+  const displayFullName = `${profileData.first_name_th || ""} ${profileData.last_name_th || ""}`.trim();
   const displayEmail = profileData.email || `${profileData.student_id || profileData.faculty_id}@siam.edu`;
   const userInitial = profileData.first_name_th?.charAt(0) || "U";
   const pdfDocuments = Array.isArray(profileData.pdf_documents) ? profileData.pdf_documents : [];
+  const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8080").replace(/\/$/, "");
+  const profilePictureRaw = profileData.profile_picture_url || profileData.profile_picture || "";
+  const profilePictureUrl = profilePictureRaw
+    ? (profilePictureRaw.startsWith("http") ? profilePictureRaw : `${apiBaseUrl}/${profilePictureRaw.replace(/^\//, "")}`)
+    : "";
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6 animate-fade-in">
@@ -92,6 +100,7 @@ export default function ProfilePage() {
 
         <div className="flex flex-col md:flex-row items-center gap-8">
           <Avatar className="h-32 w-32 ring-4 ring-primary/20 shadow-md">
+            {profilePictureUrl ? <AvatarImage src={profilePictureUrl} alt={displayFullName} /> : null}
             <AvatarFallback className="bg-primary text-primary-foreground text-4xl font-bold">
               {userInitial}
             </AvatarFallback>
@@ -164,6 +173,14 @@ export default function ProfilePage() {
           <div className="space-y-4 py-2 text-sm">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
+                <Label>ชื่อภาษาไทย</Label>
+                <Input value={formData.first_name_th || ""} onChange={e => setFormData({...formData, first_name_th: e.target.value})} />
+              </div>
+              <div className="space-y-2">
+                <Label>นามสกุลภาษาไทย</Label>
+                <Input value={formData.last_name_th || ""} onChange={e => setFormData({...formData, last_name_th: e.target.value})} />
+              </div>
+              <div className="space-y-2">
                 <Label>ชื่อภาษาอังกฤษ</Label>
                 <Input value={formData.first_name_en || ""} onChange={e => setFormData({...formData, first_name_en: e.target.value})} />
               </div>
@@ -175,7 +192,18 @@ export default function ProfilePage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>เพศ</Label>
-                <Input value={formData.gender || ""} onChange={e => setFormData({...formData, gender: e.target.value})} placeholder="ชาย / หญิง" />
+                <Select
+                  value={formData.gender || ""}
+                  onValueChange={(value) => setFormData({ ...formData, gender: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="เลือกเพศ" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ชาย">ชาย</SelectItem>
+                    <SelectItem value="หญิง">หญิง</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label>วันเกิด</Label>
@@ -193,10 +221,6 @@ export default function ProfilePage() {
                 <div className="space-y-2">
                   <Label>เบอร์โทรศัพท์</Label>
                   <Input value={formData.phone || ""} onChange={e => setFormData({...formData, phone: e.target.value})} />
-                </div>
-                <div className="space-y-2">
-                  <Label>เลขใบประกอบวิชาชีพสภาการพยาบาล</Label>
-                  <Input value={formData.nursing_council_no || ""} onChange={e => setFormData({...formData, nursing_council_no: e.target.value})} />
                 </div>
                 <div className="space-y-2">
                   <Label>ที่อยู่ปัจจุบัน</Label>
@@ -257,12 +281,39 @@ const InfoRow = ({
   </div>
 );
 
+const resolveDocumentUrl = (doc: any, apiBaseUrl: string) => {
+  if (doc.available !== true) return "";
+  const raw = String(doc.file_url || "").trim();
+  if (!raw) return "";
+  if (/^https?:\/\//i.test(raw)) return raw;
+  return `${apiBaseUrl}/${raw.replace(/^\//, "")}`;
+};
+
 const PdfDocumentsSection = ({ documents }: { documents: any[] }) => {
   if (!documents || documents.length === 0) {
-    return null;
+    return (
+      <div className="md:col-span-2 rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
+        ยังไม่มีไฟล์ PDF ในระบบ — ลิงก์ Google Drive ในฐานข้อมูล (เช่น ประวัติ/Resume) หรือไฟล์ที่อัปโหลดผ่านผู้ดูแลระบบจะแสดงที่นี่
+        เอกสารรับรองอื่น (บัตรสภา, ใบอนุญาต, ใบรับรองการสอน) ให้ผู้ใช้อัปโหลดภายหลัง
+      </div>
+    );
+  }
+  if (!documents || documents.length === 0) {
+    return (
+      <div className="md:col-span-2 rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
+        ยังไม่มีเอกสาร PDF — ไฟล์ที่อัปโหลดจากหน้าจัดการผู้ใช้ หรือลิงก์ Google Drive จะแสดงที่นี่
+      </div>
+    );
+  }
+  if (!documents || documents.length === 0) {
+    return (
+      <div className="md:col-span-2 rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
+        ไม่มีเอกสาร
+      </div>
+    );
   }
 
-  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
+  const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8080").replace(/\/$/, "");
 
   return (
     <div className="md:col-span-2 space-y-3">
@@ -270,10 +321,60 @@ const PdfDocumentsSection = ({ documents }: { documents: any[] }) => {
         <FileText className="h-4 w-4 text-primary" />
         <p className="font-semibold text-foreground">เอกสาร PDF</p>
       </div>
+      <p className="text-xs text-muted-foreground">
+        แสดงเฉพาะ PDF จาก Google Drive หรือไฟล์ที่อัปโหลดในระบบ — ไม่ดึงรูปจาก Excel อีกต่อไป
+      </p>
       <div className="grid gap-3 sm:grid-cols-2">
         {documents.map((doc, index) => {
-          const filePath = doc.file_path || "";
-          const fileUrl = filePath.startsWith("http") ? filePath : `${apiBaseUrl}/${filePath}`;
+          const fileUrl = resolveDocumentUrl(doc, apiBaseUrl);
+          const available = doc.available === true && Boolean(fileUrl);
+          const kind = doc.kind || "file";
+          const sourceLabel =
+            doc.source === "google_drive"
+              ? "Google Drive"
+              : doc.source === "local"
+                ? "ไฟล์ในระบบ"
+                : doc.source === "missing"
+                  ? "ยังไม่มีไฟล์บนเซิร์ฟเวอร์"
+                  : "ลิงก์ภายนอก";
+
+          const iconWrapClass =
+            kind === "pdf" || kind === "drive"
+              ? "bg-red-50 text-red-600 ring-red-100"
+              : kind === "image"
+                ? "bg-sky-50 text-sky-700 ring-sky-100"
+                : "bg-amber-50 text-amber-700 ring-amber-100";
+
+          const content = (
+            <>
+              <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-lg ring-1 ${iconWrapClass}`}>
+                {kind === "image" ? <ImageIcon className="h-6 w-6" /> : <FileText className="h-6 w-6" />}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-medium text-foreground">{doc.title || "เอกสารแนบ"}</p>
+                <p className="truncate text-xs text-muted-foreground">{doc.file_name || doc.file_path}</p>
+                <p className="truncate text-[11px] text-muted-foreground/80">{sourceLabel}</p>
+              </div>
+              {available ? (
+                <ExternalLink className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-primary" />
+              ) : (
+                <AlertCircle className="h-4 w-4 text-muted-foreground" />
+              )}
+            </>
+          );
+
+          if (!available) {
+            return (
+              <div
+                key={`${doc.title || doc.file_name}-${index}`}
+                className="flex items-center gap-3 rounded-xl border bg-muted/30 p-3 opacity-80"
+                title="ยังไม่มีไฟล์ PDF บนเซิร์ฟเวอร์ — อัปโหลดภายหลังได้"
+              >
+                {content}
+              </div>
+            );
+          }
+
           return (
             <a
               key={`${doc.title || doc.file_name}-${index}`}
@@ -282,14 +383,7 @@ const PdfDocumentsSection = ({ documents }: { documents: any[] }) => {
               rel="noopener noreferrer"
               className="group flex items-center gap-3 rounded-xl border bg-card p-3 transition-colors hover:border-primary/60 hover:bg-primary/5"
             >
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-red-50 text-red-600 ring-1 ring-red-100">
-                <FileText className="h-6 w-6" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-medium text-foreground">{doc.title || "เอกสาร PDF"}</p>
-                <p className="truncate text-xs text-muted-foreground">{doc.file_name || filePath}</p>
-              </div>
-              <ExternalLink className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-primary" />
+              {content}
             </a>
           );
         })}

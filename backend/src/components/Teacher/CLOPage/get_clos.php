@@ -4,6 +4,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 require_once __DIR__ . '/clo_mapping_helpers.php';
+require_once __DIR__ . '/curriculum_repository.php';
 
 $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -27,13 +28,28 @@ try {
             exit();
         }
 
-        $frameworkStmt = $pdo->query("SELECT mapping_json FROM curriculum_framework WHERE is_active = 1 LIMIT 1");
-        $framework = $frameworkStmt->fetch(PDO::FETCH_ASSOC);
-        $mappingData = $framework && !empty($framework['mapping_json']) ? json_decode($framework['mapping_json'], true) : [];
-        if (!is_array($mappingData)) {
-            $mappingData = [];
+        $frameworkId = getActiveFrameworkId($pdo);
+        if (!$frameworkId) {
+            echo json_encode(["status" => "success", "data" => ["clos" => [], "plos" => [], "ylo_matrix" => new stdClass(), "sub_plo_catalog" => []]], JSON_UNESCAPED_UNICODE);
+            exit();
         }
 
+        if (curriculumTablesReady($pdo) && curriculumHasRelationalData($pdo, $frameworkId)) {
+            $clos = listClosBySubjectCode($pdo, $frameworkId, (string)$subject_code);
+            $yloMatrix = getYloMatrixFromTables($pdo, $frameworkId);
+            echo json_encode([
+                "status" => "success",
+                "data" => [
+                    "clos" => $clos,
+                    "plos" => getPloCatalogFromTables($pdo, $frameworkId),
+                    "ylo_matrix" => empty($yloMatrix) ? new stdClass() : $yloMatrix,
+                    "sub_plo_catalog" => getSubPloCatalogFromTables($pdo, $frameworkId),
+                ],
+            ], JSON_UNESCAPED_UNICODE);
+            exit();
+        }
+
+        $mappingData = loadActiveMappingData($pdo);
         $rawClos = $mappingData['subject_mappings'][$subject_code]['clos'] ?? [];
 
         $clos = [];
@@ -44,6 +60,7 @@ try {
                 "description" => $clo['description'] ?? ($clo['clo_description'] ?? ''),
                 "ylo_id" => $clo['ylo_id'] ?? null,
                 "mapped_plos" => $clo['mapped_plos'] ?? [],
+                "sub_plos" => $clo['sub_plos'] ?? [],
             ];
         }
 
@@ -52,12 +69,14 @@ try {
             "data" => [
                 "clos" => $clos,
                 "plos" => getPloCatalog($mappingData),
+                "ylo_matrix" => $mappingData['ylo_plo_matrix'] ?? new stdClass(),
+                "sub_plo_catalog" => getSubPloCatalog($mappingData),
             ],
         ], JSON_UNESCAPED_UNICODE);
         exit();
     }
 
-    echo json_encode(["status" => "success", "data" => ["clos" => [], "plos" => []]], JSON_UNESCAPED_UNICODE);
+    echo json_encode(["status" => "success", "data" => ["clos" => [], "plos" => [], "ylo_matrix" => new stdClass(), "sub_plo_catalog" => []]], JSON_UNESCAPED_UNICODE);
 } catch (Exception $e) {
     http_response_code(500);
     echo json_encode(["status" => "error", "message" => $e->getMessage()]);

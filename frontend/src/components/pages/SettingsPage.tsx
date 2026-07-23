@@ -153,7 +153,7 @@ const SettingsPage = () => {
       });
       return;
     }
-    if (passwords.new.length < 12) {
+    if (passwords.new.length < 8) {
       toast({
         title: "รหัสผ่านสั้นเกินไป",
         description: PASSWORD_POLICY_HINT,
@@ -424,7 +424,7 @@ const SettingsPage = () => {
                   type={showNewPassword ? "text" : "password"}
                   value={passwords.new}
                   onChange={(e) => setPasswords({ ...passwords, new: e.target.value })}
-                  placeholder="กรอกรหัสผ่านใหม่ (อย่างน้อย 12 ตัวอักษร + ตัวเลข)"
+                  placeholder="กรอกรหัสผ่านใหม่ (อย่างน้อย 8 ตัว)"
                 />
                 <Button
                   type="button"

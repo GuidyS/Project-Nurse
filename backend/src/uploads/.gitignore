@@ -1,0 +1,7 @@
+# Ignore uploaded binaries; keep folder structure + docs
+*
+!*/
+!.gitignore
+!README.md
+!**/.gitkeep
+!**/*.md

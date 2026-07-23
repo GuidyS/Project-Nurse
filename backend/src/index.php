@@ -147,13 +147,11 @@
             case 'delete-clo':
                 require_once 'components/Teacher/CLOPage/delete_clo.php';
                 break;
-
-            // CourseReports
-            case 'get-report-filters':
-                require_once 'components/Teacher/CourseReports/get_report_filters.php';
+            case 'save-ylo-matrix':
+                require_once 'components/Teacher/CLOPage/save_ylo_matrix.php';
                 break;
-            case 'get-course-report':
-                require_once 'components/Teacher/CourseReports/get_course_report.php';
+            case 'migrate-mapping-json-to-tables':
+                require_once 'components/Teacher/CLOPage/migrate_mapping_json_to_tables.php';
                 break;
 
             // CoursesPage

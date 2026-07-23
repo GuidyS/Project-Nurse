@@ -285,7 +285,8 @@ try {
         throw new Exception("รองรับเฉพาะไฟล์ .xlsx, .xls และ .csv เท่านั้น");
     }
 
-    $uploadDir = __DIR__ . "/uploads/imports/$importType/";
+    // Central storage: backend/src/uploads/imports/{type}/
+    $uploadDir = __DIR__ . "/../../../uploads/imports/$importType/";
     if (!file_exists($uploadDir)) {
         mkdir($uploadDir, 0777, true);
     }

@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from "react";
-import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -46,6 +45,7 @@ const teacherPdfOptions = [
   { value: "nursing_council_file", label: "ไฟล์บัตรสภาการพยาบาล" },
   { value: "license_file", label: "ไฟล์ใบอนุญาต" },
   { value: "teaching_cert_file", label: "ไฟล์ใบรับรองการสอน" },
+  { value: "teaching_degree_file", label: "ไฟล์ใบคุณวุฒิการศึกษา" },
 ];
 
 const studentPdfOptions = [
@@ -66,6 +66,15 @@ export default function UsersManagement() {
   const [detailForm, setDetailForm] = useState<any>({});
   const [pdfFiles, setPdfFiles] = useState<Record<string, File[]>>({});
   const [selectedPdfField, setSelectedPdfField] = useState("nursing_council_file");
+  const [savedDocuments, setSavedDocuments] = useState<Array<{
+    field: string;
+    title: string;
+    file_name: string;
+    file_path: string;
+    available?: boolean;
+    portfolio_id?: number | null;
+  }>>([]);
+  const [deletingDocKey, setDeletingDocKey] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const pdfInputRef = useRef<HTMLInputElement | null>(null);
   const { toast } = useToast();
@@ -96,6 +105,7 @@ export default function UsersManagement() {
       setEditingUserId(userId);
       setDetailForm({});
       setPdfFiles({});
+      setSavedDocuments([]);
       if (pdfInputRef.current) {
         pdfInputRef.current.value = "";
       }
@@ -104,6 +114,7 @@ export default function UsersManagement() {
         setEditingUserRole(res.data.data.role_id);
         setSelectedPdfField(res.data.data.role_id === 3 ? "student_id_card_file" : "nursing_council_file");
         setDetailForm(res.data.data.details || {});
+        setSavedDocuments(Array.isArray(res.data.data.uploaded_documents) ? res.data.data.uploaded_documents : []);
         setIsEditDialogOpen(true);
       }
     } catch (error) {
@@ -167,6 +178,7 @@ export default function UsersManagement() {
       toast({ title: "อัปเดตข้อมูลสำเร็จ" });
       setIsEditDialogOpen(false);
       setPdfFiles({});
+      setSavedDocuments([]);
       fetchUsers();
     } catch (error: any) {
       toast({
@@ -186,6 +198,38 @@ export default function UsersManagement() {
       toast({ title: "ลบผู้ใช้สำเร็จ" });
     } catch (error) {
       toast({ title: "ลบผู้ใช้ล้มเหลว", variant: "destructive" });
+    }
+  };
+
+  const handleDeleteSavedDocument = async (doc: {
+    field: string;
+    file_path: string;
+    file_name: string;
+    portfolio_id?: number | null;
+  }) => {
+    if (!editingUserId) return;
+    const docKey = `${doc.portfolio_id || ""}:${doc.file_path}`;
+    try {
+      setDeletingDocKey(docKey);
+      const res = await api.post("/index.php?page=manage-user", {
+        action: "delete_document",
+        user_id: editingUserId,
+        field: doc.field,
+        file_path: doc.file_path,
+        portfolio_id: doc.portfolio_id || null,
+      });
+      if (res.data.status === "success") {
+        setSavedDocuments(Array.isArray(res.data.uploaded_documents) ? res.data.uploaded_documents : []);
+        toast({ title: "ลบเอกสารสำเร็จ", description: doc.file_name });
+      }
+    } catch (error: any) {
+      toast({
+        title: "ลบเอกสารล้มเหลว",
+        description: error?.response?.data?.message || "ไม่สามารถลบไฟล์ได้",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingDocKey(null);
     }
   };
 
@@ -277,6 +321,42 @@ export default function UsersManagement() {
                 {file.name}
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {savedDocuments.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-muted-foreground">เอกสารที่อัปโหลดแล้ว ({savedDocuments.length})</p>
+          <div className="space-y-2">
+            {savedDocuments.map((doc) => {
+              const docKey = `${doc.portfolio_id || ""}:${doc.file_path}`;
+              const isDeleting = deletingDocKey === docKey;
+              return (
+                <div
+                  key={docKey}
+                  className="flex items-center gap-2 rounded-md border bg-card px-3 py-2"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-foreground">{doc.title}</p>
+                    <p className="truncate text-xs text-muted-foreground">{doc.file_name}</p>
+                    {!doc.available && (
+                      <p className="text-[11px] text-amber-600">ไฟล์ไม่อยู่บนเซิร์ฟเวอร์แล้ว</p>
+                    )}
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    disabled={isDeleting || isSaving}
+                    onClick={() => handleDeleteSavedDocument(doc)}
+                  >
+                    {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                  </Button>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
