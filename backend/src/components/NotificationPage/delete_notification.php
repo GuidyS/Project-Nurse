@@ -19,16 +19,49 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
+require_once __DIR__ . '/notification_hidden_helper.php';
+
 if (isset($input['id'])) {
     try {
-        //  SAFETY DELETE: ลบเฉพาะที่ ID ตรงกัน AND เป็นของ User คนนี้เท่านั้น
-        // ถ้าแอบส่ง ID ของคนอื่นมา ระบบจะไม่ลบให้ (เพราะ user_id ไม่ตรง)
-        $sql = "DELETE FROM notifications WHERE notification_id = :id AND user_id = :user_id";
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute([
-            ':id' => $input['id'],
-            ':user_id' => $_SESSION['user_id']
-        ]);
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        ensureNotificationHiddenTable($pdo);
+
+        $userId = (int)$_SESSION['user_id'];
+        $notifId = (int)$input['id'];
+
+        // ต้องเป็นผู้รับหรือผู้ส่งของการแจ้งเตือนใบนี้เท่านั้น
+        $own = $pdo->prepare(
+            "SELECT user_id, sender_user_id FROM notifications
+             WHERE notification_id = :id AND (user_id = :uid OR sender_user_id = :uid2) LIMIT 1"
+        );
+        $own->execute([':id' => $notifId, ':uid' => $userId, ':uid2' => $userId]);
+        $row = $own->fetch(PDO::FETCH_ASSOC);
+
+        if (!$row) {
+            http_response_code(404);
+            echo json_encode(["status" => "error", "message" => "ไม่พบการแจ้งเตือนนี้"], JSON_UNESCAPED_UNICODE);
+            exit();
+        }
+
+        // ซ่อนเฉพาะฝั่งของผู้ใช้คนนี้ (อีกฝ่ายยังเห็นอยู่)
+        $hide = $pdo->prepare(
+            "INSERT IGNORE INTO notification_hidden (notification_id, user_id) VALUES (:id, :uid)"
+        );
+        $hide->execute([':id' => $notifId, ':uid' => $userId]);
+
+        // ถ้าทั้งผู้รับและผู้ส่งซ่อนแล้ว (หรือไม่มีผู้ส่ง) ค่อยลบแถวจริงเพื่อไม่ให้ข้อมูลค้าง
+        $receiverId = (int)$row['user_id'];
+        $senderId = $row['sender_user_id'] !== null ? (int)$row['sender_user_id'] : null;
+
+        $countStmt = $pdo->prepare("SELECT COUNT(*) FROM notification_hidden WHERE notification_id = :id");
+        $countStmt->execute([':id' => $notifId]);
+        $hiddenCount = (int)$countStmt->fetchColumn();
+
+        $sidesNeeded = ($senderId !== null && $senderId !== $receiverId) ? 2 : 1;
+        if ($hiddenCount >= $sidesNeeded) {
+            $pdo->prepare("DELETE FROM notifications WHERE notification_id = :id")->execute([':id' => $notifId]);
+            $pdo->prepare("DELETE FROM notification_hidden WHERE notification_id = :id")->execute([':id' => $notifId]);
+        }
 
         echo json_encode(["status" => "success"]);
     } catch (Exception $e) {

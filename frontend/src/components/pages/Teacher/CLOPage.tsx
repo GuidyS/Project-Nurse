@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
-import { Edit, Trash2, Save, BookOpen, Target, Loader2, Settings2 } from "lucide-react";
+import { Edit, Trash2, Save, BookOpen, Target, Loader2, Settings2, Plus, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -66,6 +67,31 @@ const YLO_OPTIONS = [
   { value: "YLO4", label: "YLO4 — ชั้นปีที่ 4" },
 ];
 
+// เรียงรหัส Sub PLO ตามตัวเลข (1.2 ก่อน 1.10 และ 2.1) — ไม่ให้รายการใหม่ไปต่อท้ายแบบไม่เรียง
+const subCodeOrder = (code: string): number => {
+  const m = /^(\d+)\.(\d+)$/.exec(code.trim());
+  return m ? Number(m[1]) * 1000 + Number(m[2]) : Number.MAX_SAFE_INTEGER;
+};
+
+const sortSubCodes = (codes: string[]): string[] =>
+  [...codes].sort((a, b) => subCodeOrder(a) - subCodeOrder(b) || a.localeCompare(b));
+
+const ploNumber = (plo: string): number => Number(plo.replace(/\D/g, "")) || 0;
+
+const sortPloCodes = (codes: string[]): string[] =>
+  [...codes].sort((a, b) => ploNumber(a) - ploNumber(b));
+
+// รหัส Sub PLO ถัดไปของ PLO นั้น เช่น PLO1 มีถึง 1.3 -> 1.4 (ระบบรันเลขให้เอง)
+function nextSubCode(catalog: SubPlo[], plo: string): string {
+  const major = ploNumber(plo);
+  if (!major) return "";
+  const minors = catalog
+    .map((s) => /^(\d+)\.(\d+)$/.exec(s.code))
+    .filter((m): m is RegExpExecArray => !!m && Number(m[1]) === major)
+    .map((m) => Number(m[2]));
+  return `${major}.${(minors.length ? Math.max(...minors) : 0) + 1}`;
+}
+
 function plosOfYlo(matrix: YloMatrix, yloId: string): string[] {
   const row = matrix[yloId];
   if (!row) return [];
@@ -95,14 +121,15 @@ function CloSubPloFields({
     setFormData({ ...formData, sub_plos: next });
   };
 
-  // จัดกลุ่ม Sub PLO ตาม PLO แม่
+  // จัดกลุ่ม Sub PLO ตาม PLO แม่ (เรียงเลขในแต่ละกลุ่ม)
   const groups: Record<string, SubPlo[]> = {};
   subPloCatalog.forEach((s) => {
     (groups[s.plo] = groups[s.plo] || []).push(s);
   });
-  const groupKeys = Object.keys(groups).sort(
-    (a, b) => Number(a.replace(/\D/g, "")) - Number(b.replace(/\D/g, ""))
-  );
+  Object.keys(groups).forEach((k) => {
+    groups[k].sort((a, b) => subCodeOrder(a.code) - subCodeOrder(b.code));
+  });
+  const groupKeys = sortPloCodes(Object.keys(groups));
 
   return (
     <div className="space-y-3 rounded-md border border-border/60 bg-background/50 p-3">
@@ -116,7 +143,10 @@ function CloSubPloFields({
           )}
         </div>
       ) : (
-        <div className="text-xs text-muted-foreground">เลือก YLO ก่อน เพื่อกำหนด PLO และติ๊ก Sub PLO</div>
+        <div className="flex items-start gap-2 rounded-md border border-amber-500/50 bg-amber-500/10 p-2.5 text-sm text-amber-700 dark:text-amber-400">
+          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+          <span>กรุณาเลือก YLO ก่อน จึงจะกำหนด PLO และติ๊ก Sub PLO ได้</span>
+        </div>
       )}
       {subPloCatalog.length > 0 && (
         <div className="space-y-2">
@@ -161,17 +191,22 @@ function YloEditorDialog({
   onOpenChange,
   yloMatrix,
   ploCatalog,
+  subPloCatalog,
   onSaved,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   yloMatrix: YloMatrix;
   ploCatalog: PloMeta[];
+  subPloCatalog: SubPlo[];
   onSaved: () => void;
 }) {
   const { toast } = useToast();
+  const [view, setView] = useState<"ylo" | "subplo">("ylo");
   const [draft, setDraft] = useState<YloMatrix>({});
   const [activeYlo, setActiveYlo] = useState("YLO1");
+  const [catalogDraft, setCatalogDraft] = useState<SubPlo[]>([]);
+  const [newSub, setNewSub] = useState<SubPlo>({ code: "", plo: "", description: "" });
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -187,7 +222,10 @@ function YloEditorDialog({
     });
     setDraft(next);
     setActiveYlo("YLO1");
-  }, [open, yloMatrix, ploCatalog]);
+    setCatalogDraft(subPloCatalog.map((s) => ({ ...s })));
+    setNewSub({ code: "", plo: "", description: "" });
+    setView("ylo");
+  }, [open, yloMatrix, ploCatalog, subPloCatalog]);
 
   const setCell = (ylo: string, plo: string, patch: Partial<YloPloInfo>) => {
     setDraft((prev) => ({
@@ -196,19 +234,56 @@ function YloEditorDialog({
     }));
   };
 
+  const setSubDesc = (code: string, description: string) => {
+    setCatalogDraft((prev) => prev.map((s) => (s.code === code ? { ...s, description } : s)));
+  };
+
+  const removeSub = (code: string) => {
+    setCatalogDraft((prev) => prev.filter((s) => s.code !== code));
+  };
+
+  // รหัสถัดไปที่ระบบจะกำหนดให้ (ผู้ใช้เลือกแค่ PLO)
+  const pendingCode = newSub.plo ? nextSubCode(catalogDraft, newSub.plo) : "";
+
+  const addSub = () => {
+    if (!newSub.plo) {
+      toast({ title: "แจ้งเตือน", description: "กรุณาเลือก PLO ที่ต้องการเพิ่ม Sub PLO", variant: "destructive" });
+      return;
+    }
+    const code = pendingCode;
+    if (catalogDraft.some((s) => s.code === code)) {
+      toast({ title: "แจ้งเตือน", description: `รหัส ${code} มีอยู่แล้ว`, variant: "destructive" });
+      return;
+    }
+    setCatalogDraft((prev) =>
+      [...prev, { code, plo: newSub.plo, description: newSub.description }].sort(
+        (a, b) => subCodeOrder(a.code) - subCodeOrder(b.code)
+      )
+    );
+    setNewSub({ code: "", plo: newSub.plo, description: "" });
+  };
+
   const handleSave = async () => {
+    if (catalogDraft.length === 0) {
+      toast({ title: "แจ้งเตือน", description: "ต้องมี Sub PLO อย่างน้อย 1 รายการ", variant: "destructive" });
+      return;
+    }
     setSaving(true);
     try {
       const res = await api.post("/index.php?page=save-ylo-matrix", { ylo_plo_matrix: draft });
-      if (res.data?.status === "success") {
-        toast({ title: "สำเร็จ", description: "บันทึกข้อมูล YLO เรียบร้อยแล้ว" });
-        onOpenChange(false);
-        onSaved();
-      } else {
-        toast({ title: "ข้อผิดพลาด", description: res.data?.message || "บันทึกไม่สำเร็จ", variant: "destructive" });
+      if (res.data?.status !== "success") {
+        throw new Error(res.data?.message || "บันทึก YLO ไม่สำเร็จ");
       }
-    } catch {
-      toast({ title: "ข้อผิดพลาด", description: "บันทึกไม่สำเร็จ", variant: "destructive" });
+      const res2 = await api.post("/index.php?page=save-sub-plo-catalog", { sub_plo_catalog: catalogDraft });
+      if (res2.data?.status !== "success") {
+        throw new Error(res2.data?.message || "บันทึก Sub PLO ไม่สำเร็จ");
+      }
+      toast({ title: "สำเร็จ", description: `บันทึกข้อมูล YLO และ Sub PLO เรียบร้อยแล้ว` });
+      onOpenChange(false);
+      onSaved();
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "บันทึกไม่สำเร็จ";
+      toast({ title: "ข้อผิดพลาด", description: message, variant: "destructive" });
     } finally {
       setSaving(false);
     }
@@ -216,56 +291,145 @@ function YloEditorDialog({
 
   const yloLabel = YLO_OPTIONS.find((y) => y.value === activeYlo)?.label || activeYlo;
 
+  // จัดกลุ่ม Sub PLO draft ตาม PLO แม่ (เรียงเลขในแต่ละกลุ่ม)
+  const subGroups: Record<string, SubPlo[]> = {};
+  catalogDraft.forEach((s) => {
+    (subGroups[s.plo] = subGroups[s.plo] || []).push(s);
+  });
+  Object.keys(subGroups).forEach((k) => {
+    subGroups[k].sort((a, b) => subCodeOrder(a.code) - subCodeOrder(b.code));
+  });
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto" onInteractOutside={(e) => e.preventDefault()}>
         <DialogHeader>
-          <DialogTitle>แก้ไข YLO — กำหนด PLO ของแต่ละชั้นปี</DialogTitle>
+          <DialogTitle>แก้ไข YLO / Sub PLO ของหลักสูตร</DialogTitle>
         </DialogHeader>
 
-        <div className="flex gap-2 flex-wrap">
-          {YLO_OPTIONS.map((y) => (
-            <Button
-              key={y.value}
-              size="sm"
-              variant={activeYlo === y.value ? "default" : "outline"}
-              onClick={() => setActiveYlo(y.value)}
-            >
-              {y.label}
-            </Button>
-          ))}
+        <div className="flex gap-2 border-b pb-2">
+          <Button size="sm" variant={view === "ylo" ? "default" : "ghost"} onClick={() => setView("ylo")}>
+            PLO ของชั้นปี (YLO)
+          </Button>
+          <Button size="sm" variant={view === "subplo" ? "default" : "ghost"} onClick={() => setView("subplo")}>
+            จัดการ Sub PLO
+          </Button>
         </div>
 
-        <div className="rounded-md border">
-          <div className="bg-muted/40 px-3 py-2 text-sm font-semibold border-b">{yloLabel}</div>
-          <div className="divide-y">
-            {ploCatalog.map((plo) => {
-              const cell = draft[activeYlo]?.[plo.id];
-              if (!cell) return null;
-              return (
-                <div key={plo.id} className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] gap-3 items-start px-3 py-2">
-                  <div className="text-sm">
-                    <span className="font-medium">{plo.id}</span>
-                    <span className="text-muted-foreground">: {plo.name}</span>
+        {view === "ylo" ? (
+          <>
+            <div className="flex gap-2 flex-wrap">
+              {YLO_OPTIONS.map((y) => (
+                <Button
+                  key={y.value}
+                  size="sm"
+                  variant={activeYlo === y.value ? "default" : "outline"}
+                  onClick={() => setActiveYlo(y.value)}
+                >
+                  {y.label}
+                </Button>
+              ))}
+            </div>
+
+            <div className="rounded-md border">
+              <div className="bg-muted/40 px-3 py-2 text-sm font-semibold border-b">{yloLabel}</div>
+              <div className="divide-y">
+                {ploCatalog.map((plo) => {
+                  const cell = draft[activeYlo]?.[plo.id];
+                  if (!cell) return null;
+                  return (
+                    <div key={plo.id} className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] gap-3 items-start px-3 py-2">
+                      <div className="text-sm">
+                        <span className="font-medium">{plo.id}</span>
+                        <span className="text-muted-foreground">: {plo.name}</span>
+                      </div>
+                      <div className="pt-0.5">
+                        <Checkbox
+                          checked={cell.active}
+                          onCheckedChange={(checked) => setCell(activeYlo, plo.id, { active: !!checked })}
+                        />
+                      </div>
+                      <Textarea
+                        className="min-h-[38px] text-sm"
+                        placeholder={cell.active ? "คำอธิบาย PLO สำหรับชั้นปีนี้..." : "-"}
+                        value={cell.description}
+                        disabled={!cell.active}
+                        onChange={(e) => setCell(activeYlo, plo.id, { description: e.target.value })}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="text-xs text-muted-foreground">
+              หลักสูตรปรับปรุงทุก 5 ปี — เพิ่ม/ลบ/แก้ Sub PLO ได้ที่นี่ (ลบแล้ว CLO ที่เคยติ๊ก Sub นั้นจะถูกถอดให้อัตโนมัติ)
+            </p>
+            <div className="space-y-3">
+              {ploCatalog.map((plo) => (
+                <div key={plo.id} className="rounded-md border">
+                  <div className="bg-muted/40 px-3 py-1.5 text-sm font-semibold border-b">
+                    {plo.id} <span className="font-normal text-muted-foreground">: {plo.name}</span>
                   </div>
-                  <div className="pt-0.5">
-                    <Checkbox
-                      checked={cell.active}
-                      onCheckedChange={(checked) => setCell(activeYlo, plo.id, { active: !!checked })}
-                    />
+                  <div className="divide-y">
+                    {(subGroups[plo.id] || []).map((sub) => (
+                      <div key={sub.code} className="flex items-center gap-2 px-3 py-1.5">
+                        <Badge variant="outline" className="shrink-0">{sub.code}</Badge>
+                        <Input
+                          className="h-8 text-sm"
+                          value={sub.description}
+                          placeholder="คำอธิบาย Sub PLO..."
+                          onChange={(e) => setSubDesc(sub.code, e.target.value)}
+                        />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 shrink-0 text-destructive"
+                          onClick={() => removeSub(sub.code)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    {!(subGroups[plo.id] || []).length && (
+                      <p className="px-3 py-1.5 text-xs text-muted-foreground">ยังไม่มี Sub PLO</p>
+                    )}
                   </div>
-                  <Textarea
-                    className="min-h-[38px] text-sm"
-                    placeholder={cell.active ? "คำอธิบาย PLO สำหรับชั้นปีนี้..." : "-"}
-                    value={cell.description}
-                    disabled={!cell.active}
-                    onChange={(e) => setCell(activeYlo, plo.id, { description: e.target.value })}
-                  />
                 </div>
-              );
-            })}
-          </div>
-        </div>
+              ))}
+            </div>
+
+            <div className="rounded-md border border-dashed p-3 space-y-2">
+              <Label className="text-xs font-semibold">เพิ่ม Sub PLO ใหม่ (ระบบกำหนดรหัสให้อัตโนมัติ)</Label>
+              <div className="flex flex-wrap items-center gap-2">
+                <Select value={newSub.plo} onValueChange={(v) => setNewSub({ ...newSub, plo: v })}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue placeholder="เลือก PLO" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ploCatalog.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>{p.id}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Badge variant="outline" className="h-9 px-3 text-sm font-semibold">
+                  {pendingCode || "รหัสอัตโนมัติ"}
+                </Badge>
+                <Input
+                  className="flex-1 min-w-[180px]"
+                  placeholder="คำอธิบาย..."
+                  value={newSub.description}
+                  onChange={(e) => setNewSub({ ...newSub, description: e.target.value })}
+                />
+                <Button size="sm" onClick={addSub} disabled={!newSub.plo} className="gap-1">
+                  <Plus className="h-4 w-4" /> เพิ่ม
+                </Button>
+              </div>
+            </div>
+          </>
+        )}
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>ยกเลิก</Button>
@@ -301,7 +465,12 @@ export default function CLOPage() {
       try {
         const res = await api.get('/index.php?page=get-subjects');
         if (res.data.status === 'success') {
-          setCourses(res.data.data);
+          const list: Course[] = res.data.data || [];
+          setCourses(list);
+          // เลือกวิชาแรกอัตโนมัติ เพื่อให้ matrix/catalog โหลดก่อนเปิด dialog "แก้ไข YLO"
+          if (list.length > 0) {
+            setSelectedCourse((prev) => prev || `${list[0].subject_id}`);
+          }
         }
       } catch {
         toast({ title: "ข้อผิดพลาด", description: "ดึงข้อมูลรายวิชาไม่สำเร็จ", variant: "destructive" });
@@ -574,13 +743,13 @@ export default function CLOPage() {
                               {clo.clo_code || `CLO ${index + 1}`}
                             </Badge>
                             {clo.ylo_id && <Badge variant="secondary">{clo.ylo_id}</Badge>}
-                            {(clo.mapped_plos || []).map((plo) => (
+                            {sortPloCodes(clo.mapped_plos || []).map((plo) => (
                               <Badge key={plo} variant="outline">{plo}</Badge>
                             ))}
                           </div>
                           {(clo.sub_plos || []).length > 0 && (
                             <div className="flex flex-wrap items-center gap-2">
-                              {(clo.sub_plos || []).map((sub) => (
+                              {sortSubCodes(clo.sub_plos || []).map((sub) => (
                                 <Badge
                                   key={sub}
                                   variant="outline"
@@ -689,6 +858,7 @@ export default function CLOPage() {
         onOpenChange={setYloEditorOpen}
         yloMatrix={yloMatrix}
         ploCatalog={ploCatalog}
+        subPloCatalog={subPloCatalog}
         onSaved={() => fetchCLOs(false)}
       />
     </div>

@@ -150,6 +150,9 @@
             case 'save-ylo-matrix':
                 require_once 'components/Teacher/CLOPage/save_ylo_matrix.php';
                 break;
+            case 'save-sub-plo-catalog':
+                require_once 'components/Teacher/CLOPage/save_sub_plo_catalog.php';
+                break;
             case 'migrate-mapping-json-to-tables':
                 require_once 'components/Teacher/CLOPage/migrate_mapping_json_to_tables.php';
                 break;

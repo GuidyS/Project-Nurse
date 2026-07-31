@@ -176,6 +176,18 @@ function getPloCatalogFromTables(PDO $pdo, int $frameworkId): array
     return $out;
 }
 
+// subPloCodeOrder() / sortSubPloCodes() นิยามไว้ที่ clo_mapping_helpers.php (ใช้ร่วมกันทั้ง 2 เส้นทาง)
+require_once __DIR__ . '/clo_mapping_helpers.php';
+
+function sortPloCodes(array $codes): array
+{
+    $codes = array_values(array_unique(array_map('strval', $codes)));
+    usort($codes, function ($a, $b) {
+        return ((int)preg_replace('/\D/', '', $a)) <=> ((int)preg_replace('/\D/', '', $b));
+    });
+    return $codes;
+}
+
 function getSubPloCatalogFromTables(PDO $pdo, int $frameworkId): array
 {
     $stmt = $pdo->prepare(
@@ -194,6 +206,13 @@ function getSubPloCatalogFromTables(PDO $pdo, int $frameworkId): array
             'description' => (string)($row['description'] ?? ''),
         ];
     }
+
+    // เรียงตาม PLO แม่ แล้วตามเลข Sub PLO
+    usort($out, function ($a, $b) {
+        $ploDiff = ((int)preg_replace('/\D/', '', $a['plo'])) <=> ((int)preg_replace('/\D/', '', $b['plo']));
+        return $ploDiff !== 0 ? $ploDiff : (subPloCodeOrder($a['code']) <=> subPloCodeOrder($b['code']));
+    });
+
     return $out;
 }
 
@@ -297,9 +316,10 @@ function listAllClosDetailed(PDO $pdo, int $frameworkId): array
 
     foreach ($clos as &$clo) {
         $cid = (int)$clo['id'];
-        $clo['mapped_plos'] = $plosByClo[$cid] ?? [];
+        // เรียงเลขให้เรียบร้อยก่อนส่งออก (ไม่ให้รายการใหม่ไปต่อท้ายแบบไม่เรียง)
+        $clo['mapped_plos'] = sortPloCodes($plosByClo[$cid] ?? []);
         $clo['plo_weights'] = $weightsByClo[$cid] ?? [];
-        $clo['sub_plos'] = $subsByClo[$cid] ?? [];
+        $clo['sub_plos'] = sortSubPloCodes($subsByClo[$cid] ?? []);
     }
     unset($clo);
 

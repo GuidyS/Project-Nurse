@@ -82,6 +82,24 @@ try {
 
         $permissions = $perm_stmt->fetchAll(PDO::FETCH_COLUMN);
 
+        // Fallback: ผู้ใช้ที่ยังไม่ถูกกำหนดตำแหน่งใน user_position จะได้สิทธิ์ว่าง
+        // ทำให้เมนู/ปุ่มหายทั้งหมด -> ใช้สิทธิ์ของตำแหน่งที่ตรงกับ role แทน (อ่านอย่างเดียว ไม่แก้ข้อมูล)
+        if (empty($permissions)) {
+            $roleToPosition = [3 => 'นักศึกษา', 2 => 'อาจารย์ประจำ', 1 => 'เลขา'];
+            $roleId = (int)$user['role_id'];
+            if (isset($roleToPosition[$roleId])) {
+                $fallback_stmt = $db->prepare(
+                    "SELECT DISTINCT p.permission_name
+                     FROM permissions p
+                     JOIN position_permission pp ON p.permission_id = pp.permission_id
+                     JOIN position pos ON pos.position_id = pp.position_id
+                     WHERE pos.position_name = :position_name"
+                );
+                $fallback_stmt->execute([':position_name' => $roleToPosition[$roleId]]);
+                $permissions = $fallback_stmt->fetchAll(PDO::FETCH_COLUMN);
+            }
+        }
+
         session_regenerate_id(true);
         $_SESSION['permissions'] = $permissions;
         $_SESSION['user_id'] = $user['user_id'];

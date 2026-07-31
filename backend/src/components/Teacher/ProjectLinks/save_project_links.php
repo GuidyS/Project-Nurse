@@ -5,8 +5,8 @@ if (session_status() === PHP_SESSION_NONE) session_start();
 $possible_paths = [
     __DIR__ . '/config/config.php',
     __DIR__ . '/../config/config.php',
-    __DIR__ . '/../../config/config.php',
-    __DIR__ . '/../../../config/config.php'
+    __DIR__ . '/../../../config/config.php',
+    __DIR__ . '/../../../../config/config.php'
 ];
 foreach ($possible_paths as $path) {
     if (file_exists($path)) {

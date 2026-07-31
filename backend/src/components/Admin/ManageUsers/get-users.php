@@ -2,8 +2,26 @@
 require_once __DIR__ . '/../../../config/config.php';
 header("Content-Type: application/json");
 
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+if (!isset($_SESSION['user_id'])) {
+    http_response_code(401);
+    echo json_encode(["status" => "error", "message" => "Unauthorized"]);
+    exit();
+}
+
 try {
     $db = new Connect();
+
+    // เฉพาะ admin (role_id = 1) เท่านั้น — กันข้อมูลผู้ใช้รั่วไป role อื่น
+    $roleStmt = $db->prepare("SELECT role_id FROM users WHERE user_id = ?");
+    $roleStmt->execute([$_SESSION['user_id']]);
+    if ((int)$roleStmt->fetchColumn() !== 1) {
+        http_response_code(403);
+        echo json_encode(["status" => "error", "message" => "ไม่มีสิทธิ์เข้าถึงข้อมูลผู้ใช้"], JSON_UNESCAPED_UNICODE);
+        exit();
+    }
     
     // ดึงข้อมูลผู้ใช้ พร้อมชื่อจากตาราง faculty หรือ student และตำแหน่งปัจจุบัน
     $sql = "SELECT u.user_id as id, u.username, u.role_id, u.created_at,
