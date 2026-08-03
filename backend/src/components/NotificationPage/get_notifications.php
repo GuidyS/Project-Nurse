@@ -14,6 +14,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
 
+// สร้างตารางเก็บ "ใบที่ผู้ใช้ลบออกจากรายการตัวเอง" ถ้ายังไม่มี (ครั้งแรกเท่านั้น)
+require_once __DIR__ . '/notification_hidden_helper.php';
+ensureNotificationHiddenTable($pdo);
+
 try {
     if (!isset($_SESSION['user_id'])) {
         http_response_code(401);
@@ -63,13 +67,19 @@ try {
             LEFT JOIN faculty f_sender ON CAST(sender_u.username AS CHAR) = f_sender.faculty_id
             LEFT JOIN student s_sender ON CAST(sender_u.username AS UNSIGNED) = s_sender.student_id
             
-            WHERE n.user_id = :filter_user_id OR n.sender_user_id = :filter_user_id
+            WHERE (n.user_id = :filter_user_id OR n.sender_user_id = :filter_user_id)
+              -- ไม่แสดงใบที่ผู้ใช้คนนี้ลบออกจากรายการของตัวเองแล้ว (อีกฝ่ายยังเห็นอยู่)
+              AND NOT EXISTS (
+                    SELECT 1 FROM notification_hidden nh
+                    WHERE nh.notification_id = n.notification_id AND nh.user_id = :hidden_user_id
+              )
             ORDER BY n.created_at DESC";
 
     $stmt = $pdo->prepare($sql);
     $stmt->execute([
         ':current_user_id' => $user_id,
         ':filter_user_id' => $user_id,
+        ':hidden_user_id' => $user_id,
     ]);
     $notifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
 

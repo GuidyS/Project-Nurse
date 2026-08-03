@@ -3,14 +3,15 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Download, TrendingUp, TrendingDown, Minus, BarChart3, FileText, Loader2, AlertCircle } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { Download, TrendingUp, TrendingDown, Minus, BarChart3, FileText, Loader2, AlertCircle, Search } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, BarChart, Bar } from 'recharts';
 import api from '@/lib/axios';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable'; // ใช้การ import แบบนี้เพื่อหลีกเลี่ยงการใช้ (doc as any)
+import { Input } from '@/components/ui/input';
 
 interface YearlyDataItem {
   year: string;
@@ -55,6 +56,7 @@ export default function FiveYearSummary() {
   const [selectedProgram, setSelectedProgram] = useState('all');
   const [yearlyData, setYearlyData] = useState<YearlyDataItem[]>([]);
   const [courseData, setCourseData] = useState<CourseDataItem[]>([]);
+  const [courseSearch, setCourseSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -100,6 +102,16 @@ export default function FiveYearSummary() {
   }, []);
 
   const years = yearlyData.map(d => d.year);
+
+  const filteredCourseData = useMemo(() => {
+    const q = courseSearch.trim().toLowerCase();
+    if (!q) return courseData;
+    return courseData.filter(
+      (c) =>
+        String(c.code ?? '').toLowerCase().includes(q) ||
+        String(c.name ?? '').toLowerCase().includes(q)
+    );
+  }, [courseData, courseSearch]);
 
   const handleExport = (format: string) => {
     if (format === 'excel') {
@@ -384,55 +396,70 @@ export default function FiveYearSummary() {
         </div>
 
         <Card>
-          <CardHeader>
-            <CardTitle>สรุปผลรายวิชา 5 ปี</CardTitle>
-            <CardDescription>เกรดเฉลี่ยรายวิชาย้อนหลัง 5 ปี</CardDescription>
+          <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between space-y-0">
+            <div className="space-y-1.5">
+              <CardTitle>สรุปผลรายวิชา 5 ปี</CardTitle>
+              <CardDescription>เกรดเฉลี่ยรายวิชาย้อนหลัง 5 ปี</CardDescription>
+            </div>
+            <div className="relative w-full sm:w-64 shrink-0">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={courseSearch}
+                onChange={(e) => setCourseSearch(e.target.value)}
+                placeholder="ค้นหารหัส / ชื่อวิชา..."
+                className="pl-9"
+              />
+            </div>
           </CardHeader>
           <CardContent>
             {courseData.length === 0 ? (
               <div className="text-center py-6 text-muted-foreground">ไม่พบรายวิชาที่สอนในฐานข้อมูลหลักสูตรที่เลือก</div>
+            ) : filteredCourseData.length === 0 ? (
+              <div className="text-center py-6 text-muted-foreground">ไม่พบรายวิชาที่ตรงกับคำค้นหา</div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>รหัสวิชา</TableHead>
-                    <TableHead>ชื่อวิชา</TableHead>
-                    {years.map((y) => (
-                      <TableHead key={y} className="text-center">{y}</TableHead>
-                    ))}
-                    <TableHead className="text-center">แนวโน้ม</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {courseData.map((course) => (
-                    <TableRow key={course.code}>
-                      <TableCell className="font-medium">{course.code}</TableCell>
-                      <TableCell>{course.name}</TableCell>
+              <div className="max-h-[28rem] overflow-auto modern-scrollbar rounded-md border">
+                <Table>
+                  <TableHeader className="sticky top-0 z-10 bg-card [&_tr]:border-b">
+                    <TableRow>
+                      <TableHead>รหัสวิชา</TableHead>
+                      <TableHead>ชื่อวิชา</TableHead>
                       {years.map((y) => (
-                        <TableCell key={y} className="text-center">
-                          {Number(course['y' + y] || 0).toFixed(2)}
-                        </TableCell>
+                        <TableHead key={y} className="text-center">{y}</TableHead>
                       ))}
-                      <TableCell className="text-center">
-                        <div className="flex items-center justify-center gap-1">
-                          {getTrendIcon(course.trend)}
-                          <Badge
-                            variant={
-                              course.trend === 'up'
-                                ? 'default'
-                                : course.trend === 'down'
-                                ? 'destructive'
-                                : 'secondary'
-                            }
-                          >
-                            {course.trend === 'up' ? 'ดีขึ้น' : course.trend === 'down' ? 'ลดลง' : 'คงที่'}
-                          </Badge>
-                        </div>
-                      </TableCell>
+                      <TableHead className="text-center">แนวโน้ม</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredCourseData.map((course) => (
+                      <TableRow key={course.code}>
+                        <TableCell className="font-medium">{course.code}</TableCell>
+                        <TableCell>{course.name}</TableCell>
+                        {years.map((y) => (
+                          <TableCell key={y} className="text-center">
+                            {Number(course['y' + y] || 0).toFixed(2)}
+                          </TableCell>
+                        ))}
+                        <TableCell className="text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            {getTrendIcon(course.trend)}
+                            <Badge
+                              variant={
+                                course.trend === 'up'
+                                  ? 'default'
+                                  : course.trend === 'down'
+                                  ? 'destructive'
+                                  : 'secondary'
+                              }
+                            >
+                              {course.trend === 'up' ? 'ดีขึ้น' : course.trend === 'down' ? 'ลดลง' : 'คงที่'}
+                            </Badge>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             )}
           </CardContent>
         </Card>

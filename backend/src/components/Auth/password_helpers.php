@@ -39,31 +39,21 @@ function authPasswordNeedsRehash(string $hash): bool
  */
 function validatePasswordPolicy(string $password): ?string
 {
-    if (strlen($password) < 12) {
-        return 'รหัสผ่านต้องมีอย่างน้อย 12 ตัวอักษร';
-    }
-
-    if (!preg_match('/[A-Za-zก-๙]/u', $password) || !preg_match('/[0-9]/', $password)) {
-        return 'รหัสผ่านต้องมีทั้งตัวอักษรและตัวเลข';
-    }
-
-    if (preg_match('/^(.)\1+$/u', $password)) {
-        return 'รหัสผ่านต้องไม่เป็นตัวอักษรซ้ำทั้งหมด';
+    if (strlen($password) < 8) {
+        return 'รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร';
     }
 
     $normalized = strtolower($password);
     $weak = [
-        '123456789012',
-        '1234567890123',
-        'password1234',
-        'password12345',
-        'qwerty123456',
-        'abcdefghijk1',
-        '111111111111',
-        '000000000000',
-        'admin1234567',
-        'welcome12345',
-        'nurse1234567',
+        '12345678',
+        'password',
+        'qwerty12',
+        'abcdefgh',
+        '11111111',
+        '00000000',
+        'admin123',
+        'welcome1',
+        'nurse123',
     ];
     if (in_array($normalized, $weak, true)) {
         return 'รหัสผ่านนี้เดาง่ายเกินไป กรุณาตั้งรหัสที่ซับซ้อนกว่านี้';

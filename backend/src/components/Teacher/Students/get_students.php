@@ -1,6 +1,7 @@
 <?php
 if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/../CLOPage/curriculum_repository.php';
 
 header("Access-Control-Allow-Origin: http://localhost:5173");
 header("Access-Control-Allow-Credentials: true");
@@ -28,14 +29,14 @@ try {
         exit();
     }
 
-    // 2. หา subject_codes จาก framework
-    $stmt_fw = $db->query("SELECT mapping_json FROM curriculum_framework WHERE is_active = 1 LIMIT 1");
-    $row_fw = $stmt_fw->fetch(PDO::FETCH_ASSOC);
-    $mappingData = $row_fw ? json_decode($row_fw['mapping_json'], true) : [];
-
+    // 2. หา subject_codes จาก curriculum relational / fallback JSON
+    $frameworkId = getActiveFrameworkId($db);
     $my_subject_codes = [];
-    if (isset($mappingData['subject_mappings'])) {
-        foreach ($mappingData['subject_mappings'] as $code => $data) {
+    if ($frameworkId && curriculumTablesReady($db) && curriculumHasRelationalData($db, $frameworkId)) {
+        $my_subject_codes = getInstructorSubjectCodes($db, $frameworkId, (string)$faculty_id);
+    } else {
+        $mappingData = loadActiveMappingData($db);
+        foreach ($mappingData['subject_mappings'] ?? [] as $code => $data) {
             if (isset($data['instructor_id']) && $data['instructor_id'] == $faculty_id) {
                 $my_subject_codes[] = $code;
             }

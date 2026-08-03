@@ -1,6 +1,7 @@
 <?php
 if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/../CLOPage/curriculum_repository.php';
 
 header("Access-Control-Allow-Origin: http://localhost:5173");
 header("Access-Control-Allow-Credentials: true");
@@ -25,13 +26,13 @@ try {
 
     // 💡 [กรณีที่ 1] ไม่ได้ส่ง subject_id มา -> ให้คิวรีรายวิชาทั้งหมดที่อาจารย์คนนี้รับผิดชอบก่อน
     if (!$subject_id) {
-        $stmt_fw = $db->query("SELECT mapping_json FROM curriculum_framework WHERE is_active = 1 LIMIT 1");
-        $row_fw = $stmt_fw->fetch(PDO::FETCH_ASSOC);
-        $mappingData = $row_fw ? json_decode($row_fw['mapping_json'], true) : [];
-
+        $frameworkId = getActiveFrameworkId($db);
         $my_subject_codes = [];
-        if (isset($mappingData['subject_mappings'])) {
-            foreach ($mappingData['subject_mappings'] as $code => $data) {
+        if ($frameworkId && curriculumTablesReady($db) && curriculumHasRelationalData($db, $frameworkId)) {
+            $my_subject_codes = getInstructorSubjectCodes($db, $frameworkId, (string)$my_faculty_id);
+        } else {
+            $mappingData = loadActiveMappingData($db);
+            foreach ($mappingData['subject_mappings'] ?? [] as $code => $data) {
                 if (isset($data['instructor_id']) && $data['instructor_id'] == $my_faculty_id) {
                     $my_subject_codes[] = $code;
                 }
@@ -59,13 +60,16 @@ try {
     $subject_code = $stmt_subject->fetchColumn();
 
     $clo_headers = [];
-    $stmt_fw = $db->query("SELECT mapping_json FROM curriculum_framework WHERE is_active = 1 LIMIT 1");
-    $row_fw = $stmt_fw->fetch(PDO::FETCH_ASSOC);
-    if ($row_fw && !empty($row_fw['mapping_json'])) {
-        $data = json_decode($row_fw['mapping_json'], true);
+    $frameworkId = getActiveFrameworkId($db);
+    if ($frameworkId && curriculumTablesReady($db) && curriculumHasRelationalData($db, $frameworkId)) {
+        foreach (listClosBySubjectCode($db, $frameworkId, (string)$subject_code) as $clo) {
+            $clo_headers[] = $clo['clo_code'] ?? $clo['code'] ?? $clo['clo_id'];
+        }
+    } else {
+        $data = loadActiveMappingData($db);
         $subject_clos = $data['subject_mappings'][$subject_code]['clos'] ?? [];
         foreach ($subject_clos as $clo) {
-            $clo_headers[] = $clo['id'] ?? $clo['code'] ?? $clo['clo_id']; 
+            $clo_headers[] = $clo['id'] ?? $clo['code'] ?? $clo['clo_id'];
         }
     }
 

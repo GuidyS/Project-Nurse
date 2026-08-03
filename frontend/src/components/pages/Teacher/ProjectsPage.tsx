@@ -22,6 +22,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
+import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
 
 // โครงสร้างข้อมูลที่ตรงกับฐานข้อมูลจริง
 interface Project {
@@ -37,6 +38,9 @@ const ProjectsPage = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // States สำหรับจัดการ Modal เพิ่มและแก้ไข
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -123,17 +127,27 @@ const ProjectsPage = () => {
   };
 
   // 5. ลบโครงการ (Delete)
-  const handleDeleteProject = async (id: number) => {
-    if (!confirm("คุณแน่ใจหรือไม่ว่าต้องการลบโครงการนี้? ข้อมูลที่เกี่ยวข้องอาจถูกลบไปด้วย")) return;
+  const openDeleteConfirm = (id: number) => {
+    setPendingDeleteId(id);
+    setIsConfirmOpen(true);
+  };
 
+  const handleDeleteProject = async () => {
+    if (pendingDeleteId == null) return;
+
+    setIsDeleting(true);
     try {
-      const res = await api.post("/index.php?page=delete-project", { project_id: id });
+      const res = await api.post("/index.php?page=delete-project", { project_id: pendingDeleteId });
       if (res.data.status === "success") {
         toast({ title: "ลบสำเร็จ", description: "ลบโครงการออกจากระบบแล้ว" });
+        setIsConfirmOpen(false);
+        setPendingDeleteId(null);
         fetchProjects();
       }
     } catch (error: any) {
       toast({ title: "ข้อผิดพลาด", description: "ไม่สามารถลบโครงการได้ อาจมีการใช้งานอยู่", variant: "destructive" });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -142,7 +156,7 @@ const ProjectsPage = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">จัดการโครงการ</h1>
+          <h1 className="text-3xl font-bold text-foreground">จัดการโครงการ</h1>
           <p className="text-muted-foreground mt-1">สร้าง แก้ไข และติดตามความคืบหน้าโครงการภาควิชา</p>
         </div>
         <Button className="gap-2" onClick={handleOpenCreateModal}>
@@ -214,7 +228,7 @@ const ProjectsPage = () => {
                       <Link2 className="h-4 w-4 text-purple-500" /> เชื่อมโยงระดับ LO
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem className="gap-2 text-red-600 focus:bg-red-50" onClick={() => handleDeleteProject(project.project_id)}>
+                    <DropdownMenuItem className="gap-2 text-red-600 focus:bg-red-50" onClick={() => openDeleteConfirm(project.project_id)}>
                       <Trash2 className="h-4 w-4" /> ลบโครงการ
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -288,6 +302,18 @@ const ProjectsPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmActionDialog
+        open={isConfirmOpen}
+        onOpenChange={(open) => {
+          setIsConfirmOpen(open);
+          if (!open) setPendingDeleteId(null);
+        }}
+        title="ยืนยันการลบ"
+        description="คุณแน่ใจหรือไม่ว่าต้องการลบโครงการนี้? ข้อมูลที่เกี่ยวข้องอาจถูกลบไปด้วย"
+        onConfirm={handleDeleteProject}
+        isLoading={isDeleting}
+      />
     </div>
   );
 };

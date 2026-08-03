@@ -11,6 +11,17 @@ function normalizeYearKeyFromYlo(?string $yloId): ?string
 
 function derivePlosFromYlo(array $mappingData, ?string $yloId): array
 {
+    // ใช้ ylo_plo_matrix (แก้ไขได้จากหน้า "แก้ไข YLO") เป็นแหล่งหลัก
+    if ($yloId && !empty($mappingData['ylo_plo_matrix'][$yloId]) && is_array($mappingData['ylo_plo_matrix'][$yloId])) {
+        $plos = [];
+        foreach ($mappingData['ylo_plo_matrix'][$yloId] as $ploId => $info) {
+            if (!empty($info['active'])) {
+                $plos[] = (string)$ploId;
+            }
+        }
+        return $plos;
+    }
+
     $yearKey = normalizeYearKeyFromYlo($yloId);
     if (!$yearKey) {
         return [];
@@ -78,6 +89,88 @@ function getPloCatalog(array $mappingData): array
     }
 
     return $plos;
+}
+
+// เรียงรหัส Sub PLO ตามตัวเลข (1.2 มาก่อน 1.10 และ 2.1) — ใช้ร่วมกับฝั่ง mapping_json
+if (!function_exists('subPloCodeOrder')) {
+    function subPloCodeOrder(string $code): int
+    {
+        if (preg_match('/^(\d+)\.(\d+)$/', trim($code), $m)) {
+            return ((int)$m[1]) * 1000 + (int)$m[2];
+        }
+        return PHP_INT_MAX;
+    }
+}
+
+if (!function_exists('sortSubPloCodes')) {
+    function sortSubPloCodes(array $codes): array
+    {
+        $codes = array_values(array_unique(array_map('strval', $codes)));
+        usort($codes, function ($a, $b) {
+            $diff = subPloCodeOrder($a) <=> subPloCodeOrder($b);
+            return $diff !== 0 ? $diff : strcmp($a, $b);
+        });
+        return $codes;
+    }
+}
+
+function getSubPloCatalog(array $mappingData): array
+{
+    $catalog = [];
+    foreach (($mappingData['sub_plo_catalog'] ?? []) as $sub) {
+        if (empty($sub['code']) || empty($sub['plo'])) {
+            continue;
+        }
+        $catalog[] = [
+            'code' => (string)$sub['code'],
+            'plo' => (string)$sub['plo'],
+            'description' => (string)($sub['description'] ?? ''),
+        ];
+    }
+
+    // Fallback: derive from nested plos[].sub_plos when top-level catalog missing
+    if (empty($catalog)) {
+        foreach (($mappingData['plos'] ?? []) as $plo) {
+            $ploCode = (string)($plo['plo_id'] ?? $plo['id'] ?? '');
+            if ($ploCode === '') {
+                continue;
+            }
+            foreach ($plo['sub_plos'] ?? [] as $sub) {
+                $code = (string)($sub['id'] ?? $sub['code'] ?? '');
+                if ($code === '') {
+                    continue;
+                }
+                $catalog[] = [
+                    'code' => $code,
+                    'plo' => $ploCode,
+                    'description' => (string)($sub['desc'] ?? $sub['description'] ?? ''),
+                ];
+            }
+        }
+    }
+
+    return $catalog;
+}
+
+// กรอง sub_plos ให้เหลือเฉพาะตัวที่ PLO แม่อยู่ในชุด PLO ที่ derive จาก YLO (กติกา: บล็อก Sub นอก YLO)
+function filterSubPlosByAllowedPlos(array $mappingData, ?array $subPlos, array $allowedPlos): array
+{
+    if (!is_array($subPlos)) {
+        return [];
+    }
+    $parentByCode = [];
+    foreach (getSubPloCatalog($mappingData) as $sub) {
+        $parentByCode[$sub['code']] = $sub['plo'];
+    }
+    $allowed = array_flip($allowedPlos);
+    $result = [];
+    foreach ($subPlos as $code) {
+        $code = (string)$code;
+        if (isset($parentByCode[$code]) && isset($allowed[$parentByCode[$code]])) {
+            $result[] = $code;
+        }
+    }
+    return sortSubPloCodes($result);
 }
 
 function mergeCourseMappedPlos(array $subjectData): array

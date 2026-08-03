@@ -1,6 +1,7 @@
 <?php
 if (session_status() === PHP_SESSION_NONE) session_start();
-require_once __DIR__ . '/../../../config/config.php'; 
+require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/../CLOPage/curriculum_repository.php';
 
 header("Access-Control-Allow-Origin: http://localhost:5173");
 header("Access-Control-Allow-Credentials: true");
@@ -13,45 +14,33 @@ $input = json_decode(file_get_contents("php://input"), true);
 try {
     $db = new Connect();
 
-    if (!empty($input['subject_code']) && isset($input['faculty_id'])) {
-        $subject_code = $input['subject_code'];
-        $faculty_id = $input['faculty_id']; 
-        
-        $sql = "SELECT id, mapping_json FROM curriculum_framework WHERE is_active = 1 LIMIT 1";
-        $stmt = $db->query($sql);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
- 
-        if ($row) {
-            $data = json_decode($row['mapping_json'], true);
-            
-            if (!isset($data['subject_mappings'])) $data['subject_mappings'] = [];
-            if (!isset($data['subject_mappings'][$subject_code])) $data['subject_mappings'][$subject_code] = [];
- 
-            $msg = "";
-            if (empty($faculty_id)) {
-                unset($data['subject_mappings'][$subject_code]['instructor_id']);
-                $msg = "ยกเลิกการมอบหมายอาจารย์สำเร็จ";
-            } else {
-                $data['subject_mappings'][$subject_code]['instructor_id'] = $faculty_id;
-                $msg = "มอบหมายอาจารย์สำเร็จ";
-            }
- 
-            $new_json = json_encode($data, JSON_UNESCAPED_UNICODE);
-            
-            $update_sql = "UPDATE curriculum_framework SET mapping_json = :json WHERE id = :id";
-            $update_stmt = $db->prepare($update_sql);
-            $update_stmt->execute([
-                ':json' => $new_json,
-                ':id' => $row['id']
-            ]);
- 
-            echo json_encode(["status" => "success", "message" => $msg]);
-        } else {
-            echo json_encode(["status" => "error", "message" => "ไม่พบหลักสูตรที่เปิดใช้งาน"]);
-        }
-    } else {
+    if (empty($input['subject_code']) || !isset($input['faculty_id'])) {
         echo json_encode(["status" => "error", "message" => "ข้อมูลไม่ครบถ้วน"]);
+        exit();
     }
+
+    $subject_code = $input['subject_code'];
+    $faculty_id = $input['faculty_id'];
+
+    $frameworkId = getActiveFrameworkId($db);
+    if (!$frameworkId) {
+        echo json_encode(["status" => "error", "message" => "ไม่พบหลักสูตรที่เปิดใช้งาน"]);
+        exit();
+    }
+
+    if (!curriculumTablesReady($db) || !curriculumHasRelationalData($db, $frameworkId)) {
+        http_response_code(503);
+        echo json_encode([
+            "status" => "error",
+            "message" => "ยังไม่ได้ migrate ข้อมูลหลักสูตรไปตาราง relational",
+        ], JSON_UNESCAPED_UNICODE);
+        exit();
+    }
+
+    $msg = empty($faculty_id) ? "ยกเลิกการมอบหมายอาจารย์สำเร็จ" : "มอบหมายอาจารย์สำเร็จ";
+    setSubjectInstructor($db, $frameworkId, (string)$subject_code, empty($faculty_id) ? null : (string)$faculty_id);
+
+    echo json_encode(["status" => "success", "message" => $msg]);
 } catch (Exception $e) {
     http_response_code(500);
     echo json_encode(["status" => "error", "message" => $e->getMessage()]);

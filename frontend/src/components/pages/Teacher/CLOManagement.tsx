@@ -42,7 +42,7 @@ interface CloFormState {
 const EMPTY_CLO: CloFormState = { code: '', description: '', plo_weights: {} };
 
 function sumPloWeights(ploWeights: Record<string, number | string>): number {
-  return Object.values(ploWeights).reduce((sum, value) => sum + (Number(value) || 0), 0);
+  return Object.values(ploWeights).reduce<number>((sum, value) => sum + (Number(value) || 0), 0);
 }
 
 function getDisplayPloBadges(

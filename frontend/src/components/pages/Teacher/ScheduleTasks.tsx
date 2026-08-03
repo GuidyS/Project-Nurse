@@ -12,6 +12,7 @@ import { CalendarDays, Plus, Clock, CheckCircle, AlertTriangle, Search, Loader2 
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/axios';
+import { ConfirmActionDialog } from '@/components/ui/ConfirmActionDialog';
 
 // Interfaces สำหรับ TypeScript
 interface Task {
@@ -58,7 +59,10 @@ export default function ScheduleTasks() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
-  
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const [newTask, setNewTask] = useState({
     studentId: '',
     task: '',
@@ -152,19 +156,29 @@ export default function ScheduleTasks() {
   };
 
   // 4. ฟังก์ชันลบงาน
-  const handleDeleteTask = async (taskId: string) => {
-    if (!window.confirm("คุณแน่ใจหรือไม่ว่าต้องการลบงานนี้?")) return;
-    
+  const openDeleteConfirm = (taskId: string) => {
+    setPendingDeleteId(taskId);
+    setIsConfirmOpen(true);
+  };
+
+  const handleDeleteTask = async () => {
+    if (!pendingDeleteId) return;
+
+    setIsDeleting(true);
     try {
-      const response = await api.post('/index.php?page=delete-schedule-task', { id: taskId });
+      const response = await api.post('/index.php?page=delete-schedule-task', { id: pendingDeleteId });
       if (response.data.status === 'success') {
         toast({ title: 'สำเร็จ', description: 'ลบงานเรียบร้อยแล้ว' });
-        fetchTasksData(); // โหลดข้อมูลตารางใหม่
+        setIsConfirmOpen(false);
+        setPendingDeleteId(null);
+        fetchTasksData();
       } else {
         toast({ title: 'ข้อผิดพลาด', description: response.data.message || 'ไม่สามารถลบงานได้', variant: 'destructive' });
       }
     } catch (error) {
       toast({ title: 'ข้อผิดพลาด', description: 'เกิดข้อผิดพลาดในการลบงาน', variant: 'destructive' });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -355,7 +369,7 @@ export default function ScheduleTasks() {
                         <TableCell>
                           <div className="flex gap-2">
                             <Button variant="outline" size="sm" onClick={() => handleEditClick(task)}>แก้ไข</Button>
-                            <Button variant="destructive" size="sm" onClick={() => handleDeleteTask(task.id)}>ลบ</Button>
+                            <Button variant="destructive" size="sm" onClick={() => openDeleteConfirm(task.id)}>ลบ</Button>
                             {task.status !== 'completed' && (
                               <Button size="sm" onClick={() => handleCompleteTask(task.id)}>เสร็จสิ้น</Button>
                             )}
@@ -374,6 +388,18 @@ export default function ScheduleTasks() {
           </CardContent>
         </Card>
       </div>
+
+      <ConfirmActionDialog
+        open={isConfirmOpen}
+        onOpenChange={(open) => {
+          setIsConfirmOpen(open);
+          if (!open) setPendingDeleteId(null);
+        }}
+        title="ยืนยันการลบ"
+        description="คุณแน่ใจหรือไม่ว่าต้องการลบงานนี้?"
+        onConfirm={handleDeleteTask}
+        isLoading={isDeleting}
+      />
     </>
   );
 }

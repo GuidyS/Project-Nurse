@@ -4,6 +4,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 require_once __DIR__ . '/../CLOPage/clo_mapping_helpers.php';
+require_once __DIR__ . '/../CLOPage/curriculum_repository.php';
 
 $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -20,25 +21,33 @@ try {
     $stmt_subjects->execute();
     $courses = $stmt_subjects->fetchAll(PDO::FETCH_ASSOC);
 
-    $sql_framework = "SELECT mapping_json FROM curriculum_framework WHERE is_active = 1 LIMIT 1";
-    $stmt_framework = $pdo->query($sql_framework);
-    $row_framework = $stmt_framework->fetch(PDO::FETCH_ASSOC);
-
+    $frameworkId = getActiveFrameworkId($pdo);
     $plos = [];
     $cloMap = [];
 
-    if ($row_framework && !empty($row_framework['mapping_json'])) {
-        $data = json_decode($row_framework['mapping_json'], true);
-        if (!is_array($data)) {
-            $data = [];
+    if ($frameworkId && curriculumTablesReady($pdo) && curriculumHasRelationalData($pdo, $frameworkId)) {
+        $plos = listPloCodes($pdo, $frameworkId);
+        $coursePlos = getCoursePloMap($pdo, $frameworkId);
+        $allClos = listAllClosDetailed($pdo, $frameworkId);
+        $closBySubject = [];
+        foreach ($allClos as $clo) {
+            $closBySubject[(string)$clo['subject_code']][] = cloRowToApiArray($clo);
         }
-
+        foreach ($courses as $course) {
+            $code = $course['code'];
+            $subjectData = [
+                'course_plos' => $coursePlos[$code] ?? [],
+                'clos' => $closBySubject[$code] ?? [],
+            ];
+            $cloMap[$code] = mergeCourseMappedPlos($subjectData);
+        }
+    } else {
+        $data = loadActiveMappingData($pdo);
         if (isset($data['plos']) && is_array($data['plos'])) {
             foreach ($data['plos'] as $plo) {
                 $plos[] = $plo['plo_id'] ?? $plo['id'];
             }
         }
-
         if (isset($data['subject_mappings'])) {
             foreach ($courses as $course) {
                 $code = $course['code'];

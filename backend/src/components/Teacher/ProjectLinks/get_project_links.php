@@ -5,8 +5,8 @@ if (session_status() === PHP_SESSION_NONE) session_start();
 $possible_paths = [
     __DIR__ . '/config/config.php',
     __DIR__ . '/../config/config.php',
-    __DIR__ . '/../../config/config.php',
-    __DIR__ . '/../../../config/config.php'
+    __DIR__ . '/../../../config/config.php',
+    __DIR__ . '/../../../../config/config.php'
 ];
 foreach ($possible_paths as $path) {
     if (file_exists($path)) {
@@ -14,6 +14,7 @@ foreach ($possible_paths as $path) {
         break;
     }
 }
+require_once __DIR__ . '/../CLOPage/curriculum_repository.php';
 
 $origin = $_SERVER['HTTP_ORIGIN'] ?? 'http://localhost:5173';
 $allowedOrigins = ['http://localhost:5173', 'http://127.0.0.1:5173'];
@@ -66,9 +67,15 @@ try {
     $ylosByCode = [];
     $closByCode = [];
 
-    $frameworkStmt = $db->query("SELECT mapping_json FROM curriculum_framework WHERE is_active = 1 LIMIT 1");
-    $framework = $frameworkStmt->fetch(PDO::FETCH_ASSOC);
-    $mappingData = $framework && !empty($framework['mapping_json']) ? json_decode($framework['mapping_json'], true) : [];
+    $mappingData = loadActiveMappingData($db);
+    // Keep legacy clos list from raw JSON backup (subject catalog for project links)
+    $fwRow = getActiveFrameworkRow($db);
+    if ($fwRow && !empty($fwRow['mapping_json'])) {
+        $rawJson = json_decode($fwRow['mapping_json'], true);
+        if (is_array($rawJson) && !empty($rawJson['clos'])) {
+            $mappingData['clos'] = $rawJson['clos'];
+        }
+    }
 
     foreach (($mappingData['plos'] ?? []) as $plo) {
         $code = $plo['plo_id'] ?? null;

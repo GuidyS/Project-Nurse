@@ -3,6 +3,8 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+require_once __DIR__ . '/../CLOPage/curriculum_repository.php';
+
 $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
@@ -37,6 +39,7 @@ function normalizeCloForManagement(array $clo, int $fallbackIndex = 0): array
         'description' => $clo['description'] ?? ($clo['clo_description'] ?? ''),
         'mapped_plos' => $mappedPlos,
         'plo_weights' => $ploWeights,
+        'weight' => array_sum($ploWeights),
         'status' => $clo['status'] ?? 'active',
     ];
 }
@@ -54,20 +57,40 @@ try {
         exit();
     }
 
-    $stmt = $pdo->query("SELECT mapping_json FROM curriculum_framework WHERE is_active = 1 LIMIT 1");
-    $row = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    if (!$row) {
+    $frameworkId = getActiveFrameworkId($pdo);
+    if (!$frameworkId) {
         http_response_code(404);
         echo json_encode(["status" => "error", "message" => "ไม่พบโครงสร้างหลักสูตรที่ใช้งานอยู่"]);
         exit();
     }
 
-    $data = !empty($row['mapping_json']) ? json_decode($row['mapping_json'], true) : [];
-    if (!is_array($data)) {
-        $data = [];
+    if (curriculumTablesReady($pdo) && curriculumHasRelationalData($pdo, $frameworkId)) {
+        $rawClos = listClosBySubjectCode($pdo, $frameworkId, (string)$subject_code);
+        $coursePlosMap = getCoursePloMap($pdo, $frameworkId);
+        $coursePlos = array_values($coursePlosMap[(string)$subject_code] ?? []);
+        $plos = [];
+        foreach (getPloCatalogFromTables($pdo, $frameworkId) as $plo) {
+            $plos[] = [
+                'id' => $plo['id'],
+                'name' => $plo['id'] . ' - ' . mb_substr($plo['name'], 0, 50) . '...',
+            ];
+        }
+        $clos = [];
+        foreach ($rawClos as $index => $clo) {
+            $clos[] = normalizeCloForManagement($clo, $index);
+        }
+        echo json_encode([
+            'status' => 'success',
+            'data' => [
+                'clos' => $clos,
+                'plos' => $plos,
+                'course_plos' => $coursePlos,
+            ],
+        ], JSON_UNESCAPED_UNICODE);
+        exit();
     }
 
+    $data = loadActiveMappingData($pdo);
     $rawClos = $data['subject_mappings'][$subject_code]['clos'] ?? [];
     if (empty($rawClos) && !empty($data['course_clos'][$subject_code])) {
         $rawClos = $data['course_clos'][$subject_code];

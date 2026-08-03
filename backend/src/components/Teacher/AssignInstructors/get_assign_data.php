@@ -1,6 +1,7 @@
 <?php
 if (session_status() === PHP_SESSION_NONE) session_start();
-require_once __DIR__ . '/../../../config/config.php'; 
+require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/../CLOPage/curriculum_repository.php'; 
 
 header("Access-Control-Allow-Origin: http://localhost:5173");
 header("Access-Control-Allow-Credentials: true");
@@ -40,19 +41,24 @@ try {
         }
     }
 
-    // 3. ดึงก้อน JSON กลาง 
-    $sql_framework = "SELECT mapping_json FROM curriculum_framework WHERE is_active = 1 LIMIT 1";
-    $stmt_fw = $db->query($sql_framework);
-    $row_fw = $stmt_fw->fetch(PDO::FETCH_ASSOC);
-    $mappingData = $row_fw ? json_decode($row_fw['mapping_json'], true) : [];
+    // 3. instructor assignments from relational tables (fallback JSON)
+    $frameworkId = getActiveFrameworkId($db);
+    $instructorMap = [];
+    if ($frameworkId && curriculumTablesReady($db) && curriculumHasRelationalData($db, $frameworkId)) {
+        $instructorMap = getSubjectInstructorMap($db, $frameworkId);
+    } else {
+        $mappingData = loadActiveMappingData($db);
+        foreach ($mappingData['subject_mappings'] ?? [] as $subjCode => $data) {
+            if (!empty($data['instructor_id'])) {
+                $instructorMap[$subjCode] = $data['instructor_id'];
+            }
+        }
+    }
 
     $instructorCourseCounts = [];
-    if (isset($mappingData['subject_mappings'])) {
-        foreach ($mappingData['subject_mappings'] as $subjCode => $data) {
-            if (!empty($data['instructor_id'])) {
-                $fid = $data['instructor_id'];
-                $instructorCourseCounts[$fid] = ($instructorCourseCounts[$fid] ?? 0) + 1;
-            }
+    foreach ($instructorMap as $fid) {
+        if (!empty($fid)) {
+            $instructorCourseCounts[$fid] = ($instructorCourseCounts[$fid] ?? 0) + 1;
         }
     }
 
@@ -64,7 +70,7 @@ try {
     $courseList = [];
     foreach ($subjects as $s) {
         $code = $s['subject_code'];
-        $instructorId = $mappingData['subject_mappings'][$code]['instructor_id'] ?? null;
+        $instructorId = $instructorMap[$code] ?? null;
         $instructorName = $instructorId ? ($facultyMap[$instructorId] ?? 'ไม่ทราบชื่ออาจารย์') : null;
 
         $courseList[] = [

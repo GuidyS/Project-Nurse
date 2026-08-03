@@ -414,7 +414,7 @@ export default function Reports() {
     <div className="p-6 space-y-6 animate-fade-in">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">รายงานงบประมาณและโครงการ</h1>
+          <h1 className="text-3xl font-bold text-foreground">รายงานงบประมาณและโครงการ</h1>
           <p className="text-muted-foreground">
             ภาพรวมงบแผน โครงการ กิจกรรมย่อย และเอกสารประกอบของคณะพยาบาลศาสตร์
           </p>

@@ -33,6 +33,20 @@ try {
     exit();
 }
 
+// ต้อง login และไม่ใช่นักศึกษา (dashboard ผู้บริหาร/อาจารย์เท่านั้น)
+if (!isset($_SESSION['user_id'])) {
+    http_response_code(401);
+    echo json_encode(["status" => "error", "message" => "Unauthorized"]);
+    exit();
+}
+$roleStmt = $pdo->prepare("SELECT role_id FROM users WHERE user_id = ?");
+$roleStmt->execute([$_SESSION['user_id']]);
+if ((int)$roleStmt->fetchColumn() === 3) {
+    http_response_code(403);
+    echo json_encode(["status" => "error", "message" => "ไม่มีสิทธิ์เข้าถึงหน้านี้"], JSON_UNESCAPED_UNICODE);
+    exit();
+}
+
 try {
     $data = [
         "stats"     => [],

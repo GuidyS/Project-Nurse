@@ -91,10 +91,10 @@ export default function AdvisorNotifications() {
 
   return (
     <>
-      <div className="space-y-6 animate-fade-in">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold tracking-tight">การแจ้งเตือน</h1>
+      <div className="mx-auto min-h-[calc(100vh-5rem)] w-full max-w-7xl animate-fade-in space-y-4 overflow-x-hidden px-3 py-4 sm:space-y-6 sm:px-4 lg:px-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 flex-wrap items-center gap-3">
+            <h1 className="text-xl font-bold tracking-tight sm:text-2xl lg:text-3xl">การแจ้งเตือน</h1>
             {unreadCount > 0 && (
               <Badge className="px-2.5 py-0.5 text-sm font-semibold bg-red-500 text-white animate-pulse rounded-full">
                 {unreadCount} ใหม่
@@ -103,6 +103,7 @@ export default function AdvisorNotifications() {
           </div>
           <Button 
             variant="outline" 
+            className="w-full sm:w-auto"
             onClick={markAllAsRead} 
             disabled={unreadCount === 0 || isProcessing}
           >
@@ -111,12 +112,12 @@ export default function AdvisorNotifications() {
           </Button>
         </div>
 
-        <Card>
+        <Card className="overflow-hidden">
           <CardHeader>
-            <CardTitle>รายการแจ้งเตือนทั้งหมด</CardTitle>
-            <CardDescription>กล่องข้อความติดตามสถานะและคำขอจากนักศึกษาในความดูแล</CardDescription>
+            <CardTitle className="text-lg sm:text-xl">รายการแจ้งเตือนทั้งหมด</CardTitle>
+            <CardDescription className="text-sm">กล่องข้อความติดตามสถานะและคำขอจากนักศึกษาในความดูแล</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3 sm:space-y-4">
             {isLoading ? (
               <div className="flex justify-center py-10"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
             ) : notifications.length === 0 ? (
@@ -127,16 +128,16 @@ export default function AdvisorNotifications() {
               notifications.map((notification) => (
                 <div
                   key={notification.id}
-                  className={`flex items-start gap-4 p-4 rounded-xl border transition-all ${
+                  className={`flex flex-col gap-3 rounded-xl border p-3 transition-all sm:flex-row sm:items-start sm:gap-4 sm:p-4 ${
                     !notification.read ? 'bg-primary/5 border-primary/20 shadow-sm' : 'bg-card text-muted-foreground'
                   }`}
                 >
-                  <div className="mt-1">
+                  <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-muted sm:mt-1">
                     {getNotificationIcon(notification.type)}
                   </div>
-                  <div className="flex-1 space-y-1">
+                  <div className="min-w-0 flex-1 space-y-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <p className={`font-medium ${!notification.read ? 'text-foreground' : 'text-slate-500'}`}>
+                      <p className={`break-words font-medium ${!notification.read ? 'text-foreground' : 'text-slate-500'}`}>
                         {notification.title}
                       </p>
                       {getTypeBadge(notification.type)}
@@ -144,18 +145,18 @@ export default function AdvisorNotifications() {
                         <Badge variant="outline" className="bg-red-50/50 text-red-600 border-red-200 text-[10px] h-5">ใหม่</Badge>
                       )}
                     </div>
-                    <p className="text-sm line-clamp-2">{notification.message}</p>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground pt-1">
+                    <p className="line-clamp-3 break-words text-sm sm:line-clamp-2">{notification.message}</p>
+                    <div className="flex flex-wrap items-center gap-2 pt-1 text-xs text-muted-foreground">
                       <Clock className="h-3 w-3" />
                       <span>{notification.date} เวลา {notification.time} น.</span>
                     </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-shrink-0">
                     {notification.studentId && (
-                      <Button variant="outline" size="sm">ดูโปรไฟล์</Button>
+                      <Button variant="outline" size="sm" className="w-full sm:w-auto">ดูโปรไฟล์</Button>
                     )}
                     {!notification.read && (
-                      <Button size="sm" onClick={() => markAsRead(notification.id)}>
+                      <Button size="sm" className="w-full sm:w-auto" onClick={() => markAsRead(notification.id)}>
                         อ่านแล้ว
                       </Button>
                     )}

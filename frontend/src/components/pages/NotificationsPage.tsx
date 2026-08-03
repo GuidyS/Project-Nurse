@@ -35,6 +35,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
+import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
 
 interface Notification {
   id: number;
@@ -78,6 +79,9 @@ const NotificationsPage = () => {
   const [isSending, setIsSending] = useState(false);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
 
   const unreadCount = notifications.filter(
@@ -141,7 +145,7 @@ const NotificationsPage = () => {
     setNotificationType("info");
     setNotificationCategory(roleId === 1 ? "general" : "student");
     setSelectedRecipients([]);
-    setRecipientSearch
+    setRecipientSearch("");
   };
 
   const loadNotifications = async () => {
@@ -259,14 +263,25 @@ const NotificationsPage = () => {
     }
   };
 
-  const deleteNotification = async (id: number) => {
+  const openDeleteConfirm = (id: number) => {
+    setPendingDeleteId(id);
+    setIsDeleteOpen(true);
+  };
+
+  const deleteNotification = async () => {
+    if (pendingDeleteId == null) return;
+    setIsDeleting(true);
     try {
-      await api.post("/index.php?page=delete-notification", { id });
-      setNotifications((prev) => prev.filter((n) => n.id !== id));
+      await api.post("/index.php?page=delete-notification", { id: pendingDeleteId });
+      setNotifications((prev) => prev.filter((n) => n.id !== pendingDeleteId));
+      setIsDeleteOpen(false);
+      setPendingDeleteId(null);
       toast({ title: "ลบแจ้งเตือนสำเร็จ" });
       window.dispatchEvent(new Event("updateNotificationBadge"));
     } catch (error) {
       toast({ title: "ลบแจ้งเตือนไม่สำเร็จ", variant: "destructive" });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -330,10 +345,7 @@ const NotificationsPage = () => {
       setIsDialogOpen(false);
       resetForm();
       toast({
-        title: "ส่งการแจ้งเตือนสำเร็จ",
-        description: skipped > 0
-          ? `ส่งสำเร็จ ${sent} คน และข้าม ${skipped} คนตามการตั้งค่าผู้รับ`
-          : `ส่งแจ้งเตือนไปยังนักศึกษา ${sent} คนแล้ว`,
+        title: "ส่งการแจ้งเตือนสำเร็จ"
       });
     } catch (error) {
       toast({ title: "ส่งการแจ้งเตือนไม่สำเร็จ", variant: "destructive" });
@@ -373,7 +385,7 @@ const NotificationsPage = () => {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+          <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
             การแจ้งเตือน
             {unreadCount > 0 && (
               <Badge className="bg-destructive text-destructive-foreground">
@@ -398,7 +410,7 @@ const NotificationsPage = () => {
                   ส่งแจ้งเตือนใหม่
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-[600px]">
+              <DialogContent className="sm:max-w-[800px]">
                 <DialogHeader>
                   <DialogTitle>ส่งการแจ้งเตือนให้นักศึกษา</DialogTitle>
                   <DialogDescription>
@@ -649,7 +661,7 @@ const NotificationsPage = () => {
                       className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive z-10"
                       onClick={(e) => {
                         e.stopPropagation(); // 🎯 ดักจับ Event ไม่ให้การกดปุ่ม "ลบ" ทะลุไปเปิดหน้าต่างรายละเอียด
-                        deleteNotification(notification.id);
+                        openDeleteConfirm(notification.id);
                       }}
                     >
                       <Trash2 className="h-4 w-4" />
@@ -714,6 +726,20 @@ const NotificationsPage = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      <ConfirmActionDialog
+        open={isDeleteOpen}
+        onOpenChange={(open) => {
+          setIsDeleteOpen(open);
+          if (!open) setPendingDeleteId(null);
+        }}
+        title="ยืนยันการลบ"
+        description="คุณแน่ใจหรือไม่ว่าต้องการลบการแจ้งเตือนนี้? การดำเนินการนี้ไม่สามารถย้อนกลับได้"
+        confirmLabel="ลบ"
+        variant="destructive"
+        onConfirm={deleteNotification}
+        isLoading={isDeleting}
+      />
     </div>
   );
 };

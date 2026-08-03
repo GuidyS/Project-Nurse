@@ -1,12 +1,11 @@
 import { useState, useEffect, useRef } from "react";
-import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,22 +13,34 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, Search, Edit, Trash2, MoreHorizontal, UserPlus, Upload } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import api from "@/lib/axios";
+import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface User {
   id: string;
   email: string;
   fullName: string;
-  role: "admin" | "student" | "teacher";
+  role: "admin" | "student" | "teacher" | "unassigned";
   teacherSubRole?: string;
   status: "active" | "inactive";
   createdAt: string;
 }
 
+type RoleTab = "teacher" | "student" | "admin" | "unassigned";
+
 const roleLabels: Record<string, string> = {
   admin: "ผู้ดูแลระบบ",
   student: "นักศึกษา",
   teacher: "อาจารย์",
+  unassigned: "รอจัดบทบาท",
 };
+
+const roleTabs: { value: RoleTab; label: string }[] = [
+  { value: "teacher", label: "อาจารย์" },
+  { value: "student", label: "นักศึกษา" },
+  { value: "admin", label: "ผู้ดูแลระบบ" },
+  { value: "unassigned", label: "รอจัดบทบาท" },
+];
 
 const subRoleLabels: Record<string, string> = {
   dean: "คณบดี",
@@ -46,6 +57,7 @@ const teacherPdfOptions = [
   { value: "nursing_council_file", label: "ไฟล์บัตรสภาการพยาบาล" },
   { value: "license_file", label: "ไฟล์ใบอนุญาต" },
   { value: "teaching_cert_file", label: "ไฟล์ใบรับรองการสอน" },
+  { value: "teaching_degree_file", label: "ไฟล์ใบคุณวุฒิการศึกษา" },
 ];
 
 const studentPdfOptions = [
@@ -57,8 +69,9 @@ const studentPdfOptions = [
 export default function UsersManagement() {
   const [users, setUsers] = useState<User[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [newUser, setNewUser] = useState<{ email: string; fullName: string; role: "admin" | "student" | "teacher" }>({ email: "", fullName: "", role: "student" });
+  const [roleTab, setRoleTab] = useState<RoleTab>("teacher");
+  const [isGenerateOpen, setIsGenerateOpen] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   // 🎯 States สำหรับ Dialog แก้ไขข้อมูลเชิงลึก
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
@@ -66,7 +79,29 @@ export default function UsersManagement() {
   const [detailForm, setDetailForm] = useState<any>({});
   const [pdfFiles, setPdfFiles] = useState<Record<string, File[]>>({});
   const [selectedPdfField, setSelectedPdfField] = useState("nursing_council_file");
+  const [savedDocuments, setSavedDocuments] = useState<Array<{
+    field: string;
+    title: string;
+    file_name: string;
+    file_path: string;
+    available?: boolean;
+    portfolio_id?: number | null;
+  }>>([]);
+  const [deletingDocKey, setDeletingDocKey] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [pendingDeleteUserId, setPendingDeleteUserId] = useState<string | null>(null);
+  const [isDeleteUserOpen, setIsDeleteUserOpen] = useState(false);
+  const [isDeletingUser, setIsDeletingUser] = useState(false);
+  const [pendingToggleUserId, setPendingToggleUserId] = useState<string | null>(null);
+  const [isToggleOpen, setIsToggleOpen] = useState(false);
+  const [isToggling, setIsToggling] = useState(false);
+  const [pendingDeleteDoc, setPendingDeleteDoc] = useState<{
+    field: string;
+    file_path: string;
+    file_name: string;
+    portfolio_id?: number | null;
+  } | null>(null);
+  const [isDeleteDocOpen, setIsDeleteDocOpen] = useState(false);
   const pdfInputRef = useRef<HTMLInputElement | null>(null);
   const { toast } = useToast();
 
@@ -84,10 +119,42 @@ export default function UsersManagement() {
     fetchUsers();
   }, []);
 
-  const handleAddUser = () => {
-    // แนะนำให้นำไปเปิดหน้า Register หรือเรียก API register.php แทนครับ
-    toast({ title: "แนะนำ", description: "กรุณาใช้หน้าสมัครสมาชิกเพื่อเพิ่มผู้ใช้ใหม่" });
-    setIsAddDialogOpen(false);
+  const handleGenerateAccounts = async () => {
+    try {
+      setIsGenerating(true);
+      const response = await api.post("/index.php?page=generate-user-accounts");
+      if (response.data?.status === "success") {
+        const imported = response.data.imported ?? 0;
+        const skippedExisting = response.data.skippedExisting ?? 0;
+        const skippedNoBirth = response.data.skippedNoBirth ?? 0;
+        toast({
+          title: "สร้างบัญชีสำเร็จ",
+          description:
+            `สร้าง ${imported} บัญชี` +
+            (response.data.facultyCount || response.data.studentCount
+              ? ` (อาจารย์ ${response.data.facultyCount ?? 0}, นักศึกษา ${response.data.studentCount ?? 0})`
+              : "") +
+            (skippedExisting ? `, มีบัญชีแล้ว ${skippedExisting}` : "") +
+            (skippedNoBirth ? `, ไม่มีวันเกิด ${skippedNoBirth}` : ""),
+        });
+        setIsGenerateOpen(false);
+        fetchUsers();
+      } else {
+        toast({
+          title: "สร้างบัญชีไม่สำเร็จ",
+          description: response.data?.message || "เกิดข้อผิดพลาด",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "สร้างบัญชีไม่สำเร็จ",
+        description: error?.response?.data?.message || "เกิดข้อผิดพลาด",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   // 🎯 ดึงข้อมูลเข้าฟอร์มแก้ไข
@@ -96,6 +163,7 @@ export default function UsersManagement() {
       setEditingUserId(userId);
       setDetailForm({});
       setPdfFiles({});
+      setSavedDocuments([]);
       if (pdfInputRef.current) {
         pdfInputRef.current.value = "";
       }
@@ -104,6 +172,7 @@ export default function UsersManagement() {
         setEditingUserRole(res.data.data.role_id);
         setSelectedPdfField(res.data.data.role_id === 3 ? "student_id_card_file" : "nursing_council_file");
         setDetailForm(res.data.data.details || {});
+        setSavedDocuments(Array.isArray(res.data.data.uploaded_documents) ? res.data.data.uploaded_documents : []);
         setIsEditDialogOpen(true);
       }
     } catch (error) {
@@ -167,6 +236,7 @@ export default function UsersManagement() {
       toast({ title: "อัปเดตข้อมูลสำเร็จ" });
       setIsEditDialogOpen(false);
       setPdfFiles({});
+      setSavedDocuments([]);
       fetchUsers();
     } catch (error: any) {
       toast({
@@ -179,27 +249,124 @@ export default function UsersManagement() {
     }
   };
 
-  const handleDeleteUser = async (id: string) => {
+  const openDeleteUserConfirm = (id: string) => {
+    setPendingDeleteUserId(id);
+    setIsDeleteUserOpen(true);
+  };
+
+  const handleDeleteUser = async () => {
+    if (!pendingDeleteUserId) return;
+    setIsDeletingUser(true);
     try {
-      await api.delete(`/index.php?page=manage-user&id=${id}`);
-      setUsers(users.filter((u) => u.id !== id));
+      await api.delete(`/index.php?page=manage-user&id=${pendingDeleteUserId}`);
+      setUsers((prev) => prev.filter((u) => u.id !== pendingDeleteUserId));
       toast({ title: "ลบผู้ใช้สำเร็จ" });
+      setIsDeleteUserOpen(false);
+      setPendingDeleteUserId(null);
     } catch (error) {
       toast({ title: "ลบผู้ใช้ล้มเหลว", variant: "destructive" });
+    } finally {
+      setIsDeletingUser(false);
     }
   };
 
-  const filteredUsers = users.filter(
-    (user) =>
-      user.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const openDeleteDocConfirm = (doc: {
+    field: string;
+    file_path: string;
+    file_name: string;
+    portfolio_id?: number | null;
+  }) => {
+    setPendingDeleteDoc(doc);
+    setIsDeleteDocOpen(true);
+  };
 
-  const handleToggleStatus = (id: string) => {
-    setUsers(users.map((u) => 
-      u.id === id ? { ...u, status: u.status === "active" ? "inactive" : "active" } : u
-    ));
-    toast({ title: "อัปเดตสถานะสำเร็จ" });
+  const handleDeleteSavedDocument = async () => {
+    if (!editingUserId || !pendingDeleteDoc) return;
+    const doc = pendingDeleteDoc;
+    const docKey = `${doc.portfolio_id || ""}:${doc.file_path}`;
+    try {
+      setDeletingDocKey(docKey);
+      const res = await api.post("/index.php?page=manage-user", {
+        action: "delete_document",
+        user_id: editingUserId,
+        field: doc.field,
+        file_path: doc.file_path,
+        portfolio_id: doc.portfolio_id || null,
+      });
+      if (res.data.status === "success") {
+        setSavedDocuments(Array.isArray(res.data.uploaded_documents) ? res.data.uploaded_documents : []);
+        toast({ title: "ลบเอกสารสำเร็จ", description: doc.file_name });
+        setIsDeleteDocOpen(false);
+        setPendingDeleteDoc(null);
+      }
+    } catch (error: any) {
+      toast({
+        title: "ลบเอกสารล้มเหลว",
+        description: error?.response?.data?.message || "ไม่สามารถลบไฟล์ได้",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingDocKey(null);
+    }
+  };
+
+  const filteredUsers = users.filter((user) => {
+    if (user.role !== roleTab) return false;
+    const q = searchQuery.toLowerCase();
+    return (
+      user.fullName.toLowerCase().includes(q) ||
+      user.email.toLowerCase().includes(q)
+    );
+  });
+
+  const tabCount = (tab: RoleTab) => users.filter((u) => u.role === tab).length;
+
+  const pendingToggleUser = users.find((u) => u.id === pendingToggleUserId);
+  const toggleNextStatus = pendingToggleUser?.status === "active" ? "inactive" : "active";
+
+  const openToggleConfirm = (id: string) => {
+    setPendingToggleUserId(id);
+    setIsToggleOpen(true);
+  };
+
+  const handleToggleStatus = async () => {
+    if (!pendingToggleUserId) return;
+    const current = users.find((u) => u.id === pendingToggleUserId);
+    if (!current) return;
+    const nextStatus = current.status === "active" ? "inactive" : "active";
+    setIsToggling(true);
+    try {
+      const res = await api.post("/index.php?page=manage-user", {
+        action: "toggle_status",
+        user_id: pendingToggleUserId,
+        status: nextStatus,
+      });
+      if (res.data.status === "success") {
+        const savedStatus = (res.data.data?.status as "active" | "inactive") || nextStatus;
+        setUsers((prev) =>
+          prev.map((u) => (u.id === pendingToggleUserId ? { ...u, status: savedStatus } : u))
+        );
+        toast({
+          title: savedStatus === "inactive" ? "ระงับการใช้งานสำเร็จ" : "เปิดใช้งานสำเร็จ",
+        });
+        setIsToggleOpen(false);
+        setPendingToggleUserId(null);
+      } else {
+        toast({
+          title: "อัปเดตสถานะล้มเหลว",
+          description: res.data.message || "ไม่สามารถเปลี่ยนสถานะได้",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "อัปเดตสถานะล้มเหลว",
+        description: error?.response?.data?.message || "เชื่อมต่อ API ไม่ได้",
+        variant: "destructive",
+      });
+    } finally {
+      setIsToggling(false);
+    }
   };
 
   const handlePdfFileChange = (field: string, fileList?: FileList | null) => {
@@ -281,6 +448,42 @@ export default function UsersManagement() {
         </div>
       )}
 
+      {savedDocuments.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-muted-foreground">เอกสารที่อัปโหลดแล้ว ({savedDocuments.length})</p>
+          <div className="space-y-2">
+            {savedDocuments.map((doc) => {
+              const docKey = `${doc.portfolio_id || ""}:${doc.file_path}`;
+              const isDeleting = deletingDocKey === docKey;
+              return (
+                <div
+                  key={docKey}
+                  className="flex items-center gap-2 rounded-md border bg-card px-3 py-2"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-foreground">{doc.title}</p>
+                    <p className="truncate text-xs text-muted-foreground">{doc.file_name}</p>
+                    {!doc.available && (
+                      <p className="text-[11px] text-amber-600">ไฟล์ไม่อยู่บนเซิร์ฟเวอร์แล้ว</p>
+                    )}
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    disabled={isDeleting || isSaving}
+                    onClick={() => openDeleteDocConfirm(doc)}
+                  >
+                    {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       <p className="text-xs text-muted-foreground">{description}</p>
     </div>
   );
@@ -290,69 +493,23 @@ export default function UsersManagement() {
       <div className="p-6 space-y-6 animate-fade-in">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">จัดการผู้ใช้</h1>
-            <p className="text-muted-foreground">เพิ่ม แก้ไข ลบ ผู้ใช้ในระบบ</p>
+            <h1 className="text-3xl font-bold text-foreground">จัดการผู้ใช้</h1>
+            <p className="text-muted-foreground">สร้างบัญชีจากข้อมูลอาจารย์/นักศึกษา แก้ไข ลบ และมอบบทบาท</p>
           </div>
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="gap-2">
-                <UserPlus className="h-4 w-4" />
-                เพิ่มผู้ใช้
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>เพิ่มผู้ใช้ใหม่</DialogTitle>
-                <DialogDescription>กรอกข้อมูลเพื่อสร้างบัญชีผู้ใช้ใหม่</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="fullName">ชื่อ-นามสกุล</Label>
-                  <Input
-                    id="fullName"
-                    value={newUser.fullName}
-                    onChange={(e) => setNewUser({ ...newUser, fullName: e.target.value })}
-                    placeholder="กรอกชื่อ-นามสกุล"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">อีเมล</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={newUser.email}
-                    onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-                    placeholder="example@faculty.edu"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="role">บทบาท</Label>
-                  <Select value={newUser.role} onValueChange={(value: "admin" | "student" | "teacher") => setNewUser({ ...newUser, role: value })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="เลือกบทบาท" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="admin">ผู้ดูแลระบบ</SelectItem>
-                      <SelectItem value="student">นักศึกษา</SelectItem>
-                      <SelectItem value="teacher">อาจารย์</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>ยกเลิก</Button>
-                <Button onClick={handleAddUser}>เพิ่มผู้ใช้</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+          <Button className="gap-2" onClick={() => setIsGenerateOpen(true)} disabled={isGenerating}>
+            {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
+            สร้างบัญชีจากข้อมูลในระบบ
+          </Button>
         </div>
 
         <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
+          <CardHeader className="space-y-4">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
               <div>
-                <CardTitle>รายชื่อผู้ใช้ทั้งหมด</CardTitle>
-                <CardDescription>ผู้ใช้ในระบบ {users.length} คน</CardDescription>
+                <CardTitle>รายชื่อผู้ใช้</CardTitle>
+                <CardDescription>
+                  {roleLabels[roleTab]} {tabCount(roleTab)} คน · ทั้งหมด {users.length} คน
+                </CardDescription>
               </div>
               <div className="relative w-64">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -364,6 +521,18 @@ export default function UsersManagement() {
                 />
               </div>
             </div>
+            <Tabs value={roleTab} onValueChange={(value) => setRoleTab(value as RoleTab)}>
+              <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
+                {roleTabs.map((tab) => (
+                  <TabsTrigger key={tab.value} value={tab.value} className="gap-1.5">
+                    {tab.label}
+                    <Badge variant="secondary" className="h-5 min-w-5 px-1.5 text-[10px]">
+                      {tabCount(tab.value)}
+                    </Badge>
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
           </CardHeader>
           <CardContent>
             <Table>
@@ -378,51 +547,64 @@ export default function UsersManagement() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredUsers.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <Avatar className="h-8 w-8">
-                          <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                            {user.fullName.charAt(0)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span className="font-medium">{user.fullName}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{user.email}</TableCell>
-                    <TableCell>
-                      <div className="flex flex-col gap-1">
-                        <Badge variant="outline">{roleLabels[user.role]}</Badge>
-                        {user.teacherSubRole && (
-                          <Badge variant="secondary" className="text-xs">{subRoleLabels[user.teacherSubRole]}</Badge>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={user.status === "active" ? "default" : "secondary"} className={user.status === "active" ? "bg-success" : ""}>
-                        {user.status === "active" ? "ใช้งาน" : "ระงับ"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{user.createdAt}</TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleEditClick(user.id)} className="gap-2"><Edit className="h-4 w-4" /> แก้ไขข้อมูล</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleToggleStatus(user.id)} className="gap-2">
-                            {user.status === "active" ? "ระงับการใช้งาน" : "เปิดใช้งาน"}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDeleteUser(user.id)} className="gap-2 text-destructive"><Trash2 className="h-4 w-4" /> ลบ</DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                {filteredUsers.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                      ไม่พบผู้ใช้ในหมวดนี้
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : (
+                  filteredUsers.map((user) => (
+                    <TableRow key={user.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-8 w-8">
+                            <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                              {user.fullName.charAt(0)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="font-medium">{user.fullName}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{user.email}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-1">
+                          <Badge
+                            variant={user.role === "unassigned" ? "secondary" : "outline"}
+                            className={user.role === "unassigned" ? "bg-amber-100 text-amber-900 border-amber-200" : undefined}
+                          >
+                            {roleLabels[user.role] || user.role}
+                          </Badge>
+                          {user.teacherSubRole && (
+                            <Badge variant="secondary" className="text-xs">{subRoleLabels[user.teacherSubRole]}</Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={user.status === "active" ? "default" : "secondary"} className={user.status === "active" ? "bg-success" : ""}>
+                          {user.status === "active" ? "ใช้งาน" : "ระงับ"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{user.createdAt}</TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleEditClick(user.id)} className="gap-2"><Edit className="h-4 w-4" /> แก้ไขข้อมูล</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => openToggleConfirm(user.id)} className="gap-2">
+                              {user.status === "active" ? "ระงับการใช้งาน" : "เปิดใช้งาน"}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => openDeleteUserConfirm(user.id)} className="gap-2 text-destructive"><Trash2 className="h-4 w-4" /> ลบ</DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </CardContent>
@@ -496,6 +678,59 @@ export default function UsersManagement() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmActionDialog
+        open={isGenerateOpen}
+        onOpenChange={setIsGenerateOpen}
+        title="ยืนยันการสร้างบัญชี"
+        description="ระบบจะสร้างบัญชีจากข้อมูลอาจารย์และนักศึกษาที่มีวันเกิดในฐานข้อมูล โดยใช้รหัสประจำตัวเป็นชื่อผู้ใช้ และรหัสผ่านเริ่มต้นเป็นวันเกิดรูปแบบวันเดือนปี พ.ศ. (เช่น 25/12/2519 → 25122519) บัญชีที่สร้างจะอยู่ในสถานะรอจัดบทบาท และจะข้ามคนที่มีบัญชีอยู่แล้วหรือไม่มีวันเกิด"
+        confirmLabel="สร้างบัญชี"
+        variant="default"
+        onConfirm={handleGenerateAccounts}
+        isLoading={isGenerating}
+      />
+
+      <ConfirmActionDialog
+        open={isDeleteUserOpen}
+        onOpenChange={(open) => {
+          setIsDeleteUserOpen(open);
+          if (!open) setPendingDeleteUserId(null);
+        }}
+        title="ยืนยันการลบผู้ใช้"
+        description="คุณแน่ใจหรือไม่ว่าต้องการลบผู้ใช้นี้? การลบจะไม่สามารถย้อนกลับได้"
+        onConfirm={handleDeleteUser}
+        isLoading={isDeletingUser}
+      />
+
+      <ConfirmActionDialog
+        open={isToggleOpen}
+        onOpenChange={(open) => {
+          setIsToggleOpen(open);
+          if (!open) setPendingToggleUserId(null);
+        }}
+        title={toggleNextStatus === "inactive" ? "ยืนยันการระงับการใช้งาน" : "ยืนยันการเปิดใช้งาน"}
+        description={
+          toggleNextStatus === "inactive"
+            ? "ผู้ใช้ที่ถูกระงับจะไม่สามารถเข้าสู่ระบบได้ คุณต้องการดำเนินการต่อหรือไม่?"
+            : "ต้องการเปิดใช้งานบัญชีนี้ใหม่อีกครั้งหรือไม่?"
+        }
+        confirmLabel={toggleNextStatus === "inactive" ? "ระงับ" : "เปิดใช้งาน"}
+        variant={toggleNextStatus === "inactive" ? "destructive" : "default"}
+        onConfirm={handleToggleStatus}
+        isLoading={isToggling}
+      />
+
+      <ConfirmActionDialog
+        open={isDeleteDocOpen}
+        onOpenChange={(open) => {
+          setIsDeleteDocOpen(open);
+          if (!open) setPendingDeleteDoc(null);
+        }}
+        title="ยืนยันการลบเอกสาร"
+        description={`คุณแน่ใจหรือไม่ว่าต้องการลบไฟล์ "${pendingDeleteDoc?.file_name || ""}"?`}
+        onConfirm={handleDeleteSavedDocument}
+        isLoading={Boolean(deletingDocKey)}
+      />
     </>
   );
 }

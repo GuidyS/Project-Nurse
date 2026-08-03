@@ -11,6 +11,7 @@ import { CheckSquare, Upload, FileImage, FileText, Download, Search, Eye, Loader
 import { useState, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
+import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
 
 type EvidenceItem = {
   id: string;
@@ -48,6 +49,9 @@ export default function Evidence() {
   const [students, setStudents] = useState<StudentItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [newEvidence, setNewEvidence] = useState({
     studentId: '',
@@ -141,19 +145,29 @@ export default function Evidence() {
     }
   };
   
-  const handleDelete = async (id: string) => {
-    if (!confirm("คุณแน่ใจหรือไม่ว่าต้องการลบหลักฐานนี้?")) return;
-    
+  const openDeleteConfirm = (id: string) => {
+    setPendingDeleteId(id);
+    setIsConfirmOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (!pendingDeleteId) return;
+
+    setIsDeleting(true);
     try {
-      const response = await api.post('/index.php?page=delete-evidence', { id });
+      const response = await api.post('/index.php?page=delete-evidence', { id: pendingDeleteId });
       if (response.data.status === 'success') {
         toast({ title: "สำเร็จ", description: "ลบหลักฐานเรียบร้อยแล้ว" });
+        setIsConfirmOpen(false);
+        setPendingDeleteId(null);
         fetchEvidence();
       } else {
         toast({ title: "ข้อผิดพลาด", description: response.data.message || "ไม่สามารถลบได้", variant: "destructive" });
       }
     } catch (error) {
       toast({ title: "ข้อผิดพลาด", description: "ไม่สามารถลบหลักฐานได้", variant: "destructive" });
+    } finally {
+      setIsDeleting(false);
     }
   };
   //ฟังค์ชัน ดู
@@ -385,7 +399,7 @@ export default function Evidence() {
                             ยืนยัน
                           </Button>
                         )}
-                        <Button variant="destructive" size="sm" onClick={() => handleDelete(evidence.id)}>
+                        <Button variant="destructive" size="sm" onClick={() => openDeleteConfirm(evidence.id)}>
                           <Trash2 className="mr-1 h-3 w-3" />
                           ลบ
                         </Button>
@@ -398,6 +412,18 @@ export default function Evidence() {
           </CardContent>
         </Card>
       </div>
+
+      <ConfirmActionDialog
+        open={isConfirmOpen}
+        onOpenChange={(open) => {
+          setIsConfirmOpen(open);
+          if (!open) setPendingDeleteId(null);
+        }}
+        title="ยืนยันการลบ"
+        description="คุณแน่ใจหรือไม่ว่าต้องการลบหลักฐานนี้?"
+        onConfirm={handleDelete}
+        isLoading={isDeleting}
+      />
     </>
   );
 }

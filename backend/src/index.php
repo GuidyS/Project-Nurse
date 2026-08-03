@@ -64,6 +64,9 @@
             case 'manage-user':
                 require_once 'components/Admin/ManageUsers/manage-user.php';
                 break;
+            case 'generate-user-accounts':
+                require_once 'components/Admin/ManageUsers/generate-user-accounts.php';
+                break;
             case 'manage-role':
                 require_once 'components/Admin/ManageUsers/manage-role.php';
                 break;
@@ -159,13 +162,22 @@
             case 'delete-clo':
                 require_once 'components/Teacher/CLOPage/delete_clo.php';
                 break;
-
-            // CourseReports
-            case 'get-report-filters':
-                require_once 'components/Teacher/CourseReports/get_report_filters.php';
+            case 'save-ylo-matrix':
+                require_once 'components/Teacher/CLOPage/save_ylo_matrix.php';
                 break;
+            case 'save-sub-plo-catalog':
+                require_once 'components/Teacher/CLOPage/save_sub_plo_catalog.php';
+                break;
+            case 'migrate-mapping-json-to-tables':
+                require_once 'components/Teacher/CLOPage/migrate_mapping_json_to_tables.php';
+                break;
+
+            // CoursesReports
             case 'get-course-report':
                 require_once 'components/Teacher/CourseReports/get_course_report.php';
+                break;
+            case 'get-report-filters':
+                require_once 'components/Teacher/CourseReports/get_report_filters.php';
                 break;
 
             // CoursesPage
