@@ -1,10 +1,12 @@
-import { useState } from "react";
-import { Search, Filter, Upload, Eye, Edit, MoreVertical, Star, Calendar } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Search, Filter, Upload, Eye, MoreVertical, Star, Calendar } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Table,
   TableBody,
@@ -19,26 +21,239 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import api from "@/lib/axios";
+import { Student, getStatusBadge } from "@/components/pages/Teacher/PracticalStudents";
+import { StudentDetailsDialog } from "@/components/ui/StudentDetailsDialog";
+import { StudentEvaluateDialog } from "@/components/ui/StudentEvaluateDialog";
+import { useToast } from "@/hooks/use-toast";
 
-const practicalStudents = [
-  { id: 1, studentId: "64010001", name: "นายสมชาย รักเรียน", hospital: "รพ.ศิริราช", ward: "อายุรกรรม", performance: 85, tasksCompleted: 12, totalTasks: 15 },
-  { id: 2, studentId: "64010002", name: "นางสาวสมหญิง ใจดี", hospital: "รพ.จุฬาลงกรณ์", ward: "ศัลยกรรม", performance: 92, tasksCompleted: 14, totalTasks: 15 },
-  { id: 3, studentId: "64010003", name: "นายวิชัย เก่งกล้า", hospital: "รพ.รามาธิบดี", ward: "กุมารเวชกรรม", performance: 78, tasksCompleted: 10, totalTasks: 15 },
-  { id: 4, studentId: "64010004", name: "นางสาวพิมพ์ใจ สวยงาม", hospital: "รพ.ศิริราช", ward: "สูติศาสตร์", performance: 88, tasksCompleted: 13, totalTasks: 15 },
-  { id: 5, studentId: "64010005", name: "นายกิตติ อดทน", hospital: "รพ.จุฬาลงกรณ์", ward: "อายุรกรรม", performance: 72, tasksCompleted: 9, totalTasks: 15 },
-  { id: 6, studentId: "64010006", name: "นางสาวนภา ท้องฟ้า", hospital: "รพ.รามาธิบดี", ward: "ศัลยกรรม", performance: 95, tasksCompleted: 15, totalTasks: 15 },
-  { id: 7, studentId: "64010007", name: "นายธนกฤต มั่นคง", hospital: "รพ.ศิริราช", ward: "กุมารเวชกรรม", performance: 82, tasksCompleted: 11, totalTasks: 15 },
-  { id: 8, studentId: "64010008", name: "นางสาวอรุณี แสงทอง", hospital: "รพ.จุฬาลงกรณ์", ward: "สูติศาสตร์", performance: 90, tasksCompleted: 14, totalTasks: 15 },
-];
+export interface PracticalStudent extends Student {
+  hospital: string;
+  ward: string;
+  performance: number;
+  totalTasks: number;
+}
 
 const PracticalPage = () => {
+  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
+  const [students, setStudents] = useState<PracticalStudent[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const filteredStudents = practicalStudents.filter(
+  const [selectedStudent, setSelectedStudent] = useState<PracticalStudent | null>(null);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [isEvaluateOpen, setIsEvaluateOpen] = useState(false);
+  const [isAssignOpen, setIsAssignOpen] = useState(false);
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const [evaluateScore, setEvaluateScore] = useState("");
+  const [evaluateComment, setEvaluateComment] = useState("");
+
+  const [taskName, setTaskName] = useState("");
+  const [taskDueDate, setTaskDueDate] = useState("");
+  const [taskPriority, setTaskPriority] = useState("medium");
+  const [taskDescription, setTaskDescription] = useState("");
+
+  const [evidenceTitle, setEvidenceTitle] = useState("");
+  const [evidenceType, setEvidenceType] = useState("photo");
+  const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
+
+  const fetchStudents = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const response = await api.get("/index.php?page=get-practical-students");
+      if (response.data.status === "success") {
+        const rows = (response.data.data || []).map((s: Student & Partial<PracticalStudent>) => {
+          const tasksCompleted = Number(s.tasksCompleted ?? 0);
+          const tasksPending = Number(s.tasksPending ?? 0);
+          const totalTasks = Number(s.totalTasks ?? tasksCompleted + tasksPending);
+          const progress = Number(s.progress ?? 0);
+          const hospital = s.hospital || s.workplace || "โรงพยาบาลเครือข่ายฝึกปฏิบัติ";
+          return {
+            ...s,
+            hospital,
+            workplace: s.workplace || hospital,
+            ward: s.ward || "—",
+            performance: Number(s.performance ?? progress),
+            totalTasks,
+            tasksCompleted,
+            tasksPending,
+            progress,
+          } as PracticalStudent;
+        });
+        setStudents(rows);
+      } else {
+        setError(response.data.message || "โหลดข้อมูลไม่สำเร็จ");
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "เชื่อมต่อ API ไม่ได้";
+      setError(message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchStudents();
+  }, []);
+
+  const handleScoreChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    if (val === "") {
+      setEvaluateScore("");
+      return;
+    }
+    const num = parseInt(val, 10);
+    if (!isNaN(num)) {
+      if (num > 100) setEvaluateScore("100");
+      else if (num < 0) setEvaluateScore("0");
+      else setEvaluateScore(num.toString());
+    }
+  };
+
+  const openEvaluate = (student: PracticalStudent) => {
+    setSelectedStudent(student);
+    setEvaluateScore("");
+    setEvaluateComment("");
+    setIsEvaluateOpen(true);
+  };
+
+  const openAssign = (student: PracticalStudent) => {
+    setSelectedStudent(student);
+    setTaskName("");
+    setTaskDueDate("");
+    setTaskPriority("medium");
+    setTaskDescription("");
+    setIsAssignOpen(true);
+  };
+
+  const openUpload = (student: PracticalStudent | null = null) => {
+    setSelectedStudent(student);
+    setEvidenceTitle("");
+    setEvidenceType("photo");
+    setEvidenceFile(null);
+    setIsUploadOpen(true);
+  };
+
+  const handleSaveEvaluation = async () => {
+    if (!selectedStudent) return;
+    if (evaluateScore === "") {
+      toast({ title: "แจ้งเตือน", description: "กรุณาระบุคะแนน", variant: "destructive" });
+      return;
+    }
+    try {
+      setIsSaving(true);
+      const response = await api.post("/index.php?page=save-performance", {
+        selectedStudent: selectedStudent.studentId,
+        score: Number(evaluateScore),
+        comment: evaluateComment,
+      });
+      if (response.data.status === "success") {
+        toast({ title: "สำเร็จ", description: "บันทึกผลการประเมินเรียบร้อย" });
+        setIsEvaluateOpen(false);
+        fetchStudents();
+      } else {
+        toast({
+          title: "ข้อผิดพลาด",
+          description: response.data.message || "บันทึกไม่สำเร็จ",
+          variant: "destructive",
+        });
+      }
+    } catch {
+      toast({ title: "ข้อผิดพลาด", description: "เชื่อมต่อ API ไม่ได้", variant: "destructive" });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleAssignTask = async () => {
+    if (!selectedStudent || !taskName.trim() || !taskDueDate) {
+      toast({ title: "แจ้งเตือน", description: "กรอกชื่องานและกำหนดส่งให้ครบ", variant: "destructive" });
+      return;
+    }
+    try {
+      setIsSaving(true);
+      const response = await api.post("/index.php?page=create-schedule-task", {
+        studentId: selectedStudent.studentId,
+        task: taskName.trim(),
+        dueDate: taskDueDate,
+        priority: taskPriority,
+        description: taskDescription.trim() || null,
+      });
+      if (response.data.status === "success") {
+        toast({ title: "สำเร็จ", description: "มอบหมายงานเรียบร้อย" });
+        setIsAssignOpen(false);
+        fetchStudents();
+      } else {
+        toast({
+          title: "ข้อผิดพลาด",
+          description: response.data.message || "มอบหมายงานไม่สำเร็จ",
+          variant: "destructive",
+        });
+      }
+    } catch {
+      toast({ title: "ข้อผิดพลาด", description: "เชื่อมต่อ API ไม่ได้", variant: "destructive" });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleUploadEvidence = async () => {
+    if (!selectedStudent || !evidenceTitle.trim() || !evidenceFile) {
+      toast({ title: "แจ้งเตือน", description: "เลือกนักศึกษา ชื่อหลักฐาน และไฟล์ให้ครบ", variant: "destructive" });
+      return;
+    }
+    try {
+      setIsSaving(true);
+      const formData = new FormData();
+      formData.append("studentId", selectedStudent.studentId);
+      formData.append("title", evidenceTitle.trim());
+      formData.append("type", evidenceType);
+      formData.append("file", evidenceFile);
+      const response = await api.post("/index.php?page=upload-evidence", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      if (response.data.status === "success") {
+        toast({ title: "สำเร็จ", description: "อัปโหลดหลักฐานเรียบร้อย" });
+        setIsUploadOpen(false);
+      } else {
+        toast({
+          title: "ข้อผิดพลาด",
+          description: response.data.message || "อัปโหลดไม่สำเร็จ",
+          variant: "destructive",
+        });
+      }
+    } catch {
+      toast({ title: "ข้อผิดพลาด", description: "เชื่อมต่อ API ไม่ได้", variant: "destructive" });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const filteredStudents = students.filter(
     (s) =>
       s.name.includes(searchQuery) ||
       s.studentId.includes(searchQuery) ||
-      s.hospital.includes(searchQuery)
+      s.hospital.includes(searchQuery) ||
+      (s.workplace || "").includes(searchQuery)
   );
 
   const getPerformanceBadge = (score: number) => {
@@ -48,47 +263,51 @@ const PracticalPage = () => {
     return <Badge variant="destructive">ต้องปรับปรุง</Badge>;
   };
 
+  const avgPerformance =
+    students.length > 0
+      ? Math.round(students.reduce((sum, s) => sum + s.performance, 0) / students.length)
+      : 0;
+
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">นักศึกษาฝึกปฏิบัติ</h1>
+          <h1 className="text-3xl font-bold text-foreground">นักศึกษาฝึกปฏิบัติ</h1>
           <p className="text-muted-foreground mt-1">จัดการและติดตามนักศึกษาที่ดูแล (1:8)</p>
         </div>
-        <Button variant="outline" className="gap-2">
+        <Button variant="outline" className="gap-2" onClick={() => openUpload(null)}>
           <Upload className="h-4 w-4" />
           อัปโหลดหลักฐาน
         </Button>
       </div>
 
-      {/* Stats */}
+      {error && (
+        <div className="p-4 bg-red-50 text-red-600 rounded-md">Error: {error}</div>
+      )}
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-card rounded-xl shadow-card p-4 text-center">
-          <p className="text-2xl font-bold text-foreground">{practicalStudents.length}</p>
+          <p className="text-2xl font-bold text-foreground">{students.length}</p>
           <p className="text-xs text-muted-foreground">นักศึกษาทั้งหมด</p>
         </div>
         <div className="bg-card rounded-xl shadow-card p-4 text-center">
           <p className="text-2xl font-bold text-success">
-            {practicalStudents.filter((s) => s.performance >= 80).length}
+            {students.filter((s) => s.performance >= 80).length}
           </p>
           <p className="text-xs text-muted-foreground">ผลงานดี</p>
         </div>
         <div className="bg-card rounded-xl shadow-card p-4 text-center">
           <p className="text-2xl font-bold text-warning">
-            {practicalStudents.filter((s) => s.performance < 80 && s.performance >= 70).length}
+            {students.filter((s) => s.performance < 80 && s.performance >= 70).length}
           </p>
           <p className="text-xs text-muted-foreground">ต้องติดตาม</p>
         </div>
         <div className="bg-card rounded-xl shadow-card p-4 text-center">
-          <p className="text-2xl font-bold text-primary">
-            {Math.round(practicalStudents.reduce((sum, s) => sum + s.performance, 0) / practicalStudents.length)}%
-          </p>
+          <p className="text-2xl font-bold text-primary">{avgPerformance}%</p>
           <p className="text-xs text-muted-foreground">เฉลี่ย Performance</p>
         </div>
       </div>
 
-      {/* Search & Filter */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -99,13 +318,12 @@ const PracticalPage = () => {
             className="pl-10"
           />
         </div>
-        <Button variant="outline" className="gap-2">
+        <Button variant="outline" className="gap-2" disabled>
           <Filter className="h-4 w-4" />
           กรอง
         </Button>
       </div>
 
-      {/* Table */}
       <div className="bg-card rounded-xl shadow-card overflow-hidden">
         <Table>
           <TableHeader>
@@ -119,67 +337,220 @@ const PracticalPage = () => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredStudents.map((student) => (
-              <TableRow key={student.id}>
-                <TableCell>
-                  <div className="flex items-center gap-3">
-                    <Avatar className="h-9 w-9">
-                      <AvatarFallback className="bg-muted text-muted-foreground text-sm">
-                        {student.name.charAt(0)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="font-medium text-foreground">{student.name}</p>
-                      <p className="text-xs text-muted-foreground">{student.studentId}</p>
-                    </div>
-                  </div>
-                </TableCell>
-                <TableCell className="text-muted-foreground">{student.hospital}</TableCell>
-                <TableCell>
-                  <Badge variant="outline">{student.ward}</Badge>
-                </TableCell>
-                <TableCell>
-                  <div className="w-32">
-                    <div className="flex items-center justify-between text-xs mb-1">
-                      <span className="text-muted-foreground">{student.tasksCompleted}/{student.totalTasks}</span>
-                    </div>
-                    <Progress value={(student.tasksCompleted / student.totalTasks) * 100} className="h-1.5" />
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">{student.performance}%</span>
-                    {getPerformanceBadge(student.performance)}
-                  </div>
-                </TableCell>
-                <TableCell className="text-right">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem className="gap-2">
-                        <Eye className="h-4 w-4" /> ดูข้อมูล
-                      </DropdownMenuItem>
-                      <DropdownMenuItem className="gap-2">
-                        <Star className="h-4 w-4" /> บันทึก Performance
-                      </DropdownMenuItem>
-                      <DropdownMenuItem className="gap-2">
-                        <Calendar className="h-4 w-4" /> มอบหมายงาน
-                      </DropdownMenuItem>
-                      <DropdownMenuItem className="gap-2">
-                        <Upload className="h-4 w-4" /> อัปโหลดหลักฐาน
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+            {isLoading ? (
+              <TableRow>
+                <TableCell colSpan={6} className="h-24 text-center">
+                  กำลังโหลดข้อมูล...
                 </TableCell>
               </TableRow>
-            ))}
+            ) : filteredStudents.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                  ไม่พบข้อมูลนักศึกษา
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredStudents.map((student) => (
+                <TableRow key={student.id}>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-9 w-9">
+                        <AvatarFallback className="bg-muted text-muted-foreground text-sm">
+                          {student.name.charAt(0)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-medium text-foreground">{student.name}</p>
+                        <p className="text-xs text-muted-foreground">{student.studentId}</p>
+                        <div className="mt-1">{getStatusBadge(student.status)}</div>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">{student.hospital}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline">{student.ward}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    <div className="w-32">
+                      <div className="flex items-center justify-between text-xs mb-1">
+                        <span className="text-muted-foreground">
+                          {student.tasksCompleted}/{student.totalTasks}
+                        </span>
+                      </div>
+                      <Progress
+                        value={student.totalTasks > 0 ? (student.tasksCompleted / student.totalTasks) * 100 : 0}
+                        className="h-1.5"
+                      />
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{student.performance}%</span>
+                      {getPerformanceBadge(student.performance)}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          className="gap-2"
+                          onClick={() => {
+                            setSelectedStudent(student);
+                            setIsDetailsOpen(true);
+                          }}
+                        >
+                          <Eye className="h-4 w-4" /> ดูข้อมูล
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="gap-2" onClick={() => openEvaluate(student)}>
+                          <Star className="h-4 w-4" /> บันทึก Performance
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="gap-2" onClick={() => openAssign(student)}>
+                          <Calendar className="h-4 w-4" /> มอบหมายงาน
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="gap-2" onClick={() => openUpload(student)}>
+                          <Upload className="h-4 w-4" /> อัปโหลดหลักฐาน
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </div>
+
+      <StudentDetailsDialog
+        isOpen={isDetailsOpen}
+        onOpenChange={setIsDetailsOpen}
+        student={selectedStudent}
+      />
+
+      <StudentEvaluateDialog
+        isOpen={isEvaluateOpen}
+        onOpenChange={setIsEvaluateOpen}
+        student={selectedStudent}
+        score={evaluateScore}
+        onScoreChange={handleScoreChange}
+        comment={evaluateComment}
+        onCommentChange={(e) => setEvaluateComment(e.target.value)}
+        onSave={handleSaveEvaluation}
+        isSaving={isSaving}
+      />
+
+      <Dialog open={isAssignOpen} onOpenChange={setIsAssignOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>มอบหมายงาน</DialogTitle>
+            <DialogDescription>
+              สร้าง Schedule Task ให้ {selectedStudent?.name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>ชื่องาน</Label>
+              <Input value={taskName} onChange={(e) => setTaskName(e.target.value)} placeholder="เช่น บันทึกการพยาบาล" />
+            </div>
+            <div className="space-y-2">
+              <Label>กำหนดส่ง</Label>
+              <Input type="date" value={taskDueDate} onChange={(e) => setTaskDueDate(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>ความสำคัญ</Label>
+              <Select value={taskPriority} onValueChange={setTaskPriority}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="low">ต่ำ</SelectItem>
+                  <SelectItem value="medium">ปานกลาง</SelectItem>
+                  <SelectItem value="high">สูง</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>รายละเอียด</Label>
+              <Textarea value={taskDescription} onChange={(e) => setTaskDescription(e.target.value)} rows={3} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAssignOpen(false)}>ยกเลิก</Button>
+            <Button onClick={handleAssignTask} disabled={isSaving}>
+              {isSaving ? "กำลังบันทึก..." : "มอบหมาย"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>อัปโหลดหลักฐาน</DialogTitle>
+            <DialogDescription>
+              แนบหลักฐานการปฏิบัติงาน{selectedStudent ? ` ของ ${selectedStudent.name}` : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {!selectedStudent && (
+              <div className="space-y-2">
+                <Label>นักศึกษา</Label>
+                <Select
+                  onValueChange={(id) => {
+                    const found = students.find((s) => s.studentId === id) || null;
+                    setSelectedStudent(found);
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="เลือกนักศึกษา" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {students.map((s) => (
+                      <SelectItem key={s.studentId} value={s.studentId}>
+                        {s.studentId} — {s.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label>ชื่อหลักฐาน</Label>
+              <Input value={evidenceTitle} onChange={(e) => setEvidenceTitle(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>ประเภท</Label>
+              <Select value={evidenceType} onValueChange={setEvidenceType}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="photo">รูปภาพ</SelectItem>
+                  <SelectItem value="document">เอกสาร</SelectItem>
+                  <SelectItem value="video">วิดีโอ</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>ไฟล์</Label>
+              <Input
+                type="file"
+                onChange={(e) => setEvidenceFile(e.target.files?.[0] || null)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsUploadOpen(false)}>ยกเลิก</Button>
+            <Button onClick={handleUploadEvidence} disabled={isSaving}>
+              {isSaving ? "กำลังอัปโหลด..." : "อัปโหลด"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

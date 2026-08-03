@@ -23,8 +23,9 @@ try {
     $stmt_fac->execute([$user_id]);
     $my_faculty_id = $stmt_fac->fetchColumn();
 
-    // เช็คว่ามีตาราง schedule_tasks ไหม ป้องกัน Error
+    // เช็คว่ามีตาราง schedule_tasks / approval_requests ไหม
     $has_tasks_table = $db->query("SHOW TABLES LIKE 'schedule_tasks'")->rowCount() > 0;
+    $has_approval_table = $db->query("SHOW TABLES LIKE 'approval_requests'")->rowCount() > 0;
 
     // 2. ดึงนักศึกษาที่อยู่ในความดูแล (ดึงจากตาราง mapping)
     $sql = "
@@ -69,19 +70,51 @@ try {
         if ($total > 0 && $progress == 100) {
             $status = 'completed';
         } else if ($tasksPending > 0 && $progress < 30) {
-            // สมมติเกณฑ์ว่า ถ้างานค้างเยอะแล้วเปอร์เซ็นต์ต่ำ ให้ขึ้นเตือนว่า 'issue' (มีปัญหา)
             $status = 'issue'; 
         }
+
+        // 4. คะแนน performance ล่าสุดจาก approval_requests (ถ้ามี)
+        $performance = $progress;
+        if ($has_approval_table) {
+            $stmt_perf = $db->prepare("
+                SELECT description
+                FROM approval_requests
+                WHERE request_type = 'performance_eval'
+                  AND target_ref_type = 'student'
+                  AND target_ref_id = ?
+                ORDER BY created_at DESC
+                LIMIT 1
+            ");
+            $stmt_perf->execute([(string)$st['studentId']]);
+            $scoreRaw = $stmt_perf->fetchColumn();
+            if ($scoreRaw) {
+                $scores = json_decode($scoreRaw, true) ?: [];
+                if (isset($scores['overall'])) {
+                    $overall = (float)$scores['overall'];
+                    // รองรับทั้งสเกล 0-5 (หน้า Performance) และ 0-100 (หน้าประเมินเร็ว)
+                    $performance = $overall <= 5 ? (int)round(($overall / 5) * 100) : (int)round($overall);
+                } elseif (isset($scores['score'])) {
+                    $performance = (int)round((float)$scores['score']);
+                }
+            }
+        }
+
+        // สถานที่ฝึก / หอผู้ป่วย — ยังไม่มีตารางเก็บจริง ใช้ค่า default
+        $workplace = "โรงพยาบาลเครือข่ายฝึกปฏิบัติ";
+        $ward = "—";
 
         $students[] = [
             "id" => $st['id'],
             "studentId" => $st['studentId'],
             "name" => $st['name'],
-            // สถานที่ฝึกปฏิบัติ ปัจจุบันยังไม่มีตารางเก็บ จึงใส่ค่า Default ไว้ก่อน
-            "workplace" => "โรงพยาบาลเครือข่ายฝึกปฏิบัติ", 
+            "workplace" => $workplace,
+            "hospital" => $workplace,
+            "ward" => $ward,
             "progress" => $progress,
+            "performance" => $performance,
             "tasksCompleted" => $tasksCompleted,
             "tasksPending" => $tasksPending,
+            "totalTasks" => $total,
             "status" => $status
         ];
     }

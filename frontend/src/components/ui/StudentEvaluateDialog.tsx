@@ -13,11 +13,20 @@ interface Props {
   onScoreChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   comment: string;
   onCommentChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
-  onSave: () => void;
+  onSave: () => void | Promise<void>;
+  isSaving?: boolean;
 }
 
 export function StudentEvaluateDialog({
-  isOpen, onOpenChange, student, score, onScoreChange, comment, onCommentChange, onSave
+  isOpen,
+  onOpenChange,
+  student,
+  score,
+  onScoreChange,
+  comment,
+  onCommentChange,
+  onSave,
+  isSaving = false,
 }: Props) {
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -31,30 +40,41 @@ export function StudentEvaluateDialog({
         <div className="space-y-4 py-4">
           <div className="space-y-2">
             <Label htmlFor="score">คะแนนประเมิน (0-100)</Label>
-            <Input 
-              id="score" 
-              type="number" 
-              placeholder="ระบุคะแนน..." 
-              max="100" 
-              min="0" 
+            <Input
+              id="score"
+              type="number"
+              placeholder="ระบุคะแนน..."
+              max="100"
+              min="0"
               value={score}
               onChange={onScoreChange}
+              disabled={isSaving}
             />
           </div>
           <div className="space-y-2">
             <Label htmlFor="comment">ความคิดเห็นเพิ่มเติม / ข้อเสนอแนะ</Label>
-            <Textarea 
-              id="comment" 
-              placeholder="พิมพ์ความคิดเห็นที่นี่..." 
-              rows={4} 
+            <Textarea
+              id="comment"
+              placeholder="พิมพ์ความคิดเห็นที่นี่..."
+              rows={4}
               value={comment}
               onChange={onCommentChange}
+              disabled={isSaving}
             />
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>ยกเลิก</Button>
-          <Button onClick={() => { onSave(); onOpenChange(false); }}>บันทึกผลการประเมิน</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSaving}>
+            ยกเลิก
+          </Button>
+          <Button
+            onClick={() => {
+              void onSave();
+            }}
+            disabled={isSaving}
+          >
+            {isSaving ? 'กำลังบันทึก...' : 'บันทึกผลการประเมิน'}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

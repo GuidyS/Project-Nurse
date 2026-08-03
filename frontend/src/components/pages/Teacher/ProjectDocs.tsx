@@ -90,6 +90,21 @@ export default function ProjectDocs() {
     fetchDocuments();
   }, []);
 
+  // รับ projectId จากหน้า ProjectsPage (เมนูอัปโหลดเอกสาร)
+  useEffect(() => {
+    if (loading) return;
+    const pending = sessionStorage.getItem("pendingProjectId");
+    if (!pending) return;
+
+    sessionStorage.removeItem("pendingProjectId");
+    setFormData((prev) => ({
+      ...prev,
+      project_id: pending,
+      date: prev.date || new Date().toISOString().slice(0, 10),
+    }));
+    setIsCreateOpen(true);
+  }, [loading, projects]);
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -259,8 +274,7 @@ export default function ProjectDocs() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  {/* ช่องสำหรับวิทยุ/เลือก */}
-                  <TableHead className="w-[50px]"></TableHead>
+                  <TableHead className="w-[50px]"></TableHead> {/* ช่องสำหรับวิทยุ/เลือก */}
                   <TableHead>ชื่อเอกสาร</TableHead>
                   <TableHead>โครงการ</TableHead>
                   <TableHead>ประเภท</TableHead>

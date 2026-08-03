@@ -1,5 +1,5 @@
 import { ShieldAlert } from 'lucide-react';
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import ProfilePage from "@/components/pages/ProfilePage";
 import CourseStudents from "@/components/pages/Teacher/CourseStudents";
@@ -35,7 +35,6 @@ import ProjectReports from "@/components/pages/Teacher/ProjectReports";
 import ProjectLinks from "@/components/pages/Teacher/ProjectLinks";
 import ProjectDocs from "@/components/pages/Teacher/ProjectDocs";
 import ProgramReports from "@/components/pages/Teacher/ProgramReports";
-import PracticalStudents from "@/components/pages/Teacher/PracticalStudents";
 import Approvals from "@/components/pages/Admin/Approvals";
 import AuditLog from "@/components/pages/Admin/AuditLog";
 import ExportData from "@/components/pages/Admin/ExportData";
@@ -45,6 +44,7 @@ import RolesManagement from "@/components/pages/Admin/RolesManagement";
 import UsersManagement from "@/components/pages/Admin/UsersManagement";
 import DeanDashboard from "@/components/pages/Teacher/DeanDashboard";
 import Retention from "@/components/pages/Teacher/Retention";
+import PracticalPage from '@/components/pages/Teacher/PracticalPage';
 
 const Index = () => {
   const [activeItem, setActiveItem] = useState(() => {
@@ -75,6 +75,17 @@ const Index = () => {
 
     return "login";
   });
+
+  useEffect(() => {
+    const onNavigate = (event: Event) => {
+      const detail = (event as CustomEvent<{ page?: string }>).detail;
+      if (detail?.page) {
+        setActiveItem(detail.page);
+      }
+    };
+    window.addEventListener("app:navigate", onNavigate);
+    return () => window.removeEventListener("app:navigate", onNavigate);
+  }, []);
 
   // คอมโพเนนต์หน้าจอเมื่อไม่มีสิทธิ์เข้าถึง (Unauthorized)
   const UnauthorizedView = () => (
@@ -181,7 +192,7 @@ const Index = () => {
         case "grades": return <Grades />;                                           //*
         case "my-courses": return <MyCourses />;                                    //*
         case "performance": return <Performance />;
-        case "practical-students": return <PracticalStudents />;                    //* /* ดูรายชื่อนศ.และประเมินผลการฝึกปฏิบัติของเด็กได้*/ /* อจ.ปฏิบัติ */
+        case "practical-students": return <PracticalPage />;                    //* /* ดูรายชื่อนศ.และประเมินผลการฝึกปฏิบัติของเด็กได้*/ /* อจ.ปฏิบัติ */
         case "program-reports": return <ProgramReports />;                          //*
         case "schedule-tasks": return <ScheduleTasks />;                            //*
         case "projectspage": return <ProjectsPage />;                               //*
