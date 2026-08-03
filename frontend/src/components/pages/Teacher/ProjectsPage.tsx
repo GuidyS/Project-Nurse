@@ -45,12 +45,24 @@ const ProjectsPage = () => {
   // States สำหรับจัดการ Modal เพิ่มและแก้ไข
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
+  const [viewProject, setViewProject] = useState<Project | null>(null);
+  const [isViewOpen, setIsViewOpen] = useState(false);
   const [formData, setFormData] = useState({
     project_id: "",
     project_name_th: "",
     project_name_en: "",
     description: "",
   });
+
+  const navigateToProjectPage = (page: "project-docs" | "project-links", projectId: number) => {
+    sessionStorage.setItem("pendingProjectId", String(projectId));
+    window.dispatchEvent(new CustomEvent("app:navigate", { detail: { page } }));
+  };
+
+  const handleOpenViewModal = (project: Project) => {
+    setViewProject(project);
+    setIsViewOpen(true);
+  };
 
   // 1. ฟังก์ชันดึงข้อมูลโครงการทั้งหมด (Read)
   const fetchProjects = async () => {
@@ -215,16 +227,22 @@ const ProjectsPage = () => {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-48">
-                    <DropdownMenuItem className="gap-2">
+                    <DropdownMenuItem className="gap-2" onClick={() => handleOpenViewModal(project)}>
                       <Eye className="h-4 w-4 text-blue-500" /> ดูรายละเอียด
                     </DropdownMenuItem>
                     <DropdownMenuItem className="gap-2" onClick={() => handleOpenEditModal(project)}>
                       <Edit className="h-4 w-4 text-orange-500" /> แก้ไขโครงการ
                     </DropdownMenuItem>
-                    <DropdownMenuItem className="gap-2">
+                    <DropdownMenuItem
+                      className="gap-2"
+                      onClick={() => navigateToProjectPage("project-docs", project.project_id)}
+                    >
                       <Upload className="h-4 w-4 text-green-500" /> อัปโหลดเอกสาร
                     </DropdownMenuItem>
-                    <DropdownMenuItem className="gap-2">
+                    <DropdownMenuItem
+                      className="gap-2"
+                      onClick={() => navigateToProjectPage("project-links", project.project_id)}
+                    >
                       <Link2 className="h-4 w-4 text-purple-500" /> เชื่อมโยงระดับ LO
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
@@ -299,6 +317,72 @@ const ProjectsPage = () => {
               {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               {editMode ? "บันทึกการแก้ไข" : "สร้างโครงการ"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog ดูรายละเอียดโครงการ */}
+      <Dialog
+        open={isViewOpen}
+        onOpenChange={(open) => {
+          setIsViewOpen(open);
+          if (!open) setViewProject(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-[560px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>รายละเอียดโครงการ</DialogTitle>
+            <DialogDescription>ข้อมูลโครงการที่บันทึกในระบบ</DialogDescription>
+          </DialogHeader>
+          {viewProject && (
+            <div className="space-y-4 py-2 text-sm">
+              <div className="space-y-1">
+                <p className="text-muted-foreground">รหัสโครงการ</p>
+                <p className="font-medium text-foreground">{viewProject.project_id}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-muted-foreground">ชื่อโครงการ (ภาษาไทย)</p>
+                <p className="font-medium text-foreground whitespace-pre-wrap">{viewProject.project_name_th}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-muted-foreground">ชื่อโครงการ (ภาษาอังกฤษ)</p>
+                <p className="font-medium text-foreground whitespace-pre-wrap">
+                  {viewProject.project_name_en || "—"}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-muted-foreground">คำอธิบาย</p>
+                <p className="font-medium text-foreground whitespace-pre-wrap rounded-lg border bg-muted/30 p-3">
+                  {viewProject.description || "ไม่มีคำอธิบายโครงการ"}
+                </p>
+              </div>
+            </div>
+          )}
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setIsViewOpen(false)}>ปิด</Button>
+            {viewProject && (
+              <>
+                <Button
+                  variant="secondary"
+                  className="gap-2"
+                  onClick={() => {
+                    setIsViewOpen(false);
+                    navigateToProjectPage("project-docs", viewProject.project_id);
+                  }}
+                >
+                  <Upload className="h-4 w-4" /> เอกสาร
+                </Button>
+                <Button
+                  className="gap-2"
+                  onClick={() => {
+                    setIsViewOpen(false);
+                    handleOpenEditModal(viewProject);
+                  }}
+                >
+                  <Edit className="h-4 w-4" /> แก้ไข
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

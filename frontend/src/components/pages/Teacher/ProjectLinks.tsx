@@ -45,7 +45,11 @@ export default function ProjectLinks() {
           setClos(data.clos || []);
           setLinks(data.links || {});
           
-          if (data.projects && data.projects.length > 0) {
+          const pending = sessionStorage.getItem("pendingProjectId");
+          if (pending && (data.projects || []).some((p: any) => String(p.id) === pending)) {
+            setSelectedProjectId(pending);
+            sessionStorage.removeItem("pendingProjectId");
+          } else if (data.projects && data.projects.length > 0) {
             setSelectedProjectId(data.projects[0].id.toString());
           }
         }
