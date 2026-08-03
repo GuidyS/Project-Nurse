@@ -410,15 +410,15 @@ const NotificationsPage = () => {
                   ส่งแจ้งเตือนใหม่
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-[800px]">
-                <DialogHeader>
+              <DialogContent className="flex max-h-[90vh] w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-[800px]">
+                <DialogHeader className="shrink-0 space-y-1.5 border-b px-6 py-8 pr-12 text-left">
                   <DialogTitle>ส่งการแจ้งเตือนให้นักศึกษา</DialogTitle>
                   <DialogDescription>
                     ส่งแจ้งเตือนผ่าน In-App และ/หรือ Email ให้นักศึกษา
                   </DialogDescription>
                 </DialogHeader>
 
-                <div className="space-y-4 py-4">
+                <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-6 py-4">
                   <div className="space-y-2">
                     <Label>หัวข้อ</Label>
                     <Input
@@ -544,7 +544,7 @@ const NotificationsPage = () => {
                   </div>
                 </div>
 
-                <DialogFooter>
+                <DialogFooter className="shrink-0 border-t px-6 py-4 sm:space-x-2">
                   <Button variant="outline" onClick={() => handleDialogOpenChange(false)}>
                     ยกเลิก
                   </Button>

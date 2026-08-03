@@ -379,7 +379,7 @@ const PdfDocumentsSection = ({ documents }: { documents: any[] }) => {
     <div className="md:col-span-2 space-y-3">
       <div className="flex items-center gap-2">
         <FileText className="h-4 w-4 text-primary" />
-        <p className="font-semibold text-foreground">เอกสาร PDF</p>
+        <p className="font-semibold text-foreground">เอกสาร</p>
       </div>
       <div className="grid gap-3 sm:grid-cols-5">
         {documents.map((doc, index) => {
