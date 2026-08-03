@@ -2,10 +2,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { FileText, Save, Edit, Loader2 } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { FileText, Save, Edit, Loader2, Search } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
+import { Input } from '@/components/ui/input';
 
 interface CLOMapData {
   [courseCode: string]: string[];
@@ -24,6 +25,7 @@ export default function CLOMap() {
   
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [courseSearch, setCourseSearch] = useState('');
 
   // 🌟 ดึงข้อมูลจากฐานข้อมูลเมื่อเปิดหน้า
   const fetchMapData = async () => {
@@ -45,6 +47,16 @@ export default function CLOMap() {
   useEffect(() => {
     fetchMapData();
   }, []);
+
+  const filteredCourses = useMemo(() => {
+    const q = courseSearch.trim().toLowerCase();
+    if (!q) return courses;
+    return courses.filter(
+      (c) =>
+        String(c.code ?? '').toLowerCase().includes(q) ||
+        String(c.name ?? '').toLowerCase().includes(q)
+    );
+  }, [courses, courseSearch]);
 
   const toggleMapping = (courseCode: string, plo: string) => {
     if (!isEditing) return;
@@ -128,14 +140,25 @@ return (
 
         {/* CLO Map Table */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              ตาราง CLO Mapping
-            </CardTitle>
-            <CardDescription>
-              ติ๊กเลือกความสอดคล้องระหว่างรายวิชา (แกน Y) และ PLO (แกน X)
-            </CardDescription>
+          <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between space-y-0">
+            <div className="space-y-1.5">
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                ตาราง CLO Mapping
+              </CardTitle>
+              <CardDescription>
+                ติ๊กเลือกความสอดคล้องระหว่างรายวิชา (แกน Y) และ PLO (แกน X)
+              </CardDescription>
+            </div>
+            <div className="relative w-full sm:w-64 shrink-0">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={courseSearch}
+                onChange={(e) => setCourseSearch(e.target.value)}
+                placeholder="ค้นหารหัส / ชื่อวิชา..."
+                className="pl-9"
+              />
+            </div>
           </CardHeader>
           <CardContent className="overflow-x-auto">
             <Table>
@@ -149,22 +172,34 @@ return (
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {courses.length > 0 ? courses.map((course) => (
-                  <TableRow key={course.code}>
-                    <TableCell className="font-medium">{course.code}</TableCell>
-                    <TableCell>{course.name}</TableCell>
-                    {plos.map((plo) => (
-                      <TableCell key={plo} className="text-center">
-                        <Checkbox
-                          checked={cloMap[course.code]?.includes(plo) || false}
-                          onCheckedChange={() => toggleMapping(course.code, plo)}
-                          disabled={!isEditing}
-                        />
-                      </TableCell>
-                    ))}
+                {courses.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={plos.length + 2} className="text-center py-6">
+                      ไม่มีรายวิชาในระบบ
+                    </TableCell>
                   </TableRow>
-                )) : (
-                  <TableRow><TableCell colSpan={plos.length + 2} className="text-center py-6">ไม่มีรายวิชาในระบบ</TableCell></TableRow>
+                ) : filteredCourses.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={plos.length + 2} className="text-center py-6">
+                      ไม่พบรายวิชาที่ตรงกับคำค้นหา
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredCourses.map((course) => (
+                    <TableRow key={course.code}>
+                      <TableCell className="font-medium">{course.code}</TableCell>
+                      <TableCell>{course.name}</TableCell>
+                      {plos.map((plo) => (
+                        <TableCell key={plo} className="text-center">
+                          <Checkbox
+                            checked={cloMap[course.code]?.includes(plo) || false}
+                            onCheckedChange={() => toggleMapping(course.code, plo)}
+                            disabled={!isEditing}
+                          />
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))
                 )}
               </TableBody>
             </Table>

@@ -448,8 +448,53 @@ try {
             $input = json_decode(file_get_contents("php://input"), true) ?: [];
             $input['details'] = parseRequestDetails($input['details'] ?? []);
         }
-        $id = $input['user_id'] ?? null;
+        $id = $input['user_id'] ?? $input['id'] ?? null;
         if (!$id) throw new Exception("ข้อมูลไม่ครบถ้วน");
+
+        // ระงับ / เปิดใช้งานบัญชีผู้ใช้
+        if (($input['action'] ?? '') === 'toggle_status') {
+            $adminStmt = $db->prepare("SELECT role_id FROM users WHERE user_id = ?");
+            $adminStmt->execute([$_SESSION['user_id']]);
+            if ((int)$adminStmt->fetchColumn() !== 1) {
+                http_response_code(403);
+                echo json_encode(["status" => "error", "message" => "ไม่มีสิทธิ์เปลี่ยนสถานะผู้ใช้"], JSON_UNESCAPED_UNICODE);
+                exit();
+            }
+
+            if ((string)$id === (string)$_SESSION['user_id']) {
+                throw new Exception("ไม่สามารถระงับบัญชีของตัวเองได้");
+            }
+
+            $u_stmt = $db->prepare("SELECT user_id, username, COALESCE(status, 'active') AS status FROM users WHERE user_id = :id");
+            $u_stmt->execute([':id' => $id]);
+            $u_info = $u_stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$u_info) throw new Exception("ไม่พบผู้ใช้งานในระบบ");
+
+            $requested = isset($input['status']) ? strtolower(trim((string)$input['status'])) : '';
+            if ($requested === 'active' || $requested === 'inactive') {
+                $newStatus = $requested;
+            } else {
+                $newStatus = ($u_info['status'] === 'inactive') ? 'active' : 'inactive';
+            }
+
+            $upd = $db->prepare("UPDATE users SET status = :status WHERE user_id = :id");
+            $upd->execute([':status' => $newStatus, ':id' => $id]);
+
+            $actionLabel = $newStatus === 'inactive' ? 'ระงับ' : 'เปิดใช้งาน';
+            $db->prepare("INSERT INTO audit_log (user_id, action_type, resource, details, ip_address) VALUES (?, 'update', 'ผู้ใช้', ?, ?)")
+               ->execute([
+                   $_SESSION['user_id'],
+                   "{$actionLabel}บัญชีผู้ใช้ {$u_info['username']} (user_id={$id})",
+                   $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'
+               ]);
+
+            echo json_encode([
+                "status" => "success",
+                "message" => $newStatus === 'inactive' ? "ระงับการใช้งานเรียบร้อย" : "เปิดใช้งานเรียบร้อย",
+                "data" => ["id" => (string)$id, "status" => $newStatus],
+            ], JSON_UNESCAPED_UNICODE);
+            exit();
+        }
 
         // ลบไฟล์ PDF ที่อัปโหลดไว้ (ไม่ลบบัญชีผู้ใช้)
         if (($input['action'] ?? '') === 'delete_document') {

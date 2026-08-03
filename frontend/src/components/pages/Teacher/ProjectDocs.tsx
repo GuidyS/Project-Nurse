@@ -259,7 +259,8 @@ export default function ProjectDocs() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[50px]"></TableHead> {/* ช่องสำหรับวิทยุ/เลือก */}
+                  {/* ช่องสำหรับวิทยุ/เลือก */}
+                  <TableHead className="w-[50px]"></TableHead>
                   <TableHead>ชื่อเอกสาร</TableHead>
                   <TableHead>โครงการ</TableHead>
                   <TableHead>ประเภท</TableHead>

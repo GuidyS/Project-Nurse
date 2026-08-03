@@ -88,7 +88,7 @@ export default function AuditLog() {
       <div className="p-6 space-y-6 animate-fade-in">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Audit Log</h1>
+            <h1 className="text-3xl font-bold text-foreground">Audit Log</h1>
             <p className="text-muted-foreground">ประวัติการใช้งานระบบของผู้ใช้ทั้งหมด</p>
           </div>
           <ExportButton reportName="Audit-Log" />

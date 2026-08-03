@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { UserCheck, UserPlus, Clock, CheckCircle, XCircle, AlertCircle, Plus } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import api from '@/lib/axios';
+import { ConfirmActionDialog } from '@/components/ui/ConfirmActionDialog';
 
 const getStatusBadge = (status: string) => {
   switch (status) {
@@ -37,6 +38,9 @@ export default function TransferRequests() {
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [newRequest, setNewRequest] = useState({ studentId: '', toAdvisorId: '', reason: '' });
+  const [pendingApproveId, setPendingApproveId] = useState<string | null>(null);
+  const [isApproveOpen, setIsApproveOpen] = useState(false);
+  const [isApproving, setIsApproving] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -63,12 +67,23 @@ export default function TransferRequests() {
     fetchData();
   }, []);
 
-  const handleApprove = async (id: string) => {
+  const openApproveConfirm = (id: string) => {
+    setPendingApproveId(id);
+    setIsApproveOpen(true);
+  };
+
+  const handleApprove = async () => {
+    if (!pendingApproveId) return;
+    setIsApproving(true);
     try {
-      await api.post('/components/Teacher/TransferRequests/update_transfer_status.php', { request_id: id, status: 'approved' });
+      await api.post('/components/Teacher/TransferRequests/update_transfer_status.php', { request_id: pendingApproveId, status: 'approved' });
+      setIsApproveOpen(false);
+      setPendingApproveId(null);
       fetchData();
     } catch (err) {
       console.error(err);
+    } finally {
+      setIsApproving(false);
     }
   };
 
@@ -221,7 +236,7 @@ export default function TransferRequests() {
                         <TableCell>{getStatusBadge(request.status)}</TableCell>
                         <TableCell>
                           <div className="flex gap-2">
-                            <Button size="sm" onClick={() => handleApprove(request.id)}>
+                            <Button size="sm" onClick={() => openApproveConfirm(request.id)}>
                               <CheckCircle className="mr-1 h-3 w-3" />
                               รับ
                             </Button>
@@ -418,6 +433,20 @@ export default function TransferRequests() {
           </DialogContent>
         </Dialog>
       </div>
+
+      <ConfirmActionDialog
+        open={isApproveOpen}
+        onOpenChange={(open) => {
+          setIsApproveOpen(open);
+          if (!open) setPendingApproveId(null);
+        }}
+        title="ยืนยันการอนุมัติ"
+        description="คุณแน่ใจหรือไม่ว่าต้องการอนุมัติคำขอย้ายที่ปรึกษานี้?"
+        confirmLabel="อนุมัติ"
+        variant="default"
+        onConfirm={handleApprove}
+        isLoading={isApproving}
+      />
     </>
   );
 }

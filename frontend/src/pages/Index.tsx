@@ -7,7 +7,6 @@ import StudentsInfo from "@/components/pages/Teacher/StudentsInfo";
 import ProjectsPage from "@/components/pages/Teacher/ProjectsPage";
 import CoursesPage from "@/components/pages/Teacher/CoursesPage";
 import CLOPage from "@/components/pages/Teacher/CLOPage";
-import PracticalPage from "@/components/pages/Teacher/PracticalPage";
 import NotificationsPage from "@/components/pages/NotificationsPage";
 import SettingsPage from "@/components/pages/SettingsPage";
 import LoginPage from "@/components/pages/Auth/LoginPage";
@@ -44,7 +43,6 @@ import ImportData from "@/components/pages/Admin/ImportData";
 import Reports from "@/components/pages/Admin/Reports";
 import RolesManagement from "@/components/pages/Admin/RolesManagement";
 import UsersManagement from "@/components/pages/Admin/UsersManagement";
-import Dashboard from "@/components/pages/Teacher/Dashboard";
 import DeanDashboard from "@/components/pages/Teacher/DeanDashboard";
 import Retention from "@/components/pages/Teacher/Retention";
 
@@ -59,14 +57,19 @@ const Index = () => {
       const roleId = Number(userObj.role_id);
       const positionId = Number(userObj.position_id);
 
-      if (roleId === 1) return "users-management";
-      if (roleId === 2) {
-        if (positionId === 1) return "dean-dashboard";
-        if (positionId === 3) return "advises";
-        return "plo-ylo-report";
+      switch (roleId) {
+        case 1:
+          return "users-management";
+        case 2:
+          if (positionId === 1) return "dean-dashboard";
+          if (positionId === 2) return "my-courses";
+          if (positionId === 3) return "advises";
+          if (positionId === 4) return "practical-students";
+          if (positionId === 5) return "clos";
+          if (positionId === 6) return "projectspage";
+        case 3:
+          return "transcript";
       }
-      if (roleId === 3) return "transcript";
-      
       return "profile";
     }
 
@@ -109,9 +112,8 @@ const Index = () => {
                 else if (pId === 2) setActiveItem("my-courses");
                 else if (pId === 3) setActiveItem("advises");
                 else if (pId === 4) setActiveItem("practical-students");
-                else if (pId === 5) setActiveItem("clo-map");
-                else if (pId === 6) setActiveItem("project-docs");
-                else setActiveItem("plo-ylo-report");
+                else if (pId === 5) setActiveItem("clos");
+                else if (pId === 6) setActiveItem("projectspage");
                 break;
               case 3: setActiveItem("transcript"); break;
               default: setActiveItem("profile");
@@ -154,7 +156,7 @@ const Index = () => {
 
     // 5. 🔒 หมวดสิทธิ์อาจารย์และคณะกรรมการ (Teacher - Role 2) หรือ Admin
     const teacherPages = [
-      "teacher-dashboard", "courses", "five-year-summary", "clo-management", "clos",
+      "courses", "five-year-summary", "clo-management", "clos",
       "plo-ylo-report", "course-report", "course-students", "documents", "assign-instructors", "clo-map",
       "evidence", "grades", "my-courses", "performance", "practical-students",
       "program-reports", "schedule-tasks", "projectspage", "my-projects", "project-docs",
@@ -165,7 +167,6 @@ const Index = () => {
     if (teacherPages.includes(activeItem)) {
       if (roleId !== 1 && roleId !== 2) return <UnauthorizedView />;
       switch (activeItem) {
-        case "teacher-dashboard": return <Dashboard />;
         case "courses": return <CoursesPage />;                                     //*
         case "five-year-summary": return <FiveYearSummary />;                       //*
         case "clo-management": return <CLOManagement />;                            //*

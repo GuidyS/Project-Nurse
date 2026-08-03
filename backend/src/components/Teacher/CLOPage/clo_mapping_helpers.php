@@ -91,6 +91,29 @@ function getPloCatalog(array $mappingData): array
     return $plos;
 }
 
+// เรียงรหัส Sub PLO ตามตัวเลข (1.2 มาก่อน 1.10 และ 2.1) — ใช้ร่วมกับฝั่ง mapping_json
+if (!function_exists('subPloCodeOrder')) {
+    function subPloCodeOrder(string $code): int
+    {
+        if (preg_match('/^(\d+)\.(\d+)$/', trim($code), $m)) {
+            return ((int)$m[1]) * 1000 + (int)$m[2];
+        }
+        return PHP_INT_MAX;
+    }
+}
+
+if (!function_exists('sortSubPloCodes')) {
+    function sortSubPloCodes(array $codes): array
+    {
+        $codes = array_values(array_unique(array_map('strval', $codes)));
+        usort($codes, function ($a, $b) {
+            $diff = subPloCodeOrder($a) <=> subPloCodeOrder($b);
+            return $diff !== 0 ? $diff : strcmp($a, $b);
+        });
+        return $codes;
+    }
+}
+
 function getSubPloCatalog(array $mappingData): array
 {
     $catalog = [];
@@ -147,7 +170,7 @@ function filterSubPlosByAllowedPlos(array $mappingData, ?array $subPlos, array $
             $result[] = $code;
         }
     }
-    return array_values(array_unique($result));
+    return sortSubPloCodes($result);
 }
 
 function mergeCourseMappedPlos(array $subjectData): array

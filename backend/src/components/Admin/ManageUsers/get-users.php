@@ -2,11 +2,30 @@
 require_once __DIR__ . '/../../../config/config.php';
 header("Content-Type: application/json");
 
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+if (!isset($_SESSION['user_id'])) {
+    http_response_code(401);
+    echo json_encode(["status" => "error", "message" => "Unauthorized"]);
+    exit();
+}
+
 try {
     $db = new Connect();
+
+    // เฉพาะ admin (role_id = 1) เท่านั้น — กันข้อมูลผู้ใช้รั่วไป role อื่น
+    $roleStmt = $db->prepare("SELECT role_id FROM users WHERE user_id = ?");
+    $roleStmt->execute([$_SESSION['user_id']]);
+    if ((int)$roleStmt->fetchColumn() !== 1) {
+        http_response_code(403);
+        echo json_encode(["status" => "error", "message" => "ไม่มีสิทธิ์เข้าถึงข้อมูลผู้ใช้"], JSON_UNESCAPED_UNICODE);
+        exit();
+    }
     
     // ดึงข้อมูลผู้ใช้ พร้อมชื่อจากตาราง faculty หรือ student และตำแหน่งปัจจุบัน
     $sql = "SELECT u.user_id as id, u.username, u.role_id, u.created_at,
+                   COALESCE(u.status, 'active') as status,
                    s.first_name_th as s_fname, s.last_name_th as s_lname,
                    f.first_name_th as f_fname, f.last_name_th as f_lname,
                    up.position_id
@@ -21,15 +40,20 @@ try {
 
     $result = [];
     foreach($users as $u) {
-        // แมป Role ID ให้ตรงกับหน้าเว็บ
-        $roleStr = 'student';
-        if ($u['role_id'] == 1) $roleStr = 'admin';
-        if ($u['role_id'] == 2) $roleStr = 'teacher';
+        $roleId = $u['role_id'];
 
-        // กำหนดชื่อ
-        $fullName = ($u['role_id'] == 3) 
-            ? trim($u['s_fname'].' '.$u['s_lname']) 
-            : trim($u['f_fname'].' '.$u['f_lname']);
+        // แมป Role ID ให้ตรงกับหน้าเว็บ (null = รอจัดบทบาท)
+        $roleStr = 'unassigned';
+        if ($roleId !== null && $roleId !== '') {
+            if ((int)$roleId === 1) $roleStr = 'admin';
+            elseif ((int)$roleId === 2) $roleStr = 'teacher';
+            elseif ((int)$roleId === 3) $roleStr = 'student';
+        }
+
+        // ชื่อจาก faculty หรือ student โดยไม่ผูกกับ role
+        $studentName = trim(($u['s_fname'] ?? '') . ' ' . ($u['s_lname'] ?? ''));
+        $facultyName = trim(($u['f_fname'] ?? '') . ' ' . ($u['f_lname'] ?? ''));
+        $fullName = $studentName !== '' ? $studentName : $facultyName;
 
         // แมป SubRole สำหรับหน้า RolesManagement
         $subRoleMap = [
@@ -41,10 +65,10 @@ try {
         $result[] = [
             'id' => (string)$u['id'],
             'email' => $u['username'], // ใช้ username แทนอีเมลชั่วคราว
-            'fullName' => $fullName ?: 'ไม่ระบุชื่อ',
+            'fullName' => $fullName !== '' ? $fullName : 'ไม่ระบุชื่อ',
             'role' => $roleStr,
             'teacherSubRole' => $teacherSubRole,
-            'status' => 'active', // ค่าเริ่มต้น เพราะใน DB ยังไม่มีคอลัมน์ status ในตาราง users
+            'status' => ($u['status'] === 'inactive') ? 'inactive' : 'active',
             'createdAt' => date('Y-m-d', strtotime($u['created_at']))
         ];
     }

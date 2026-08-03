@@ -1,9 +1,18 @@
 import { useState } from "react";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import api from "@/lib/axios";
 import { cn } from "@/lib/utils";
@@ -21,10 +30,25 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showResetPassword, setShowResetPassword] = useState(false);
+  const [roleUnassignedOpen, setRoleUnassignedOpen] = useState(false);
 
   const handleBackToLogin = () => {
     setShowResetPassword(false);
     setIsLoading(false);
+  };
+
+  const showRoleUnassignedPopup = (payload?: { code?: string; message?: string }) => {
+    const code = payload?.code;
+    const message = payload?.message || "";
+    if (
+      code === "role_unassigned" ||
+      message.includes("ยังไม่ได้มอบสิทธิ์") ||
+      message.includes("ยังไม่ถูกมอบบทบาท")
+    ) {
+      setRoleUnassignedOpen(true);
+      return true;
+    }
+    return false;
   };
 
     const handleLogin = async (e: React.FormEvent) => {
@@ -58,10 +82,19 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
       
       toast.success("เข้าสู่ระบบสำเร็จ");
       onLoginSuccess(response.data.user);
+    } else if (showRoleUnassignedPopup(response.data)) {
+      // card popup
+    } else {
+      toast.error(response.data.message || "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง");
     }
   } catch (error: any) {
-    const message = error.response?.data?.message || "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง";
-    toast.error(message);
+    const data = error.response?.data;
+    if (showRoleUnassignedPopup(data)) {
+      // card popup
+    } else {
+      const message = data?.message || "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง";
+      toast.error(message);
+    }
     console.error("Login Error:", error);
   } finally {
     setIsLoading(false);
@@ -236,6 +269,28 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
             
         </form>
       </div>
+
+      <AlertDialog open={roleUnassignedOpen} onOpenChange={setRoleUnassignedOpen}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 text-amber-800">
+              <ShieldAlert className="h-6 w-6" />
+            </div>
+            <AlertDialogTitle className="text-center">ยังไม่สามารถเข้าสู่ระบบได้</AlertDialogTitle>
+            <AlertDialogDescription className="text-center space-y-2">
+              <span className="block">
+                บัญชีของคุณยังไม่ได้ถูกมอบสิทธิ์ (บทบาท) ในระบบ
+              </span>
+              <span className="block text-muted-foreground">
+                กรุณาติดต่อผู้ดูแลระบบเพื่อมอบ role ก่อนเข้าใช้งาน
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="sm:justify-center">
+            <AlertDialogAction className="min-w-28">รับทราบ</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

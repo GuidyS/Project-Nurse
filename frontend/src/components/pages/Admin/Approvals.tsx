@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
 import { CheckCircle, XCircle, Clock, FileText, Loader2 } from "lucide-react";
+import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
 
 type ApprovalStatus = "pending" | "approved" | "rejected";
 
@@ -75,6 +76,8 @@ export default function Approvals() {
   const [approvals, setApprovals] = useState<ApprovalRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<{ id: string; action: "approve" | "reject" } | null>(null);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const { toast } = useToast();
 
   const fetchApprovals = useCallback(async () => {
@@ -99,7 +102,14 @@ export default function Approvals() {
     fetchApprovals();
   }, [fetchApprovals]);
 
-  const updateApprovalStatus = async (id: string, action: "approve" | "reject") => {
+  const openConfirm = (id: string, action: "approve" | "reject") => {
+    setPendingAction({ id, action });
+    setIsConfirmOpen(true);
+  };
+
+  const updateApprovalStatus = async () => {
+    if (!pendingAction) return;
+    const { id, action } = pendingAction;
     const endpoint = action === "approve" ? "approve-request" : "reject-request";
     const successTitle = action === "approve" ? "อนุมัติคำขอสำเร็จ" : "ปฏิเสธคำขอสำเร็จ";
     const failureTitle = action === "approve" ? "อนุมัติคำขอไม่สำเร็จ" : "ปฏิเสธคำขอไม่สำเร็จ";
@@ -108,6 +118,8 @@ export default function Approvals() {
       setUpdatingId(id);
       await api.post(`/index.php?page=${endpoint}`, { id });
       toast({ title: successTitle });
+      setIsConfirmOpen(false);
+      setPendingAction(null);
       await fetchApprovals();
     } catch (error) {
       toast({
@@ -167,7 +179,7 @@ export default function Approvals() {
               <Button
                 size="sm"
                 disabled={updatingId === approval.id}
-                onClick={() => updateApprovalStatus(approval.id, "approve")}
+                onClick={() => openConfirm(approval.id, "approve")}
               >
                 {updatingId === approval.id ? (
                   <Loader2 className="mr-1 h-3 w-3 animate-spin" />
@@ -180,7 +192,7 @@ export default function Approvals() {
                 variant="outline"
                 size="sm"
                 disabled={updatingId === approval.id}
-                onClick={() => updateApprovalStatus(approval.id, "reject")}
+                onClick={() => openConfirm(approval.id, "reject")}
               >
                 <XCircle className="mr-1 h-3 w-3" />
                 ปฏิเสธ
@@ -195,6 +207,7 @@ export default function Approvals() {
   };
 
   return (
+    <>
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">อนุมัติคำขอ</h1>
@@ -296,5 +309,24 @@ export default function Approvals() {
         </TabsContent>
       </Tabs>
     </div>
+
+    <ConfirmActionDialog
+      open={isConfirmOpen}
+      onOpenChange={(open) => {
+        setIsConfirmOpen(open);
+        if (!open) setPendingAction(null);
+      }}
+      title={pendingAction?.action === "reject" ? "ยืนยันการปฏิเสธ" : "ยืนยันการอนุมัติ"}
+      description={
+        pendingAction?.action === "reject"
+          ? "คุณแน่ใจหรือไม่ว่าต้องการปฏิเสธคำขอนี้?"
+          : "คุณแน่ใจหรือไม่ว่าต้องการอนุมัติคำขอนี้?"
+      }
+      confirmLabel={pendingAction?.action === "reject" ? "ปฏิเสธ" : "อนุมัติ"}
+      variant={pendingAction?.action === "reject" ? "destructive" : "default"}
+      onConfirm={updateApprovalStatus}
+      isLoading={updatingId !== null}
+    />
+    </>
   );
 }

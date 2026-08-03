@@ -9,8 +9,10 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Shield, Search, UserCog } from "lucide-react";
+import { Check, Shield, Search, UserCog } from "lucide-react";
+import { cn } from "@/lib/utils";
 import api from "@/lib/axios";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface UserWithRole {
   id: string;
@@ -19,6 +21,8 @@ interface UserWithRole {
   currentRole: string;
   teacherSubRole?: string;
 }
+
+type RoleTab = "teacher" | "student" | "admin" | "unassigned";
 
 const roles = [
   { value: "admin", label: "ผู้ดูแลระบบ", description: "สิทธิ์เต็มในการจัดการระบบ" },
@@ -39,7 +43,15 @@ const roleLabels: Record<string, string> = {
   admin: "ผู้ดูแลระบบ",
   student: "นักศึกษา",
   teacher: "อาจารย์",
+  unassigned: "รอจัดบทบาท",
 };
+
+const roleTabs: { value: RoleTab; label: string }[] = [
+  { value: "teacher", label: "อาจารย์" },
+  { value: "student", label: "นักศึกษา" },
+  { value: "admin", label: "ผู้ดูแลระบบ" },
+  { value: "unassigned", label: "รอจัดบทบาท" },
+];
 
 const subRoleLabels: Record<string, string> = {
   dean: "คณบดี",
@@ -53,6 +65,7 @@ const subRoleLabels: Record<string, string> = {
 export default function RolesManagement() {
   const [users, setUsers] = useState<UserWithRole[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [roleTab, setRoleTab] = useState<RoleTab>("unassigned");
   const [selectedUser, setSelectedUser] = useState<UserWithRole | null>(null);
   const [newRole, setNewRole] = useState("");
   const [primaryPosition, setPrimaryPosition] = useState("");
@@ -127,12 +140,16 @@ export default function RolesManagement() {
     }
   };
 
-  const filteredUsers = users.filter(
-    (user) =>
-      user.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredUsers = users.filter((user) => {
+    if (user.currentRole !== roleTab) return false;
+    const q = searchQuery.toLowerCase();
+    return (
+      user.fullName.toLowerCase().includes(q) ||
+      user.email.toLowerCase().includes(q)
+    );
+  });
 
+  const tabCount = (tab: RoleTab) => users.filter((u) => u.currentRole === tab).length;
 
   const handlePrimaryPositionChange = (value: string) => {
     setPrimaryPosition(value);
@@ -160,7 +177,7 @@ export default function RolesManagement() {
     }
 
     setSelectedUser(user);
-    setNewRole(user.currentRole);
+    setNewRole(user.currentRole === "unassigned" ? "" : user.currentRole);
     setPrimaryPosition(user.teacherSubRole || "");
     setSecondaryPositions([]);
     setIsDialogOpen(true);
@@ -183,15 +200,22 @@ export default function RolesManagement() {
       <div className="p-6 space-y-6 animate-fade-in">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">จัดการ Role</h1>
+            <h1 className="text-3xl font-bold text-foreground">จัดการ Role</h1>
             <p className="text-muted-foreground">มอบหมายและถอด Role ของผู้ใช้ในระบบ</p>
           </div>
         </div>
 
         {/* Role Summary Cards */}
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-4">
           {roles.map((role) => (
-            <Card key={role.value}>
+            <Card
+              key={role.value}
+              className={cn(
+                "cursor-pointer transition-colors hover:border-primary/40",
+                roleTab === role.value && "border-primary"
+              )}
+              onClick={() => setRoleTab(role.value as RoleTab)}
+            >
               <CardHeader className="pb-2">
                 <div className="flex items-center gap-2">
                   <Shield className="h-5 w-5 text-primary" />
@@ -201,19 +225,39 @@ export default function RolesManagement() {
               <CardContent>
                 <p className="text-sm text-muted-foreground">{role.description}</p>
                 <p className="mt-2 text-2xl font-bold">
-                  {users.filter((u) => u.currentRole === role.value).length}
+                  {tabCount(role.value as RoleTab)}
                 </p>
               </CardContent>
             </Card>
           ))}
+          <Card
+            className={cn(
+              "cursor-pointer transition-colors hover:border-primary/40",
+              roleTab === "unassigned" && "border-primary"
+            )}
+            onClick={() => setRoleTab("unassigned")}
+          >
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-2">
+                <Shield className="h-5 w-5 text-amber-600" />
+                <CardTitle className="text-base">รอจัดบทบาท</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">บัญชียังไม่มี role — มอบสิทธิ์ก่อนเข้าใช้ระบบ</p>
+              <p className="mt-2 text-2xl font-bold">{tabCount("unassigned")}</p>
+            </CardContent>
+          </Card>
         </div>
 
         <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
+          <CardHeader className="space-y-4">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
               <div>
                 <CardTitle>จัดการ Role ผู้ใช้</CardTitle>
-                <CardDescription>เลือกผู้ใช้เพื่อมอบหมายหรือถอด Role</CardDescription>
+                <CardDescription>
+                  {roleLabels[roleTab]} {tabCount(roleTab)} คน · ทั้งหมด {users.length} คน
+                </CardDescription>
               </div>
               <div className="relative w-64">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -225,6 +269,18 @@ export default function RolesManagement() {
                 />
               </div>
             </div>
+            <Tabs value={roleTab} onValueChange={(value) => setRoleTab(value as RoleTab)}>
+              <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
+                {roleTabs.map((tab) => (
+                  <TabsTrigger key={tab.value} value={tab.value} className="gap-1.5">
+                    {tab.label}
+                    <Badge variant="secondary" className="h-5 min-w-5 px-1.5 text-[10px]">
+                      {tabCount(tab.value)}
+                    </Badge>
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
           </CardHeader>
           <CardContent>
             <Table>
@@ -237,54 +293,67 @@ export default function RolesManagement() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredUsers.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <Avatar className="h-8 w-8">
-                          <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                            {user.fullName.charAt(0)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span className="font-medium">{user.fullName}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{user.email}</TableCell>
-                    <TableCell>
-                      <div className="flex flex-col gap-1">
-                        <Badge variant="outline">{roleLabels[user.currentRole]}</Badge>
-                        {user.teacherSubRole && (
-                          <Badge variant="secondary" className="text-xs">{subRoleLabels[user.teacherSubRole]}</Badge>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {isSelfUser(user.id) ? (
-                        <Badge variant="secondary">ผู้ดูแลระบบ</Badge>
-                      ) : (
-                        <Button variant="outline" size="sm" onClick={() => openAssignDialog(user)} className="gap-2">
-                          <UserCog className="h-4 w-4" />
-                          จัดการ Role
-                        </Button>
-                      )}
+                {filteredUsers.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
+                      ไม่พบผู้ใช้ในหมวดนี้
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : (
+                  filteredUsers.map((user) => (
+                    <TableRow key={user.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-8 w-8">
+                            <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                              {user.fullName.charAt(0)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="font-medium">{user.fullName}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{user.email}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-1">
+                          <Badge
+                            variant={user.currentRole === "unassigned" ? "secondary" : "outline"}
+                            className={user.currentRole === "unassigned" ? "bg-amber-100 text-amber-900 border-amber-200" : undefined}
+                          >
+                            {roleLabels[user.currentRole] || user.currentRole}
+                          </Badge>
+                          {user.teacherSubRole && (
+                            <Badge variant="secondary" className="text-xs">{subRoleLabels[user.teacherSubRole]}</Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {isSelfUser(user.id) ? (
+                          <Badge variant="secondary">ผู้ดูแลระบบ</Badge>
+                        ) : (
+                          <Button variant="outline" size="sm" onClick={() => openAssignDialog(user)} className="gap-2">
+                            <UserCog className="h-4 w-4" />
+                            จัดการ Role
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </CardContent>
         </Card>
 
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
+          <DialogContent className="sm:max-w-2xl">
+            <DialogHeader className="space-y-1.5">
               <DialogTitle>มอบหมาย Role</DialogTitle>
               <DialogDescription>
                 {selectedUser && `เปลี่ยน Role ของ ${selectedUser.fullName}`}
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
+            <div className="space-y-5 py-4">
+              <div className="space-y-2.5">
                 <Label>Role หลัก</Label>
                 <Select
                   value={newRole}
@@ -308,7 +377,7 @@ export default function RolesManagement() {
               </div>
               {newRole === "teacher" && (
                 <>
-                  <div className="space-y-2">
+                  <div className="space-y-2.5">
                     <Label>ตำแหน่งหลัก</Label>
                     <Select value={primaryPosition} onValueChange={handlePrimaryPositionChange}>
                       <SelectTrigger>
@@ -322,9 +391,14 @@ export default function RolesManagement() {
                     </Select>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label>ตำแหน่งรอง</Label>
-                    <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="space-y-3 rounded-lg border border-border/80 bg-muted/10 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <Label>ตำแหน่งรอง</Label>
+                      <span className="text-xs text-muted-foreground">
+                        {secondaryPositions.length} รายการ
+                      </span>
+                    </div>
+                    <div className="grid gap-2.5 sm:grid-cols-2">
                       {teacherSubRoles.map((subRole) => {
                         const isPrimary = primaryPosition === subRole.value;
                         const isSelected = secondaryPositions.includes(subRole.value);
@@ -333,23 +407,39 @@ export default function RolesManagement() {
                           <Button
                             key={subRole.value}
                             type="button"
-                            variant={isSelected ? "default" : "outline"}
+                            variant="outline"
                             disabled={isPrimary}
-                            className="justify-start"
+                            className={cn(
+                              "h-auto min-h-[52px] items-center justify-between gap-3 whitespace-normal rounded-lg px-3 py-2.5 text-left leading-snug transition-all",
+                              "border-border/80 bg-background/60 hover:border-primary/60 hover:bg-primary/5",
+                              isSelected && "border-primary/70 bg-primary/10 text-primary hover:bg-primary/15",
+                              isPrimary && "border-muted bg-muted/30 text-muted-foreground opacity-70"
+                            )}
                             onClick={() => toggleSecondaryPosition(subRole.value)}
                           >
-                            {subRole.label}
-                            {isPrimary ? " (ตำแหน่งหลัก)" : ""}
+                            <span className="min-w-0 flex-1 break-words">
+                              {subRole.label}
+                              {isPrimary && (
+                                <span className="mt-1 block text-xs text-muted-foreground">
+                                  ตำแหน่งหลัก
+                                </span>
+                              )}
+                            </span>
+                            {isSelected && !isPrimary && (
+                              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                                <Check className="h-3.5 w-3.5" />
+                              </span>
+                            )}
                           </Button>
                         );
                       })}
                     </div>
-                    <p className="text-xs text-muted-foreground">เลือกได้หลายตำแหน่ง ตำแหน่งหลักจะไม่ถูกเลือกซ้ำเป็นตำแหน่งรอง</p>
+                    <p className="text-xs leading-relaxed text-muted-foreground">เลือกได้หลายตำแหน่ง ตำแหน่งหลักจะไม่ถูกเลือกซ้ำเป็นตำแหน่งรอง</p>
                   </div>
                 </>
               )}
             </div>
-            <DialogFooter>
+            <DialogFooter className="gap-2 border-t border-border/70 pt-4">
               <Button variant="outline" onClick={() => setIsDialogOpen(false)}>ยกเลิก</Button>
               <Button onClick={handleAssignRole}>บันทึก</Button>
             </DialogFooter>

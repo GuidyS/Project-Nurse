@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: db
--- Generation Time: Jul 23, 2026 at 03:32 AM
+-- Generation Time: Aug 03, 2026 at 10:47 AM
 -- Server version: 9.7.0
 -- PHP Version: 8.3.26
 
@@ -1270,17 +1270,13 @@ INSERT INTO `audit_log` (`audit_log_id`, `user_id`, `action_type`, `resource`, `
 (9, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-05-25 15:31:22'),
 (10, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-05-25 15:59:35'),
 (11, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-05-25 16:46:02'),
-(20, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-05-25 17:52:31'),
-(22, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-05-25 18:19:23'),
 (24, 4, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-05-25 18:37:41'),
 (26, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-05-25 18:39:47'),
 (27, 6, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-05-25 18:48:21'),
 (28, 4, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-05-25 18:48:40'),
 (30, 7, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-05-25 18:49:34'),
-(32, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-05-25 18:50:35'),
 (33, 7, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-05-25 18:50:52'),
 (34, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-05-25 18:57:33'),
-(36, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-05-25 18:59:10'),
 (37, 7, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-05-25 18:59:39'),
 (39, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-05-25 19:04:57'),
 (40, 7, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-05-25 19:26:58'),
@@ -1291,7 +1287,6 @@ INSERT INTO `audit_log` (`audit_log_id`, `user_id`, `action_type`, `resource`, `
 (45, 4, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-05-25 19:44:21'),
 (47, 6, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-05-25 19:46:11'),
 (48, 4, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-05-25 19:46:31'),
-(50, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-05-25 19:47:10'),
 (52, 7, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-05-25 19:47:43'),
 (53, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-05-25 19:47:59'),
 (54, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-05-26 16:43:33'),
@@ -1301,7 +1296,6 @@ INSERT INTO `audit_log` (`audit_log_id`, `user_id`, `action_type`, `resource`, `
 (58, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-05-26 17:41:51'),
 (59, 6, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-05-26 17:41:59'),
 (60, 4, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-05-26 17:42:06'),
-(61, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-05-26 17:47:05'),
 (62, 4, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-05-26 17:50:16'),
 (64, 7, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-05-26 17:50:33'),
 (67, 6, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-05-26 17:51:25'),
@@ -1373,13 +1367,11 @@ INSERT INTO `audit_log` (`audit_log_id`, `user_id`, `action_type`, `resource`, `
 (143, 6, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-06-17 15:12:59'),
 (144, 7, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-06-17 15:14:35'),
 (146, 4, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-06-17 15:17:49'),
-(149, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-06-17 15:26:13'),
 (150, 1, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-06-17 15:28:06'),
 (151, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-06-17 15:30:42'),
 (152, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-06-17 15:58:12'),
 (154, 7, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-06-17 16:11:21'),
 (155, 7, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-06-19 20:58:58'),
-(156, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-06-19 21:00:06'),
 (157, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-06-19 21:02:43'),
 (158, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-06-20 15:33:18'),
 (159, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-06-21 15:00:33'),
@@ -1463,17 +1455,11 @@ INSERT INTO `audit_log` (`audit_log_id`, `user_id`, `action_type`, `resource`, `
 (252, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-06-29 17:19:58'),
 (253, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-06-29 17:20:20'),
 (254, 5, 'update', 'ผู้ใช้', 'แก้ไขข้อมูลบัญชี: 44172033', '172.18.0.1', '2026-06-29 17:45:23'),
-(255, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-06-29 17:47:11'),
 (256, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-06-29 17:54:47'),
 (257, 5, 'update', 'ผู้ใช้', 'แก้ไขข้อมูลบัญชี: 44172033', '172.18.0.1', '2026-06-29 17:59:45'),
-(258, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-06-29 18:00:28'),
 (259, 5, 'update', 'ผู้ใช้', 'แก้ไขข้อมูลบัญชี: 44172033', '172.18.0.1', '2026-06-29 19:37:47'),
-(260, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-06-29 19:38:09'),
 (261, 7, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-06-29 19:42:19'),
-(262, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-06-29 19:44:43'),
 (263, 5, 'update', 'ผู้ใช้', 'แก้ไขข้อมูลบัญชี: 44172033', '172.18.0.1', '2026-06-29 20:06:52'),
-(264, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-06-29 20:08:22'),
-(265, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-06-29 20:21:26'),
 (266, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-06-29 20:21:51'),
 (267, 5, 'update', 'ผู้ใช้', 'แก้ไขข้อมูลบัญชี: 44172033', '172.18.0.1', '2026-06-29 20:34:00'),
 (268, 5, 'update', 'ผู้ใช้', 'แก้ไขข้อมูลบัญชี: 44172033', '172.18.0.1', '2026-06-29 20:38:13'),
@@ -1483,45 +1469,23 @@ INSERT INTO `audit_log` (`audit_log_id`, `user_id`, `action_type`, `resource`, `
 (272, 5, 'update', 'ผู้ใช้', 'แก้ไขข้อมูลบัญชี: 44172033', '172.18.0.1', '2026-06-29 21:03:36'),
 (273, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-06-29 21:12:12'),
 (274, 5, 'update', 'ผู้ใช้', 'แก้ไขข้อมูลบัญชี: 44172033', '172.18.0.1', '2026-06-29 21:12:23'),
-(275, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-06-29 21:12:55'),
 (276, 5, 'update', 'ผู้ใช้', 'แก้ไขข้อมูลบัญชี: 44172033', '172.18.0.1', '2026-06-29 21:14:04'),
 (277, 5, 'update', 'ผู้ใช้', 'แก้ไขข้อมูลบัญชี: 44172033', '172.18.0.1', '2026-06-29 21:26:50'),
 (278, 5, 'update', 'ผู้ใช้', 'แก้ไขข้อมูลบัญชี: 44172033', '172.18.0.1', '2026-06-29 21:33:38'),
 (279, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-06-30 16:47:46'),
-(280, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-06-30 19:46:26'),
 (281, 1, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-06-30 22:55:19'),
-(282, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-06-30 23:12:42'),
 (283, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-01 08:07:36'),
 (284, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-01 09:44:31'),
 (285, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-01 18:22:50'),
-(286, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-01 19:17:03'),
 (287, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-03 05:55:34'),
-(288, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-08 10:52:04'),
-(289, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-08 18:27:17'),
-(290, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-10 08:27:36'),
 (291, 1, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-10 09:38:57'),
 (292, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-10 10:05:00'),
-(293, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-10 10:05:14'),
 (294, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-10 11:53:31'),
-(295, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-10 11:54:14'),
 (296, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-11 11:02:28'),
-(297, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-11 11:02:55'),
-(298, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-11 14:34:17'),
-(299, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-11 14:35:28'),
-(300, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-11 14:53:59'),
-(301, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-11 14:55:02'),
-(302, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-11 14:58:19'),
 (303, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-11 14:59:27'),
-(304, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-11 14:59:33'),
 (305, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-11 18:04:25'),
-(306, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-11 18:05:21'),
-(307, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-11 18:10:42'),
-(308, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-11 18:10:56'),
-(309, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-11 18:11:06'),
-(310, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-11 18:11:27'),
 (311, 6, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-11 19:40:59'),
 (312, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-11 20:01:38'),
-(313, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-11 20:02:52'),
 (314, 6, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-11 20:03:13'),
 (315, 6, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-11 20:23:56'),
 (316, 6, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-11 20:24:19'),
@@ -1530,41 +1494,42 @@ INSERT INTO `audit_log` (`audit_log_id`, `user_id`, `action_type`, `resource`, `
 (319, 6, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-11 20:41:39'),
 (320, 6, 'update', 'ความปลอดภัย', 'เปลี่ยนรหัสผ่านสำเร็จ', '172.18.0.1', '2026-07-11 20:44:22'),
 (321, 6, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-11 20:44:48'),
-(322, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-11 21:28:05'),
 (323, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-11 21:28:39'),
 (324, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-11 21:30:13'),
-(325, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-11 21:30:42'),
-(326, 10, 'update', 'ความปลอดภัย', 'เปลี่ยนรหัสผ่านสำเร็จ', '172.18.0.1', '2026-07-11 21:31:35'),
-(327, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-11 21:31:51'),
 (328, 6, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-11 21:32:28'),
-(329, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-11 21:51:39'),
 (330, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-12 13:05:40'),
-(331, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-12 13:07:59'),
-(332, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-12 13:21:08'),
 (333, 6, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-12 13:25:26'),
-(334, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-12 13:25:57'),
 (335, 6, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-12 13:32:59'),
-(336, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-12 13:39:27'),
 (337, 6, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-12 14:08:37'),
 (338, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-12 15:14:45'),
 (339, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-12 15:17:39'),
-(340, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-12 15:23:13'),
-(341, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-14 15:35:27'),
 (342, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-14 18:28:26'),
 (343, 5, 'update', 'ผู้ใช้', 'แก้ไขข้อมูลบัญชี: 44172033', '172.18.0.1', '2026-07-14 18:38:12'),
-(344, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-14 18:38:56'),
 (345, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-17 13:07:38'),
-(346, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-17 13:11:21'),
-(347, 10, 'update', 'ความปลอดภัย', 'เปลี่ยนรหัสผ่านสำเร็จ', '172.18.0.1', '2026-07-17 13:11:45'),
-(348, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-17 13:12:08'),
 (349, 5, 'update', 'ผู้ใช้', 'แก้ไขข้อมูลบัญชี: 44172033', '172.18.0.1', '2026-07-17 13:23:19'),
 (350, 5, 'update', 'ผู้ใช้', 'แก้ไขข้อมูลบัญชี: 44172033', '172.18.0.1', '2026-07-17 13:24:01'),
 (351, 5, 'delete', 'ผู้ใช้', 'ลบเอกสารผู้ใช้ 44172033: uploads/user-documents/44172033/teaching_degree_file_20260717_132401_6109a41d.pdf', '172.18.0.1', '2026-07-17 13:32:47'),
 (352, 5, 'update', 'ผู้ใช้', 'แก้ไขข้อมูลบัญชี: 44172033', '172.18.0.1', '2026-07-17 13:36:39'),
 (353, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-19 13:41:00'),
-(354, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-19 13:43:17'),
-(355, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-21 22:12:02'),
-(356, 10, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-23 02:21:00');
+(359, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-23 18:41:33'),
+(363, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-07-29 07:57:13'),
+(364, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-08-01 08:39:06'),
+(366, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-08-02 14:36:33'),
+(369, 6, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-08-02 16:08:16'),
+(375, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-08-02 18:24:31'),
+(380, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-08-02 22:13:42'),
+(383, 5, 'update', 'ผู้ใช้', 'ระงับบัญชีผู้ใช้ 44172033 (user_id=10)', '172.18.0.1', '2026-08-02 22:14:51'),
+(384, 5, 'update', 'ผู้ใช้', 'เปิดใช้งานบัญชีผู้ใช้ 44172033 (user_id=10)', '172.18.0.1', '2026-08-02 22:19:45'),
+(396, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-08-03 05:34:23'),
+(399, 5, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-08-03 08:32:17'),
+(400, 12, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-08-03 08:36:14'),
+(401, 12, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-08-03 08:40:08'),
+(402, 12, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-08-03 08:40:48'),
+(403, 12, 'update', 'ความปลอดภัย', 'เปลี่ยนรหัสผ่านสำเร็จ', '172.18.0.1', '2026-08-03 08:41:12'),
+(404, 12, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-08-03 08:41:26'),
+(405, 13, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-08-03 09:35:56'),
+(406, 12, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-08-03 10:07:13'),
+(407, 12, 'login', 'ระบบ', 'เข้าสู่ระบบสำเร็จ', '172.18.0.1', '2026-08-03 10:09:43');
 
 -- --------------------------------------------------------
 
@@ -2193,11 +2158,12 @@ INSERT INTO `faculty` (`id`, `faculty_id`, `title`, `first_name_th`, `last_name_
 (24, 59172121, 'อาจารย์', 'ระชี', 'ดิษฐจร', 'Rachi', 'Disthchr', 'หญิง', '1955-11-16', NULL, '0869755634', '146 ซ.สุขุมวิท 62 ต.บางจาก อ.พระโขนง กรุงเทพฯ 10260', '4511012136', '2027-12-23', '2016-11-01', NULL, 'https://drive.google.com/uc?id=10OJ3-dzXbX-myVOmccENNAMR910U3fpL', NULL, NULL, NULL, 'Active', NULL, '2026-07-05 03:43:30'),
 (41, 60172123, 'อาจารย์', 'ขวัญเรือน', 'ก๋าวิตู', 'Khwayerueon', 'Kawitu', 'หญิง', '1985-06-19', NULL, '0847083511', '206/4 The village bangna3 ต.บางพลีใหญ่ อ.บางพลี จ.สมุทรปราการ', '5111207345', '2024-07-25', '2017-02-02', NULL, 'https://drive.google.com/uc?id=1qf6sC-ZthUNaS6ntboBTHYlcPTChtwip', NULL, NULL, NULL, 'Active', NULL, '2026-07-05 03:44:54'),
 (46, 63172128, 'อาจารย์', 'เรวัต', 'แย้มสุดา', 'Erwat', 'Aeymsuda', 'ชาย', '1959-04-28', NULL, '0814463037', '109/170 หมู่2 ต.มหาสวัสดิ์ อ.บางกรวย จ.นนทบุรี', 'อ.1/21510', NULL, '2020-01-01', NULL, 'https://drive.google.com/uc?id=1HcurGQ_0JKN-s4zn6PX7FPmR7hie1KI3', NULL, NULL, NULL, 'Active', NULL, '2026-07-05 03:44:54'),
+(12, 63172129, 'อาจารย์', 'รัตนาภรณ์', 'นิวาศานนท์', 'Ratnaphrn', 'Niwasannth', 'หญิง', '1992-03-24', NULL, '0868046982', 'หมู่บ้านร้อยพฤกษาเลควิว  223/169 ซอย11 หมู่ 10 ต. นครปฐม อ เมืองนครปฐม จ.นครปฐม', '51811261753', '2025-07-26', '2019-02-01', NULL, 'https://drive.google.com/uc?id=1Yb5w7soKR-wXjXupTQJbZbgtwYw73HDB', NULL, NULL, NULL, 'Active', NULL, '2026-07-05 03:43:30'),
+(55, 63172133, 'นางสาว', 'พรรณี', 'ตรังคสันต์', NULL, NULL, 'หญิง', '1968-02-27', NULL, NULL, NULL, NULL, NULL, '2015-10-10', NULL, NULL, NULL, NULL, NULL, 'Active', NULL, '2026-08-02 14:44:20'),
 (14, 64172139, 'นางสาว', 'สุภาภรณ์', 'ศรีฟ้า', 'Suphaphrn', 'Srifa', 'หญิง', '1985-11-12', NULL, '0840583508', '131 ซ เพชรเกษม 48 แยก 24 แขวงบางแวก เขตภาษีเจริญ กทม 10160', '5111207470', '2028-07-02', '2021-03-01', NULL, 'https://drive.google.com/uc?id=1noxVEzgrQHZ9nXUbfT4hhubvxi-UGrKe', NULL, NULL, NULL, 'Active', NULL, '2026-07-05 03:43:30'),
 (44, 65172141, 'อาจารย์', 'นฐมน', 'บุญล้อม', 'Nthmn', 'Buylom', 'หญิง', '1972-02-28', NULL, '0949629947', 'มัลเบอรี่เพลส  118/8-9 ถ.เพชรเกษม แขวงบางหว้า เขตภาษีเจริญ  กรุงเทพฯ', '4511014607', '2027-12-23', '2022-08-01', NULL, 'https://drive.google.com/uc?id=1Ec2xvmzkH5sgnPl7U1p_rl6pRRQzs6VR', NULL, NULL, NULL, 'Active', NULL, '2026-07-05 03:44:54'),
 (40, 65172145, 'อาจารย์', 'ปรมัตถ์', 'กิจจานุกิจวัฒนา', 'Prmatth', 'Kichchanukichwathna', 'หญิง', '1987-04-28', NULL, '0865133653', '581/943 เดอะนิชไอดีพระราม 2 เฟส 2', '5211209760', '2027-12-20', '2022-12-01', NULL, 'https://drive.google.com/uc?id=1XaNNEA8x7lgMO-YblrQGRtbM8g0Wvjsr', NULL, NULL, NULL, 'Active', NULL, '2026-07-05 03:44:54'),
-(50, 66172146, 'นางสาว', 'สุธาทิพย์', 'กัลยา', 'Suthathiphy', 'Kalya', 'หญิง', '2000-01-22', NULL, '0893724113', '921/8  ซอยเพชรเกษม 4  ถนนเพชรเกษม  แขวงวัดท่าพระ  เขตบางกอกใหญ่  กรุงเทพมหานคร 10600', NULL, NULL, '2023-05-18', NULL, 'https://drive.google.com/uc?id=1pHcvF34hbZRXweT-3BgNVUmTADlkGtJP', NULL, NULL, NULL, 'Active', NULL, '2026-07-05 03:44:55'),
-(12, 6317212129, 'อาจารย์', 'รัตนาภรณ์', 'นิวาศานนท์', 'Ratnaphrn', 'Niwasannth', 'หญิง', '1992-03-24', NULL, '0868046982', 'หมู่บ้านร้อยพฤกษาเลควิว  223/169 ซอย11 หมู่ 10 ต. นครปฐม อ เมืองนครปฐม จ.นครปฐม', '51811261753', '2025-07-26', '2019-02-01', NULL, 'https://drive.google.com/uc?id=1Yb5w7soKR-wXjXupTQJbZbgtwYw73HDB', NULL, NULL, NULL, 'Active', NULL, '2026-07-05 03:43:30');
+(50, 66172146, 'นางสาว', 'สุธาทิพย์', 'กัลยา', 'Suthathiphy', 'Kalya', 'หญิง', '2000-01-22', NULL, '0893724113', '921/8  ซอยเพชรเกษม 4  ถนนเพชรเกษม  แขวงวัดท่าพระ  เขตบางกอกใหญ่  กรุงเทพมหานคร 10600', NULL, NULL, '2023-05-18', NULL, 'https://drive.google.com/uc?id=1pHcvF34hbZRXweT-3BgNVUmTADlkGtJP', NULL, NULL, NULL, 'Active', NULL, '2026-07-05 03:44:55');
 
 -- --------------------------------------------------------
 
@@ -2347,10 +2313,26 @@ INSERT INTO `notifications` (`notification_id`, `user_id`, `sender_user_id`, `ti
 (14, 5, NULL, 'นักศึกษาเสี่ยงผลการเรียนต่ำ', 'นักศึกษาในความดูแลมีผลการเรียนรายวิชาต่ำกว่าเกณฑ์ กรุณานัดหมายให้คำปรึกษา', '{\"module\": \"advisor\", \"student_id\": \"6603400001\", \"source_table\": \"avisor_notifications\", \"legacy_notification_id\": 1}', 'warning', 'in-app', 0, '2026-07-10 10:17:10'),
 (15, 5, NULL, 'คำขอนัดพบจากนักศึกษา', 'นักศึกษาส่งคำขอนัดพบเพื่อปรึกษาเรื่องการลงทะเบียนภาคเรียนหน้า', '{\"module\": \"advisor\", \"student_id\": \"6603400002\", \"source_table\": \"avisor_notifications\", \"legacy_notification_id\": 2}', 'request', 'in-app', 1, '2026-07-10 10:17:10'),
 (16, 5, NULL, 'กำหนดส่งรายงานการให้คำปรึกษา', 'ครบกำหนดส่งสรุปรายงานการให้คำปรึกษาประจำภาคเรียนภายในสิ้นเดือนนี้', '{\"module\": \"advisor\", \"student_id\": null, \"source_table\": \"avisor_notifications\", \"legacy_notification_id\": 3}', 'info', 'in-app', 1, '2026-07-10 10:17:10'),
-(17, 5, 10, 'โหลๆเทสๆอุอุอุ', 'อุอุอุอุอึอึอึอึอึ', NULL, 'request', 'in-app', 0, '2026-07-11 11:08:42'),
-(18, 10, 5, 'อุ', 'อุอุ', NULL, 'info', 'in-app', 0, '2026-07-19 13:42:28'),
-(19, 10, 5, 'อุอีก', 'อุอุอุ', NULL, 'info', 'in-app', 0, '2026-07-19 13:43:44'),
-(20, 10, 5, 'gg', 'ggggg', NULL, 'info', 'both', 0, '2026-07-19 13:44:26');
+(17, 5, NULL, 'โหลๆเทสๆอุอุอุ', 'อุอุอุอุอึอึอึอึอึ', NULL, 'request', 'in-app', 0, '2026-07-11 11:08:42');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `notification_hidden`
+--
+
+CREATE TABLE `notification_hidden` (
+  `notification_id` bigint NOT NULL,
+  `user_id` bigint NOT NULL,
+  `hidden_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `notification_hidden`
+--
+
+INSERT INTO `notification_hidden` (`notification_id`, `user_id`, `hidden_at`) VALUES
+(21, 5, '2026-08-02 15:43:18');
 
 -- --------------------------------------------------------
 
@@ -2503,8 +2485,7 @@ INSERT INTO `position` (`position_id`, `position_name`) VALUES
 (5, 'อาจารย์ผู้รับผิดชอบหลักสูตร'),
 (6, 'อาจารย์ผู้รับผิดชอบโครงการ'),
 (7, 'เลขา'),
-(8, 'นักศึกษา'),
-(9, 'อาจารย์ประจำหลักสูตร');
+(8, 'นักศึกษา');
 
 -- --------------------------------------------------------
 
@@ -2573,6 +2554,10 @@ INSERT INTO `position_permission` (`position_id`, `permission_id`) VALUES
 (7, 29),
 (5, 30),
 (7, 30),
+(2, 31),
+(4, 31),
+(5, 31),
+(6, 31),
 (6, 32),
 (6, 33),
 (1, 34),
@@ -2580,6 +2565,11 @@ INSERT INTO `position_permission` (`position_id`, `permission_id`) VALUES
 (1, 35),
 (8, 36),
 (8, 37),
+(2, 39),
+(2, 40),
+(2, 41),
+(2, 42),
+(2, 43),
 (5, 44),
 (5, 45),
 (3, 46),
@@ -2880,7 +2870,7 @@ CREATE TABLE `student` (
 --
 
 INSERT INTO `student` (`id`, `student_id`, `student_code`, `user_id`, `program_id`, `title`, `first_name_th`, `last_name_th`, `first_name_en`, `last_name_en`, `nickname`, `gender`, `year_level`, `gpa`, `birth_date`, `hometown_province`, `height`, `weight`, `bmi`, `email`, `phone`, `status`, `home_phone`, `home_address`, `graduation_date`, `dropout_date`, `dropout_reason`, `description`, `created_at`, `id_card_number`, `admission_year`, `updated_at`, `skill_score`, `attitude_score`, `knowledge_score`, `comm_score`, `overall_score`, `last_eval_date`) VALUES
-(1, 6603400001, 'TEMP-1', NULL, NULL, 'นางสาว', 'ญาณันธร', 'โอนอิง', NULL, NULL, NULL, 'หญิง', 1, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'Dropout', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 2567, '2026-07-11 20:20:00', 0.00, 0.00, 0.00, 0.00, 0.00, NULL),
+(1, 6603400001, 'TEMP-1', NULL, NULL, 'นางสาว', 'ญาณันธร', 'โอนอิง', NULL, NULL, NULL, 'หญิง', 1, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'Active', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 2567, '2026-07-27 20:18:11', 0.00, 0.00, 0.00, 0.00, 0.00, NULL),
 (3, 6603400002, 'TEMP-2', NULL, NULL, 'นางสาว', 'จุรีพร', 'ผลพรต', NULL, NULL, NULL, 'หญิง', 1, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'Graduted', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 2567, '2026-07-11 20:20:27', 0.00, 0.00, 0.00, 0.00, 0.00, NULL),
 (5, 6603400004, 'TEMP-3', NULL, NULL, 'นางสาว', 'ศิริพรรณ', 'ทองอ่อน', NULL, NULL, NULL, 'หญิง', 1, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'Retired', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 2567, '2026-07-11 20:20:32', 0.00, 0.00, 0.00, 0.00, 0.00, NULL),
 (6, 6603400005, 'TEMP-4', NULL, NULL, 'นางสาว', 'ตะวัน', 'รีฮุง', NULL, NULL, NULL, 'หญิง', 1, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'Active', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 2567, '2026-06-27 21:27:39', 0.00, 0.00, 0.00, 0.00, 0.00, NULL),
@@ -3510,7 +3500,6 @@ INSERT INTO `system_sidebar_menus` (`menu_id`, `title`, `url`, `icon`, `permissi
 (27, 'รายงานโครงการ', 'project-reports', 'BarChart3', 'PROJECT_REPORTS_VIEW', 'โครงการ คณะ', 1),
 (28, 'ข้อมูลนักศึกษา', 'transcript', 'User', 'STUDENT_VIEW_TRANSCRIPT', NULL, 1),
 (29, 'แฟ้มสะสมผลงาน', 'portfolio', 'FileText', 'STUDENT_VIEW_PORTFOLIO', NULL, 1),
-(30, 'แดชบอร์ดอาจารย์', 'teacher-dashboard', 'LayoutDashboard', 'TEACHER_DASHBOARD_VIEW', 'การจัดการเรียนการสอน', 1),
 (31, 'รายวิชา', 'courses', 'BookOpen', 'COURSES_VIEW', 'การจัดการเรียนการสอน', 1),
 (32, 'จัดการ CLO', 'clo-management', 'Target', 'CLO_MANAGEMENT_VIEW', 'งานหลักสูตร', 1),
 (33, 'ผล CLO รายบุคคล', 'course-students', 'Users', 'COURSE_STUDENTS_VIEW', 'การจัดการเรียนการสอน', 1),
@@ -3535,7 +3524,8 @@ CREATE TABLE `users` (
   `user_id` bigint NOT NULL,
   `username` varchar(100) NOT NULL COMMENT 'ชื่อผู้ใช้ (ห้ามซ้ำ)',
   `password_hash` varchar(255) NOT NULL COMMENT 'รหัสผ่านที่เข้ารหัสแล้ว (ห้ามเก็บ Plain text)',
-  `role_id` bigint NOT NULL COMMENT 'เชื่อมกับตาราง Role เพื่อบอกว่าเป็นใคร',
+  `role_id` bigint DEFAULT NULL COMMENT '\r\nNULL = รอ admin มอบบทบาท',
+  `status` enum('active','inactive') NOT NULL DEFAULT 'active',
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
@@ -3543,13 +3533,62 @@ CREATE TABLE `users` (
 -- Dumping data for table `users`
 --
 
-INSERT INTO `users` (`user_id`, `username`, `password_hash`, `role_id`, `created_at`) VALUES
-(1, '6603400001', '$2y$10$W68TSe8x0O9Jf/1A35UBQOKJqkoiSrngXhd3Ol.ewbocGr9m5LYpu', 3, '2026-02-02 09:35:39'),
-(4, '41172011', '$2y$10$3K1ZE8cjAfEJKOeV1CrjJ.XzEObB75V3KBpWjDk/X6DaCg1ihyaiC', 2, '2026-02-14 03:47:25'),
-(5, '46172040', '$argon2id$v=19$m=65536,t=4,p=2$NGg3OVphSXFnZXd3ZFhDSQ$hnaWnTLwU18Bt0t0V2cbLQTYcMbtYDXGcaehPqiwtLw', 1, '2026-02-14 16:13:36'),
-(6, '41172017', '$argon2id$v=19$m=65536,t=4,p=2$TEl6M0ZneWZIQ3M2aC9KVA$gD3atvhPqWg11/+d1f4RHCSptmHCHwNmPzAAV32XBq0', 2, '2026-02-14 18:02:44'),
-(7, '63172133', '$2y$10$X7qXABiTtnCl1xSbziwsc.VkyWBv7sDqou6Iu6ChatJAvoIevCFp6', 2, '2026-03-01 18:20:12'),
-(10, '44172033', '$argon2id$v=19$m=65536,t=4,p=2$QWxkUTVOTXZTUHVFSVdlTA$I1lI61l8aBrjfBKiV7atiDhoFhFE9SWJfRYoF0MbJQM', 2, '2026-05-25 17:51:02');
+INSERT INTO `users` (`user_id`, `username`, `password_hash`, `role_id`, `status`, `created_at`) VALUES
+(1, '6603400001', '$2y$10$W68TSe8x0O9Jf/1A35UBQOKJqkoiSrngXhd3Ol.ewbocGr9m5LYpu', 3, 'active', '2026-02-02 09:35:39'),
+(4, '41172011', '$2y$10$3K1ZE8cjAfEJKOeV1CrjJ.XzEObB75V3KBpWjDk/X6DaCg1ihyaiC', 2, 'active', '2026-02-14 03:47:25'),
+(5, '46172040', '$argon2id$v=19$m=65536,t=4,p=2$NGg3OVphSXFnZXd3ZFhDSQ$hnaWnTLwU18Bt0t0V2cbLQTYcMbtYDXGcaehPqiwtLw', 1, 'active', '2026-02-14 16:13:36'),
+(6, '41172017', '$argon2id$v=19$m=65536,t=4,p=2$TEl6M0ZneWZIQ3M2aC9KVA$gD3atvhPqWg11/+d1f4RHCSptmHCHwNmPzAAV32XBq0', 2, 'active', '2026-02-14 18:02:44'),
+(7, '63172133', '$2y$10$X7qXABiTtnCl1xSbziwsc.VkyWBv7sDqou6Iu6ChatJAvoIevCFp6', 2, 'active', '2026-03-01 18:20:12'),
+(12, '44172033', '$argon2id$v=19$m=65536,t=4,p=2$NG5hRVVUL2dPSjY3VjJHRg$gJGcz5tFNlrbcc0braEj1mzpK92womQgmfWgRGSrChw', 2, 'active', '2026-08-03 08:33:48'),
+(13, '40172006', '$argon2id$v=19$m=65536,t=4,p=2$eXJLV1ExMWJsTWNvMzJUMw$saQ5IhUCMPIYrZU5sVWww6gXBjSa3+nqu9xYtY48WV0', 2, 'active', '2026-08-03 08:35:28'),
+(14, '123456', '$argon2id$v=19$m=65536,t=4,p=2$MU1ySnVLdUI1NUh3SWFuYw$DSbP4XXKCaVikHhX0AZP6RNFFIZFdW/cqCgJ539AaUI', 2, 'active', '2026-08-03 09:28:58'),
+(15, '234561', '$argon2id$v=19$m=65536,t=4,p=2$c29vTENvcnlMUS9TSzZUUQ$ufx03PZmrfgKob0M0U2OhdFmeL8A0ty8mHq2+zv9ua0', NULL, 'active', '2026-08-03 09:28:58'),
+(16, '380018', '$argon2id$v=19$m=65536,t=4,p=2$cHhUVjVNUjRMdkFDUk1jbg$Y1sjnD4lppcRTjenNG+hAFr1PfXExAQUE1D1CYwmDXg', NULL, 'active', '2026-08-03 09:28:58'),
+(17, '382018', '$argon2id$v=19$m=65536,t=4,p=2$SE82S3YubWV5a0t5ZVY2eA$702OUuzc7EVTrY7LmMgxRqogQGoqvBAdeVjurehkq2c', NULL, 'active', '2026-08-03 09:28:58'),
+(18, '540215', '$argon2id$v=19$m=65536,t=4,p=2$bW91eGRSajlONGxBU3U1WQ$xXPOuSvPg3joXQ31gB7xh0OR9F/cecHzsmvWzdQDQ1g', NULL, 'active', '2026-08-03 09:28:59'),
+(19, '570205', '$argon2id$v=19$m=65536,t=4,p=2$VHNMTnpqOFhCTWVwYzZweQ$0KeTztMC3YzNK9F7/FXpR1LtBfQjvCjTikaYdZHccWg', NULL, 'active', '2026-08-03 09:28:59'),
+(20, '650291', '$argon2id$v=19$m=65536,t=4,p=2$M2txeFp6NlQ0amsyVFdaQQ$Ag6+/+YCvbIyRCxgG7IiUcn/uK3cZy8JDIsk12rXdsk', NULL, 'active', '2026-08-03 09:28:59'),
+(21, '980279', '$argon2id$v=19$m=65536,t=4,p=2$WGFIS3pJcFdudnlsVkVCRQ$ntDrHi5llyXtP2lNIa/GDIACzRAYt3YR+8bhz61BHYU', NULL, 'active', '2026-08-03 09:28:59'),
+(22, '999001', '$argon2id$v=19$m=65536,t=4,p=2$OVVhMjhDNjFTbWRycVhxcA$HebT89lrotY6WteOJ1lhZtAlnqYu1MwRHDy81WUf4Os', NULL, 'active', '2026-08-03 09:28:59'),
+(23, '999002', '$argon2id$v=19$m=65536,t=4,p=2$UUtGd01CMkE3ZnlFS1ZHVA$XmXnYX7BVdew9vBJfZS16css2KBNChn4WU9iZVKmE24', NULL, 'active', '2026-08-03 09:28:59'),
+(24, '999003', '$argon2id$v=19$m=65536,t=4,p=2$eDBaRFZkSW9hODByQUZMWA$yEzYjpMZ+YQUHUt21Ahzn27dbOlDIulgKyF6DdqJgiM', NULL, 'active', '2026-08-03 09:28:59'),
+(25, '999004', '$argon2id$v=19$m=65536,t=4,p=2$R3NBOGJNUDFuYWdLc0pFVw$QmJwgm/Ng2PuOYY11nGLTWUY5+yvprT3SblIII6avCU', NULL, 'active', '2026-08-03 09:29:00'),
+(26, '5200009', '$argon2id$v=19$m=65536,t=4,p=2$T1lUclV2VUs3V3JNcDNQeQ$Hwd+RVa+FBEsnvFENbsramhldWzEHsQk+6mR91eI1eY', NULL, 'active', '2026-08-03 09:29:00'),
+(27, '41172008', '$argon2id$v=19$m=65536,t=4,p=2$YWVmRmowWk9PRFo2c2h1OA$hZGFYvQmocnP6J3jPOcpsLZP6VptVsTWcqcDRTyQlms', NULL, 'active', '2026-08-03 09:29:00'),
+(28, '42172021', '$argon2id$v=19$m=65536,t=4,p=2$amhTVnVZdnY0Rmg4Q0Y5UA$3EJy6HS3c2QL42xeK68fO5LtyPwme1TleneW2yYC5R0', NULL, 'active', '2026-08-03 09:29:00'),
+(29, '42172025', '$argon2id$v=19$m=65536,t=4,p=2$MU80YVczWXMyWmdmUWVoYQ$dbC+5+K448EPGOgki3K9npNwCkEfDKjLV/Mdb0wO7XE', NULL, 'active', '2026-08-03 09:29:00'),
+(30, '45172037', '$argon2id$v=19$m=65536,t=4,p=2$MGIwR1pwdU9xWjBrN1hjdA$TlbnX8KBJauEFa3aVM2NA5Ji3KQwmBBCx4XZ/H+aUHU', NULL, 'active', '2026-08-03 09:29:00'),
+(31, '45172038', '$argon2id$v=19$m=65536,t=4,p=2$S1EuMUsuc3BzS2tKTlRISw$9v0r4DxDy1y9oBUfPP4DlVje8YHoTzVvZUzOkQuHZKI', NULL, 'active', '2026-08-03 09:29:00'),
+(32, '47172044', '$argon2id$v=19$m=65536,t=4,p=2$RVl3bkt5Q3NVLngyQVFTRw$Vwaxj3BRY7SipFQ0f9+Xg3e50t2yEAw3DUF/+9buRmE', NULL, 'active', '2026-08-03 09:29:01'),
+(33, '47172046', '$argon2id$v=19$m=65536,t=4,p=2$YkNxc3V5UDhpL1FyMXZsNg$kl4qk07NoeEnK7zHC4jVjNK9cwmK3vVIT3mmYM8tfLI', NULL, 'active', '2026-08-03 09:29:01'),
+(34, '47172047', '$argon2id$v=19$m=65536,t=4,p=2$aXNvUFIxL3JrMWplRVpWbg$JiyEP6PdiFg/zgvh6EaBHpKbzme+Y07aUPHCaMiS/2Q', NULL, 'active', '2026-08-03 09:29:01'),
+(35, '47172049', '$argon2id$v=19$m=65536,t=4,p=2$aUNmdDVPeWxhenkvRW8vSw$14ETWkHfik5rY8vf6RLgT26Pl7FSu3j7RO+F19SzNX0', NULL, 'active', '2026-08-03 09:29:01'),
+(36, '49172053', '$argon2id$v=19$m=65536,t=4,p=2$SEVDUDBmU2JZdGpzR3NqVg$jgcaS9iCNvPZQ4DKfHrwLL/elty4T2kFPxmKpHTIrCI', NULL, 'active', '2026-08-03 09:29:01'),
+(37, '49172054', '$argon2id$v=19$m=65536,t=4,p=2$Zm1ZV1UwOXNyTURrTk1hRw$BS7D/Kh74wIM9TAJrCy/fy8tFUhIB/6i/ku+838W5Bw', NULL, 'active', '2026-08-03 09:29:01'),
+(38, '50172059', '$argon2id$v=19$m=65536,t=4,p=2$YkFwZXBEcGN0NHVLM05MLg$lWvG6kc1ldQoC9alEMcruYGnEuB4WZ8lp7kC1AczhyE', NULL, 'active', '2026-08-03 09:29:01'),
+(39, '51162072', '$argon2id$v=19$m=65536,t=4,p=2$SmNnd0FrM2VJakFWYTUzWQ$jhIXB7RvBxkZgD0Tsv+mVFY0ipgpDCdQI5Q9bKbbkOc', NULL, 'active', '2026-08-03 09:29:01'),
+(40, '52172065', '$argon2id$v=19$m=65536,t=4,p=2$SGdpaDdQZHBsZW5ndnVodA$iUtZj8Hu6Bmlnz9lXVzXX1bwZkuugg9CeFyZMDZFPP8', NULL, 'active', '2026-08-03 09:29:02'),
+(41, '53172079', '$argon2id$v=19$m=65536,t=4,p=2$UTZ1a0lPYkNJN1dqY1B2Yg$scS2HpFkVP18M3JL68GVAsKOVdMErXBE9HkhdnGXxSw', NULL, 'active', '2026-08-03 09:29:02'),
+(42, '54127262', '$argon2id$v=19$m=65536,t=4,p=2$Sy5iMEg4ejZaZmZvZi93Vg$ys7337+TU2OuoqxviDgvw3LOmMaQqiwsaSt6agy/Rdg', NULL, 'active', '2026-08-03 09:29:02'),
+(43, '54172071', '$argon2id$v=19$m=65536,t=4,p=2$WS9Scy9vTlVVRDBWLnIxYw$+Pdd+Lv64yS35AedUe6p1a95en2uXnwVXAazlhytXQU', NULL, 'active', '2026-08-03 09:29:02'),
+(44, '54172078', '$argon2id$v=19$m=65536,t=4,p=2$U2NsSHZ1a29EVzVvcmhmcw$4TuGZx9djKod+2MpkegUOo53eX1DZYkJ22KkhPNTYB8', NULL, 'active', '2026-08-03 09:29:02'),
+(45, '54172085', '$argon2id$v=19$m=65536,t=4,p=2$bEJ4cC5ESDQ1b3c4MXM0ag$d+mxnF6AItHIqFazHTCE66nHhwNOFi83hybG1hsSO5U', NULL, 'active', '2026-08-03 09:29:02'),
+(46, '56172088', '$argon2id$v=19$m=65536,t=4,p=2$UktzQ0V0YWlWaFpUQjl3Yw$u3xyI6SdzdEwTNhmw56gez5cE1eDERoo2H6jj9Fy0+Q', NULL, 'active', '2026-08-03 09:29:02'),
+(47, '56172089', '$argon2id$v=19$m=65536,t=4,p=2$ZlNNcFMuMnZLSEgzVmY2Rg$b2VKm0RMHtKd9ycpGek1zqS/rGoeWZvHq+ms3JyOUCU', NULL, 'active', '2026-08-03 09:29:02'),
+(48, '56172103', '$argon2id$v=19$m=65536,t=4,p=2$WFNTellodVNVTDVaeDBRTQ$nox0g8N9Ak2xLFMmvRxPNwnr9VCmDdFDdoCYlVsw4Vs', NULL, 'active', '2026-08-03 09:29:03'),
+(49, '56172104', '$argon2id$v=19$m=65536,t=4,p=2$Um90ZDR2Sng1Mkt5VkhJRQ$GJygqKj42ZM7p1XGOMAOFvou//JFj6mSiDdvHWy3RZ0', NULL, 'active', '2026-08-03 09:29:03'),
+(50, '57172108', '$argon2id$v=19$m=65536,t=4,p=2$ZDdDTUNmMmgzLzY2MFVjaQ$RzcKOg3LF90FxjKqz5so6vHQHU6orQIf2EsoKlWS0Zo', NULL, 'active', '2026-08-03 09:29:03'),
+(51, '57172109', '$argon2id$v=19$m=65536,t=4,p=2$TzFrdnNrQXgwUkp2ZVhIUg$FXBRiIcXe2PxmadkRGmosf+bG6yvcJx683znPQQFdMU', NULL, 'active', '2026-08-03 09:29:03'),
+(52, '58172110', '$argon2id$v=19$m=65536,t=4,p=2$Q3JjNWEuUTVBZk1LcTFmTw$IIhIf1wfMqwL39gWSGLf1kJzzS/h5GXns/lmvl8sHtQ', NULL, 'active', '2026-08-03 09:29:03'),
+(53, '59172119', '$argon2id$v=19$m=65536,t=4,p=2$a2NDSWw0aFJtWTJGWGgydw$l1CEVWaBa3wpmFveXNvVLYu05QfPEzugzPh+pv6z15c', NULL, 'active', '2026-08-03 09:29:03'),
+(54, '59172121', '$argon2id$v=19$m=65536,t=4,p=2$VW5TODAuSFFxbzhhVjVGTA$fKh9GC4a0b/Y6tzifxWuqNWFCqr0mGu6O8SLR6B4Ees', NULL, 'active', '2026-08-03 09:29:03'),
+(55, '60172123', '$argon2id$v=19$m=65536,t=4,p=2$TTB2RFc4YTZkUldWWTZZSg$jByn1bwAh5mukAnRpLainOTvx3UX3g8pmWzU0hS09lU', NULL, 'active', '2026-08-03 09:29:04'),
+(56, '63172128', '$argon2id$v=19$m=65536,t=4,p=2$bzhYL2p2SkNHeUE2c1k5Lw$vFFRopf9xpPjjH5bUuyuUDN+Md8wcdt+h9kbakFOL04', NULL, 'active', '2026-08-03 09:29:04'),
+(57, '63172129', '$argon2id$v=19$m=65536,t=4,p=2$WkdtOHFTRWUxUFF5N0xHag$eJbtUcB+BHtOts6gVqrbgpylO55w/aBSTsc1/SoAnks', NULL, 'active', '2026-08-03 09:29:04'),
+(58, '64172139', '$argon2id$v=19$m=65536,t=4,p=2$ZEsyVVFuTUcvakxQS1JSVQ$mxhz7qKIUiyLvlul2i2DrJsxKyNi8j3g8D/asZdkF40', NULL, 'active', '2026-08-03 09:29:04'),
+(59, '65172141', '$argon2id$v=19$m=65536,t=4,p=2$TkhTT0N0Li5zOVdWQ3ZkNw$di047QrRWer1zx7K3aKkH0BTpAQohRD3/CFDSJKxE7Q', NULL, 'active', '2026-08-03 09:29:04'),
+(60, '65172145', '$argon2id$v=19$m=65536,t=4,p=2$QXl5VTIzNTlNL3JhYVppRw$JPNV27X3IA6wehNTBSWFwDs0KeyqEVznqkgY4ioUTsM', NULL, 'active', '2026-08-03 09:29:04'),
+(61, '66172146', '$argon2id$v=19$m=65536,t=4,p=2$YVVYREw1SFlGNnJVWDhVNw$wEz7i8yRCo0o1lVfKzE/6eTyDdgH0S4OhIQInzpAn58', NULL, 'active', '2026-08-03 09:29:04');
 
 -- --------------------------------------------------------
 
@@ -3593,10 +3632,12 @@ INSERT INTO `user_position` (`user_position_id`, `user_id`, `position_id`, `is_p
 (3, 6, 1, 1, NULL, NULL),
 (5, 7, 6, 1, NULL, NULL),
 (18, 1, 8, 1, NULL, NULL),
-(34, 10, 6, 1, NULL, NULL),
-(35, 10, 3, 0, NULL, NULL),
-(36, 10, 5, 0, NULL, NULL),
-(37, 10, 4, 0, NULL, NULL);
+(91, 12, 2, 1, NULL, NULL),
+(92, 12, 6, 0, NULL, NULL),
+(93, 12, 5, 0, NULL, NULL),
+(94, 12, 3, 0, NULL, NULL),
+(95, 12, 4, 0, NULL, NULL),
+(96, 14, 2, 1, NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -3818,6 +3859,13 @@ ALTER TABLE `notifications`
   ADD KEY `sender_user_id` (`sender_user_id`);
 
 --
+-- Indexes for table `notification_hidden`
+--
+ALTER TABLE `notification_hidden`
+  ADD PRIMARY KEY (`notification_id`,`user_id`),
+  ADD KEY `idx_notification_hidden_user` (`user_id`);
+
+--
 -- Indexes for table `permissions`
 --
 ALTER TABLE `permissions`
@@ -4036,7 +4084,7 @@ ALTER TABLE `assessments`
 -- AUTO_INCREMENT for table `audit_log`
 --
 ALTER TABLE `audit_log`
-  MODIFY `audit_log_id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=357;
+  MODIFY `audit_log_id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=408;
 
 --
 -- AUTO_INCREMENT for table `curriculum_clo`
@@ -4090,7 +4138,7 @@ ALTER TABLE `enrollment`
 -- AUTO_INCREMENT for table `faculty`
 --
 ALTER TABLE `faculty`
-  MODIFY `id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=55;
+  MODIFY `id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=56;
 
 --
 -- AUTO_INCREMENT for table `faculty_ce_records`
@@ -4120,7 +4168,7 @@ ALTER TABLE `import_history`
 -- AUTO_INCREMENT for table `notifications`
 --
 ALTER TABLE `notifications`
-  MODIFY `notification_id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=21;
+  MODIFY `notification_id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=23;
 
 --
 -- AUTO_INCREMENT for table `permissions`
@@ -4228,19 +4276,19 @@ ALTER TABLE `Student_License_Attempts`
 -- AUTO_INCREMENT for table `system_sidebar_menus`
 --
 ALTER TABLE `system_sidebar_menus`
-  MODIFY `menu_id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=44;
+  MODIFY `menu_id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=46;
 
 --
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `user_id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
+  MODIFY `user_id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=62;
 
 --
 -- AUTO_INCREMENT for table `user_position`
 --
 ALTER TABLE `user_position`
-  MODIFY `user_position_id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=38;
+  MODIFY `user_position_id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=97;
 
 --
 -- AUTO_INCREMENT for table `ylo`

@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { Upload, FileText, Award, FolderOpen, Plus, Eye, Download, Trash2, Calendar, Loader2, ExternalLink } from "lucide-react";
 import api from "@/lib/axios";
+import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
 
 interface PortfolioItem {
   id: string;
@@ -45,6 +46,9 @@ const Portfolio = () => {
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [detailItem, setDetailItem] = useState<any>(null);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
 
   const fetchPortfolio = async () => {
@@ -103,17 +107,27 @@ const Portfolio = () => {
     }
   };
 
-  const handleDeleteItem = async (id: string) => {
-    if(!confirm('คุณแน่ใจหรือไม่ที่จะลบผลงานนี้?')) return;
-    
+  const openDeleteConfirm = (id: string) => {
+    setPendingDeleteId(id);
+    setIsConfirmOpen(true);
+  };
+
+  const handleDeleteItem = async () => {
+    if (!pendingDeleteId) return;
+
+    setIsDeleting(true);
     try {
-      const res = await api.delete(`/index.php?page=delete-portfolio&id=${id}`);
+      const res = await api.delete(`/index.php?page=delete-portfolio&id=${pendingDeleteId}`);
       if (res.data.status === 'success') {
         toast({ title: "ลบสำเร็จ", description: "ลบรายการออกจาก Portfolio แล้ว" });
+        setIsConfirmOpen(false);
+        setPendingDeleteId(null);
         fetchPortfolio();
       }
     } catch (error) {
       toast({ title: "ข้อผิดพลาด", description: "ไม่สามารถลบผลงานได้", variant: "destructive" });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -141,6 +155,7 @@ const Portfolio = () => {
   const getItemsByType = (type: PortfolioItem["type"]) => items.filter((item) => item.type === type);
 
   return (
+    <>
       <div className="p-6 space-y-6 animate-fade-in">
         <div className="flex items-center justify-between">
           <div>
@@ -367,7 +382,7 @@ const Portfolio = () => {
                                 className="h-8 w-8 text-destructive hover:bg-destructive/10 z-10" 
                                 onClick={(e) => {
                                   e.stopPropagation(); 
-                                  handleDeleteItem(item.id);
+                                  openDeleteConfirm(item.id);
                                 }}
                               >
                                 <Trash2 className="h-4 w-4" />
@@ -398,6 +413,19 @@ const Portfolio = () => {
           ))}
         </Tabs>
       </div>
+
+      <ConfirmActionDialog
+        open={isConfirmOpen}
+        onOpenChange={(open) => {
+          setIsConfirmOpen(open);
+          if (!open) setPendingDeleteId(null);
+        }}
+        title="ยืนยันการลบ"
+        description="คุณแน่ใจหรือไม่ที่จะลบผลงานนี้?"
+        onConfirm={handleDeleteItem}
+        isLoading={isDeleting}
+      />
+    </>
   );
 }
 
