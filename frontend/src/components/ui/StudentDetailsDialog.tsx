@@ -1,6 +1,6 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Progress } from '@/components/ui/progress';
-import { Student, getStatusBadge } from '@/components/pages/Teacher/PracticalStudents';
+import { Student } from '@/components/pages/Teacher/PracticalStudents';
 
 interface Props {
   isOpen: boolean;
@@ -39,10 +39,6 @@ export function StudentDetailsDialog({ isOpen, onOpenChange, student }: Props) {
             <span className="col-span-3">
               ทำเสร็จ <span className="text-green-600 font-bold">{student?.tasksCompleted}</span> จากทั้งหมด <span className="font-bold">{student ? student.tasksCompleted + student.tasksPending : 0}</span> งาน
             </span>
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <span className="font-medium text-right text-muted-foreground">สถานะ:</span>
-            <span className="col-span-3">{student && getStatusBadge(student.status)}</span>
           </div>
         </div>
       </DialogContent>

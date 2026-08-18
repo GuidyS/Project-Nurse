@@ -41,6 +41,8 @@ export default function TransferRequests() {
   const [pendingApproveId, setPendingApproveId] = useState<string | null>(null);
   const [isApproveOpen, setIsApproveOpen] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
+  const pendingIncomingCount = incomingRequests.filter((request) => request.status === 'pending').length;
+  const pendingOutgoingCount = outgoingRequests.filter((request) => request.status === 'pending').length;
 
   const fetchData = async () => {
     try {
@@ -150,7 +152,7 @@ export default function TransferRequests() {
               <UserPlus className="h-4 w-4 text-green-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{incomingRequests.length}</div>
+              <div className="text-2xl font-bold">{pendingIncomingCount}</div>
               <p className="text-xs text-muted-foreground">รอดำเนินการ</p>
             </CardContent>
           </Card>
@@ -160,7 +162,7 @@ export default function TransferRequests() {
               <UserCheck className="h-4 w-4 text-blue-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{outgoingRequests.length}</div>
+              <div className="text-2xl font-bold">{pendingOutgoingCount}</div>
               <p className="text-xs text-muted-foreground">รอดำเนินการ</p>
             </CardContent>
           </Card>
@@ -192,11 +194,16 @@ export default function TransferRequests() {
           <TabsList>
             <TabsTrigger value="incoming">
               คำขอเข้า
-              {incomingRequests.length > 0 && (
-                <Badge className="ml-2 bg-primary">{incomingRequests.length}</Badge>
+              {pendingIncomingCount > 0 && (
+                <Badge className="ml-2 bg-primary">{pendingIncomingCount}</Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="outgoing">คำขอออก</TabsTrigger>
+            <TabsTrigger value="outgoing">
+              คำขอออก
+              {pendingOutgoingCount > 0 && (
+                <Badge className="ml-2 bg-primary">{pendingOutgoingCount}</Badge>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="history">ประวัติ</TabsTrigger>
           </TabsList>
 

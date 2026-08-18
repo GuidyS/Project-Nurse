@@ -113,6 +113,15 @@
             case 'get-advises':
                 require_once 'components/Teacher/Advises/get_advises.php';
                 break;
+            case 'get-student-plo-mapping':
+                require_once 'components/Teacher/Advises/get_student_plo_mapping.php';
+                break;
+            case 'save-student-plo-mapping':
+                require_once 'components/Teacher/Advises/save_student_plo_mapping.php';
+                break;
+            case 'send-advisor-message':
+                require_once 'components/Teacher/Advises/send_advisor_message.php';
+                break;
 
             // AdvisorNotifications (การแจ้งเตือนของอาจารย์)
             case 'get-advisor-notifications':
@@ -342,8 +351,14 @@
             case 'get-schedule-tasks':
                 require_once 'components/Teacher/ScheduleTasks/get_schedule_tasks.php';
                 break;
+            case 'update-schedule-task':
+                require_once 'components/Teacher/ScheduleTasks/update_schedule_task.php';
+                break;
             case 'update-task-status':
                 require_once 'components/Teacher/ScheduleTasks/update_task_status.php';
+                break;
+            case 'delete-schedule-task':
+                require_once 'components/Teacher/ScheduleTasks/delete_schedule_task.php';
                 break;
 
             // Students

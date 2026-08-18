@@ -1,10 +1,12 @@
 import { useState, useEffect, Fragment } from "react";
 import api from "@/lib/axios";
-import { Search, Filter, Download, Eye, Mail, MoreVertical, Target, CheckCircle2, Lock } from "lucide-react";
+import { Search, Download, Eye, Mail, MoreVertical, Target, CheckCircle2, Lock, User, GraduationCap, Send, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Table,
   TableBody,
@@ -22,6 +24,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -38,6 +41,7 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
 interface Student {
   id: number;
+  userId?: number | null;
   studentId: string;
   name: string;
   year: number;
@@ -132,9 +136,16 @@ const StudentsInfo = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [messageDialogOpen, setMessageDialogOpen] = useState(false);
   const [selectedYear, setSelectedYear] = useState<number>(1);
   const [mappingData, setMappingData] = useState<Record<string, Record<string, boolean>>>({});
+  const [messageTitle, setMessageTitle] = useState("");
+  const [messageBody, setMessageBody] = useState("");
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const [isMappingLoading, setIsMappingLoading] = useState(false);
+  const [isSavingMapping, setIsSavingMapping] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -164,11 +175,18 @@ const StudentsInfo = () => {
     }
   };
 
-  const filteredStudents = students.filter(
-    (s) =>
-      s.name.includes(searchQuery) ||
-      s.studentId.includes(searchQuery)
-  );
+  const normalizedSearchQuery = String(searchQuery ?? "").trim().toLowerCase();
+  const matchesSearch = (value: unknown) =>
+    String(value ?? "").toLowerCase().includes(normalizedSearchQuery);
+
+  const filteredStudents = normalizedSearchQuery
+    ? students.filter(
+        (s) =>
+          matchesSearch(s.name) ||
+          matchesSearch(s.studentId) ||
+          matchesSearch(s.email)
+      )
+    : students;
 
   const handleExport = () => {
     try {
@@ -209,23 +227,147 @@ const StudentsInfo = () => {
 
   const openStudentDetail = (student: Student) => {
     setSelectedStudent(student);
+    setDetailDialogOpen(true);
+  };
+
+  const mergeMappingData = (
+    baseMapping: Record<string, Record<string, boolean>>,
+    savedMapping: unknown
+  ) => {
+    if (!savedMapping || typeof savedMapping !== "object" || Array.isArray(savedMapping)) {
+      return baseMapping;
+    }
+
+    const saved = savedMapping as Record<string, Record<string, boolean>>;
+    const merged: Record<string, Record<string, boolean>> = {};
+
+    Object.entries(baseMapping).forEach(([courseCode, subMapping]) => {
+      merged[courseCode] = { ...subMapping };
+      Object.keys(subMapping).forEach((subId) => {
+        if (typeof saved[courseCode]?.[subId] === "boolean") {
+          merged[courseCode][subId] = saved[courseCode][subId];
+        }
+      });
+    });
+
+    return merged;
+  };
+
+  const loadSavedMapping = async (student: Student, year: number) => {
+    const initialMapping = getInitialMapping(year, student.studentId);
+    setMappingData(initialMapping);
+    setIsMappingLoading(true);
+
+    try {
+      const response = await api.get("/index.php?page=get-student-plo-mapping", {
+        params: {
+          student_id: student.studentId,
+          year_level: year,
+        },
+      });
+      const savedMapping = response.data?.data?.mapping;
+      if (savedMapping) {
+        setMappingData(mergeMappingData(initialMapping, savedMapping));
+      }
+    } catch (error) {
+      toast({
+        title: "โหลดข้อมูล PLO/CLO ไม่สำเร็จ",
+        description: "จะแสดงข้อมูลเริ่มต้นให้ก่อน กรุณาลองเปิดใหม่อีกครั้ง",
+        variant: "destructive",
+      });
+    } finally {
+      setIsMappingLoading(false);
+    }
+  };
+
+  const openMappingDialog = (student: Student | null = selectedStudent) => {
+    if (!student) return;
+    setSelectedStudent(student);
     // Set to current year of the student
     setSelectedYear(student.year);
-    setMappingData(getInitialMapping(student.year, student.studentId));
+    setDetailDialogOpen(false);
     setDialogOpen(true);
+    loadSavedMapping(student, student.year);
+  };
+
+  const openMessageDialog = (student: Student | null = selectedStudent) => {
+    if (!student) return;
+    setSelectedStudent(student);
+    setMessageTitle("");
+    setMessageBody("");
+    setDetailDialogOpen(false);
+    setMessageDialogOpen(true);
+  };
+
+  const handleSendMessage = async () => {
+    if (!selectedStudent) {
+      toast({
+        title: "ไม่พบผู้รับข้อความ",
+        description: "นักศึกษาคนนี้ยังไม่มีบัญชีผู้ใช้ที่เชื่อมกับระบบแจ้งเตือน",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!messageTitle.trim() || !messageBody.trim()) {
+      toast({
+        title: "กรุณากรอกข้อมูลให้ครบ",
+        description: "ต้องระบุหัวข้อและข้อความก่อนส่ง",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSendingMessage(true);
+
+    try {
+      const response = await api.post("/index.php?page=send-advisor-message", {
+        student_id: selectedStudent.studentId,
+        title: messageTitle.trim(),
+        message: messageBody.trim(),
+        channel: "both",
+        type: "info",
+        category: "student",
+        recipient_ids: [],
+      });
+      const sent = Number(response.data?.sent ?? 1);
+
+      setMessageDialogOpen(false);
+      setMessageTitle("");
+      setMessageBody("");
+      window.dispatchEvent(new Event("updateNotificationBadge"));
+      toast({
+        title: sent > 0 ? "ส่งข้อความสำเร็จ" : "ส่งข้อความไม่สำเร็จ",
+        description:
+          sent > 0
+            ? `ส่งข้อความถึง ${selectedStudent.name} และเพิ่มในหน้าการแจ้งเตือนแล้ว`
+            : "ผู้รับปิดการรับแจ้งเตือนหมวดนักศึกษาไว้",
+        variant: sent > 0 ? undefined : "destructive",
+      });
+    } catch (error) {
+      toast({
+        title: "ส่งข้อความไม่สำเร็จ",
+        description: "ไม่สามารถส่งข้อความไปยังการแจ้งเตือนได้",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSendingMessage(false);
+    }
   };
 
   const handleYearChange = (year: string) => {
     const yearNum = parseInt(year);
     setSelectedYear(yearNum);
-    setMappingData(getInitialMapping(yearNum, selectedStudent?.studentId));
+    if (selectedStudent) {
+      loadSavedMapping(selectedStudent, yearNum);
+    }
   };
 
   // Check if the selected year is read-only (previous years are locked)
   const isYearReadOnly = selectedStudent ? selectedYear < selectedStudent.year : false;
 
   const toggleMapping = (courseCode: string, subId: string) => {
-    if (isYearReadOnly) return; // Don't allow changes for locked years
+    if (isYearReadOnly || isMappingLoading || isSavingMapping) return; // Don't allow changes for locked years or busy states
     
     setMappingData(prev => ({
       ...prev,
@@ -236,12 +378,30 @@ const StudentsInfo = () => {
     }));
   };
 
-  const saveMapping = () => {
+  const saveMapping = async () => {
+    if (!selectedStudent) return;
+
+    setIsSavingMapping(true);
+    try {
+      await api.post("/index.php?page=save-student-plo-mapping", {
+        student_id: selectedStudent.studentId,
+        year_level: selectedYear,
+        mapping: mappingData,
+      });
     toast({
       title: "บันทึกสำเร็จ",
       description: `บันทึก Course-PLO Mapping ของ ${selectedStudent?.name} ปี ${selectedYear} เรียบร้อยแล้ว`,
     });
     setDialogOpen(false);
+    } catch (error) {
+      toast({
+        title: "บันทึกไม่สำเร็จ",
+        description: "ไม่สามารถเก็บข้อมูล PLO/CLO ได้",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingMapping(false);
+    }
   };
 
   // Get courses for selected year
@@ -343,7 +503,7 @@ const StudentsInfo = () => {
                 </TableCell>
                 <TableCell>{getStatusBadge(student.status)}</TableCell>
                 <TableCell>
-                  <Button variant="outline" size="sm" className="gap-2" onClick={(e) => { e.stopPropagation(); openStudentDetail(student); }}>
+                  <Button variant="outline" size="sm" className="gap-2" onClick={(e) => { e.stopPropagation(); openMappingDialog(student); }}>
                     <Target className="h-4 w-4" />
                     ติ้ก PLO/CLO
                   </Button>
@@ -359,7 +519,7 @@ const StudentsInfo = () => {
                       <DropdownMenuItem className="gap-2" onClick={() => openStudentDetail(student)}>
                         <Eye className="h-4 w-4" /> ดูข้อมูล
                       </DropdownMenuItem>
-                      <DropdownMenuItem className="gap-2">
+                      <DropdownMenuItem className="gap-2" onClick={() => openMessageDialog(student)}>
                         <Mail className="h-4 w-4" /> ส่งข้อความ
                       </DropdownMenuItem>
                     </DropdownMenuContent>
@@ -375,6 +535,136 @@ const StudentsInfo = () => {
       <div className="flex items-center justify-between text-sm text-muted-foreground">
         <span>แสดง {filteredStudents.length} จาก {students.length} คน</span>
       </div>
+
+      {/* Student Detail Dialog */}
+      <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
+        <DialogContent className="sm:max-w-[680px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-3">
+              <Avatar className="h-12 w-12">
+                <AvatarFallback className="bg-primary/10 text-primary text-lg">
+                  {selectedStudent?.name.charAt(0)}
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <p className="text-xl font-semibold leading-tight">{selectedStudent?.name}</p>
+                <p className="text-sm font-normal text-muted-foreground">
+                  รหัส {selectedStudent?.studentId}
+                </p>
+              </div>
+            </DialogTitle>
+          </DialogHeader>
+
+          {selectedStudent && (
+            <div className="space-y-5 pt-2">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-lg border bg-card p-4">
+                  <div className="mb-3 flex items-center gap-2 text-sm text-muted-foreground">
+                    <User className="h-4 w-4" />
+                    สถานะ
+                  </div>
+                  {getStatusBadge(selectedStudent.status)}
+                </div>
+                <div className="rounded-lg border bg-card p-4">
+                  <div className="mb-3 flex items-center gap-2 text-sm text-muted-foreground">
+                    <GraduationCap className="h-4 w-4" />
+                    ชั้นปี
+                  </div>
+                  <p className="text-2xl font-bold">ปี {selectedStudent.year}</p>
+                </div>
+                <div className="rounded-lg border bg-card p-4">
+                  <div className="mb-3 flex items-center gap-2 text-sm text-muted-foreground">
+                    <CheckCircle2 className="h-4 w-4" />
+                    GPA
+                  </div>
+                  <p className="text-2xl font-bold">{selectedStudent.gpa.toFixed(2)}</p>
+                </div>
+              </div>
+
+              <div className="rounded-lg border bg-card p-4">
+                <h3 className="mb-4 font-semibold">ข้อมูลทั่วไป</h3>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <p className="text-sm text-muted-foreground">ชื่อ-นามสกุล</p>
+                    <p className="font-semibold">{selectedStudent.name}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">รหัสนักศึกษา</p>
+                    <p className="font-semibold">{selectedStudent.studentId}</p>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <p className="text-sm text-muted-foreground">อีเมล</p>
+                    <p className="font-semibold">{selectedStudent.email}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col-reverse gap-3 border-t pt-4 sm:flex-row sm:justify-end">
+                <Button variant="outline" className="gap-2" onClick={() => openMessageDialog()}>
+                  <Mail className="h-4 w-4" />
+                  ส่งข้อความ
+                </Button>
+                <Button className="gap-2" onClick={() => openMappingDialog()}>
+                  <Target className="h-4 w-4" />
+                  ติ๊ก PLO/CLO
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Send Message Dialog */}
+      <Dialog open={messageDialogOpen} onOpenChange={setMessageDialogOpen}>
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Mail className="h-5 w-5 text-primary" />
+              ส่งข้อความ
+            </DialogTitle>
+            <DialogDescription>
+              ข้อความจะถูกส่งถึง {selectedStudent?.name} และแสดงในหน้าการแจ้งเตือน
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="rounded-lg border bg-muted/30 p-3">
+              <p className="text-sm text-muted-foreground">ผู้รับ</p>
+              <p className="font-semibold">{selectedStudent?.name}</p>
+              <p className="text-xs text-muted-foreground">{selectedStudent?.studentId}</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="student-message-title">หัวข้อ</Label>
+              <Input
+                id="student-message-title"
+                value={messageTitle}
+                onChange={(e) => setMessageTitle(e.target.value)}
+                placeholder="ระบุหัวข้อข้อความ"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="student-message-body">ข้อความ</Label>
+              <Textarea
+                id="student-message-body"
+                value={messageBody}
+                onChange={(e) => setMessageBody(e.target.value)}
+                placeholder="พิมพ์ข้อความถึงนักศึกษา..."
+                className="min-h-[140px]"
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <Button variant="outline" onClick={() => setMessageDialogOpen(false)} disabled={isSendingMessage}>
+              ยกเลิก
+            </Button>
+            <Button onClick={handleSendMessage} className="gap-2" disabled={isSendingMessage}>
+              {isSendingMessage ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              {isSendingMessage ? "กำลังส่ง..." : "ส่งข้อความ"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Course-PLO Mapping Matrix Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -408,13 +698,19 @@ const StudentsInfo = () => {
                 </div>
               </div>
               <div className="flex items-center gap-3">
+                {isMappingLoading && (
+                  <Badge variant="secondary" className="gap-1">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    กำลังโหลด
+                  </Badge>
+                )}
                 {isYearReadOnly && (
                   <Badge variant="secondary" className="gap-1 bg-warning/10 text-warning border-warning/30">
                     <Lock className="h-3 w-3" />
                     ปีที่ผ่านมา (ไม่สามารถแก้ไขได้)
                   </Badge>
                 )}
-                <Select value={selectedYear.toString()} onValueChange={handleYearChange}>
+                <Select value={selectedYear.toString()} onValueChange={handleYearChange} disabled={isMappingLoading || isSavingMapping}>
                   <SelectTrigger className="w-32">
                     <SelectValue placeholder="เลือกปี" />
                   </SelectTrigger>
@@ -495,8 +791,8 @@ const StudentsInfo = () => {
                                   <Checkbox
                                     checked={mappingData[course.courseCode]?.[sub] || false}
                                     onCheckedChange={() => toggleMapping(course.courseCode, sub)}
-                                    disabled={isYearReadOnly}
-                                    className={`mx-auto ${isYearReadOnly ? 'cursor-not-allowed' : ''}`}
+                                    disabled={isYearReadOnly || isMappingLoading || isSavingMapping}
+                                    className={`mx-auto ${isYearReadOnly || isMappingLoading || isSavingMapping ? 'cursor-not-allowed' : ''}`}
                                   />
                                 </TableCell>
                               ))
@@ -513,8 +809,8 @@ const StudentsInfo = () => {
 
             <div className="flex justify-end gap-3 pt-4 border-t mt-4">
               <Button variant="outline" onClick={() => setDialogOpen(false)}>ยกเลิก</Button>
-              <Button onClick={saveMapping} className="gap-2" disabled={isYearReadOnly}>
-                <CheckCircle2 className="h-4 w-4" />
+              <Button onClick={saveMapping} className="gap-2" disabled={isYearReadOnly || isMappingLoading || isSavingMapping}>
+                {isSavingMapping ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
                 บันทึก
               </Button>
             </div>

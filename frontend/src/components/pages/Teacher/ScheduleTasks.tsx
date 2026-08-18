@@ -23,6 +23,7 @@ interface Task {
   dueDate: string;
   status: string;
   priority: string;
+  description?: string;
 }
 
 interface Student {
@@ -76,8 +77,23 @@ export default function ScheduleTasks() {
       setIsLoading(true);
       const response = await api.get('/index.php?page=get-schedule-tasks');
       if (response.data.status === 'success') {
-        setTasks(response.data.data.tasks || []);
-        setStudents(response.data.data.students || []);
+        const rows = (response.data.data.tasks || []).map((task: Partial<Task>) => ({
+          ...task,
+          id: String(task.id ?? ''),
+          studentId: String(task.studentId ?? ''),
+          studentName: String(task.studentName ?? ''),
+          task: String(task.task ?? ''),
+          dueDate: String(task.dueDate ?? ''),
+          status: task.status || 'pending',
+          priority: task.priority || 'medium',
+          description: String(task.description ?? ''),
+        })) as Task[];
+        const studentRows = (response.data.data.students || []).map((student: Partial<Student>) => ({
+          id: String(student.id ?? ''),
+          name: String(student.name ?? ''),
+        })) as Student[];
+        setTasks(rows);
+        setStudents(studentRows);
       }
     } catch (error) {
       toast({ title: 'ข้อผิดพลาด', description: 'ไม่สามารถโหลดข้อมูลงานได้', variant: 'destructive' });
@@ -96,7 +112,7 @@ export default function ScheduleTasks() {
       task: task.task,
       dueDate: task.dueDate,
       priority: task.priority,
-      description: (task as any).description || '',
+      description: task.description || '',
     });
     setEditingTaskId(task.id);
     setIsDialogOpen(true);
@@ -111,7 +127,13 @@ export default function ScheduleTasks() {
     try {
       setIsSubmitting(true);
       if (editingTaskId) {
-        const response = await api.post('/index.php?page=update-schedule-task', { ...newTask, id: editingTaskId });
+        const response = await api.post('/index.php?page=update-schedule-task', {
+          id: editingTaskId,
+          task: newTask.task,
+          dueDate: newTask.dueDate,
+          priority: newTask.priority,
+          description: newTask.description,
+        });
         if (response.data.status === 'success') {
           toast({ title: 'สำเร็จ', description: 'แก้ไขงานเรียบร้อยแล้ว' });
           setIsDialogOpen(false);
@@ -182,12 +204,22 @@ export default function ScheduleTasks() {
     }
   };
 
-  const filteredTasks = tasks.filter(
-    (task) =>
-      task.studentName?.includes(searchTerm) ||
-      task.studentId?.includes(searchTerm) ||
-      task.task?.includes(searchTerm)
-  );
+  const normalizedSearchTerm = searchTerm.trim().toLowerCase();
+  const matchesSearch = (value: unknown) =>
+    String(value ?? '').toLowerCase().includes(normalizedSearchTerm);
+
+  const filteredTasks = normalizedSearchTerm
+    ? tasks.filter(
+        (task) =>
+          matchesSearch(task.studentName) ||
+          matchesSearch(task.studentId) ||
+          matchesSearch(task.task)
+      )
+    : tasks;
+
+  const editingTask = editingTaskId
+    ? tasks.find((task) => task.id === editingTaskId) || null
+    : null;
 
   const stats = {
     total: tasks.length,
@@ -225,22 +257,37 @@ export default function ScheduleTasks() {
                 <DialogDescription>{editingTaskId ? "แก้ไขรายละเอียดงานที่มอบหมายแล้ว" : "มอบหมายงานให้นักศึกษาฝึกปฏิบัติ"}</DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
-                <div className="grid gap-2">
-                  <Label>นักศึกษา</Label>
-                  <Select
-                    value={newTask.studentId}
-                    onValueChange={(value) => setNewTask({ ...newTask, studentId: value })}
-                  >
-                    <SelectTrigger><SelectValue placeholder="เลือกนักศึกษา" /></SelectTrigger>
-                    <SelectContent>
-                      {students.map((student) => (
-                        <SelectItem key={student.id} value={String(student.id)}>
-                          {student.id} - {student.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                {editingTaskId ? (
+                  <div className="grid gap-2">
+                    <Label>นักศึกษา</Label>
+                    <Input
+                      value={
+                        editingTask
+                          ? `${editingTask.studentId} - ${editingTask.studentName}`
+                          : newTask.studentId
+                      }
+                      disabled
+                      className="disabled:opacity-100 disabled:text-foreground"
+                    />
+                  </div>
+                ) : (
+                  <div className="grid gap-2">
+                    <Label>นักศึกษา</Label>
+                    <Select
+                      value={newTask.studentId}
+                      onValueChange={(value) => setNewTask({ ...newTask, studentId: value })}
+                    >
+                      <SelectTrigger><SelectValue placeholder="เลือกนักศึกษา" /></SelectTrigger>
+                      <SelectContent>
+                        {students.map((student) => (
+                          <SelectItem key={student.id} value={student.id}>
+                            {student.id} - {student.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                 <div className="grid gap-2">
                   <Label>ชื่องาน</Label>
                   <Input
@@ -286,7 +333,7 @@ export default function ScheduleTasks() {
                 <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isSubmitting}>ยกเลิก</Button>
                 <Button onClick={handleSave} disabled={isSubmitting}>
                   {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                  สร้างงาน
+                  บันทึก
                 </Button>
               </DialogFooter>
             </DialogContent>

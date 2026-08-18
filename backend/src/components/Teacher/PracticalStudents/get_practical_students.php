@@ -74,7 +74,9 @@ try {
         }
 
         // 4. คะแนน performance ล่าสุดจาก approval_requests (ถ้ามี)
-        $performance = $progress;
+        $performance = null;
+        $hasPerformanceEval = false;
+        $performanceComment = "";
         if ($has_approval_table) {
             $stmt_perf = $db->prepare("
                 SELECT description
@@ -93,9 +95,12 @@ try {
                     $overall = (float)$scores['overall'];
                     // รองรับทั้งสเกล 0-5 (หน้า Performance) และ 0-100 (หน้าประเมินเร็ว)
                     $performance = $overall <= 5 ? (int)round(($overall / 5) * 100) : (int)round($overall);
+                    $hasPerformanceEval = true;
                 } elseif (isset($scores['score'])) {
                     $performance = (int)round((float)$scores['score']);
+                    $hasPerformanceEval = true;
                 }
+                $performanceComment = isset($scores['comment']) ? (string)$scores['comment'] : "";
             }
         }
 
@@ -112,6 +117,8 @@ try {
             "ward" => $ward,
             "progress" => $progress,
             "performance" => $performance,
+            "hasPerformanceEval" => $hasPerformanceEval,
+            "performanceComment" => $performanceComment,
             "tasksCompleted" => $tasksCompleted,
             "tasksPending" => $tasksPending,
             "totalTasks" => $total,
