@@ -4,7 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Users, Search, Download, GraduationCap } from 'lucide-react';
+import { Users, Search, Download, GraduationCap, AlertTriangle } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import api from '@/lib/axios';
 import { useToast } from '@/hooks/use-toast';
@@ -92,7 +92,7 @@ export default function Students() {
             <h1 className="text-3xl font-bold tracking-tight">รายชื่อนักศึกษา</h1>
             <p className="text-muted-foreground">นักศึกษาที่ลงทะเบียนในรายวิชาที่สอน</p>
           </div>
-          <Button variant="outline" onClick={handleExport}>
+          <Button onClick={handleExport}>
             <Download className="mr-2 h-4 w-4" />
             ส่งออกรายชื่อ
           </Button>
@@ -123,7 +123,7 @@ export default function Students() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">ต้องติดตาม</CardTitle>
-              <Users className="h-4 w-4 text-yellow-500" />
+              <AlertTriangle className="h-4 w-4 text-yellow-500" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-yellow-600">

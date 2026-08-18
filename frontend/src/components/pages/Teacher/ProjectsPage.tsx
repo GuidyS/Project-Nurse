@@ -46,6 +46,7 @@ interface Project {
   budget_allocated?: string | number | null;
   budget_spent?: string | number | null;
   budget_note?: string | null;
+  progress?: string | number | null;
 }
 
 const statusLabels: Record<string, string> = {
@@ -185,6 +186,16 @@ const ProjectsPage = () => {
   const handleSaveProject = async () => {
     if (!formData.project_name_th.trim()) {
       toast({ title: "แจ้งเตือน", description: "กรุณากรอกชื่อโครงการ (ภาษาไทย)", variant: "destructive" });
+      return;
+    }
+    const currentProject = projects.find((project) => project.project_id.toString() === formData.project_id);
+    const currentProgress = Number(currentProject?.progress || 0);
+    if (formData.status === "completed" && currentProgress < 100) {
+      toast({
+        title: "ยังเปลี่ยนเป็นเสร็จสิ้นไม่ได้",
+        description: `ความคืบหน้าปัจจุบัน ${currentProgress}% ต้องครบ 100% ก่อน`,
+        variant: "destructive",
+      });
       return;
     }
 
@@ -427,10 +438,20 @@ const ProjectsPage = () => {
                   <SelectContent>
                     <SelectItem value="pending">รออนุมัติ</SelectItem>
                     <SelectItem value="active">กำลังดำเนินการ</SelectItem>
-                    <SelectItem value="completed">เสร็จสิ้น</SelectItem>
+                    <SelectItem
+                      value="completed"
+                      disabled={Number(projects.find((project) => project.project_id.toString() === formData.project_id)?.progress || 0) < 100}
+                    >
+                      เสร็จสิ้น
+                    </SelectItem>
                     <SelectItem value="cancelled">ไม่อนุมัติ/ยกเลิก</SelectItem>
                   </SelectContent>
                 </Select>
+                {Number(projects.find((project) => project.project_id.toString() === formData.project_id)?.progress || 0) < 100 && (
+                  <p className="text-xs text-muted-foreground">
+                    สถานะเสร็จสิ้นจะเลือกได้เมื่อความคืบหน้าโครงการครบ 100%
+                  </p>
+                )}
               </div>
             )}
             <div className="grid gap-4 md:grid-cols-3">

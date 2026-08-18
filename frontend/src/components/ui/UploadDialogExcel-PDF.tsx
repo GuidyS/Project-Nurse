@@ -129,7 +129,7 @@ export function UploadDialog({ open, onOpenChange, type }: UploadDialogProps) {
         <div>
           <label className="text-sm font-medium mb-1.5 block">หมายเหตุ (ไม่บังคับ)</label>
           <textarea
-            className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+            className="w-full resize-none rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-primary/40 dark:border-slate-600 dark:bg-slate-950 dark:placeholder:text-slate-400"
             rows={2}
             placeholder="ระบุรายละเอียดเพิ่มเติม"
             value={note}

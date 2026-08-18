@@ -94,11 +94,11 @@ export default function ProjectReports() {
             <p className="text-muted-foreground">รายงานความคืบหน้าและงบประมาณสะสม</p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => handleExport('excel')}>
+            <Button onClick={() => handleExport('excel')}>
               <Download className="mr-2 h-4 w-4" />
               CSV
             </Button>
-            <Button variant="outline" onClick={() => handleExport('pdf')}>
+            <Button variant="secondary" onClick={() => handleExport('pdf')}>
               <FileText className="mr-2 h-4 w-4" />
               ส่งออกข้อมูล
             </Button>

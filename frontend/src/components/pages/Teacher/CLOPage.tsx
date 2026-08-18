@@ -653,7 +653,7 @@ export default function CLOPage() {
           <h1 className="text-3xl font-bold tracking-tight">การจัดการ CLO รายวิชา</h1>
           <p className="text-muted-foreground">Course Learning Outcomes Management</p>
         </div>
-        <Button variant="outline" className="gap-2" onClick={() => setYloEditorOpen(true)}>
+        <Button className="gap-2" onClick={() => setYloEditorOpen(true)}>
           <Settings2 className="h-4 w-4" /> แก้ไข YLO
         </Button>
       </div>
@@ -681,7 +681,7 @@ export default function CLOPage() {
 
         <div className="md:col-span-3 space-y-4">
           {selectedCourse ? (
-            <div className="bg-card rounded-xl shadow-card p-6 border-t-4 border-t-primary">
+            <div className="bg-card rounded-xl shadow-card p-6">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-lg font-bold flex items-center gap-2">
                   <Target className="h-5 w-5 text-primary" />

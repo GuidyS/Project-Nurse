@@ -65,7 +65,7 @@ export default function PLOYLOReport() {
           <h1 className="text-3xl font-bold tracking-tight">รายงาน PLO/YLO</h1>
           <p className="text-muted-foreground">รายงานผลลัพธ์การเรียนรู้จากฐานข้อมูล</p>
         </div>
-        <Button variant="outline" onClick={handleExport}>
+        <Button onClick={handleExport}>
           <Download className="mr-2 h-4 w-4" />
           ส่งออกรายงาน
         </Button>

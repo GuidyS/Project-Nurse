@@ -285,7 +285,7 @@ const StudentsInfo = () => {
           <h1 className="text-3xl font-bold tracking-tight">นักศึกษาในที่ปรึกษา</h1>
           <p className="text-muted-foreground mt-1">จัดการข้อมูลนักศึกษาและติดตาม PLO/YLO/CLO</p>
         </div>
-        <Button variant="outline" className="gap-2" onClick={handleExport}>
+        <Button className="gap-2" onClick={handleExport}>
           <Download className="h-4 w-4" />
           ส่งออกรายชื่อ
         </Button>

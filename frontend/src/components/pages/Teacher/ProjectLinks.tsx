@@ -3,7 +3,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { TrendingUp, Save, Link } from 'lucide-react';
+import { FolderKanban, Save, Link } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import api from '@/lib/axios'; 
 
@@ -135,7 +135,7 @@ export default function ProjectLinks() {
           <Card>
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
-                <TrendingUp className="h-5 w-5" />
+                <FolderKanban className="h-5 w-5" />
                 เลือกโครงการ
               </CardTitle>
               <CardDescription>คลิกเลือกโครงการที่ต้องการจัดพิกัดเป้าหมาย</CardDescription>
@@ -216,7 +216,7 @@ export default function ProjectLinks() {
               </div>
               <Button onClick={handleSave} disabled={!selectedProjectId || isSaving}>
                 <Save className="mr-2 h-4 w-4" />
-                {isSaving ? 'กำลังบันทึก...' : 'บันทึกพิกัด'}
+                {isSaving ? 'กำลังบันทึก...' : 'บันทึก'}
               </Button>
             </CardHeader>
             <CardContent className="flex-1 overflow-auto">

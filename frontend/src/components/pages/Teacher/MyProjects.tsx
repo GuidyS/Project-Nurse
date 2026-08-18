@@ -2,7 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { FolderKanban, Users, Calendar, DollarSign, Loader2 } from 'lucide-react';
+import { FolderKanban, Users, Calendar, DollarSign, Loader2, PlayCircle, WalletCards } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
@@ -107,7 +107,7 @@ export default function MyProjects({ onItemClick }: MyProjectsProps) {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">กำลังดำเนินการ</CardTitle>
-              <FolderKanban className="h-4 w-4 text-green-500" />
+              <PlayCircle className="h-4 w-4 text-green-500" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-600">
@@ -118,7 +118,7 @@ export default function MyProjects({ onItemClick }: MyProjectsProps) {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">งบประมาณรวม</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
+              <WalletCards className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">

@@ -31,6 +31,7 @@ const SettingsPage = () => {
   const { toast } = useToast();
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const savedTheme =
     typeof window !== "undefined" ? localStorage.getItem("theme") || "system" : "system";
   
@@ -445,13 +446,28 @@ const SettingsPage = () => {
 
             <div className="space-y-2">
               <Label htmlFor="confirm-password">ยืนยันรหัสผ่านใหม่</Label>
-              <Input
-                id="confirm-password"
-                type="password"
-                value={passwords.confirm}
-                onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })}
-                placeholder="กรอกรหัสผ่านใหม่อีกครั้ง"
-              />
+              <div className="relative">
+                <Input
+                  id="confirm-password"
+                  type={showConfirmPassword ? "text" : "password"}
+                  value={passwords.confirm}
+                  onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })}
+                  placeholder="กรอกรหัสผ่านใหม่อีกครั้ง"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-0 top-0 h-full px-3"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                >
+                  {showConfirmPassword ? (
+                    <EyeOff className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <Eye className="h-4 w-4 text-muted-foreground" />
+                  )}
+                </Button>
+              </div>
             </div>
 
             <Button

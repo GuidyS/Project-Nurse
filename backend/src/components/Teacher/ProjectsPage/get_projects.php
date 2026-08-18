@@ -38,7 +38,8 @@ try {
             pby.fiscal_year,
             pby.budget_allocated,
             pby.budget_spent,
-            pby.result AS budget_note
+            pby.result AS budget_note,
+            COALESCE(pl.progress, 0) AS progress
         FROM project p
         LEFT JOIN (
             SELECT b1.*
@@ -49,6 +50,11 @@ try {
                 GROUP BY project_id
             ) latest ON latest.latest_budget_id = b1.project_budget_years_id
         ) pby ON pby.project_id = p.project_id
+        LEFT JOIN (
+            SELECT project_id, MAX(actual_percent) AS progress
+            FROM project_progress_logs
+            GROUP BY project_id
+        ) pl ON pl.project_id = p.project_id
     ";
 
     if ($search) {

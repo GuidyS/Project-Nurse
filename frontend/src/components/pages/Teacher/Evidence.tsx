@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CheckSquare, Upload, FileImage, FileText, Download, Search, Eye, Loader2, Trash2 } from 'lucide-react';
+import { CheckCircle, Clock, FileImage, FileText, Image, Upload, Download, Search, Eye, Loader2, Trash2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
@@ -29,6 +29,19 @@ type StudentItem = {
   name: string;
 };
 
+const evidenceFileRules: Record<string, { accept: string; extensions: string[]; label: string }> = {
+  photo: { accept: "image/*", extensions: [".jpg", ".jpeg", ".png", ".webp"], label: "รูปภาพ" },
+  document: { accept: ".pdf,.doc,.docx", extensions: [".pdf", ".doc", ".docx"], label: "เอกสาร" },
+  video: { accept: "video/*", extensions: [".mp4", ".mov", ".avi", ".webm"], label: "วิดีโอ" },
+  certificate: { accept: ".pdf,.jpg,.jpeg,.png", extensions: [".pdf", ".jpg", ".jpeg", ".png"], label: "ใบรับรอง" },
+};
+
+const isAllowedEvidenceFile = (file: File, type: string) => {
+  const rules = evidenceFileRules[type] || evidenceFileRules.photo;
+  const fileName = file.name.toLowerCase();
+  return rules.extensions.some((extension) => fileName.endsWith(extension));
+};
+
 const getTypeBadge = (type: string) => {
   switch (type) {
     case 'photo':
@@ -37,6 +50,8 @@ const getTypeBadge = (type: string) => {
       return <Badge className="bg-green-500"><FileText className="mr-1 h-3 w-3" />เอกสาร</Badge>;
     case 'video':
       return <Badge className="bg-purple-500">วิดีโอ</Badge>;
+    case 'certificate':
+      return <Badge className="bg-teal-500"><FileText className="mr-1 h-3 w-3" />ใบรับรอง</Badge>;
     default:
       return <Badge variant="secondary">{type}</Badge>;
   }
@@ -101,6 +116,15 @@ export default function Evidence() {
   const handleUpload = async () => {
     if (!newEvidence.studentId || !newEvidence.title || !newEvidence.type || !selectedFile) {
       toast({ title: "แจ้งเตือน", description: "กรุณากรอกข้อมูลและเลือกไฟล์ให้ครบถ้วน", variant: "destructive" });
+      return;
+    }
+    if (!isAllowedEvidenceFile(selectedFile, newEvidence.type)) {
+      const rules = evidenceFileRules[newEvidence.type] || evidenceFileRules.photo;
+      toast({
+        title: "ชนิดไฟล์ไม่ตรงกับประเภท",
+        description: `ประเภท${rules.label}รองรับเฉพาะไฟล์ ${rules.extensions.join(", ")}`,
+        variant: "destructive",
+      });
       return;
     }
 
@@ -223,7 +247,7 @@ export default function Evidence() {
           </div>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button>
+              <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
                 <Upload className="mr-2 h-4 w-4" />
                 อัปโหลดหลักฐาน
               </Button>
@@ -266,7 +290,10 @@ export default function Evidence() {
                   <Label>ประเภท</Label>
                   <Select
                     value={newEvidence.type}
-                    onValueChange={(value) => setNewEvidence({ ...newEvidence, type: value })}
+                    onValueChange={(value) => {
+                      setNewEvidence({ ...newEvidence, type: value });
+                      setSelectedFile(null);
+                    }}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -275,6 +302,7 @@ export default function Evidence() {
                       <SelectItem value="photo">รูปภาพ</SelectItem>
                       <SelectItem value="document">เอกสาร</SelectItem>
                       <SelectItem value="video">วิดีโอ</SelectItem>
+                      <SelectItem value="certificate">ใบรับรอง</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -282,9 +310,23 @@ export default function Evidence() {
                   <Label>ไฟล์</Label>
                   <Input
                     type="file"
+                    accept={(evidenceFileRules[newEvidence.type] || evidenceFileRules.photo).accept}
+                    key={newEvidence.type}
                     onChange={(e) => {
                       if (e.target.files && e.target.files[0]) {
-                        setSelectedFile(e.target.files[0]);
+                        const file = e.target.files[0];
+                        if (!isAllowedEvidenceFile(file, newEvidence.type)) {
+                          const rules = evidenceFileRules[newEvidence.type] || evidenceFileRules.photo;
+                          toast({
+                            title: "ชนิดไฟล์ไม่ตรงกับประเภท",
+                            description: `ประเภท${rules.label}รองรับเฉพาะไฟล์ ${rules.extensions.join(", ")}`,
+                            variant: "destructive",
+                          });
+                          e.target.value = "";
+                          setSelectedFile(null);
+                          return;
+                        }
+                        setSelectedFile(file);
                       }
                     }}
                   />
@@ -305,7 +347,7 @@ export default function Evidence() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">หลักฐานทั้งหมด</CardTitle>
-              <CheckSquare className="h-4 w-4 text-muted-foreground" />
+              <FileText className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stats.total}</div>
@@ -314,7 +356,7 @@ export default function Evidence() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">ตรวจสอบแล้ว</CardTitle>
-              <CheckSquare className="h-4 w-4 text-green-500" />
+              <CheckCircle className="h-4 w-4 text-green-500" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-600">{stats.verified}</div>
@@ -323,7 +365,7 @@ export default function Evidence() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">รอตรวจสอบ</CardTitle>
-              <CheckSquare className="h-4 w-4 text-yellow-500" />
+              <Clock className="h-4 w-4 text-yellow-500" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-yellow-600">{stats.pending}</div>
@@ -332,7 +374,7 @@ export default function Evidence() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">รูปภาพ</CardTitle>
-              <FileImage className="h-4 w-4 text-blue-500" />
+              <Image className="h-4 w-4 text-blue-500" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stats.photos}</div>
@@ -395,7 +437,7 @@ export default function Evidence() {
                         </Button>
                         {!evidence.verified && (
                           <Button size="sm" onClick={() => handleVerify(evidence.id)}>
-                            <CheckSquare className="mr-1 h-3 w-3" />
+                            <CheckCircle className="mr-1 h-3 w-3" />
                             ยืนยัน
                           </Button>
                         )}

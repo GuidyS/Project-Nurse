@@ -2,7 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { FileText, Upload, Download, Eye, Plus, X } from 'lucide-react';
+import { FileText, Upload, Download, Eye, Plus, X, CheckCircle, Clock, ClipboardList } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react'; 
 import api from '@/lib/axios';
 
@@ -232,7 +232,7 @@ export default function ProjectDocs() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">อนุมัติแล้ว</CardTitle>
-              <FileText className="h-4 w-4 text-green-500" />
+              <CheckCircle className="h-4 w-4 text-green-500" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-600">
@@ -243,7 +243,7 @@ export default function ProjectDocs() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">รอตรวจสอบ</CardTitle>
-              <FileText className="h-4 w-4 text-yellow-500" />
+              <Clock className="h-4 w-4 text-yellow-500" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-yellow-600">
@@ -254,7 +254,7 @@ export default function ProjectDocs() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">ข้อเสนอโครงการ</CardTitle>
-              <FileText className="h-4 w-4 text-primary" />
+              <ClipboardList className="h-4 w-4 text-primary" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
@@ -380,7 +380,7 @@ export default function ProjectDocs() {
                     value={formData.name}
                     onChange={handleInputChange}
                     placeholder="เช่น ข้อเสนอโครงการวิจัย AI v1"
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    className="flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 dark:border-slate-600 dark:bg-slate-950 dark:placeholder:text-slate-400"
                     required
                   />
                 </div>
@@ -391,7 +391,7 @@ export default function ProjectDocs() {
                     name="project_id"
                     value={formData.project_id}
                     onChange={handleInputChange}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    className="flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 dark:border-slate-600 dark:bg-slate-950 dark:placeholder:text-slate-400"
                     required
                   >
                     <option value="">เลือกโครงการ</option>
@@ -409,7 +409,7 @@ export default function ProjectDocs() {
                     name="type"
                     value={formData.type}
                     onChange={handleInputChange}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    className="flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 dark:border-slate-600 dark:bg-slate-950"
                   >
                     <option value="proposal">ข้อเสนอ</option>
                     <option value="progress">รายงานความก้าวหน้า</option>
@@ -431,7 +431,7 @@ export default function ProjectDocs() {
                           target.showPicker();
                         }
                       }}
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 cursor-pointer"
+                      className="flex h-10 w-full cursor-pointer rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 dark:border-slate-600 dark:bg-slate-950"
                       required
                      />
                   </div>

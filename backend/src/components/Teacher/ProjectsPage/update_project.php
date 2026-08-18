@@ -21,6 +21,25 @@ if (!isset($_SESSION['user_id'])) {
 try {
     // VALIDATION: ต้องมี ID และชื่อโครงการ
     if (!empty($input['project_id']) && !empty($input['project_name_th'])) {
+        if (($input['status'] ?? '') === 'completed') {
+            $progressStmt = $pdo->prepare("
+                SELECT COALESCE(MAX(actual_percent), 0)
+                FROM project_progress_logs
+                WHERE project_id = :project_id
+            ");
+            $progressStmt->execute([':project_id' => $input['project_id']]);
+            $currentProgress = (float)$progressStmt->fetchColumn();
+
+            if ($currentProgress < 100) {
+                http_response_code(400);
+                echo json_encode([
+                    "status" => "error",
+                    "message" => "ไม่สามารถเปลี่ยนสถานะเป็นเสร็จสิ้นได้จนกว่าความคืบหน้าจะครบ 100%"
+                ]);
+                exit();
+            }
+        }
+
         $pdo->beginTransaction();
         
         $sql = "UPDATE project 
