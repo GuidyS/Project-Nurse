@@ -3,7 +3,8 @@ if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../CLOPage/curriculum_repository.php';
 
-header("Access-Control-Allow-Origin: http://localhost:5173");
+header('Access-Control-Allow-Origin: ' . (in_array($_SERVER['HTTP_ORIGIN'] ?? '', ['http://localhost:5173', 'http://127.0.0.1:5173'], true) ? ($_SERVER['HTTP_ORIGIN'] ?? '') : 'http://localhost:5173'));
+header('Vary: Origin');
 header("Access-Control-Allow-Credentials: true");
 header("Content-Type: application/json; charset=UTF-8");
 

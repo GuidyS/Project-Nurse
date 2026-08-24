@@ -271,7 +271,7 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
       </div>
 
       <AlertDialog open={roleUnassignedOpen} onOpenChange={setRoleUnassignedOpen}>
-        <AlertDialogContent className="max-w-md">
+        <AlertDialogContent className="app-dialog-md">
           <AlertDialogHeader>
             <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 text-amber-800">
               <ShieldAlert className="h-6 w-6" />

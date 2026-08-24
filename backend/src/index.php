@@ -1,6 +1,14 @@
 <?php
     // ตั้งค่า CORS (ต้องอยู่บรรทัดแรกๆ ก่อน logic อื่น)
-    header("Access-Control-Allow-Origin: http://localhost:5173");
+    $allowedOrigins = [
+        'http://localhost:5173',
+        'http://127.0.0.1:5173',
+    ];
+    $requestOrigin = $_SERVER['HTTP_ORIGIN'] ?? '';
+    if (in_array($requestOrigin, $allowedOrigins, true)) {
+        header("Access-Control-Allow-Origin: {$requestOrigin}");
+        header("Vary: Origin");
+    }
     header("Access-Control-Allow-Credentials: true");
     header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
     header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
@@ -76,6 +84,9 @@
             case 'get-approval-requests':
                 require_once 'components/Admin/Approvals/get-approval-requests.php';
                 break;
+            case 'create-approval-request':
+                require_once 'components/Admin/Approvals/create-approval-request.php';
+                break;
             case 'approve-request':
                 require_once 'components/Admin/Approvals/approve-request.php';
                 break;
@@ -94,12 +105,39 @@
             case 'admin-reports':
                 require_once 'components/Admin/Reports/get-reports.php';
                 break;
+            case 'schema-audit':
+                require_once 'components/Admin/SchemaAudit/schema_audit.php';
+                break;
+            case 'approve-budget':
+                require_once 'components/Admin/Reports/approve-budget.php';
+                break;
+            case 'performance':
+                require_once 'components/Performance.php';
+                break;
+            case 'projectspage':
+                require_once 'components/Teacher/ProjectsPage.php';
+                break;
+            case 'teacher-dashboard':
+                require_once 'components/Teacher/Dashboard/get_dashboard_stats.php';
+                break;
+            case 'teacher-courses':
+                require_once 'components/Teacher/CoursesPage/api.php';
+                break;
 
             /* -------- Teacher -------- */
 
             // Advises
             case 'get-advises':
                 require_once 'components/Teacher/Advises/get_advises.php';
+                break;
+            case 'get-student-plo-mapping':
+                require_once 'components/Teacher/Advises/get_student_plo_mapping.php';
+                break;
+            case 'save-student-plo-mapping':
+                require_once 'components/Teacher/Advises/save_student_plo_mapping.php';
+                break;
+            case 'send-advisor-message':
+                require_once 'components/Teacher/Advises/send_advisor_message.php';
                 break;
 
             // AdvisorNotifications (การแจ้งเตือนของอาจารย์)
@@ -197,6 +235,9 @@
             case 'delete-document':
                 require_once 'components/Teacher/Documents/delete_document.php';
                 break;
+            case 'download-document':
+                require_once 'components/Teacher/Documents/download_document.php';
+                break;
 
             // Evidence
             case 'get-evidence':
@@ -281,6 +322,18 @@
             case 'get-my-projects':
                 require_once 'components/Teacher/MyProjects/get_my_projects.php';
                 break;
+            case 'get-my-project-faculty-options':
+                require_once 'components/Teacher/MyProjects/get_my_project_faculty_options.php';
+                break;
+            case 'create-my-project':
+                require_once 'components/Teacher/MyProjects/create_my_project.php';
+                break;
+            case 'update-my-project':
+                require_once 'components/Teacher/MyProjects/update_my_project.php';
+                break;
+            case 'upload-my-project-file':
+                require_once 'components/Teacher/MyProjects/upload_my_project_file.php';
+                break;
 
             // ProjectPage
             case 'add-project':
@@ -341,13 +394,13 @@
 
             // TransferRequests
             case 'create-transfer-request':
-                require_once 'components/Teacher/TransferRequests/create_transfer_request';
+                require_once 'components/Teacher/TransferRequests/create_transfer_request.php';
                 break;
             case 'get-transfer-requests':
-                require_once 'components/Teacher/TransferRequests/get_transfer_requests';
+                require_once 'components/Teacher/TransferRequests/get_transfer_requests.php';
                 break;
             case 'update-transfer-status':
-                require_once 'components/Teacher/TransferRequests/update_transfer_status';
+                require_once 'components/Teacher/TransferRequests/update_transfer_status.php';
                 break;
 
             /* -------- Student -------- */

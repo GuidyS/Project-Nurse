@@ -5,7 +5,8 @@ if (session_status() === PHP_SESSION_NONE) {
 // อ้างอิงพาร์ทรากหลักของเซิร์ฟเวอร์ Docker อย่างปลอดภัย ป้องกันปัญหาหาไฟล์ไม่เจอ
 require_once __DIR__ . '/../../../config/config.php'; 
 
-header("Access-Control-Allow-Origin: http://localhost:5173");
+header('Access-Control-Allow-Origin: ' . (in_array($_SERVER['HTTP_ORIGIN'] ?? '', ['http://localhost:5173', 'http://127.0.0.1:5173'], true) ? ($_SERVER['HTTP_ORIGIN'] ?? '') : 'http://localhost:5173'));
+header('Vary: Origin');
 header("Access-Control-Allow-Credentials: true");
 header("Access-Control-Allow-Methods: GET, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization");

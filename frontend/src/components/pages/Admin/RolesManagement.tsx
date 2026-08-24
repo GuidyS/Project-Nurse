@@ -22,6 +22,14 @@ interface UserWithRole {
   teacherSubRole?: string;
 }
 
+interface ApiUser {
+  id: string | number;
+  email: string;
+  fullName: string;
+  role: string;
+  teacherSubRole?: string;
+}
+
 type RoleTab = "teacher" | "student" | "admin" | "unassigned";
 
 const roles = [
@@ -47,9 +55,9 @@ const roleLabels: Record<string, string> = {
 };
 
 const roleTabs: { value: RoleTab; label: string }[] = [
+  { value: "admin", label: "ผู้ดูแลระบบ" },
   { value: "teacher", label: "อาจารย์" },
   { value: "student", label: "นักศึกษา" },
-  { value: "admin", label: "ผู้ดูแลระบบ" },
   { value: "unassigned", label: "รอจัดบทบาท" },
 ];
 
@@ -65,7 +73,7 @@ const subRoleLabels: Record<string, string> = {
 export default function RolesManagement() {
   const [users, setUsers] = useState<UserWithRole[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [roleTab, setRoleTab] = useState<RoleTab>("unassigned");
+  const [roleTab, setRoleTab] = useState<RoleTab>("teacher");
   const [selectedUser, setSelectedUser] = useState<UserWithRole | null>(null);
   const [newRole, setNewRole] = useState("");
   const [primaryPosition, setPrimaryPosition] = useState("");
@@ -90,10 +98,10 @@ export default function RolesManagement() {
 // ดึงข้อมูลผู้ใช้จาก API ตัวเดียวกัน
   const fetchUsers = async () => {
     try {
-      const response = await api.get("/index.php?page=get-users");
+      const response = await api.get<ApiUser[]>("/index.php?page=get-users");
       // Map ให้ตรงกับ Interface UserWithRole
-      setUsers(response.data.map((u: any) => ({
-        id: u.id, email: u.email, fullName: u.fullName, 
+      setUsers(response.data.map((u) => ({
+        id: String(u.id), email: u.email, fullName: u.fullName,
         currentRole: u.role, teacherSubRole: u.teacherSubRole
       })));
     } catch (error) {
@@ -131,10 +139,15 @@ export default function RolesManagement() {
       toast({ title: "มอบหมาย Role สำเร็จ" });
       setIsDialogOpen(false);
       fetchUsers(); // โหลดข้อมูลใหม่เพื่อให้ UI อัปเดต
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message =
+        typeof error === "object" && error !== null && "response" in error
+          ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
+          : undefined;
+
       toast({
         title: "เกิดข้อผิดพลาด",
-        description: error.response?.data?.message || "ไม่สามารถอัปเดต Role ได้",
+        description: message || "ไม่สามารถอัปเดต Role ได้",
         variant: "destructive",
       });
     }
@@ -200,61 +213,18 @@ export default function RolesManagement() {
       <div className="p-6 space-y-6 animate-fade-in">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">จัดการ Role</h1>
+            <h1 className="text-3xl font-bold text-foreground py-1">จัดการ Role</h1>
             <p className="text-muted-foreground">มอบหมายและถอด Role ของผู้ใช้ในระบบ</p>
           </div>
         </div>
 
-        {/* Role Summary Cards */}
-        <div className="grid gap-4 md:grid-cols-4">
-          {roles.map((role) => (
-            <Card
-              key={role.value}
-              className={cn(
-                "cursor-pointer transition-colors hover:border-primary/40",
-                roleTab === role.value && "border-primary"
-              )}
-              onClick={() => setRoleTab(role.value as RoleTab)}
-            >
-              <CardHeader className="pb-2">
-                <div className="flex items-center gap-2">
-                  <Shield className="h-5 w-5 text-primary" />
-                  <CardTitle className="text-base">{role.label}</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">{role.description}</p>
-                <p className="mt-2 text-2xl font-bold">
-                  {tabCount(role.value as RoleTab)}
-                </p>
-              </CardContent>
-            </Card>
-          ))}
-          <Card
-            className={cn(
-              "cursor-pointer transition-colors hover:border-primary/40",
-              roleTab === "unassigned" && "border-primary"
-            )}
-            onClick={() => setRoleTab("unassigned")}
-          >
-            <CardHeader className="pb-2">
-              <div className="flex items-center gap-2">
-                <Shield className="h-5 w-5 text-amber-600" />
-                <CardTitle className="text-base">รอจัดบทบาท</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">บัญชียังไม่มี role — มอบสิทธิ์ก่อนเข้าใช้ระบบ</p>
-              <p className="mt-2 text-2xl font-bold">{tabCount("unassigned")}</p>
-            </CardContent>
-          </Card>
-        </div>
+        
 
         <Card>
           <CardHeader className="space-y-4">
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <div>
-                <CardTitle>จัดการ Role ผู้ใช้</CardTitle>
+                <CardTitle className="py-2">ตำแหน่งผู้ใช้</CardTitle>
                 <CardDescription>
                   {roleLabels[roleTab]} {tabCount(roleTab)} คน · ทั้งหมด {users.length} คน
                 </CardDescription>
@@ -345,7 +315,7 @@ export default function RolesManagement() {
         </Card>
 
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="sm:max-w-2xl">
+          <DialogContent className="app-dialog-2xl">
             <DialogHeader className="space-y-1.5">
               <DialogTitle>มอบหมาย Role</DialogTitle>
               <DialogDescription>
@@ -408,19 +378,20 @@ export default function RolesManagement() {
                             key={subRole.value}
                             type="button"
                             variant="outline"
-                            disabled={isPrimary}
+                            aria-disabled={isPrimary}
+                            tabIndex={isPrimary ? -1 : undefined}
                             className={cn(
                               "h-auto min-h-[52px] items-center justify-between gap-3 whitespace-normal rounded-lg px-3 py-2.5 text-left leading-snug transition-all",
-                              "border-border/80 bg-background/60 hover:border-primary/60 hover:bg-primary/5",
-                              isSelected && "border-primary/70 bg-primary/10 text-primary hover:bg-primary/15",
-                              isPrimary && "border-muted bg-muted/30 text-muted-foreground opacity-70"
+                              "role-position-option",
+                              isSelected && "role-position-option-selected",
+                              isPrimary && "role-position-option-primary"
                             )}
                             onClick={() => toggleSecondaryPosition(subRole.value)}
                           >
                             <span className="min-w-0 flex-1 break-words">
                               {subRole.label}
                               {isPrimary && (
-                                <span className="mt-1 block text-xs text-muted-foreground">
+                                <span className="role-position-option-note mt-1 block text-xs">
                                   ตำแหน่งหลัก
                                 </span>
                               )}

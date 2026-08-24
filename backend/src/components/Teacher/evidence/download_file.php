@@ -24,7 +24,8 @@ if (isset($_GET['id'])) {
         }
         $filename = $row['file_name'] ?: "evidence_{$id}.{$extension}";
 
-        header('Access-Control-Allow-Origin: http://localhost:5173');
+        header('Access-Control-Allow-Origin: ' . (in_array($_SERVER['HTTP_ORIGIN'] ?? '', ['http://localhost:5173', 'http://127.0.0.1:5173'], true) ? ($_SERVER['HTTP_ORIGIN'] ?? '') : 'http://localhost:5173'));
+header('Vary: Origin');
         header('Access-Control-Allow-Credentials: true');
         header('Content-Type: ' . $mime);
         header('Content-Disposition: ' . $disposition . '; filename="' . basename($filename) . '"');
@@ -38,7 +39,8 @@ if (isset($_GET['id'])) {
             $mime = $row['mime_type'] ?: (mime_content_type($fullPath) ?: 'application/octet-stream');
             $filename = $row['file_name'] ?: basename($fullPath);
 
-            header('Access-Control-Allow-Origin: http://localhost:5173');
+            header('Access-Control-Allow-Origin: ' . (in_array($_SERVER['HTTP_ORIGIN'] ?? '', ['http://localhost:5173', 'http://127.0.0.1:5173'], true) ? ($_SERVER['HTTP_ORIGIN'] ?? '') : 'http://localhost:5173'));
+header('Vary: Origin');
             header('Access-Control-Allow-Credentials: true');
             header('Content-Type: ' . $mime);
             header('Content-Disposition: ' . $disposition . '; filename="' . basename($filename) . '"');

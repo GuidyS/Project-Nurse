@@ -1,84 +1,134 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) session_start();
-header('Content-Type: application/json; charset=UTF-8');
-header('Access-Control-Allow-Origin: http://localhost:5173');
-header('Access-Control-Allow-Credentials: true');
-header('Access-Control-Allow-Methods: POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+require_once __DIR__ . '/../ProjectShared/project_helpers.php';
 
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit(); }
-
-// เชื่อมต่อฐานข้อมูล (ใช้แพทเทิร์นเดียวกับไฟล์เดิมของคุณ)
-$pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
-$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+$db = project_db();
+$auth = project_require_auth($db, ['PROJECT_DOCS_MANAGE']);
 
 try {
-    if (!isset($_SESSION['user_id'])) {
-        http_response_code(401);
-        echo json_encode(["status" => "error", "message" => "Unauthorized"]);
+    $documentId = project_request_int('document_id', 'post');
+    if ($documentId === null || !isset($_FILES['file'])) {
+        project_json(["status" => "error", "message" => "ข้อมูลไม่ครบถ้วน กรุณาแนบไฟล์และรหัสเอกสาร"], 400);
         exit;
     }
 
-    if (!isset($_POST['document_id']) || !isset($_FILES['file'])) {
-        throw new Exception("ข้อมูลไม่ครบถ้วน กรุณาแนบไฟล์และรหัสเอกสาร");
+    $docStmt = $db->prepare("
+        SELECT d.id, d.project_id, p.responsible_faculty_id
+        FROM project_documents d
+        INNER JOIN project p ON p.project_id = d.project_id
+        WHERE d.id = :document_id
+        LIMIT 1
+    ");
+    $docStmt->execute([':document_id' => $documentId]);
+    $document = $docStmt->fetch(PDO::FETCH_ASSOC);
+    if (!$document) {
+        project_json(["status" => "error", "message" => "ไม่พบเอกสารที่ผูกกับโครงการที่ถูกต้อง"], 404);
+        exit;
     }
 
-    $docId = $_POST['document_id'];
     $file = $_FILES['file'];
-
-    // เช็ค Error ของไฟล์
     if ($file['error'] !== UPLOAD_ERR_OK) {
-        throw new Exception("เกิดข้อผิดพลาดระหว่างการอัปโหลดไฟล์");
+        project_json(["status" => "error", "message" => "เกิดข้อผิดพลาดระหว่างการอัปโหลดไฟล์"], 400);
+        exit;
     }
 
-    // สร้างโฟลเดอร์ uploads ใต้ document root ของ backend
-    $uploadDir = __DIR__ . '/../../../uploads/project_docs/';
-    if (!is_dir($uploadDir)) {
-        mkdir($uploadDir, 0777, true);
+    if (($file['size'] ?? 0) <= 0 || (int) $file['size'] > PROJECT_UPLOAD_MAX_BYTES) {
+        project_json(["status" => "error", "message" => "ไฟล์ต้องมีขนาดไม่เกิน 10 MB"], 400);
+        exit;
     }
 
-    // ตั้งชื่อไฟล์ใหม่กันชื่อซ้ำ (ใช้ Timestamp + ชื่อไฟล์เดิม)
-    $originalName = basename($file['name']);
+    $originalName = basename((string) $file['name']);
+    $extension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+    $allowedExtensions = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'png', 'jpg', 'jpeg'];
+    if (!in_array($extension, $allowedExtensions, true)) {
+        project_json(["status" => "error", "message" => "ชนิดไฟล์ไม่รองรับ"], 400);
+        exit;
+    }
+
+    $allowedMimes = [
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'image/png',
+        'image/jpeg',
+    ];
+    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+    $detectedMime = $finfo ? finfo_file($finfo, $file['tmp_name']) : ($file['type'] ?? '');
+    if ($finfo) {
+        finfo_close($finfo);
+    }
+    if (!in_array($detectedMime, $allowedMimes, true)) {
+        project_json(["status" => "error", "message" => "ชนิดไฟล์ไม่ตรงกับไฟล์ที่อนุญาต"], 400);
+        exit;
+    }
+
+    $baseProjectDocsDir = __DIR__ . '/../../../uploads/project_docs/';
+    if (!is_dir($baseProjectDocsDir) && !mkdir($baseProjectDocsDir, 0755, true)) {
+        project_json(["status" => "error", "message" => "ไม่สามารถสร้างโฟลเดอร์อัปโหลดได้"], 500);
+        exit;
+    }
+
+    $facultyId = $document['responsible_faculty_id'] !== null
+        ? (int) $document['responsible_faculty_id']
+        : project_resolve_faculty_id($db, $auth['user_id']);
+    if ($facultyId === null) {
+        project_json(["status" => "error", "message" => "บัญชีผู้ใช้นี้ยังไม่ได้เชื่อมกับข้อมูลอาจารย์"], 400);
+        exit;
+    }
+
+    $facultyDirName = (string) $facultyId;
+    $uploadDir = $baseProjectDocsDir . $facultyDirName . DIRECTORY_SEPARATOR;
+    if (!is_dir($uploadDir) && !mkdir($uploadDir, 0755, true)) {
+        project_json(["status" => "error", "message" => "เนเธกเนเธชเธฒเธกเธฒเธฃเธ–เธชเธฃเนเธฒเธเนเธเธฅเน€เธ”เธญเธฃเนเธญเธฑเธเนเธซเธฅเธ”เนเธ”เน"], 500);
+        exit;
+    }
+
+    $baseUploadDir = realpath($baseProjectDocsDir);
+    $realUploadDir = realpath($uploadDir);
+    if (
+        !$baseUploadDir ||
+        !$realUploadDir ||
+        strpos($realUploadDir . DIRECTORY_SEPARATOR, $baseUploadDir . DIRECTORY_SEPARATOR) !== 0
+    ) {
+        project_json(["status" => "error", "message" => "ตำแหน่งจัดเก็บไฟล์ไม่ถูกต้อง"], 500);
+        exit;
+    }
+
     $safeName = preg_replace('/[^A-Za-z0-9._-]/', '_', $originalName);
-    $fileName = time() . '_' . $safeName;
-    $targetFilePath = $uploadDir . $fileName;
-    $publicPath = 'uploads/project_docs/' . $fileName;
+    $fileName = date('YmdHis') . '_' . bin2hex(random_bytes(8)) . '_' . $safeName;
+    $targetPath = $realUploadDir . DIRECTORY_SEPARATOR . $fileName;
+    $publicPath = 'uploads/project_docs/' . $facultyDirName . '/' . $fileName;
 
-    // ย้ายไฟล์จาก Temp ไปยังโฟลเดอร์เป้าหมาย
-    if (move_uploaded_file($file['tmp_name'], $targetFilePath)) {
-        
-        // อัปเดตที่อยู่ไฟล์ในฐานข้อมูล
-        $sql = "UPDATE project_documents
-                SET file_path = :file_path,
-                    file_name = :file_name,
-                    mime_type = :mime_type,
-                    file_size = :file_size,
-                    uploaded_by = :uploaded_by
-                WHERE id = :id";
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute([
-            ':file_path' => $publicPath,
-            ':file_name' => $originalName,
-            ':mime_type' => $file['type'] ?? null,
-            ':file_size' => $file['size'] ?? null,
-            ':uploaded_by' => $_SESSION['user_id'],
-            ':id' => $docId
-        ]);
-
-        echo json_encode([
-            "status" => "success", 
-            "message" => "อัปโหลดและบันทึกไฟล์สำเร็จ",
-            "file_path" => $publicPath
-        ], JSON_UNESCAPED_UNICODE);
-    } else {
-        throw new Exception("ไม่สามารถย้ายไฟล์ไปยังโฟลเดอร์เซิร์ฟเวอร์ได้");
+    if (!move_uploaded_file($file['tmp_name'], $targetPath)) {
+        project_json(["status" => "error", "message" => "ไม่สามารถย้ายไฟล์ไปยังโฟลเดอร์เซิร์ฟเวอร์ได้"], 500);
+        exit;
     }
 
+    $stmt = $db->prepare("
+        UPDATE project_documents
+        SET file_path = :file_path,
+            file_name = :file_name,
+            mime_type = :mime_type,
+            file_size = :file_size,
+            uploaded_by = :uploaded_by
+        WHERE id = :id
+    ");
+    $stmt->execute([
+        ':file_path' => $publicPath,
+        ':file_name' => $originalName,
+        ':mime_type' => $detectedMime,
+        ':file_size' => (int) $file['size'],
+        ':uploaded_by' => $auth['user_id'],
+        ':id' => $documentId,
+    ]);
+
+    project_json([
+        "status" => "success",
+        "message" => "อัปโหลดและบันทึกไฟล์สำเร็จ",
+        "file_path" => $publicPath,
+    ]);
 } catch (Exception $e) {
-    http_response_code(400);
-    echo json_encode([
-        "status" => "error", 
-        "message" => $e->getMessage()
-    ], JSON_UNESCAPED_UNICODE);
+    project_json(["status" => "error", "message" => $e->getMessage()], 400);
 }
 ?>

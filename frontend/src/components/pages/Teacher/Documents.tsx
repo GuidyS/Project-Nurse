@@ -17,8 +17,9 @@ type DocumentItem = {
   type: string;
   course: string;
   uploadedAt: string;
-  size: string;
   status: string;
+  fileUrl?: string;
+  downloadUrl?: string;
 };
 
 const getStatusBadge = (status: string) => {
@@ -40,9 +41,16 @@ export default function Documents() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  
-  const [newDocument, setNewDocument] = useState<Partial<DocumentItem>>({
-    name: '', type: '', course: '',
+
+  const [newDocument, setNewDocument] = useState<{
+    name: string;
+    type: string;
+    course: string;
+    academic_year: string;
+    semester: string;
+    file: File | null;
+  }>({
+    name: '', type: '', course: '', academic_year: '2567', semester: '1', file: null
   });
 
   // 🌟 ดึงข้อมูลจาก API เมื่อเปิดหน้าเว็บ
@@ -51,10 +59,21 @@ export default function Documents() {
       setIsLoading(true);
       const response = await api.get('/index.php?page=get-documents');
       if (response.data.status === 'success') {
-        setDocuments(response.data.data.documents || []);
-        setCourses(response.data.data.courses || []);
+        const payload = response.data.data;
+        if (Array.isArray(payload)) {
+          setDocuments(payload);
+          setCourses([]);
+        } else if (payload && typeof payload === 'object') {
+          setDocuments(Array.isArray(payload.documents) ? payload.documents : []);
+          setCourses(Array.isArray(payload.courses) ? payload.courses : []);
+        } else {
+          setDocuments([]);
+          setCourses([]);
+        }
       }
     } catch (error) {
+      setDocuments([]);
+      setCourses([]);
       toast({ title: "ข้อผิดพลาด", description: "ไม่สามารถดึงข้อมูลเอกสารได้", variant: "destructive" });
     } finally {
       setIsLoading(false);
@@ -63,32 +82,47 @@ export default function Documents() {
 
   useEffect(() => { fetchDocuments(); }, []);
 
-  const filteredDocuments = documents.filter((doc) => {
+  const safeDocuments = Array.isArray(documents) ? documents : [];
+
+  const filteredDocuments = safeDocuments.filter((doc) => {
     const searchLower = searchTerm.toLowerCase();
     return (
-      doc.name.toLowerCase().includes(searchLower) ||
-      doc.type.toLowerCase().includes(searchLower) ||
-      doc.course.toLowerCase().includes(searchLower)
+      (doc.name || '').toLowerCase().includes(searchLower) ||
+      (doc.type || '').toLowerCase().includes(searchLower) ||
+      (doc.course || '').toLowerCase().includes(searchLower)
     );
   });
 
   // 🌟 ฟังก์ชันส่งข้อมูลอัปโหลดไปบันทึก
   const handleUpload = async () => {
-    if (!newDocument.name || !newDocument.type || !newDocument.course) {
-      toast({ title: "แจ้งเตือน", description: "กรุณากรอกข้อมูลให้ครบถ้วน", variant: "destructive" });
+    if (!newDocument.name || !newDocument.type || !newDocument.course || !newDocument.file) {
+      toast({ title: "แจ้งเตือน", description: "กรุณากรอกข้อมูลและแนบไฟล์ให้ครบถ้วน", variant: "destructive" });
       return;
     }
-    
+
     try {
-      const response = await api.post('/index.php?page=upload-document', newDocument);
+      const formData = new FormData();
+      formData.append('name', newDocument.name);
+      formData.append('type', newDocument.type);
+      formData.append('course', newDocument.course);
+      formData.append('academic_year', newDocument.academic_year);
+      formData.append('semester', newDocument.semester);
+      formData.append('file', newDocument.file);
+
+      const response = await api.post('/index.php?page=upload-document', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      
       if (response.data.status === 'success') {
         toast({ title: "สำเร็จ", description: "บันทึกข้อมูลเอกสารเรียบร้อยแล้ว" });
         setIsDialogOpen(false);
-        setNewDocument({ name: '', type: '', course: '' });
+        setNewDocument({ name: '', type: '', course: '', academic_year: '2567', semester: '1', file: null });
         fetchDocuments(); // รีเฟรชข้อมูล
+      } else {
+        toast({ title: "ข้อผิดพลาด", description: response.data.message || "ไม่สามารถอัปโหลดได้", variant: "destructive" });
       }
-    } catch (error) {
-      toast({ title: "ข้อผิดพลาด", description: "ไม่สามารถอัปโหลดได้", variant: "destructive" });
+    } catch (error: any) {
+      toast({ title: "ข้อผิดพลาด", description: error.response?.data?.message || "ไม่สามารถอัปโหลดได้", variant: "destructive" });
     }
   };
 
@@ -136,33 +170,76 @@ export default function Documents() {
                 </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label>ปีการศึกษา</Label>
+                    <Input
+                      type="number"
+                      value={newDocument.academic_year}
+                      onChange={(e) => setNewDocument({ ...newDocument, academic_year: e.target.value })}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>ภาคการศึกษา</Label>
+                    <Select value={newDocument.semester} onValueChange={(v) => setNewDocument({ ...newDocument, semester: v })}>
+                      <SelectTrigger><SelectValue placeholder="เลือกเทอม" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1">เทอม 1</SelectItem>
+                        <SelectItem value="2">เทอม 2</SelectItem>
+                        <SelectItem value="3">เทอม 3</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
                 <div className="grid gap-2">
-                  <Label>ชื่อเอกสาร</Label>
+                  <Label>รายวิชา</Label>
+                  <Select value={newDocument.course} onValueChange={(v) => setNewDocument({ ...newDocument, course: v })}>
+                    <SelectTrigger><SelectValue placeholder="เลือกรายวิชา" /></SelectTrigger>
+                    <SelectContent>
+                      {courses.map(c => (
+                        <SelectItem key={c.subject_code} value={c.subject_code}>
+                          {c.subject_code} - {c.subject_name_th}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="grid gap-2">
+                  <Label>ประเภท</Label>
+                  <Select value={newDocument.type} onValueChange={(v) => setNewDocument({ ...newDocument, type: v })}>
+                    <SelectTrigger><SelectValue placeholder="เลือกประเภท" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="มคอ.3">มคอ.3 (รายละเอียดของรายวิชา)</SelectItem>
+                      <SelectItem value="มคอ.4">มคอ.4 (รายละเอียดประสบการณ์ภาคสนาม)</SelectItem>
+                      <SelectItem value="มคอ.5">มคอ.5 (รายงานผลการดำเนินการรายวิชา)</SelectItem>
+                      <SelectItem value="มคอ.6">มคอ.6 (รายงานผลการดำเนินการประสบการณ์ภาคสนาม)</SelectItem>
+                      <SelectItem value="other">อื่นๆ</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="grid gap-2">
+                  <Label>ชื่อเอกสาร (Optional)</Label>
                   <Input
                     value={newDocument.name || ''}
                     onChange={(e) => setNewDocument({ ...newDocument, name: e.target.value })}
-                    placeholder="เช่น TQF 3 - NUR101"
+                    placeholder="เช่น มคอ.3 - NUR101"
                   />
                 </div>
+
                 <div className="grid gap-2">
-                  <Label>ประเภท</Label>
-                  <Input
-                    value={newDocument.type || ''}
-                    onChange={(e) => setNewDocument({ ...newDocument, type: e.target.value })}
-                    placeholder="เช่น TQF 3, เอกสารสอน"
+                  <Label>ไฟล์เอกสาร</Label>
+                  <Input 
+                    type="file" 
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files.length > 0) {
+                        const file = e.target.files[0];
+                        setNewDocument({ ...newDocument, file, name: newDocument.name || file.name });
+                      }
+                    }} 
                   />
-                </div>
-                <div className="grid gap-2">
-                  <Label>รายวิชา</Label>
-                  <Input
-                    value={newDocument.course || ''}
-                    onChange={(e) => setNewDocument({ ...newDocument, course: e.target.value })}
-                    placeholder="เช่น NUR101"
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label>ไฟล์</Label>
-                  <Input type="file" />
                 </div>
               </div>
               <DialogFooter>
@@ -194,7 +271,7 @@ export default function Documents() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-600">
-                {documents.filter(d => d.status === 'approved').length}
+                {safeDocuments.filter(d => d.status === 'approved').length}
               </div>
             </CardContent>
           </Card>
@@ -206,7 +283,7 @@ export default function Documents() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-yellow-600">
-                {documents.filter(d => d.status === 'pending').length}
+                {safeDocuments.filter(d => d.status === 'pending').length}
               </div>
             </CardContent>
           </Card>
@@ -247,7 +324,6 @@ export default function Documents() {
                   <TableHead>ชื่อเอกสาร</TableHead>
                   <TableHead>ประเภท</TableHead>
                   <TableHead>รายวิชา</TableHead>
-                  <TableHead>ขนาด</TableHead>
                   <TableHead>วันที่อัปโหลด</TableHead>
                   <TableHead>สถานะ</TableHead>
                   <TableHead>การดำเนินการ</TableHead>
@@ -261,13 +337,34 @@ export default function Documents() {
                       <TableCell className="font-medium">{doc.name}</TableCell>
                       <TableCell><Badge variant="outline">{doc.type}</Badge></TableCell>
                       <TableCell>{doc.course}</TableCell>
-                      <TableCell>{doc.size}</TableCell>
                       <TableCell>{doc.uploadedAt}</TableCell>
                       <TableCell>{getStatusBadge(doc.status)}</TableCell>
                       <TableCell>
                         <div className="flex gap-2">
-                          <Button variant="outline" size="icon" className="h-8 w-8"><Eye className="h-4 w-4" /></Button>
-                          <Button variant="outline" size="icon" className="h-8 w-8"><Download className="h-4 w-4" /></Button>
+                          <Button 
+                            variant="outline" 
+                            size="icon" 
+                            className="h-8 w-8" 
+                            disabled={!doc.fileUrl}
+                            onClick={() => doc.fileUrl && window.open(doc.fileUrl, '_blank')}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="icon" 
+                            className="h-8 w-8" 
+                            disabled={!doc.downloadUrl && !doc.fileUrl}
+                            onClick={() => {
+                              const url = doc.downloadUrl || doc.fileUrl;
+                              if (url) {
+                                // use an invisible iframe or just window.location for downloads so we don't open blank tabs
+                                window.location.href = url;
+                              }
+                            }}
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
                           <Button variant="outline" size="icon" className="h-8 w-8 hover:bg-red-100 hover:text-red-600 border-red-200" onClick={() => { setDeleteId(doc.id); setIsDeleteOpen(true); }}>
                             <Trash2 className="h-4 w-4" />
                           </Button>

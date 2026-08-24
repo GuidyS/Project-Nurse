@@ -105,7 +105,7 @@ export default function DeanDashboard() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">แดชบอร์ดคณบดี</h1>
+            <h1 className="text-2xl font-bold text-foreground leading-snug">แดชบอร์ดคณบดี</h1>
             <p className="text-muted-foreground">ภาพรวม KPI และรายงานสำหรับผู้บริหาร</p>
           </div>
           <div className="flex items-center gap-3">

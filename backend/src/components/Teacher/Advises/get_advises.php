@@ -2,7 +2,8 @@
 if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/../../../config/config.php';
 
-header("Access-Control-Allow-Origin: http://localhost:5173");
+header('Access-Control-Allow-Origin: ' . (in_array($_SERVER['HTTP_ORIGIN'] ?? '', ['http://localhost:5173', 'http://127.0.0.1:5173'], true) ? ($_SERVER['HTTP_ORIGIN'] ?? '') : 'http://localhost:5173'));
+header('Vary: Origin');
 header("Access-Control-Allow-Credentials: true");
 header("Content-Type: application/json; charset=UTF-8");
 
@@ -30,7 +31,7 @@ try {
     $sql = "
         SELECT
             s.student_id as id,
-            IF(s.student_code LIKE 'TEMP-%', s.student_id, s.student_code) as studentId,
+            s.student_id as studentId,
             CONCAT(IFNULL(s.title,''), s.first_name_th, ' ', s.last_name_th) as name,
             IFNULL(s.year_level, 1) as year,
             IFNULL(s.gpa, 0) as gpa,

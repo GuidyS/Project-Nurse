@@ -1,46 +1,77 @@
 <?php
 
-require_once __DIR__ . '/../../middlewares/auth_middleware.php';
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
-$input = json_decode(file_get_contents("php://input"), true);
 
 try {
-    if (!empty($input['name']) && !empty($input['course']) && !empty($input['type'])) {
-        $courseCode = $input['course'];
-        
-        $sql = "SELECT id, mapping_json FROM curriculum_framework WHERE is_active = 1 LIMIT 1";
-        $stmt = $pdo->query($sql);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!empty($_POST['name']) && !empty($_POST['course']) && !empty($_POST['type']) && isset($_FILES['file'])) {
+        $courseCode = $_POST['course'];
+        $name = $_POST['name'];
+        $type = $_POST['type']; // e.g. 'มคอ.3'
+        $academicYear = $_POST['academic_year'] ?? date('Y') + 543;
+        $semester = $_POST['semester'] ?? 1;
 
-        if ($row) {
-            $data = json_decode($row['mapping_json'], true);
+        $file = $_FILES['file'];
+
+        if ($file['error'] === UPLOAD_ERR_OK) {
+            $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
+            $newFileName = time() . "_" . rand(1000, 9999) . "." . $ext;
             
-            if (!isset($data['subject_mappings'])) $data['subject_mappings'] = [];
-            if (!isset($data['subject_mappings'][$courseCode])) $data['subject_mappings'][$courseCode] = [];
-            if (!isset($data['subject_mappings'][$courseCode]['documents'])) $data['subject_mappings'][$courseCode]['documents'] = [];
+            $uploadDir = __DIR__ . '/../../../uploads/tqf/';
+            if (!is_dir($uploadDir)) {
+                mkdir($uploadDir, 0777, true);
+            }
+            
+            $destPath = $uploadDir . $newFileName;
 
-            // สร้างเอกสารใหม่
-            $new_doc = [
-                "id" => "doc_" . time() . "_" . rand(100, 999),
-                "name" => $input['name'],
-                "type" => $input['type'],
-                "uploadedAt" => date('Y-m-d'), // วันที่อัปโหลด
-                "size" => "1.2 MB", // (จำลองขนาดไฟล์)
-                "status" => "pending" // เอกสารใหม่ให้สถานะรอดำเนินการ
-            ];
+            if (move_uploaded_file($file['tmp_name'], $destPath)) {
+                $sql = "SELECT subject_name_th FROM subject WHERE subject_code = :code";
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute([':code' => $courseCode]);
+                $subjectName = $stmt->fetchColumn() ?: '';
 
-            // ดันเอกสารใหม่เข้า Array ของวิชานั้นๆ
-            $data['subject_mappings'][$courseCode]['documents'][] = $new_doc;
+                $relativePath = '/uploads/tqf/' . $newFileName;
+                
+                $insertSql = "INSERT INTO tqf_documents 
+                    (subject_code, subject_name, tqf_type, academic_year, semester, approval_status, responsible_teacher, file_name, file_path) 
+                    VALUES 
+                    (:sc, :sn, :type, :year, :sem, 'รอหัวหน้าภาคฯ', :teacher, :fn, :fp)";
+                
+                $insertStmt = $pdo->prepare($insertSql);
+                $insertStmt->execute([
+                    ':sc' => $courseCode,
+                    ':sn' => $subjectName,
+                    ':type' => $type,
+                    ':year' => $academicYear,
+                    ':sem' => $semester,
+                    ':teacher' => $_SESSION['username'] ?? '',
+                    ':fn' => $name,
+                    ':fp' => $relativePath
+                ]);
 
-            $new_json = json_encode($data, JSON_UNESCAPED_UNICODE);
-            $update_stmt = $pdo->prepare("UPDATE curriculum_framework SET mapping_json = :json WHERE id = :id");
-            $update_stmt->execute([':json' => $new_json, ':id' => $row['id']]);
+                $tqfId = $pdo->lastInsertId();
+                $requestSql = "INSERT INTO approval_requests 
+                    (request_type, requester_user_id, target_ref_type, target_ref_id, title, status)
+                    VALUES ('document_approve', :user, 'tqf_document', :ref_id, :title, 'pending')";
+                $reqStmt = $pdo->prepare($requestSql);
+                $reqStmt->execute([
+                    ':user' => $_SESSION['user_id'] ?? 1,
+                    ':ref_id' => $tqfId,
+                    ':title' => "อนุมัติเอกสาร TQF: $name ($courseCode)"
+                ]);
 
-            echo json_encode(["status" => "success", "message" => "อัปโหลดเอกสารสำเร็จ"]);
+                echo json_encode(["status" => "success", "message" => "อัปโหลดเอกสารสำเร็จ"]);
+            } else {
+                echo json_encode(["status" => "error", "message" => "ไม่สามารถบันทึกไฟล์ได้"]);
+            }
+        } else {
+            echo json_encode(["status" => "error", "message" => "เกิดข้อผิดพลาดในการอัปโหลดไฟล์: " . $file['error']]);
         }
     } else {
-        echo json_encode(["status" => "error", "message" => "กรอกข้อมูลไม่ครบถ้วน"]);
+        echo json_encode(["status" => "error", "message" => "กรอกข้อมูลไม่ครบถ้วน หรือไม่ได้เลือกไฟล์"]);
     }
 } catch (PDOException $e) {
     http_response_code(500);

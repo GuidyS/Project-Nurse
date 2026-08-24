@@ -1,6 +1,7 @@
 <?php
 if (session_status() === PHP_SESSION_NONE) session_start();
-header("Access-Control-Allow-Origin: http://localhost:5173");
+header('Access-Control-Allow-Origin: ' . (in_array($_SERVER['HTTP_ORIGIN'] ?? '', ['http://localhost:5173', 'http://127.0.0.1:5173'], true) ? ($_SERVER['HTTP_ORIGIN'] ?? '') : 'http://localhost:5173'));
+header('Vary: Origin');
 header("Access-Control-Allow-Credentials: true");
 header("Content-Type: application/json; charset=UTF-8");
 
@@ -20,7 +21,7 @@ try {
     // ประวัติการให้คำปรึกษาของอาจารย์ที่ล็อกอิน (advisor_id เก็บ users.user_id)
     $sql = "SELECT
                 a.advice_id as id,
-                IF(s.student_code LIKE 'TEMP-%', s.student_id, s.student_code) as studentId,
+                s.student_id as studentId,
                 CONCAT(IFNULL(s.title,''), s.first_name_th, ' ', s.last_name_th) as studentName,
                 DATE_FORMAT(a.created_at, '%Y-%m-%d') as date,
                 a.topic,

@@ -23,7 +23,7 @@ function getActiveFrameworkId(PDO $pdo): ?int
 
 function getActiveFrameworkRow(PDO $pdo): ?array
 {
-    $row = $pdo->query('SELECT id, mapping_json, curriculum_year, program_name FROM curriculum_framework WHERE is_active = 1 LIMIT 1')
+    $row = $pdo->query('SELECT id, curriculum_year, program_name FROM curriculum_framework WHERE is_active = 1 LIMIT 1')
         ->fetch(PDO::FETCH_ASSOC);
     return $row ?: null;
 }
@@ -150,11 +150,35 @@ function buildMappingDataFromTables(PDO $pdo, int $frameworkId): array
         $subjectMappings[$code]['clos'][] = cloRowToApiArray($clo);
     }
 
+    $subjectNames = [];
+    if (!empty($subjectMappings)) {
+        $subjectCodes = array_keys($subjectMappings);
+        $placeholders = implode(',', array_fill(0, count($subjectCodes), '?'));
+        $subjectStmt = $pdo->prepare(
+            "SELECT subject_code, subject_name_th
+             FROM subject
+             WHERE subject_code IN ($placeholders)"
+        );
+        $subjectStmt->execute($subjectCodes);
+        foreach ($subjectStmt->fetchAll(PDO::FETCH_ASSOC) as $subject) {
+            $subjectNames[(string)$subject['subject_code']] = (string)($subject['subject_name_th'] ?? '');
+        }
+    }
+
+    $cloCatalog = [];
+    foreach (array_keys($subjectMappings) as $subjectCode) {
+        $cloCatalog[] = [
+            'subject_code' => (string)$subjectCode,
+            'subject_name' => $subjectNames[$subjectCode] ?? (string)$subjectCode,
+        ];
+    }
+
     return [
         'plos' => $plos,
         'sub_plo_catalog' => $catalog,
         'ylo_plo_matrix' => $matrix,
         'subject_mappings' => $subjectMappings,
+        'clos' => $cloCatalog,
     ];
 }
 
@@ -728,9 +752,8 @@ function loadActiveMappingData(PDO $pdo): array
         return [];
     }
     $fid = (int)$row['id'];
-    if (curriculumTablesReady($pdo) && curriculumHasRelationalData($pdo, $fid)) {
+    if (curriculumTablesReady($pdo)) {
         return buildMappingDataFromTables($pdo, $fid);
     }
-    $data = !empty($row['mapping_json']) ? json_decode($row['mapping_json'], true) : [];
-    return is_array($data) ? $data : [];
+    return [];
 }

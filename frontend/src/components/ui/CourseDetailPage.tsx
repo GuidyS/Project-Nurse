@@ -107,7 +107,7 @@ export default function CourseDetailPage({ courseCode, onBack, onManageCLO }: Co
   if (!course) {
     return (
       <Dialog open={!!courseCode} onOpenChange={(open) => !open && handleBack()}>
-        <DialogContent className="max-w-xl">
+        <DialogContent className="app-dialog-xl">
           <div className="text-center py-10">
             <p className="text-muted-foreground">ไม่พบข้อมูลรายวิชา</p>
             <Button variant="outline" className="mt-4" onClick={handleBack}>ปิด</Button>
@@ -119,7 +119,7 @@ export default function CourseDetailPage({ courseCode, onBack, onManageCLO }: Co
 
   return (
     <Dialog open={!!courseCode} onOpenChange={(open) => !open && handleBack()}>
-      <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="app-dialog-4xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">
             <span>{course.name}</span>

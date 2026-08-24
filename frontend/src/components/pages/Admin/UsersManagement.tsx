@@ -493,7 +493,7 @@ export default function UsersManagement() {
       <div className="p-6 space-y-6 animate-fade-in">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">จัดการผู้ใช้</h1>
+            <h1 className="text-3xl font-bold text-foreground py-1">จัดการผู้ใช้</h1>
             <p className="text-muted-foreground">สร้างบัญชีจากข้อมูลอาจารย์/นักศึกษา แก้ไข ลบ และมอบบทบาท</p>
           </div>
           <Button className="gap-2" onClick={() => setIsGenerateOpen(true)} disabled={isGenerating}>
@@ -506,7 +506,7 @@ export default function UsersManagement() {
           <CardHeader className="space-y-4">
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <div>
-                <CardTitle>รายชื่อผู้ใช้</CardTitle>
+                <CardTitle className="py-2">รายชื่อผู้ใช้</CardTitle>
                 <CardDescription>
                   {roleLabels[roleTab]} {tabCount(roleTab)} คน · ทั้งหมด {users.length} คน
                 </CardDescription>
@@ -613,7 +613,7 @@ export default function UsersManagement() {
 
       {/* 🎯 Dialog แก้ไขข้อมูลแบบฟอร์มยาว */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="app-dialog-3xl">
           <DialogHeader>
             <DialogTitle>แก้ไขข้อมูลผู้ใช้ (ID: {detailForm.student_id || detailForm.faculty_id})</DialogTitle>
           </DialogHeader>

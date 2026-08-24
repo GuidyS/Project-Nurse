@@ -1,48 +1,38 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) session_start();
+require_once __DIR__ . '/../ProjectShared/project_helpers.php';
 
-// 💡 แก้ไข: ทำระบบค้นหาไฟล์ config อัตโนมัติ
-$possible_paths = [
-    __DIR__ . '/config/config.php',
-    __DIR__ . '/../config/config.php',
-    __DIR__ . '/../../../config/config.php',
-    __DIR__ . '/../../../../config/config.php'
-];
-foreach ($possible_paths as $path) {
-    if (file_exists($path)) {
-        require_once $path;
-        break;
-    }
-}
-
-$origin = $_SERVER['HTTP_ORIGIN'] ?? 'http://localhost:5173';
-$allowedOrigins = ['http://localhost:5173', 'http://127.0.0.1:5173'];
-if (in_array($origin, $allowedOrigins, true)) {
-    header("Access-Control-Allow-Origin: $origin");
-}
-header("Access-Control-Allow-Credentials: true");
-header("Content-Type: application/json; charset=UTF-8");
-header("Access-Control-Allow-Methods: POST, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
-
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit(); }
+$db = project_db();
+project_require_auth($db, ['PROJECT_LINKS_MANAGE']);
+$input = project_payload();
 
 try {
-    $db = new Connect();
-    
-    $input = json_decode(file_get_contents('php://input'), true);
-
-    if (!is_array($input) || !isset($input['project_id']) || !isset($input['links'])) {
-        throw new Exception("ข้อมูลไม่ครบถ้วนสำหรับการบันทึก");
+    if (!isset($input['project_id'], $input['links']) || !is_array($input['links'])) {
+        project_json(["status" => "error", "message" => "ข้อมูลไม่ครบถ้วนสำหรับการบันทึก"], 400);
+        exit;
     }
 
-    $projectId = $input['project_id'];
+    $projectId = (int) $input['project_id'];
+    if ($projectId <= 0) {
+        project_json(["status" => "error", "message" => "รหัสโครงการไม่ถูกต้อง"], 400);
+        exit;
+    }
+    project_require_existing_project($db, $projectId);
+
     $links = $input['links'];
+    $normalizeCodes = function ($value): array {
+        if (!is_array($value)) {
+            return [];
+        }
+        return array_values(array_unique(array_filter(array_map(function ($code) {
+            $normalized = strtoupper(trim((string) $code));
+            return preg_match('/^[A-Z0-9._-]+$/', $normalized) ? $normalized : '';
+        }, $value))));
+    };
 
     $normalizedLinks = [
-        'plos' => array_values(array_unique(array_filter($links['plos'] ?? [], 'is_string'))),
-        'ylos' => array_values(array_unique(array_filter($links['ylos'] ?? [], 'is_string'))),
-        'clos' => array_values(array_unique(array_filter($links['clos'] ?? [], 'is_string'))),
+        'plos' => $normalizeCodes($links['plos'] ?? []),
+        'ylos' => $normalizeCodes($links['ylos'] ?? []),
+        'clos' => $normalizeCodes($links['clos'] ?? []),
     ];
 
     $db->beginTransaction();
@@ -60,30 +50,24 @@ try {
             $insertStmt->execute([
                 ':project_id' => $projectId,
                 ':outcome_type' => $outcomeType,
-                ':outcome_code' => $code
+                ':outcome_code' => $code,
             ]);
         }
     }
 
-    $mappingJsonString = json_encode($normalizedLinks, JSON_UNESCAPED_UNICODE);
     $updateStmt = $db->prepare("UPDATE project SET mapping_json = :mapping_json WHERE project_id = :project_id");
     $updateStmt->execute([
-        ':mapping_json' => $mappingJsonString,
-        ':project_id' => $projectId
+        ':mapping_json' => json_encode($normalizedLinks, JSON_UNESCAPED_UNICODE),
+        ':project_id' => $projectId,
     ]);
 
     $db->commit();
 
-    echo json_encode([
-        "status" => "success",
-        "message" => "บันทึกข้อมูลเรียบร้อยแล้ว"
-    ]);
-
+    project_json(["status" => "success", "message" => "บันทึกข้อมูลเรียบร้อยแล้ว"]);
 } catch (Exception $e) {
-    if (isset($db) && $db->inTransaction()) {
+    if ($db->inTransaction()) {
         $db->rollBack();
     }
-    http_response_code(500);
-    echo json_encode(["status" => "error", "message" => $e->getMessage()]);
+    project_json(["status" => "error", "message" => $e->getMessage()], 500);
 }
 ?>

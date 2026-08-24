@@ -1,5 +1,10 @@
 <?php
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/../Approvals/approval-schema.php';
 
 // นำเข้าเครื่องมือสร้าง Excel
 require_once __DIR__ . '/../../../vendor/autoload.php';
@@ -106,6 +111,8 @@ function getExportSchema(): array
 
 try {
     $schemas = getExportSchema();
+    $db = new Connect();
+    $adminUserId = approvalRequireAdmin($db);
 
     if (!isset($schemas[$category])) {
         http_response_code(400);
@@ -127,10 +134,24 @@ try {
     $headers = array_map(fn($k) => $schema['fields'][$k]['label'], $selectedKeys);
 
     // ดึงข้อมูลจาก DB
-    $db = new Connect();
     $columns = implode(', ', array_map(fn($c) => "`$c`", $schema['select']));
-    $sql = "SELECT $columns FROM `{$schema['table']}` ORDER BY {$schema['order_by']}";
-    $stmt = $db->query($sql);
+    
+    $whereClause = "";
+    $params = [];
+    if ($academicYear !== '') {
+        if ($category === 'students') {
+            $yearPrefix = substr($academicYear, 2, 2);
+            $whereClause = " WHERE student_id LIKE :yearPrefix";
+            $params[':yearPrefix'] = $yearPrefix . '%';
+        } elseif ($category === 'projects') {
+            $whereClause = " WHERE academic_year = :year";
+            $params[':year'] = $academicYear;
+        }
+    }
+
+    $sql = "SELECT $columns FROM `{$schema['table']}`{$whereClause} ORDER BY {$schema['order_by']}";
+    $stmt = $db->prepare($sql);
+    $stmt->execute($params);
 
     $exportData = [];
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
@@ -143,6 +164,7 @@ try {
     }
 
     $fileSuffix = $academicYear !== '' ? '_' . $academicYear : '';
+    approvalLogAction($db, 'export', 0, $adminUserId, "category={$category}; format={$format}; rows=" . count($exportData));
 
     // 🌟 กรณีส่งออกเป็น Excel (.xlsx)
     if ($format === 'xlsx') {

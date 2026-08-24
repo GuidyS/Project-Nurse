@@ -143,7 +143,7 @@ const Index = () => {
     // 3. 🔒 หมวดสิทธิ์ผู้ดูแลระบบ (Admin - Role 1)
     const adminPages = ["approvals", "audit-log", "export-data", "import-data", "reports", "roles-management", "users-management"];
     if (adminPages.includes(activeItem)) {
-      if (roleId !== 1) return <UnauthorizedView />;
+      if (roleId !== 1 && !(roleId == 2 && positionId == 1)) return <UnauthorizedView />;
       switch (activeItem) {
         case "approvals": return <Approvals />;                                 //*
         case "audit-log": return <AuditLog />;                                     //*                                 
@@ -158,7 +158,7 @@ const Index = () => {
     // 4. 🔒 หมวดสิทธิ์คณบดี (Role 2 + Position 1) หรือ Admin
     const deanPages = ["dean-dashboard", "retention"];
     if (deanPages.includes(activeItem)) {
-      if (roleId !== 1 && !(roleId === 2 && positionId === 1)) return <UnauthorizedView />;
+      if (roleId !== 1 && !(roleId == 2 && positionId == 1)) return <UnauthorizedView />;
       switch (activeItem) {
         case "dean-dashboard": return <DeanDashboard />;
         case "retention": return <Retention />;

@@ -43,21 +43,23 @@ function fetchAnnualReportRows($db): array
 {
     $itemStmt = $db->query("
         SELECT
-            id,
-            academic_year,
-            strategy,
-            plan_name,
-            objective,
-            kpi,
-            project_code,
-            project_name,
-            activity_name,
-            row_type,
-            parent_item_id,
-            responsible_person,
-            sort_order
-        FROM annual_project_report_items
-        ORDER BY academic_year DESC, sort_order ASC, id ASC
+            i.id,
+            i.academic_year,
+            i.strategy,
+            i.plan_name,
+            i.objective,
+            i.kpi,
+            i.project_code,
+            i.project_name,
+            i.activity_name,
+            i.row_type,
+            i.parent_item_id,
+            i.responsible_person,
+            i.sort_order,
+            ar.status as approval_status
+        FROM annual_project_report_items i
+        LEFT JOIN approval_requests ar ON i.id = ar.target_ref_id AND ar.target_ref_type = 'report_item' AND ar.request_type = 'budget_approval'
+        ORDER BY i.academic_year DESC, i.sort_order ASC, i.id ASC
     ");
     $items = $itemStmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -84,6 +86,9 @@ function fetchAnnualReportRows($db): array
             'responsiblePerson' => $item['responsible_person'],
             'rowType' => $item['row_type'] ?: 'project',
             'sortOrder' => (int)($item['sort_order'] ?? 0),
+            'approvalStatus' => $item['approval_status'] ?: 'pending',
+            'proposedBudget' => [],
+            'actualBudget' => []
         ];
 
         $itemLookup[$itemId] = $item;
@@ -174,7 +179,7 @@ function getDocumentStatus(array $row): array
         }
     }
 
-    $hasApprovedBudget = !empty($row['approvedBudgetUrl']);
+    $hasApprovedBudget = ($row['approvalStatus'] ?? '') === 'approved';
     $hasSummaryReport = !empty($row['summaryReportUrl']);
 
     if ($hasApprovedBudget && $hasSummaryReport) {
@@ -186,7 +191,7 @@ function getDocumentStatus(array $row): array
     if ($hasSummaryReport) {
         return ['label' => 'มีสรุปโครงการ', 'code' => 'summary_only'];
     }
-    return ['label' => 'ไม่มีลิงก์เอกสาร', 'code' => 'missing'];
+    return ['label' => 'รอดำเนินการ', 'code' => 'missing'];
 }
 
 function normalizeSearchText(string $value): string
@@ -255,7 +260,7 @@ function buildSummary(array $rows): array
         'actualTotal' => $actualTotal,
         'balance' => $proposedTotal - $actualTotal,
         'completeDocuments' => count(array_filter($rows, function ($row) {
-            return !empty($row['approvedBudgetUrl']) && !empty($row['summaryReportUrl']);
+            return ($row['approvalStatus'] ?? '') === 'approved' && !empty($row['summaryReportUrl']);
         })),
     ];
 }
@@ -284,7 +289,7 @@ function buildStrategySummaries(array $rows): array
         }
         $grouped[$strategy]['proposedTotal'] += sumBudget($row['proposedBudget'] ?? null);
         $grouped[$strategy]['actualTotal'] += sumBudget($row['actualBudget'] ?? null);
-        if (!empty($row['approvedBudgetUrl']) || !empty($row['summaryReportUrl'])) {
+        if (($row['approvalStatus'] ?? '') === 'approved' || !empty($row['summaryReportUrl'])) {
             $grouped[$strategy]['documents']++;
         }
     }

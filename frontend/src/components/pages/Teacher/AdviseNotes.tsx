@@ -110,7 +110,7 @@ export default function AdviseNotes() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">บันทึกการให้คำปรึกษา</h1>
+            <h1 className="text-3xl font-bold tracking-tight leading-snug ">บันทึกการให้คำปรึกษา</h1>
             <p className="text-muted-foreground">บันทึกการให้คำปรึกษานักศึกษา</p>
           </div>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -121,7 +121,7 @@ export default function AdviseNotes() {
               </Button>
             </DialogTrigger>
             {/* กันกล่องปิดเองเวลาคลิกนอก dropdown */}
-            <DialogContent className="sm:max-w-[600px]" onInteractOutside={(e) => e.preventDefault()}>
+            <DialogContent className="app-dialog-xl" onInteractOutside={(e) => e.preventDefault()}>
               <DialogHeader>
                 <DialogTitle>เพิ่มบันทึกการให้คำปรึกษา</DialogTitle>
                 <DialogDescription>
@@ -293,7 +293,7 @@ export default function AdviseNotes() {
 
       {/* Dialog ดูรายละเอียด */}
       <Dialog open={!!viewNote} onOpenChange={(o) => !o && setViewNote(null)}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="app-dialog-xl">
           <DialogHeader>
             <DialogTitle>{viewNote?.topic}</DialogTitle>
             <DialogDescription>

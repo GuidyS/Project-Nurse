@@ -1,35 +1,16 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) session_start();
-
-// ค้นหาไฟล์ config อัตโนมัติ
-$possible_paths = [
-    __DIR__ . '/config/config.php',
-    __DIR__ . '/../config/config.php',
-    __DIR__ . '/../../../config/config.php',
-    __DIR__ . '/../../../../config/config.php'
-];
-foreach ($possible_paths as $path) {
-    if (file_exists($path)) {
-        require_once $path;
-        break;
-    }
-}
+require_once __DIR__ . '/../ProjectShared/project_helpers.php';
 require_once __DIR__ . '/../CLOPage/curriculum_repository.php';
 
-$origin = $_SERVER['HTTP_ORIGIN'] ?? 'http://localhost:5173';
-$allowedOrigins = ['http://localhost:5173', 'http://127.0.0.1:5173'];
-if (in_array($origin, $allowedOrigins, true)) {
-    header("Access-Control-Allow-Origin: $origin");
-}
-header("Access-Control-Allow-Credentials: true");
-header("Content-Type: application/json; charset=UTF-8");
-header("Access-Control-Allow-Methods: GET, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
-
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit(); }
+$db = project_db();
+project_require_auth($db, ['PROJECT_LINKS_MANAGE']);
 
 try {
-    $db = new Connect();
+    $requestedProjectId = project_request_int('project_id');
+    if (isset($_GET['project_id']) && $_GET['project_id'] !== '' && $requestedProjectId === null) {
+        project_json(["status" => "error", "message" => "รหัสโครงการไม่ถูกต้อง"], 400);
+        exit;
+    }
 
     $stmt = $db->query("
         SELECT
@@ -38,23 +19,32 @@ try {
         FROM project
         ORDER BY project_id ASC
     ");
-    $projects_raw = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $projectsRaw = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     $projects = [];
     $matrix = [];
-
-    foreach ($projects_raw as $row) {
-        $pid = $row['id'];
+    $projectIds = [];
+    foreach ($projectsRaw as $row) {
+        $pid = (int) $row['id'];
         $projects[] = ['id' => $pid, 'name' => $row['name']];
-
         $matrix[$pid] = ['plos' => [], 'ylos' => [], 'clos' => []];
+        $projectIds[] = $pid;
     }
 
-    $linkStmt = $db->query("SELECT project_id, outcome_type, outcome_code FROM project_outcome_links ORDER BY project_id, outcome_type, outcome_code");
+    if ($requestedProjectId !== null && !in_array($requestedProjectId, $projectIds, true)) {
+        project_json(["status" => "error", "message" => "ไม่พบโครงการที่เลือก"], 404);
+        exit;
+    }
+
+    $linkStmt = $db->query("
+        SELECT project_id, outcome_type, outcome_code
+        FROM project_outcome_links
+        ORDER BY project_id, outcome_type, outcome_code
+    ");
     foreach ($linkStmt->fetchAll(PDO::FETCH_ASSOC) as $link) {
-        $projectId = $link['project_id'];
+        $projectId = (int) $link['project_id'];
         if (!isset($matrix[$projectId])) {
-            $matrix[$projectId] = ['plos' => [], 'ylos' => [], 'clos' => []];
+            continue;
         }
 
         $key = $link['outcome_type'] . 's';
@@ -68,46 +58,28 @@ try {
     $closByCode = [];
 
     $mappingData = loadActiveMappingData($db);
-    // Keep legacy clos list from raw JSON backup (subject catalog for project links)
-    $fwRow = getActiveFrameworkRow($db);
-    if ($fwRow && !empty($fwRow['mapping_json'])) {
-        $rawJson = json_decode($fwRow['mapping_json'], true);
-        if (is_array($rawJson) && !empty($rawJson['clos'])) {
-            $mappingData['clos'] = $rawJson['clos'];
-        }
-    }
 
     foreach (($mappingData['plos'] ?? []) as $plo) {
         $code = $plo['plo_id'] ?? null;
         if ($code) {
-            $plos[] = [
-                'code' => $code,
-                'description' => $plo['plo_name'] ?? $code
-            ];
+            $plos[] = ['code' => $code, 'description' => $plo['plo_name'] ?? $code];
         }
 
         foreach (($plo['ylo_descriptions'] ?? []) as $yearKey => $description) {
             $code = strtoupper(str_replace('YEAR_', 'YLO', strtoupper($yearKey)));
-            $ylosByCode[$code] = [
-                'code' => $code,
-                'description' => $code . ': ' . $description
-            ];
+            $ylosByCode[$code] = ['code' => $code, 'description' => $code . ': ' . $description];
         }
     }
 
     foreach (($mappingData['clos'] ?? []) as $clo) {
         $code = $clo['subject_code'] ?? null;
         if ($code) {
-            $closByCode[$code] = [
-                'code' => $code,
-                'description' => $code . ': ' . ($clo['subject_name'] ?? $code)
-            ];
+            $closByCode[$code] = ['code' => $code, 'description' => $code . ': ' . ($clo['subject_name'] ?? $code)];
         }
     }
 
     $ylos = array_values($ylosByCode);
     $clos = array_values($closByCode);
-
     $ploCodes = array_column($plos, 'code');
     $yloCodes = array_column($ylos, 'code');
     $cloCodes = array_column($clos, 'code');
@@ -133,19 +105,20 @@ try {
         }
     }
 
-    echo json_encode([
+    project_json([
         "status" => "success",
         "data" => [
             "projects" => $projects,
             "plos" => $plos,
             "ylos" => $ylos,
             "clos" => $clos,
-            "links" => empty($matrix) ? new stdClass() : $matrix
-        ]
-    ], JSON_UNESCAPED_UNICODE);
-
+            "links" => empty($matrix) ? new stdClass() : $matrix,
+            "selectedProjectId" => $requestedProjectId,
+            "source" => "project_outcome_links",
+            "schema_version" => "2026-08-11.db-completeness-v1",
+        ],
+    ]);
 } catch (Exception $e) {
-    http_response_code(500);
-    echo json_encode(["status" => "error", "message" => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    project_json(["status" => "error", "message" => $e->getMessage()], 500);
 }
 ?>

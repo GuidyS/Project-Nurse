@@ -2,7 +2,8 @@
 if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/../../../config/config.php';
 
-header("Access-Control-Allow-Origin: http://localhost:5173");
+header('Access-Control-Allow-Origin: ' . (in_array($_SERVER['HTTP_ORIGIN'] ?? '', ['http://localhost:5173', 'http://127.0.0.1:5173'], true) ? ($_SERVER['HTTP_ORIGIN'] ?? '') : 'http://localhost:5173'));
+header('Vary: Origin');
 header("Access-Control-Allow-Credentials: true");
 header("Content-Type: application/json; charset=UTF-8");
 
@@ -29,15 +30,35 @@ try {
                 WHERE student_id = :std_id AND subject_id = :sub_id";
         
         $stmt = $db->prepare($sql);
+        $stmt_gpa = $db->prepare("UPDATE student SET gpa = :gpa WHERE student_id = :std_id");
         
         foreach ($input['students'] as $student) {
             $grade_to_save = ($student['grade'] === '-') ? null : $student['grade'];
+            $gpa_to_save = null;
+
+            if (array_key_exists('gpa', $student) && $student['gpa'] !== '' && $student['gpa'] !== null) {
+                if (!is_numeric($student['gpa'])) {
+                    throw new Exception("รูปแบบ GPA ไม่ถูกต้อง");
+                }
+
+                $gpa_to_save = round((float)$student['gpa'], 2);
+                if ($gpa_to_save < 0 || $gpa_to_save > 4) {
+                    throw new Exception("GPA ต้องอยู่ระหว่าง 0.00 ถึง 4.00");
+                }
+            }
             
             $stmt->execute([
                 ':std_id' => $student['id'],
                 ':sub_id' => $subject_id,
                 ':grade' => $grade_to_save
             ]);
+
+            if (array_key_exists('gpa', $student)) {
+                $stmt_gpa->execute([
+                    ':std_id' => $student['id'],
+                    ':gpa' => $gpa_to_save
+                ]);
+            }
             
             // ถ้าไม่เจอให้ INSERT เข้าไป
             if ($stmt->rowCount() === 0) {

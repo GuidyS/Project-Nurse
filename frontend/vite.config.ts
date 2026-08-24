@@ -9,17 +9,22 @@ export default defineConfig(({ mode }) => ({
     host: true,
     port: 5173,
     allowedHosts: [
-      ".ngrok-free.dev" // เพิ่มบรรทัดนี้เพื่อให้ยอมรับทุก url จาก ngrok
+      ".ngrok-free.dev",
     ],
     watch: {
-      usePolling: true, // (Optional) ช่วยแก้ปัญหา Hot Reload บน Windows
-      interval: 100
+      usePolling: process.env.VITE_USE_POLLING === "true",
+      ignored: ["**/node_modules/**", "**/dist/**", "**/.git/**"],
     },
     hmr: {
       overlay: false,
     },
   },
-  plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
+  plugins: [
+    react(),
+    mode === "development" &&
+      process.env.VITE_ENABLE_COMPONENT_TAGGER === "true" &&
+      componentTagger(),
+  ].filter(Boolean),
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

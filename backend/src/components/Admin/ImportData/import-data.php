@@ -1,6 +1,11 @@
 <?php
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 // upload.php
 require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/../Approvals/approval-schema.php';
 header("Content-Type: application/json");
 
 require_once __DIR__ . '/../../../vendor/autoload.php';
@@ -17,7 +22,7 @@ function getImportSchema($importType) {
             'key' => 'student_id',
             'row_key' => 'student_id',
             'optional_columns' => [],
-            'columns' => ['student_id', 'title', 'first_name_th', 'last_name_th', 'first_name_en', 'last_name_en', 'gender', 'birth_date', 'email', 'phone', 'year_level', 'gpa', 'hometown_province', 'height', 'weight', 'bmi', 'home_phone', 'home_address', 'status', 'graduation_date', 'dropout_date', 'dropout_reason', 'id_card_number', 'admission_year']
+            'columns' => ['student_id', 'title', 'first_name_th', 'last_name_th', 'first_name_en', 'last_name_en', 'gender', 'birth_date', 'email', 'phone', 'year_level', 'gpa', 'hometown_province', 'height', 'weight', 'bmi', 'home_phone', 'home_address', 'status', 'graduation_date', 'dropout_date', 'dropout_reason', 'admission_year']
         ],
         'teachers' => [
             'table' => 'faculty',
@@ -269,6 +274,7 @@ function processExcelToDatabase($filePath, $importType, $db, $fileExt) {
 
 try {
     $db = new Connect();
+    $adminUserId = approvalRequireAdmin($db);
 
     if (!isset($_FILES['file']) || !isset($_POST['importType'])) {
         throw new Exception("ข้อมูลไม่ครบถ้วน (ขาดไฟล์หรือประเภทการนำเข้า)");
@@ -276,7 +282,7 @@ try {
 
     $file = $_FILES['file'];
     $importType = $_POST['importType'];
-    $userId = isset($_POST['userId']) ? $_POST['userId'] : 0;
+    $userId = $adminUserId;
 
     $allowed = ["xlsx", "xls", "csv"];
     $fileExt = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
@@ -315,6 +321,7 @@ try {
                 // 3. ถ้าสำเร็จ: UPDATE เป็น 'success'
                 $update = $db->prepare("UPDATE import_history SET status = 'success', record_count = :count WHERE id = :id");
                 $update->execute([':count' => $finalCount, ':id' => $importId]);
+                approvalLogAction($db, 'import', (int)$importId, $adminUserId, "type={$importType}; rows={$finalCount}");
 
                 echo json_encode([
                     "status" => "success",
@@ -326,6 +333,7 @@ try {
             // 4. ถ้าพลาด: UPDATE เป็น 'failed'
             $errorUpdate = $db->prepare("UPDATE import_history SET status = 'failed', error_details = :msg WHERE id = :id");
             $errorUpdate->execute([':msg' => $e->getMessage(), ':id' => $importId]);
+            approvalLogAction($db, 'import_failed', (int)$importId, $adminUserId, "type={$importType}; error=" . $e->getMessage());
             throw $e; 
         }
     } else {

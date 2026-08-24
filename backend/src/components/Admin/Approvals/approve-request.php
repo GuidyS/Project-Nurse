@@ -10,7 +10,9 @@ header("Content-Type: application/json; charset=UTF-8");
 
 try {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        throw new Exception('Method not allowed');
+        http_response_code(405);
+        echo json_encode(['status' => 'error', 'message' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
+        exit;
     }
 
     $payload = json_decode(file_get_contents('php://input'), true) ?: [];
@@ -18,35 +20,70 @@ try {
     $reviewNote = $payload['reviewNote'] ?? null;
 
     if ($id <= 0) {
-        throw new Exception('ไม่พบรหัสคำขออนุมัติ');
+        throw new InvalidArgumentException('Missing approval request id');
     }
 
     $db = new Connect();
     ensureApprovalRequestsSchema($db);
+    $reviewerId = approvalRequireAdmin($db);
 
-    $reviewerId = $_SESSION['user_id'] ?? 1;
+    $db->beginTransaction();
+
     $stmt = $db->prepare("
+        SELECT *
+        FROM approval_requests
+        WHERE approval_request_id = :id
+        LIMIT 1
+        FOR UPDATE
+    ");
+    $stmt->execute([':id' => $id]);
+    $request = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$request) {
+        throw new RuntimeException('Approval request not found');
+    }
+    if (($request['status'] ?? '') !== 'pending') {
+        throw new RuntimeException('Approval request has already been reviewed');
+    }
+
+    approvalApplyRequest($db, $request);
+
+    $update = $db->prepare("
         UPDATE approval_requests
         SET status = 'approved',
             review_note = :review_note,
             reviewed_by = :reviewed_by,
-            reviewed_at = NOW()
+            reviewed_at = NOW(),
+            applied_at = NOW(),
+            updated_at = NOW()
         WHERE approval_request_id = :id
+          AND status = 'pending'
     ");
-    $stmt->execute([
+    $update->execute([
         ':review_note' => $reviewNote,
         ':reviewed_by' => $reviewerId,
         ':id' => $id,
     ]);
 
-    if ($stmt->rowCount() === 0) {
-        throw new Exception('ไม่พบคำขออนุมัติที่ต้องการอัปเดต');
+    if ($update->rowCount() === 0) {
+        throw new RuntimeException('Approval request could not be updated');
     }
 
-    logApprovalAction($db, 'อนุมัติ', $id, (int)$reviewerId);
-    echo json_encode(['status' => 'success', 'message' => 'อนุมัติคำขอสำเร็จ'], JSON_UNESCAPED_UNICODE);
-} catch (Exception $e) {
+    approvalLogAction($db, 'approve', $id, $reviewerId);
+    $db->commit();
+
+    echo json_encode(['status' => 'success', 'message' => 'Approval request approved'], JSON_UNESCAPED_UNICODE);
+} catch (InvalidArgumentException $e) {
+    if (isset($db) && $db->inTransaction()) {
+        $db->rollBack();
+    }
     http_response_code(400);
+    echo json_encode(['status' => 'error', 'message' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+} catch (Exception $e) {
+    if (isset($db) && $db->inTransaction()) {
+        $db->rollBack();
+    }
+    http_response_code(500);
     echo json_encode(['status' => 'error', 'message' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
 }
 

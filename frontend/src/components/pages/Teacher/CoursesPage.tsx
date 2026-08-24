@@ -254,7 +254,7 @@ const CoursesPage = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">รายวิชาที่สอน</h1>
+          <h1 className="text-3xl font-bold text-foreground leading-snug">รายวิชาที่สอน</h1>
           <p className="text-muted-foreground mt-1">จัดการรายวิชาและบันทึกผลการเรียน</p>
         </div>
       </div>
@@ -359,7 +359,7 @@ const CoursesPage = () => {
 
       {/* Grade Dialog */}
       <Dialog open={isGradeDialogOpen} onOpenChange={setIsGradeDialogOpen}>
-        <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent className="app-dialog-5xl overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>
               {viewOnly ? "รายชื่อนักศึกษา" : "บันทึก/แก้ไขผลการเรียน"} - {selectedCourse?.code} {selectedCourse?.name}

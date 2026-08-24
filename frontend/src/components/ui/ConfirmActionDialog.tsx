@@ -44,7 +44,7 @@ export function ConfirmActionDialog({
         onOpenChange(next);
       }}
     >
-      <AlertDialogContent>
+      <AlertDialogContent className="app-dialog-md">
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>{description}</AlertDialogDescription>

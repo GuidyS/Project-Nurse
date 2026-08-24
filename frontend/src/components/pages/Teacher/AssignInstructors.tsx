@@ -234,11 +234,9 @@ export default function AssignInstructors() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>รหัสวิชา</TableHead>
+                    <TableHead className="whitespace-nowrap">รหัสวิชา</TableHead>
                     <TableHead>ชื่อวิชา</TableHead>
                     <TableHead className="text-center">หน่วยกิต</TableHead>
-                    <TableHead className="text-center">นักศึกษาที่ลงทะเบียน</TableHead>
-                    <TableHead className="text-center">ภาคเรียน</TableHead>
                     <TableHead className="text-center">อาจารย์ประจำวิชา</TableHead>
                     <TableHead className="text-center">การดำเนินการ</TableHead>
                   </TableRow>
@@ -246,11 +244,9 @@ export default function AssignInstructors() {
                 <TableBody>
                   {filteredCourses.map((course) => (
                     <TableRow key={course.id}>
-                      <TableCell className="font-medium">{course.code}</TableCell>
+                      <TableCell className="font-medium whitespace-nowrap">{course.code}</TableCell>
                       <TableCell>{course.name}</TableCell>
                       <TableCell className="text-center">{course.credits}</TableCell>
-                      <TableCell className="text-center">{course.students} คน</TableCell>
-                      <TableCell className="text-center">{course.semester}</TableCell>
                       <TableCell className="text-center">
                         {course.instructor ? (
                           <Badge className="bg-green-500 hover:bg-green-600 px-2.5 py-0.5">{course.instructor}</Badge>
@@ -322,7 +318,7 @@ export default function AssignInstructors() {
 
         {/* Assign Dialog */}
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent>
+          <DialogContent className="app-dialog-lg">
             <DialogHeader>
               <DialogTitle>มอบหมายอาจารย์ผู้รับผิดชอบรายวิชา</DialogTitle>
               <DialogDescription>

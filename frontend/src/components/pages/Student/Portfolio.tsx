@@ -159,7 +159,7 @@ const Portfolio = () => {
       <div className="p-6 space-y-6 animate-fade-in">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">แฟ้มสะสมผลงาน</h1>
+            <h1 className="text-2xl font-bold text-foreground leading-snug">แฟ้มสะสมผลงาน</h1>
             <p className="text-muted-foreground">จัดการ Portfolio และใบประกาศนียบัตรของคุณ</p>
           </div>
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
@@ -169,7 +169,7 @@ const Portfolio = () => {
                 เพิ่มผลงาน
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-md">
+            <DialogContent className="app-dialog-3xl">
               <DialogHeader>
                 <DialogTitle>เพิ่มผลงานใหม่</DialogTitle>
                 <DialogDescription>อัปโหลดใบประกาศนียบัตร โครงการ หรือกิจกรรม</DialogDescription>
@@ -238,7 +238,7 @@ const Portfolio = () => {
         </div>
 
         <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
-          <DialogContent className="sm:max-w-[600px]">
+          <DialogContent className="app-dialog-3xl">
             <DialogHeader>
               <DialogTitle>รายละเอียดผลงาน</DialogTitle>
               <DialogDescription>ข้อมูลเชิงลึกของแฟ้มสะสมผลงาน</DialogDescription>

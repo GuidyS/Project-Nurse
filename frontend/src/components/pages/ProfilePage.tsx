@@ -170,7 +170,7 @@ export default function ProfilePage() {
 
       {/* 🎯 Dialog แบบฟอร์มแก้ไขข้อมูลส่วนตัว */}
       <Dialog open={editing} onOpenChange={setEditing}>
-        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="app-dialog-3xl">
           <DialogHeader>
             <DialogTitle>แก้ไขข้อมูลส่วนตัว</DialogTitle>
           </DialogHeader>

@@ -57,6 +57,10 @@
     --sidebar-accent-foreground: 217 91% 50%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217 91% 50%;
+    --sidebar-brand: 271 76% 53%;
+    --sidebar-brand-soft: 271 76% 53%;
+    --sidebar-brand-soft-strong: 271 70% 67%;
+    --sidebar-brand-foreground: 0 0% 100%;
 
     /* Custom shadows */
     --shadow-sm: 0 1px 2px 0 hsl(220 25% 15% / 0.05);
@@ -109,6 +113,10 @@
     --sidebar-accent-foreground: 210 40% 98%;
     --sidebar-border: 222 26% 16%;
     --sidebar-ring: 217 91% 60%;
+    --sidebar-brand: 271 76% 53%;
+    --sidebar-brand-soft: 271 76% 53%;
+    --sidebar-brand-soft-strong: 271 76% 53%;
+    --sidebar-brand-foreground: 0 0% 100%;
     --scrollbar-track: 222 34% 8%;
     --scrollbar-thumb: 217 15% 34%;
     --scrollbar-thumb-hover: 217 91% 64%;
@@ -249,22 +257,138 @@
 }
 
 @layer components {
+  .app-dialog-content,
+  .app-dialog-shell {
+    --app-dialog-width: 32rem;
+    --app-dialog-gutter: 1rem;
+    width: min(calc(100vw - (var(--app-dialog-gutter) * 2)), var(--app-dialog-width));
+    max-width: var(--app-dialog-width);
+    max-height: calc(100dvh - (var(--app-dialog-gutter) * 2));
+  }
+
+  .app-dialog-content {
+    overflow-y: auto;
+  }
+
+  .app-dialog-shell {
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  @media (min-width: 640px) {
+    .app-dialog-content,
+    .app-dialog-shell {
+      --app-dialog-gutter: 2rem;
+    }
+  }
+
+  .app-dialog-sm {
+    --app-dialog-width: 24rem;
+  }
+
+  .app-dialog-md {
+    --app-dialog-width: 28rem;
+  }
+
+  .app-dialog-lg {
+    --app-dialog-width: 32rem;
+  }
+
+  .app-dialog-xl {
+    --app-dialog-width: 36rem;
+  }
+
+  .app-dialog-2xl {
+    --app-dialog-width: 42rem;
+  }
+
+  .app-dialog-3xl {
+    --app-dialog-width: 48rem;
+  }
+
+  .app-dialog-4xl {
+    --app-dialog-width: 56rem;
+  }
+
+  .app-dialog-5xl {
+    --app-dialog-width: 64rem;
+  }
+
+  .app-dialog-6xl {
+    --app-dialog-width: 72rem;
+  }
+
+  .app-dialog-screen {
+    --app-dialog-width: 95vw;
+  }
+
+  .app-dialog-fixed {
+    flex-shrink: 0;
+  }
+
+  .app-dialog-body {
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow-y: auto;
+  }
+
+  .role-position-option {
+    border-color: hsl(var(--border) / 0.8) !important;
+    background-color: hsl(var(--background) / 0.6) !important;
+    color: hsl(var(--foreground)) !important;
+  }
+
+  .role-position-option:hover {
+    border-color: hsl(var(--primary) / 0.6) !important;
+    background-color: hsl(var(--primary) / 0.05) !important;
+    color: hsl(var(--primary)) !important;
+  }
+
+  .role-position-option-selected {
+    border-color: hsl(var(--primary) / 0.7) !important;
+    background-color: hsl(var(--primary) / 0.1) !important;
+    color: hsl(var(--primary)) !important;
+  }
+
+  .role-position-option-selected:hover {
+    background-color: hsl(var(--primary) / 0.15) !important;
+  }
+
+  .role-position-option-primary {
+    cursor: not-allowed;
+    border-color: hsl(var(--primary) / 0.45) !important;
+    background-color: hsl(var(--primary) / 0.08) !important;
+    color: hsl(var(--primary)) !important;
+  }
+
+  .role-position-option-primary:hover {
+    border-color: hsl(var(--primary) / 0.45) !important;
+    background-color: hsl(var(--primary) / 0.08) !important;
+    color: hsl(var(--primary)) !important;
+  }
+
+  .role-position-option-note {
+    color: hsl(var(--primary) / 0.75);
+  }
+
   /* --- User Profile & Logout UI --- */
   .sidebar-profile-avatar {
-    @apply h-full w-full border border-[#8a2be2]/20;
+    border-color: hsl(var(--sidebar-brand) / 0.2);
+    @apply h-full w-full border;
   }
   
   .sidebar-profile-fallback {
-    background-color: #ad71e6 !important;
-    color: white !important;
+    background-color: hsl(var(--sidebar-brand-soft-strong)) !important;
+    color: hsl(var(--sidebar-brand-foreground)) !important;
     @apply text-sm font-semibold;
   }
 
   .dark .sidebar-profile-fallback {
-    /* ใช้สีพื้นหลังม่วงความทึบ 10% (rgba ของ #8a2be2) ให้ตรงกับปุ่ม active */
-    background-color: rgba(138, 43, 226, 0.1) !important; 
+    /* ใช้สีพื้นหลังม่วงความทึบ 10% ให้ตรงกับปุ่ม active */
+    background-color: hsl(var(--sidebar-brand-soft) / 0.1) !important;
     /* สีตัวอักษรเป็นสีม่วง */
-    color: #8a2be2 !important; 
+    color: hsl(var(--sidebar-brand)) !important;
   }
 
   .sidebar-logout-overlay {
@@ -283,6 +407,41 @@
     @apply p-1 hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors;
   }
 
+  .sidebar-brand-bg {
+    background-color: hsl(var(--sidebar-brand));
+  }
+
+  .sidebar-logo-trigger {
+    background-color: hsl(var(--sidebar-brand) / 0.8);
+    color: hsl(var(--sidebar-brand-foreground));
+    @apply absolute inset-0 h-full w-full opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-lg flex items-center justify-center border-none;
+  }
+
+  .sidebar-logo-trigger:hover {
+    background-color: hsl(var(--sidebar-brand));
+  }
+
+  .sidebar-toggle-button {
+    color: hsl(var(--sidebar-foreground) / 0.7);
+  }
+
+  .sidebar-toggle-button:hover {
+    background-color: hsl(var(--sidebar-brand-soft) / 0.1);
+    color: hsl(var(--sidebar-brand));
+  }
+
+  .sidebar-menu-action:hover,
+  .sidebar-menu-action:active,
+  .sidebar-menu-action:focus,
+  .sidebar-menu-action.active {
+    background-color: hsl(var(--sidebar-brand-soft) / 0.1) !important;
+    color: hsl(var(--sidebar-brand)) !important;
+  }
+
+  .sidebar-menu-action:focus-visible {
+    --tw-ring-color: hsl(var(--sidebar-brand) / 0.5);
+  }
+
   /* --- Main Menu Icons --- */
   .sidebar-main-icon {
     /* ตั้งค่าเริ่มต้นให้สีไอคอนรองรับ Dark/Light Mode */
@@ -291,12 +450,12 @@
 
   /* ดักจับ Hover เฉพาะปุ่มใครปุ่มมัน */
   [data-sidebar="menu-button"]:hover .sidebar-main-icon {
-    @apply text-[#8a2be2];
+    color: hsl(var(--sidebar-brand));
   }
 
   /* สีตอนที่เมนูนั้นกำลัง Active อยู่ */
   .sidebar-main-icon.active {
-    @apply text-[#8a2be2];
+    color: hsl(var(--sidebar-brand));
   }
   
   /* --- Bottom Menu Icons --- */
@@ -307,11 +466,11 @@
 
   /* 2. ดักจับว่าถ้าเมาส์ชี้ที่ "ปุ่มเมนู" ตัวไหน ค่อยให้ไอคอนข้างในปุ่มนั้นเปลี่ยนสี */
   [data-sidebar="menu-button"]:hover .sidebar-bottom-icon {
-    @apply text-[#8a2be2];
+    color: hsl(var(--sidebar-brand));
   }
 
   /* 3. สีตอนที่เมนูนั้นกำลัง Active อยู่ */
   .sidebar-bottom-icon.active {
-    @apply text-[#8a2be2];
+    color: hsl(var(--sidebar-brand));
   }
 }
