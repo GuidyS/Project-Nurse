@@ -45,7 +45,7 @@
 ### 2. Frontend Environment Setup (Vite)
 กำหนด URL หลักสำหรับเรียกใช้งาน API:
 
-* **Directory:** `frontend/src/`
+* **Directory:** `frontend/`
 * **File:** `.env`
 
 **Source Code:**
