@@ -258,6 +258,12 @@
             case 'get-dean-dashboard':
                 require_once 'components/Teacher/DeanDashboard/get_dean_dashboard.php';
                 break;
+            case 'get-faculty-workload':
+                require_once 'components/Teacher/DeanDashboard/get_faculty_workload.php';
+                break;
+            case 'get-student-learning-outcomes':
+                require_once 'components/Teacher/DeanDashboard/get_student_learning_outcomes.php';
+                break;
 
             // Retention
             case 'get-retention':

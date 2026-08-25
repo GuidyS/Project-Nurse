@@ -45,6 +45,7 @@ import UsersManagement from "@/components/pages/Admin/UsersManagement";
 import DeanDashboard from "@/components/pages/Teacher/DeanDashboard";
 import Retention from "@/components/pages/Teacher/Retention";
 import PracticalPage from '@/components/pages/Teacher/PracticalPage';
+import FacultyDimensionPage from '@/components/pages/Teacher/FacultyDimensionPage';
 
 const Index = () => {
   const [activeItem, setActiveItem] = useState(() => {
@@ -156,12 +157,19 @@ const Index = () => {
     }
 
     // 4. 🔒 หมวดสิทธิ์คณบดี (Role 2 + Position 1) หรือ Admin
-    const deanPages = ["dean-dashboard", "retention"];
+    const deanPages = [
+      "dean-dashboard", "retention", "dean-teaching-workload", "dean-research-workload",
+      "dean-academic-service-workload", "dean-culture-workload"
+    ];
     if (deanPages.includes(activeItem)) {
       if (roleId !== 1 && !(roleId === 2 && positionId === 1)) return <UnauthorizedView />;
       switch (activeItem) {
         case "dean-dashboard": return <DeanDashboard />;
         case "retention": return <Retention />;
+        case "dean-teaching-workload": return <FacultyDimensionPage dimension="teaching" />;
+        case "dean-research-workload": return <FacultyDimensionPage dimension="research" />;
+        case "dean-academic-service-workload": return <FacultyDimensionPage dimension="academic-service" />;
+        case "dean-culture-workload": return <FacultyDimensionPage dimension="culture" />;
       }
     }
 
