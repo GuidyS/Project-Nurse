@@ -28,6 +28,7 @@ $positionSectionMap = [
     6 => 'โครงการ คณะ',
     7 => 'จัดการระบบ',
     8 => 'เมนูหลัก', // student menus ที่ section_title เป็น NULL
+    9 => 'งานวิจัย',
 ];
 
 // 2. SQL Query ดึงเมนูตามระบบสิทธิ์

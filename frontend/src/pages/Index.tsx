@@ -16,6 +16,7 @@ import Portfolio from "@/components/pages/Student/Portfolio";
 import CLOManagement from "@/components/pages/Teacher/CLOManagement";
 import PLOYLOReport from "@/components/pages/Teacher/PLOYLOReport";
 import FiveYearSummary from "@/components/pages/Teacher/FiveYearSummary";
+import ResearchSummary from "@/components/pages/Teacher/ResearchSummary";
 import CourseReports from "@/components/pages/Teacher/CourseReports";
 import Documents from "@/components/pages/Teacher/Documents";
 import AdviseNotes from "@/components/pages/Teacher/AdviseNotes";
@@ -104,6 +105,10 @@ const Index = () => {
     const userObj = savedUser ? JSON.parse(savedUser) : null;
     const roleId = userObj ? Number(userObj.role_id) : 0;
     const positionId = userObj ? Number(userObj.position_id) : 0;
+    const isResearchPreviewRoute =
+      import.meta.env.DEV &&
+      activeItem === "research-summary" &&
+      new URLSearchParams(window.location.search).get("page") === "research-summary";
 
     // 2. หมวดทั่วไปที่ทุกคนเข้าถึงได้ (Public / All Roles)
     if (activeItem === "login") {
@@ -167,7 +172,7 @@ const Index = () => {
 
     // 5. 🔒 หมวดสิทธิ์อาจารย์และคณะกรรมการ (Teacher - Role 2) หรือ Admin
     const teacherPages = [
-      "courses", "five-year-summary", "clo-management", "clos",
+      "courses", "five-year-summary", "research-summary", "clo-management", "clos",
       "plo-ylo-report", "course-report", "course-students", "documents", "assign-instructors", "clo-map",
       "evidence", "grades", "my-courses", "performance", "practical-students",
       "program-reports", "schedule-tasks", "projectspage", "my-projects", "project-docs",
@@ -176,10 +181,11 @@ const Index = () => {
     ];
     
     if (teacherPages.includes(activeItem)) {
-      if (roleId !== 1 && roleId !== 2) return <UnauthorizedView />;
+      if (!isResearchPreviewRoute && roleId !== 1 && roleId !== 2) return <UnauthorizedView />;
       switch (activeItem) {
         case "courses": return <CoursesPage />;                                     //*
         case "five-year-summary": return <FiveYearSummary />;                       //*
+        case "research-summary": return <ResearchSummary />;                         //*
         case "clo-management": return <CLOManagement />;                            //*
         case "clos": return <CLOPage />; // แก้ไขให้ใช้ CLOPage หน้าเดียว                //*
         case "plo-ylo-report": return <PLOYLOReport />;                                  //*

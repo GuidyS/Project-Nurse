@@ -231,6 +231,9 @@
             case 'get-five-year-summary':
                 require_once 'components/Teacher/FiveYearSummary/get_five_year_summary.php';
                 break;
+            case 'get-research-summary':
+                require_once 'components/Teacher/ResearchSummary/get_research_summary.php';
+                break;
 
             // Grades
             case 'get-grading-data':

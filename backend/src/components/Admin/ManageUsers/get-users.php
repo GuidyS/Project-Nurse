@@ -58,7 +58,7 @@ try {
         // แมป SubRole สำหรับหน้า RolesManagement
         $subRoleMap = [
             1 => 'dean', 2 => 'instructor', 3 => 'advisor', 
-            4 => 'practical_instructor', 5 => 'program_manager', 6 => 'project_manager'
+            4 => 'practical_instructor', 5 => 'program_manager', 6 => 'project_manager', 9 => 'research'
         ];
         $teacherSubRole = isset($subRoleMap[$u['position_id']]) ? $subRoleMap[$u['position_id']] : null;
 
