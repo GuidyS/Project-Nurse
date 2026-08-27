@@ -1,0 +1,41 @@
+<?php
+session_start();
+header("Access-Control-Allow-Origin: http://localhost:5173");
+header("Access-Control-Allow-Credentials: true");
+header("Access-Control-Allow-Methods: POST, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type, Authorization");
+header("Content-Type: application/json; charset=UTF-8");
+
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit(); }
+
+require_once __DIR__ . '/../../middlewares/auth_middleware.php'; 
+
+$pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
+$input = json_decode(file_get_contents("php://input"), true);
+
+try {
+    if (!empty($input['id'])) {
+        $portfolio_id = $input['id'];
+
+        $stmt_get = $pdo->prepare("SELECT portfolio_id FROM portfolio WHERE portfolio_id = ?");
+        $stmt_get->execute([$portfolio_id]);
+        $existing_id = $stmt_get->fetchColumn();
+
+        if ($existing_id) {
+            $stmt_update = $pdo->prepare("UPDATE portfolio SET verified = 1 WHERE portfolio_id = :id");
+            $stmt_update->execute([
+                ':id' => $portfolio_id
+            ]);
+
+            echo json_encode(["status" => "success", "message" => "ยืนยันการตรวจสอบเรียบร้อย"]);
+        } else {
+            echo json_encode(["status" => "error", "message" => "ไม่พบข้อมูลหลักฐาน"]);
+        }
+    } else {
+        echo json_encode(["status" => "error", "message" => "ข้อมูลไม่ครบถ้วน"]);
+    }
+} catch (PDOException $e) {
+    http_response_code(500);
+    echo json_encode(["status" => "error", "message" => $e->getMessage()]);
+}
+?>
