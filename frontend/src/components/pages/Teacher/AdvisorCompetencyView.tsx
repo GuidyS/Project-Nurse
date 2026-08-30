@@ -17,9 +17,6 @@ interface StudentListItem {
 
 interface CompetencyItemRow {
   id: number;
-  plo_id: number | null;
-  plo_code?: string;
-  plo_name?: string;
   sequence_no: number;
   competency_name: string;
   is_scorable: number;
@@ -41,7 +38,11 @@ export default function AdvisorCompetencyView() {
   const [isLoadingList, setIsLoadingList] = useState(true);
 
   const [selectedStudent, setSelectedStudent] = useState<StudentListItem | null>(null);
-  const [flatItems, setFlatItems] = useState<CompetencyItemRow[]>([]);
+  // ✅ FIX: เก็บเป็น groups ตามที่ backend จัดมา ไม่ flatten เป็น array เดียว
+  // เดิม flatten แล้ว sort ด้วย sequence_no ทั้งฟอร์ม ทำให้ถ้ามีเลขซ้ำข้าม PLO
+  // (เช่นตอนที่ Admin เพิ่มรายการแล้วเลขชนกัน) การจัดกลุ่มพังทันที
+  // ยึดตามโครงสร้าง groups ตรงๆ ปลอดภัยกว่า เพราะ backend แยกด้วย plo_id อยู่แล้ว ไม่ใช่ sort เลข
+  const [groups, setGroups] = useState<PloGroup[]>([]);
   const [yearLevel, setYearLevel] = useState<number | null>(null);
   const [curriculumYear, setCurriculumYear] = useState<number | null>(null);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
@@ -74,24 +75,10 @@ export default function AdvisorCompetencyView() {
         `/index.php?page=student-competency&student_id=${encodeURIComponent(student.student_id)}`
       );
       if (res.data.status === "success") {
-        const rawGroups: PloGroup[] = res.data.data.groups || [];
-        
-        // 🔄 ดึงรายการทั้งหมดออกมาแผ่เป็น Array เดียวพร้อมผูกข้อมูล PLO
-        const items: CompetencyItemRow[] = rawGroups.flatMap((g) =>
-          (g.items || []).map((it) => ({
-            ...it,
-            plo_id: g.plo_id === 0 ? null : g.plo_id,
-            plo_code: g.plo_id === 0 ? "" : g.plo_code,
-            plo_name: g.plo_id === 0 ? "" : g.plo_name,
-          }))
-        );
-
-        // 🔢 จัดเรียงตาม sequence_no จาก 1, 2, 3... ทั่วทั้งฟอร์ม
-        items.sort((a, b) => Number(a.sequence_no) - Number(b.sequence_no));
-
-        setFlatItems(items);
+        // ใช้ groups ตรงๆ ตามที่ backend ส่งมา (เรียง PLO ตาม sort_order, เรียง item ในแต่ละ PLO ตาม sequence_no อยู่แล้ว)
+        setGroups(res.data.data.groups || []);
         setYearLevel(res.data.data.year_level);
-        setCurriculumYear(res.data.data.framework?.curriculum_year || 2567);
+        setCurriculumYear(res.data.data.framework?.curriculum_year || null);
       } else {
         toast({ title: "ข้อผิดพลาด", description: res.data.message || "โหลดข้อมูลไม่สำเร็จ", variant: "destructive" });
         setView("list");
@@ -105,21 +92,25 @@ export default function AdvisorCompetencyView() {
   };
 
   const handleScoreChange = (itemId: number, score: number) => {
-    setFlatItems((prev) =>
-      prev.map((it) => (it.id === itemId ? { ...it, score } : it))
+    setGroups((prev) =>
+      prev.map((g) => ({
+        ...g,
+        items: g.items.map((it) => (it.id === itemId ? { ...it, score } : it)),
+      }))
     );
   };
 
   const handleBack = () => {
     setView("list");
     setSelectedStudent(null);
-    setFlatItems([]);
+    setGroups([]);
   };
 
   const handleSave = async () => {
     if (!selectedStudent) return;
 
-    const scores = flatItems
+    const scores = groups
+      .flatMap((g) => g.items)
       .filter((it) => it.is_scorable && it.score)
       .map((it) => ({ competency_item_id: it.id, score: it.score }));
 
@@ -237,7 +228,7 @@ export default function AdvisorCompetencyView() {
 
       {isLoadingDetail ? (
         <div className="py-24 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
-      ) : flatItems.length === 0 ? (
+      ) : groups.length === 0 || groups.every((g) => g.items.length === 0) ? (
         <Card><CardContent className="py-16 text-center text-muted-foreground">ยังไม่มีรายการประเมินสำหรับชั้นปีนี้</CardContent></Card>
       ) : (
         <Card className="shadow-sm overflow-hidden border border-border">
@@ -255,58 +246,55 @@ export default function AdvisorCompetencyView() {
                 </tr>
               </thead>
               <tbody>
-                {flatItems.map((item, index) => {
-                  // ตรวจสอบว่าต้องแสดงหัวข้อ PLO ขั้นก่อนข้อนี้หรือไม่
-                  const prevItem = flatItems[index - 1];
-                  const showPloHeader = item.plo_id && item.plo_id !== prevItem?.plo_id;
-
-                  return (
-                    <React.Fragment key={item.id}>
-                      {showPloHeader && (
-                        <tr className="border-b bg-muted/30">
-                          <td colSpan={7} className="py-2.5 px-4 font-semibold text-sm text-foreground bg-accent/20 border-b border-border">
-                            {item.plo_code} {item.plo_name}
-                          </td>
-                        </tr>
-                      )}
-
-                      <tr className="border-b border-border/60 hover:bg-muted/10 transition-colors">
-                        <td className="py-3 px-2 text-center text-muted-foreground font-medium border-r border-border align-middle">
-                          {item.sequence_no}.
+                {/* ✅ วนตาม groups ตรงๆ: PLO header ขึ้น 1 ครั้งต่อกลุ่มเสมอ ไม่ขึ้นอยู่กับว่า sequence_no เรียงถูกหรือไม่ */}
+                {groups.map((g) =>
+                  g.items.length === 0 ? null : (
+                    <React.Fragment key={g.plo_id}>
+                      <tr className="border-b bg-muted/30">
+                        <td colSpan={7} className="py-2.5 px-4 font-semibold text-sm text-foreground bg-accent/20 border-b border-border">
+                          {g.plo_code} {g.plo_name}
                         </td>
-                        <td className="py-3 px-4 text-foreground border-r border-border align-middle leading-relaxed">
-                          <span className={!item.is_scorable ? "text-muted-foreground italic" : ""}>
-                            {item.competency_name}
-                          </span>
-                        </td>
-
-                        {!item.is_scorable ? (
-                          <td colSpan={5} className="bg-muted/60 text-center py-3 text-xs text-muted-foreground font-medium select-none">
-                            ไม่ต้องประเมินเพราะไม่กำหนดตัวชี้วัด
-                          </td>
-                        ) : (
-                          <td colSpan={5} className="p-0">
-                            <RadioGroup
-                              value={item.score ? String(item.score) : undefined}
-                              onValueChange={(v) => handleScoreChange(item.id, Number(v))}
-                              className="grid grid-cols-5 h-full w-full"
-                            >
-                              {[5, 4, 3, 2, 1].map((val) => (
-                                <label
-                                  key={val}
-                                  htmlFor={`item-${item.id}-${val}`}
-                                  className="flex items-center justify-center h-12 cursor-pointer border-r last:border-r-0 border-border hover:bg-primary/5 transition-colors"
-                                >
-                                  <RadioGroupItem value={String(val)} id={`item-${item.id}-${val}`} />
-                                </label>
-                              ))}
-                            </RadioGroup>
-                          </td>
-                        )}
                       </tr>
+
+                      {g.items.map((item) => (
+                        <tr key={item.id} className="border-b border-border/60 hover:bg-muted/10 transition-colors">
+                          <td className="py-3 px-2 text-center text-muted-foreground font-medium border-r border-border align-middle">
+                            {item.sequence_no}.
+                          </td>
+                          <td className="py-3 px-4 text-foreground border-r border-border align-middle leading-relaxed">
+                            <span className={!item.is_scorable ? "text-muted-foreground italic" : ""}>
+                              {item.competency_name}
+                            </span>
+                          </td>
+
+                          {!item.is_scorable ? (
+                            <td colSpan={5} className="bg-muted/60 text-center py-3 text-xs text-muted-foreground font-medium select-none">
+                              ไม่ต้องประเมินเพราะไม่กำหนดตัวชี้วัด
+                            </td>
+                          ) : (
+                            <td colSpan={5} className="p-0">
+                              <RadioGroup
+                                value={item.score ? String(item.score) : undefined}
+                                onValueChange={(v) => handleScoreChange(item.id, Number(v))}
+                                className="grid grid-cols-5 h-full w-full"
+                              >
+                                {[5, 4, 3, 2, 1].map((val) => (
+                                  <label
+                                    key={val}
+                                    htmlFor={`item-${item.id}-${val}`}
+                                    className="flex items-center justify-center h-12 cursor-pointer border-r last:border-r-0 border-border hover:bg-primary/5 transition-colors"
+                                  >
+                                    <RadioGroupItem value={String(val)} id={`item-${item.id}-${val}`} />
+                                  </label>
+                                ))}
+                              </RadioGroup>
+                            </td>
+                          )}
+                        </tr>
+                      ))}
                     </React.Fragment>
-                  );
-                })}
+                  )
+                )}
               </tbody>
             </table>
           </CardContent>

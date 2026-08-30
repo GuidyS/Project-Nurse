@@ -11,6 +11,35 @@ if (!isset($_SESSION['user_id'])) {
 $id = $_SESSION['user_id'];
 $db = new Connect;
 
+// Helper คำนวณชั้นปีและปีการศึกษา Real-time ตัดรอบวันที่ 10 สิงหาคม (เฉพาะ Student)
+function calculateRealtimeAcademicInfo($studentId, $entryYearCandidate = null): array {
+    $now = new DateTime();
+    $currentYearBE = (int)$now->format('Y') + 543;
+    $cutOffDate = new DateTime($now->format('Y') . '-08-10 00:00:00');
+    $academicYear = ($now >= $cutOffDate) ? $currentYearBE : ($currentYearBE - 1);
+    
+    $cleanId = trim((string)$studentId);
+    $entryYear = 0;
+    
+    if (strlen($cleanId) >= 2 && is_numeric(substr($cleanId, 0, 2))) {
+        $entryYear = 2500 + (int)substr($cleanId, 0, 2);
+    } elseif (!empty($entryYearCandidate) && is_numeric($entryYearCandidate) && (int)$entryYearCandidate >= 2500) {
+        $entryYear = (int)$entryYearCandidate;
+    } else {
+        $entryYear = $academicYear;
+    }
+
+    $yearLevel = $academicYear - $entryYear + 1;
+    if ($yearLevel < 1) $yearLevel = 1;
+    if ($yearLevel > 8) $yearLevel = 8;
+
+    return [
+        'academic_year' => $academicYear,
+        'year_level'    => $yearLevel,
+        'entry_year'    => $entryYear
+    ];
+}
+
 /**
  * Expand stored faculty file values (plain path, Drive URL, or JSON array of paths).
  */
@@ -370,13 +399,28 @@ try {
             exit;
         }
 
+        // ==========================================
+        // เฉพาะ Role Student (role_id = 3)
+        // ==========================================
         if ((int)$u_info['role_id'] === 3) {
             $stmt = $db->prepare("SELECT * FROM student WHERE student_id = :id LIMIT 1");
             $stmt->execute(['id' => $u_info['username']]);
             $profile = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
 
-            // จับคู่ที่อยู่ผู้ปกครองเข้าตัวแปร parent_address
+            // คำนวณปีการศึกษาและชั้นปี Real-time ตัดรอบ 10 สิงหาคม
+            $academicInfo = calculateRealtimeAcademicInfo(
+                $u_info['username'],
+                $profile['admission_year'] ?? null
+            );
+
+            // บังคับอัปเดตข้อมูลปีและชั้นปีเป็นค่า Real-time
+            $profile['admission_year'] = (string)$academicInfo['entry_year'];
+            $profile['year_level']     = $academicInfo['year_level'];
+            $profile['academic_year']  = $academicInfo['academic_year'];
+
+            // แมปฟิลด์ที่อยู่ผู้ปกครองและที่อยู่ปัจจุบัน
             $profile['parent_address'] = $profile['father_address'] ?? $profile['mother_address'] ?? null;
+            $profile['home_address']   = $profile['home_address'] ?? $profile['address'] ?? null;
 
             $docStmt = $db->prepare("
                 SELECT title, type, file_name, file_path, mime_type
@@ -416,6 +460,7 @@ try {
 
             echo json_encode(["status" => "success", "role" => "student", "data" => $profile], JSON_UNESCAPED_UNICODE);
         } else {
+            // โค้ดเดิมของ Teacher / Other Roles ไม่แตะต้อง[cite: 22]
             $stmt = $db->prepare("SELECT * FROM faculty WHERE faculty_id = :id LIMIT 1");
             $stmt->execute(['id' => $u_info['username']]);
             $profile = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
@@ -435,32 +480,86 @@ try {
 
     // 📝 [POST] อัปเดตข้อมูลของตัวเองผ่านหน้า Profile
     if ($method === 'POST') {
-        $input = json_decode(file_get_contents("php://input"), true);
+        $input = json_decode(file_get_contents("php://input"), true) ?: [];
         $stmt = $db->prepare("SELECT username, role_id FROM users WHERE user_id = :id");
         $stmt->execute([':id' => $id]);
         $u_info = $stmt->fetch(PDO::FETCH_ASSOC);
 
+        // ==========================================
+        // เฉพาะ Role Student (role_id = 3)
+        // ==========================================
         if ((int)$u_info['role_id'] === 3) {
-            $parentAddress = $input['parent_address'] ?? $input['father_address'] ?? null;
+            $parentAddress = !empty($input['parent_address']) ? trim($input['parent_address']) : (!empty($input['father_address']) ? trim($input['father_address']) : null);
+            
+            // ตรวจสอบและแปลงตัวเลขให้ปลอดภัย ป้องกัน SQL Type Error
+            $rawHeight = isset($input['height']) ? trim((string)$input['height']) : '';
+            $height    = ($rawHeight !== '' && is_numeric($rawHeight)) ? floatval($rawHeight) : null;
+
+            $rawWeight = isset($input['weight']) ? trim((string)$input['weight']) : '';
+            $weight    = ($rawWeight !== '' && is_numeric($rawWeight)) ? floatval($rawWeight) : null;
+
+            $rawGpa    = isset($input['gpa']) ? trim((string)$input['gpa']) : '';
+            $gpa       = ($rawGpa !== '' && is_numeric($rawGpa)) ? floatval($rawGpa) : null;
+
+            $bmi = null;
+            if ($height && $weight && $height > 0) {
+                $hMeter = $height / 100.0;
+                $bmi = round($weight / ($hMeter * $hMeter), 1);
+            }
+
+            $idCardNumber = !empty($input['id_card_number']) ? trim($input['id_card_number']) : null;
+            $homeAddress = !empty($input['home_address']) ? trim($input['home_address']) : (!empty($input['address']) ? trim($input['address']) : null);
 
             $sql = "UPDATE student SET 
-                        first_name_en = ?, 
-                        last_name_en = ?, 
-                        gender = ?, 
-                        birth_date = ?, 
-                        email = ?, 
-                        phone = ?, 
-                        home_address = ?, 
-                        father_first_name = ?,
-                        father_last_name = ?,
-                        father_phone = ?,
-                        father_address = ?,
-                        mother_first_name = ?,
-                        mother_last_name = ?,
-                        mother_phone = ?,
-                        mother_address = ?
-                    WHERE student_id = ?";
+                        first_name_en = :first_name_en, 
+                        last_name_en = :last_name_en, 
+                        gender = :gender, 
+                        birth_date = :birth_date, 
+                        email = :email, 
+                        phone = :phone, 
+                        id_card_number = :id_card_number,
+                        gpa = :gpa,
+                        height = :height,
+                        weight = :weight,
+                        bmi = :bmi,
+                        home_address = :home_address, 
+                        father_first_name = :father_first_name,
+                        father_last_name = :father_last_name,
+                        father_phone = :father_phone,
+                        father_address = :father_address,
+                        mother_first_name = :mother_first_name,
+                        mother_last_name = :mother_last_name,
+                        mother_phone = :mother_phone,
+                        mother_address = :mother_address
+                    WHERE student_id = :student_id";
             
+            $stmtUpdate = $db->prepare($sql);
+            $stmtUpdate->execute([
+                ':first_name_en'    => !empty($input['first_name_en']) ? trim($input['first_name_en']) : null,
+                ':last_name_en'     => !empty($input['last_name_en']) ? trim($input['last_name_en']) : null,
+                ':gender'           => !empty($input['gender']) ? trim($input['gender']) : null,
+                ':birth_date'       => !empty($input['birth_date']) ? trim($input['birth_date']) : null,
+                ':email'            => !empty($input['email']) ? trim($input['email']) : null,
+                ':phone'            => !empty($input['phone']) ? trim($input['phone']) : null,
+                ':id_card_number'   => $idCardNumber,
+                ':gpa'              => $gpa,
+                ':height'           => $height,
+                ':weight'           => $weight,
+                ':bmi'              => $bmi,
+                ':home_address'     => $homeAddress,
+                ':father_first_name'=> !empty($input['father_first_name']) ? trim($input['father_first_name']) : null,
+                ':father_last_name' => !empty($input['father_last_name']) ? trim($input['father_last_name']) : null,
+                ':father_phone'     => !empty($input['father_phone']) ? trim($input['father_phone']) : null,
+                ':father_address'   => $parentAddress,
+                ':mother_first_name'=> !empty($input['mother_first_name']) ? trim($input['mother_first_name']) : null,
+                ':mother_last_name' => !empty($input['mother_last_name']) ? trim($input['mother_last_name']) : null,
+                ':mother_phone'     => !empty($input['mother_phone']) ? trim($input['mother_phone']) : null,
+                ':mother_address'   => $parentAddress,
+                ':student_id'       => $u_info['username']
+            ]);
+        } else {
+            // โค้ดเดิมของ Teacher / Other Roles ไม่แตะต้อง[cite: 22]
+            $sql = "UPDATE faculty SET first_name_en = ?, last_name_en = ?, gender = ?, birth_date = ?, email = ?, phone = ?, current_address = ?, nursing_council_no = ? WHERE faculty_id = ?";
             $db->prepare($sql)->execute([
                 $input['first_name_en'] ?? null,
                 $input['last_name_en'] ?? null,
@@ -468,20 +567,10 @@ try {
                 $input['birth_date'] ?? null,
                 $input['email'] ?? null,
                 $input['phone'] ?? null,
-                $input['home_address'] ?? null,
-                $input['father_first_name'] ?? null,
-                $input['father_last_name'] ?? null,
-                $input['father_phone'] ?? null,
-                $parentAddress,
-                $input['mother_first_name'] ?? null,
-                $input['mother_last_name'] ?? null,
-                $input['mother_phone'] ?? null,
-                $parentAddress,
+                $input['current_address'] ?? null,
+                $input['nursing_council_no'] ?? null,
                 $u_info['username']
             ]);
-        } else {
-            $sql = "UPDATE faculty SET first_name_en = ?, last_name_en = ?, gender = ?, birth_date = ?, email = ?, phone = ?, current_address = ?, nursing_council_no = ? WHERE faculty_id = ?";
-            $db->prepare($sql)->execute([$input['first_name_en']??null, $input['last_name_en']??null, $input['gender']??null, $input['birth_date']??null, $input['email']??null, $input['phone']??null, $input['current_address']??null, $input['nursing_council_no']??null, $u_info['username']]);
         }
         echo json_encode(["status" => "success"], JSON_UNESCAPED_UNICODE);
         exit;

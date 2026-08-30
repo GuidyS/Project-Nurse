@@ -1,4 +1,5 @@
 <?php
+ob_start();
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
     exit();
@@ -7,9 +8,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 if (session_status() == PHP_SESSION_NONE) { session_start(); }
 require_once __DIR__ . '/../../../config/config.php';
 
+ob_end_clean();
 header("Content-Type: application/json; charset=UTF-8");
 
-if (!isset($_SESSION['user_id'])) {
+$userId = $_SESSION['user_id'] ?? $_SESSION['user']['user_id'] ?? null;
+if (!$userId) {
     http_response_code(401);
     echo json_encode(["status" => "error", "message" => "Unauthorized"], JSON_UNESCAPED_UNICODE);
     exit;
@@ -18,8 +21,9 @@ if (!isset($_SESSION['user_id'])) {
 try {
     $db = new Connect;
 
+    // ตรวจสอบสิทธิ์ Admin
     $stmt = $db->prepare("SELECT role_id FROM users WHERE user_id = :id");
-    $stmt->execute([':id' => $_SESSION['user_id']]);
+    $stmt->execute([':id' => $userId]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$user || (int)($user['role_id'] ?? 0) !== 1) {
@@ -29,7 +33,7 @@ try {
     }
 
     if (empty($_GET['framework_id'])) {
-        $stmt2 = $db->prepare("SELECT id, curriculum_year, program_name FROM curriculum_framework ORDER BY curriculum_year DESC");
+        $stmt2 = $db->prepare("SELECT id, curriculum_year, program_name, is_active FROM curriculum_framework ORDER BY is_active DESC, curriculum_year DESC");
         $stmt2->execute();
         $frameworks = $stmt2->fetchAll(PDO::FETCH_ASSOC) ?: [];
         echo json_encode(["status" => "success", "mode" => "frameworks", "data" => $frameworks], JSON_UNESCAPED_UNICODE);
@@ -39,57 +43,46 @@ try {
     $frameworkId = (int)$_GET['framework_id'];
     $yearLevel = isset($_GET['year_level']) ? (int)$_GET['year_level'] : 1;
 
-    if ($yearLevel < 1 || $yearLevel > 8) {
-        http_response_code(400);
-        echo json_encode(["status" => "error", "message" => "ชั้นปีไม่ถูกต้อง"], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
-
-    // 1. ดึง PLO ทั้งหมดของหลักสูตรนี้
+    // 1. ดึง PLO ทั้งหมดของหลักสูตร เรียงตามลำดับ PLO
     $ploStmt = $db->prepare("
         SELECT id AS plo_id, plo_code, name AS plo_name
         FROM curriculum_plo
         WHERE framework_id = :fid
-        ORDER BY sort_order ASC, plo_code ASC
+        ORDER BY COALESCE(sort_order, id) ASC, id ASC
     ");
     $ploStmt->execute([':fid' => $frameworkId]);
     $plos = $ploStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
-    // 2. ดึง Item ทั้งที่มี PLO (ในหลักสูตรนี้) และที่ไม่มี PLO (plo_id IS NULL)
+    // 2. ดึงข้อประเมินทั้งหมดในหลักสูตรและชั้นปีนั้น
     $itemStmt = $db->prepare("
         SELECT ci.id, ci.plo_id, ci.year_level, ci.sequence_no, ci.competency_name, ci.is_scorable
         FROM competency_items ci
-        LEFT JOIN curriculum_plo cp ON cp.id = ci.plo_id
-        WHERE (cp.framework_id = :fid OR ci.plo_id IS NULL) 
-          AND ci.year_level = :yl
-        ORDER BY ci.sequence_no ASC
+        INNER JOIN curriculum_plo cp ON cp.id = ci.plo_id
+        WHERE cp.framework_id = :fid AND ci.year_level = :yl
+        ORDER BY COALESCE(cp.sort_order, cp.id) ASC, ci.sequence_no ASC, ci.id ASC
     ");
     $itemStmt->execute([':fid' => $frameworkId, ':yl' => $yearLevel]);
-    $items = $itemStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    $allItems = $itemStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
+    // Auto Fix: ซ่อมแซมลำดับข้อใน Database ให้เรียง 1..N ต่อเนื่องอัตโนมัติหากพบเลขกระโดด
+    $updateSeq = $db->prepare("UPDATE competency_items SET sequence_no = :seq WHERE id = :id");
+    $currentRunningSeq = 1;
     $itemsByPlo = [];
-    $unassignedItems = [];
 
-    foreach ($items as $item) {
-        if ($item['plo_id'] !== null) {
-            $itemsByPlo[$item['plo_id']][] = $item;
-        } else {
-            $unassignedItems[] = $item;
+    foreach ($allItems as $item) {
+        if ((int)$item['sequence_no'] !== $currentRunningSeq) {
+            $updateSeq->execute([':seq' => $currentRunningSeq, ':id' => $item['id']]);
+            $item['sequence_no'] = $currentRunningSeq;
         }
+        $itemsByPlo[(int)$item['plo_id']][] = $item;
+        $currentRunningSeq++;
     }
 
+    // รวม items เข้ากลุ่ม PLO
     $result = array_map(function ($plo) use ($itemsByPlo) {
-        $plo['items'] = $itemsByPlo[$plo['plo_id']] ?? [];
+        $plo['items'] = $itemsByPlo[(int)$plo['plo_id']] ?? [];
         return $plo;
     }, $plos);
-
-    // เพิ่มหมวดรายการทั่วไป (plo_id = null) ไว้เป็นกลุ่มแรกหรือกลุ่มท้าย
-    array_unshift($result, [
-        "plo_id" => 0,
-        "plo_code" => "รายการทั่วไป",
-        "plo_name" => "(ข้อประเมินที่ไม่ต้องผูกกับ PLO)",
-        "items" => $unassignedItems
-    ]);
 
     echo json_encode(["status" => "success", "mode" => "items", "data" => $result], JSON_UNESCAPED_UNICODE);
 

@@ -6,10 +6,15 @@
     header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
     header("Content-Type: application/json; charset=UTF-8");
 
-    // --- เพิ่มส่วนนี้เข้าไป ---
+    // รองรับ Preflight Request (OPTIONS)
     if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
         http_response_code(200);
         exit();
+    }
+
+    // เรียกใช้งาน Helper สำหรับคำนวณปีการศึกษาและชั้นปีแบบ Real-time (ตัดรอบ 10 สิงหาคม)
+    if (file_exists(__DIR__ . '/src/config/academic_helper.php')) {
+        require_once __DIR__ . '/src/config/academic_helper.php';
     }
 
     $page = isset($_GET['page']) ? $_GET['page'] : '';
@@ -76,7 +81,7 @@
                 require_once 'components/Admin/competency_items/save_competency_item.php';
                 break;
             //
-           case 'delete-competency-item':
+            case 'delete-competency-item':
                 require_once 'components/Admin/competency_items/delete_competency_item.php';
                 break;
             
@@ -135,14 +140,13 @@
                 require_once 'components/Teacher/AdvisorNotifications/update_notification_read.php';
                 break;
             //
-           case 'student-competency':
+            case 'student-competency':
                 require_once 'components/Teacher/student_competency/get_student_competency.php';
                 break;
             //
             case 'save-student-competency':
                 require_once 'components/Teacher/student_competency/save_student_competency.php';
                 break;
-            
             
             // AssignInstructors
             case 'get-assign-data':
@@ -152,14 +156,14 @@
                 require_once 'components/Teacher/AssignInstructors/save_assign_instructor.php';
                 break;
             // AdvisorVaccinationView
-              case 'advisor-student-list':
-                require_once 'components/Teacher/advisor_student_list/advisor_student_list.php'; // ตรวจสอบ path ไฟล์จริงของคุณ
+            case 'advisor-student-list':
+                require_once 'components/Teacher/advisor_student_list/advisor_student_list.php';
                 break;
             case 'view-student-vaccinations':
-                require_once 'components/Teacher/view_student_vaccinations/view_student_vaccinations.php'; // ตรวจสอบ path ไฟล์จริงของคุณ
+                require_once 'components/Teacher/view_student_vaccinations/view_student_vaccinations.php';
                 break;
             // ViewStudentHealthRecords
-                case 'view-student-health-records':
+            case 'view-student-health-records':
                 require_once 'components/Teacher/view_student_health_records/view_student_health_records.php';
                 break;
             // CLOManagement
@@ -272,11 +276,6 @@
                 require_once 'components/Teacher/grading/save_grading_data.php';
                 break;
 
-            // Dashboard
-            case 'teacher-dashboard':
-                require_once 'components/Teacher/Dashboard/get_dashboard_stats.php';
-                break;
-
             // DeanDashboard
             case 'get-dean-dashboard':
                 require_once 'components/Teacher/DeanDashboard/get_dean_dashboard.php';
@@ -356,8 +355,6 @@
                 require_once 'components/Teacher/ProjectLinks/get_project_links.php';
                 break;
             case 'create-project-links':
-                require_once 'components/Teacher/ProjectLinks/save_project_links.php';
-                break;
             case 'save-project-links':
                 require_once 'components/Teacher/ProjectLinks/save_project_links.php';
                 break;
@@ -385,13 +382,13 @@
 
             // TransferRequests
             case 'create-transfer-request':
-                require_once 'components/Teacher/TransferRequests/create_transfer_request';
+                require_once 'components/Teacher/TransferRequests/create_transfer_request.php';
                 break;
             case 'get-transfer-requests':
-                require_once 'components/Teacher/TransferRequests/get_transfer_requests';
+                require_once 'components/Teacher/TransferRequests/get_transfer_requests.php';
                 break;
             case 'update-transfer-status':
-                require_once 'components/Teacher/TransferRequests/update_transfer_status';
+                require_once 'components/Teacher/TransferRequests/update_transfer_status.php';
                 break;
 
             /* -------- Student -------- */
@@ -418,21 +415,24 @@
             case 'sidebar':
                 require_once 'components/sidebar.php';
                 break;
-        // Student Vaccinations API
+
+            // Student Vaccinations API
             case 'student-vaccinations':
                 require_once 'components/Student/student_vaccinations_api/student_vaccinations_api.php';
                 break;
-        // Student Health Records API
-          case 'student-health-records':
+
+            // Student Health Records API
+            case 'student-health-records':
                 require_once 'components/Student/student_health_records_api/student_health_records_api.php';
                 break;
+
             case 'my-competency': 
                 require_once 'components/Student/student_competency/get_my_competency.php';
                 break;
-        default:
-            http_response_code(404);
-            echo json_encode(["error" => "API endpoint is not found!"]);
-            break;
-    }
 
+            default:
+                http_response_code(404);
+                echo json_encode(["error" => "API endpoint is not found!"]);
+                break;
+    }
 ?>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,7 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Plus, Pencil, Trash2, ListChecks, Save, X } from "lucide-react";
+import { Loader2, Plus, Pencil, Trash2, ListChecks, Save, X, AlertCircle } from "lucide-react";
 import api from "@/lib/axios";
 
 interface Framework {
@@ -18,7 +18,7 @@ interface Framework {
 
 interface CompetencyItem {
   id: number;
-  plo_id: number | null;
+  plo_id: number;
   year_level: number;
   sequence_no: number;
   competency_name: string;
@@ -32,7 +32,7 @@ interface PloGroup {
   items: CompetencyItem[];
 }
 
-const emptyDraft = { id: null as number | null, competency_name: "", sequence_no: "", is_scorable: true };
+const emptyDraft = { id: null as number | null, competency_name: "", is_scorable: true };
 
 export default function CompetencyItemsManagement() {
   const { toast } = useToast();
@@ -52,9 +52,11 @@ export default function CompetencyItemsManagement() {
     try {
       setIsLoadingFrameworks(true);
       const res = await api.get("/index.php?page=competency-items");
-      if (res.data.status === "success") {
+      if (res.data.status === "success" && Array.isArray(res.data.data)) {
         setFrameworks(res.data.data);
-        if (res.data.data.length > 0) setFrameworkId(String(res.data.data[0].id));
+        if (res.data.data.length > 0) {
+          setFrameworkId(String(res.data.data[0].id));
+        }
       }
     } catch (error) {
       toast({ title: "ข้อผิดพลาด", description: "โหลดรายชื่อหลักสูตรไม่สำเร็จ", variant: "destructive" });
@@ -63,7 +65,7 @@ export default function CompetencyItemsManagement() {
     }
   };
 
-  const fetchItems = async () => {
+  const fetchItems = useCallback(async () => {
     if (!frameworkId) return;
     try {
       setIsLoadingItems(true);
@@ -71,14 +73,14 @@ export default function CompetencyItemsManagement() {
         `/index.php?page=competency-items&framework_id=${frameworkId}&year_level=${yearLevel}`
       );
       if (res.data.status === "success") {
-        setGroups(res.data.data);
+        setGroups(res.data.data || []);
       }
     } catch (error) {
       toast({ title: "ข้อผิดพลาด", description: "โหลดรายการประเมินไม่สำเร็จ", variant: "destructive" });
     } finally {
       setIsLoadingItems(false);
     }
-  };
+  }, [frameworkId, yearLevel]);
 
   useEffect(() => {
     fetchFrameworks();
@@ -86,12 +88,15 @@ export default function CompetencyItemsManagement() {
 
   useEffect(() => {
     fetchItems();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [frameworkId, yearLevel]);
+  }, [fetchItems]);
 
-  const startAdd = (ploId: number, nextSeq: number) => {
+  const startAdd = (ploId: number) => {
     setEditingPloId(ploId);
-    setDraft({ id: null, competency_name: "", sequence_no: String(nextSeq), is_scorable: true });
+    setDraft({ 
+      id: null, 
+      competency_name: "", 
+      is_scorable: true 
+    });
   };
 
   const startEdit = (ploId: number, item: CompetencyItem) => {
@@ -99,7 +104,6 @@ export default function CompetencyItemsManagement() {
     setDraft({
       id: item.id,
       competency_name: item.competency_name,
-      sequence_no: String(item.sequence_no),
       is_scorable: Boolean(item.is_scorable),
     });
   };
@@ -110,8 +114,12 @@ export default function CompetencyItemsManagement() {
   };
 
   const handleSave = async (ploId: number) => {
-    if (!draft.competency_name.trim() || !draft.sequence_no) {
-      toast({ title: "กรอกไม่ครบ", description: "กรุณากรอกลำดับและรายการประเมิน", variant: "destructive" });
+    if (!draft.competency_name.trim()) {
+      toast({ 
+        title: "ข้อมูลไม่ครบถ้วน", 
+        description: "กรุณาระบุข้อความรายการประเมิน", 
+        variant: "destructive" 
+      });
       return;
     }
 
@@ -119,38 +127,46 @@ export default function CompetencyItemsManagement() {
     try {
       const res = await api.post("/index.php?page=save-competency-item", {
         id: draft.id,
-        plo_id: ploId, // ถ้าเป็น 0 Backend จะบันทึกเป็น NULL
+        plo_id: ploId,
         year_level: Number(yearLevel),
-        sequence_no: Number(draft.sequence_no),
         competency_name: draft.competency_name.trim(),
         is_scorable: draft.is_scorable ? 1 : 0,
       });
       if (res.data.status === "success") {
-        toast({ title: "บันทึกสำเร็จ" });
+        toast({ title: "บันทึกสำเร็จ", description: res.data.message });
         cancelEdit();
         fetchItems();
       } else {
         toast({ title: "บันทึกไม่สำเร็จ", description: res.data.message, variant: "destructive" });
       }
-    } catch (error) {
-      toast({ title: "ข้อผิดพลาด", description: "บันทึกรายการไม่สำเร็จ", variant: "destructive" });
+    } catch (error: any) {
+      toast({ 
+        title: "ข้อผิดพลาด", 
+        description: error.response?.data?.message || "บันทึกรายการไม่สำเร็จ", 
+        variant: "destructive" 
+      });
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleDelete = async (itemId: number) => {
+    if (!window.confirm("คุณแน่ใจหรือไม่ว่าต้องการลบรายการประเมินนี้? (ลำดับข้ออื่นจะถูกจัดเรียงใหม่อัตโนมัติ)")) return;
     setDeletingId(itemId);
     try {
       const res = await api.delete(`/index.php?page=delete-competency-item&id=${itemId}`);
       if (res.data.status === "success") {
-        toast({ title: "ลบสำเร็จ" });
+        toast({ title: "ลบสำเร็จ", description: res.data.message });
         fetchItems();
       } else {
         toast({ title: "ลบไม่สำเร็จ", description: res.data.message, variant: "destructive" });
       }
-    } catch (error) {
-      toast({ title: "ข้อผิดพลาด", description: "ลบรายการไม่สำเร็จ", variant: "destructive" });
+    } catch (error: any) {
+      toast({ 
+        title: "ข้อผิดพลาด", 
+        description: error.response?.data?.message || "ลบรายการไม่สำเร็จ", 
+        variant: "destructive" 
+      });
     } finally {
       setDeletingId(null);
     }
@@ -162,18 +178,18 @@ export default function CompetencyItemsManagement() {
         <ListChecks className="h-6 w-6 text-primary" />
         <div>
           <h1 className="text-2xl font-bold text-foreground">จัดการรายการประเมินสมรรถนะหลัก</h1>
-          <p className="text-muted-foreground text-sm">สร้าง/แก้ไข/ลบรายการประเมินแยกตามหลักสูตรและชั้นปี (ทั้งแบบผูก PLO และไม่ผูก PLO)</p>
+          <p className="text-muted-foreground text-sm">สร้าง/แก้ไข/ลบรายการประเมินตามหัวข้อ PLO แต่ละหลักสูตรและชั้นปี (ระบบจัดลำดับให้อัตโนมัติ)</p>
         </div>
       </div>
 
       <Card>
         <CardContent className="pt-6 flex flex-wrap gap-4 items-end">
-          <div className="space-y-2 min-w-[240px]">
+          <div className="space-y-2 min-w-[280px]">
             <Label>หลักสูตร</Label>
             {isLoadingFrameworks ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <Select value={frameworkId} onValueChange={setFrameworkId}>
+              <Select value={frameworkId} onValueChange={(val) => { setFrameworkId(val); cancelEdit(); }}>
                 <SelectTrigger>
                   <SelectValue placeholder="เลือกหลักสูตร" />
                 </SelectTrigger>
@@ -189,7 +205,7 @@ export default function CompetencyItemsManagement() {
           </div>
           <div className="space-y-2 w-40">
             <Label>ชั้นปีที่</Label>
-            <Select value={yearLevel} onValueChange={setYearLevel}>
+            <Select value={yearLevel} onValueChange={(val) => { setYearLevel(val); cancelEdit(); }}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -207,25 +223,31 @@ export default function CompetencyItemsManagement() {
         <div className="py-16 flex justify-center">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
+      ) : groups.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center text-muted-foreground space-y-2">
+            <AlertCircle className="h-8 w-8 mx-auto text-amber-500" />
+            <p>ไม่พบรายการ PLO ในหลักสูตรนี้ กรุณาสร้าง PLO ในระบบก่อนเพิ่มรายการประเมิน</p>
+          </CardContent>
+        </Card>
       ) : (
         <div className="space-y-4">
           {groups.map((group) => (
-            <Card key={group.plo_id} className={group.plo_id === 0 ? "border-dashed border-primary/50 bg-muted/10" : ""}>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <span>{group.plo_code}</span>
-                  <span className="text-muted-foreground font-normal">{group.plo_name}</span>
+            <Card key={group.plo_id}>
+              <CardHeader className="pb-3 border-b border-border/50 bg-muted/20">
+                <CardTitle className="text-base font-semibold text-foreground">
+                  <span className="text-primary mr-1.5">{group.plo_code}</span> {group.plo_name}
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
+              <CardContent className="pt-4 space-y-3">
                 {group.items.length === 0 && editingPloId !== group.plo_id && (
-                  <p className="text-sm text-muted-foreground italic">ยังไม่มีรายการประเมินในหมวดนี้</p>
+                  <p className="text-sm text-muted-foreground italic">ยังไม่มีรายการประเมินใน PLO นี้</p>
                 )}
 
                 {group.items.map((item) => (
-                  <div key={item.id} className="flex items-start gap-3 border rounded-md p-3 bg-background">
-                    <span className="text-sm font-medium text-muted-foreground w-8 shrink-0">{item.sequence_no}.</span>
-                    <div className="flex-1 text-sm">
+                  <div key={item.id} className="flex items-start gap-3 border border-border/80 rounded-md p-3 hover:bg-muted/10 transition-colors">
+                    <span className="text-sm font-semibold text-muted-foreground w-8 shrink-0">{item.sequence_no}.</span>
+                    <div className="flex-1 text-sm leading-relaxed">
                       {item.competency_name}
                       {!item.is_scorable && (
                         <Badge variant="secondary" className="ml-2 text-xs">ไม่ต้องประเมิน</Badge>
@@ -249,34 +271,24 @@ export default function CompetencyItemsManagement() {
                 ))}
 
                 {editingPloId === group.plo_id ? (
-                  <div className="border border-primary/40 rounded-md p-3 space-y-3 bg-muted/30">
-                    <div className="flex gap-3">
-                      <div className="w-24 space-y-1">
-                        <Label className="text-xs">ลำดับ</Label>
-                        <Input
-                          type="number"
-                          value={draft.sequence_no}
-                          onChange={(e) => setDraft((d) => ({ ...d, sequence_no: e.target.value }))}
-                        />
-                      </div>
-                      <div className="flex-1 space-y-1">
-                        <Label className="text-xs">รายการประเมินสมรรถนะ</Label>
-                        <Input
-                          value={draft.competency_name}
-                          onChange={(e) => setDraft((d) => ({ ...d, competency_name: e.target.value }))}
-                          placeholder="พิมพ์ข้อความรายการประเมิน"
-                        />
-                      </div>
+                  <div className="border border-primary/40 rounded-md p-4 space-y-3 bg-muted/30 animate-in fade-in-50">
+                    <div className="space-y-1">
+                      <Label className="text-xs">รายการประเมินสมรรถนะ</Label>
+                      <Input
+                        value={draft.competency_name}
+                        onChange={(e) => setDraft((d) => ({ ...d, competency_name: e.target.value }))}
+                        placeholder="พิมพ์ข้อความรายการประเมิน (ลำดับจะถูกกำหนดให้อัตโนมัติ)"
+                      />
                     </div>
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between pt-1">
                       <div className="flex items-center gap-2">
                         <Checkbox
                           id={`scorable-${group.plo_id}`}
                           checked={draft.is_scorable}
                           onCheckedChange={(c) => setDraft((d) => ({ ...d, is_scorable: Boolean(c) }))}
                         />
-                        <Label htmlFor={`scorable-${group.plo_id}`} className="text-sm cursor-pointer">
-                          ต้องให้คะแนน (ถ้าไม่ติ๊ก = แสดงเป็น "ไม่ต้องประเมิน")
+                        <Label htmlFor={`scorable-${group.plo_id}`} className="text-xs cursor-pointer text-muted-foreground">
+                          ต้องให้คะแนน (หากไม่เลือก จะแสดงเป็น "ไม่ต้องประเมินเพราะไม่กำหนดตัวชี้วัด")
                         </Label>
                       </div>
                       <div className="flex gap-2">
@@ -294,10 +306,10 @@ export default function CompetencyItemsManagement() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="gap-1 text-primary"
-                    onClick={() => startAdd(group.plo_id, group.items.length + 1)}
+                    className="gap-1 text-primary hover:bg-primary/10"
+                    onClick={() => startAdd(group.plo_id)}
                   >
-                    <Plus className="h-4 w-4" /> เพิ่มรายการในหมวดนี้
+                    <Plus className="h-4 w-4" /> เพิ่มรายการใน PLO นี้
                   </Button>
                 )}
               </CardContent>
