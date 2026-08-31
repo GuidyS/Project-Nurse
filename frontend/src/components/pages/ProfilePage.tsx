@@ -1,4 +1,3 @@
-import React, { useState, useEffect } from "react";
 import {
   Mail,
   Phone,
@@ -32,13 +31,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
 
@@ -48,20 +42,27 @@ export const calculateAcademicInfo = (studentIdOrEntryYear: string | number) => 
   const currentYearCE = now.getFullYear();
   const currentYearBE = currentYearCE + 543;
 
-  // วันตัดรอบเลื่อนชั้นปี: 10 สิงหาคม เวลา 00:00:00 น.
+  // วันตัดรอบเลื่อนชั้นปี: 10 สิงหาคม ของทุกปี
   const cutOffDate = new Date(currentYearCE, 7, 10, 0, 0, 0);
   const academicYear = now >= cutOffDate ? currentYearBE : currentYearBE - 1;
 
   const val = String(studentIdOrEntryYear || "").trim();
-  let entryYear = currentYearBE;
+  let entryYear = 0;
 
-  if (val.length >= 4 && parseInt(val.substring(0, 4), 10) >= 2500) {
-    entryYear = parseInt(val.substring(0, 4), 10);
-  } else if (val.length >= 2) {
+  // 1. ดึงกรณีเป็น พ.ศ. 4 หลัก
+  if (val.length === 4 && parseInt(val, 10) >= 2500 && parseInt(val, 10) <= 2600) {
+    entryYear = parseInt(val, 10);
+  } 
+  // 2. ดึงจาก 2 ตัวแรกของรหัสนักศึกษา (เช่น "6603400001" -> 66 -> 2566)
+  else if (val.length >= 2) {
     const prefix = parseInt(val.substring(0, 2), 10);
     if (!isNaN(prefix) && prefix >= 40 && prefix <= 99) {
       entryYear = 2500 + prefix;
     }
+  }
+
+  if (entryYear === 0) {
+    entryYear = academicYear;
   }
 
   let yearLevel = academicYear - entryYear + 1;
@@ -71,7 +72,7 @@ export const calculateAcademicInfo = (studentIdOrEntryYear: string | number) => 
   return {
     academicYear,
     yearLevel,
-    entryYear: entryYear ? String(entryYear) : "-",
+    entryYear: String(entryYear),
     yearLevelText: `ปี ${yearLevel}`,
   };
 };
@@ -83,7 +84,7 @@ export default function ProfilePage() {
   const [editing, setEditing] = useState(false);
   const [formData, setFormData] = useState<any>({});
   const [isSaving, setIsSaving] = useState(false);
-
+  
   const { toast } = useToast();
 
   const fetchProfile = async () => {
@@ -112,11 +113,22 @@ export default function ProfilePage() {
     setFormData((prev: any) => ({ ...prev, [name]: value }));
   };
 
+  // ดักกรองให้รับเฉพาะตัวเลข 0-9
+  const handleNumericInputChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    maxLength?: number
+  ) => {
+    const { name, value } = e.target;
+    const cleanValue = value.replace(/\D/g, "");
+    const finalValue = maxLength ? cleanValue.slice(0, maxLength) : cleanValue;
+    setFormData((prev: any) => ({ ...prev, [name]: finalValue }));
+  };
+
   const handleSelectChange = (name: string, value: string) => {
     setFormData((prev: any) => ({ ...prev, [name]: value }));
   };
 
-  // ฟังก์ชันคำนวณ BMI
+  // ฟังก์ชันคำนวณ BMI อัตโนมัติ
   const calculateBMI = (height?: number | string, weight?: number | string) => {
     if (!height || !weight) return "-";
     const h = parseFloat(String(height)) / 100;
@@ -127,6 +139,16 @@ export default function ProfilePage() {
 
   const handleSaveProfile = async () => {
     try {
+      // ตรวจสอบความถูกต้องของเลขบัตรประชาชน (ถ้ามีการกรอก)
+      if (userRole === "student" && formData.id_card_number && formData.id_card_number.length !== 13) {
+        toast({
+          title: "ข้อมูลไม่ถูกต้อง",
+          description: "รหัสประจำตัวประชาชนต้องมีครบ 13 หลัก",
+          variant: "destructive",
+        });
+        return;
+      }
+
       setIsSaving(true);
       const res = await api.post("/index.php?page=profile", formData);
       if (res.data.status === "success") {
@@ -148,68 +170,44 @@ export default function ProfilePage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="p-12 text-center text-muted-foreground animate-pulse flex flex-col items-center justify-center min-h-[50vh] gap-3">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <span>กำลังโหลดข้อมูลโปรไฟล์...</span>
-      </div>
-    );
-  }
+  if (loading) return <div className="p-12 text-center text-muted-foreground animate-pulse">กำลังโหลดข้อมูลโปรไฟล์...</div>;
+  if (!profileData) return <div className="p-12 text-center text-destructive">ไม่พบข้อมูลผู้ใช้งาน</div>;
 
-  if (!profileData) {
-    return (
-      <div className="p-12 text-center text-destructive">ไม่พบข้อมูลผู้ใช้งาน</div>
-    );
-  }
-
-  const studentId =
-    profileData.student_id || profileData.username || "6603400001";
+  const studentId = profileData.student_id || profileData.username || "6603400001";
   const academicCalculated = calculateAcademicInfo(studentId);
 
   const displayFullNameTH = `${profileData.first_name_th || ""} ${profileData.last_name_th || ""}`.trim();
   const displayFullNameEN = `${profileData.first_name_en || ""} ${profileData.last_name_en || ""}`.trim();
-  const displayEmail =
-    profileData.email || `${studentId}@siam.edu`;
+  const displayEmail = profileData.email || `${studentId}@siam.edu`;
   const userInitial = profileData.first_name_th?.charAt(0) || "ญ";
-  const pdfDocuments = Array.isArray(profileData.pdf_documents)
-    ? profileData.pdf_documents
-    : [];
-  const apiBaseUrl = (
-    import.meta.env.VITE_API_BASE_URL || "http://localhost:8080"
-  ).replace(/\/$/, "");
-  const profilePictureRaw =
-    profileData.profile_picture_url || profileData.profile_picture || "";
+  const pdfDocuments = Array.isArray(profileData.pdf_documents) ? profileData.pdf_documents : [];
+  const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8080").replace(/\/$/, "");
+  const profilePictureRaw = profileData.profile_picture_url || profileData.profile_picture || "";
   const profilePictureUrl = profilePictureRaw
-    ? profilePictureRaw.startsWith("http")
-      ? profilePictureRaw
-      : `${apiBaseUrl}/${profilePictureRaw.replace(/^\//, "")}`
+    ? (profilePictureRaw.startsWith("http") ? profilePictureRaw : `${apiBaseUrl}/${profilePictureRaw.replace(/^\//, "")}`)
     : "";
 
   const fatherFullName = `${profileData.father_first_name || ""} ${profileData.father_last_name || ""}`.trim();
   const motherFullName = `${profileData.mother_first_name || ""} ${profileData.mother_last_name || ""}`.trim();
-  const parentAddress =
-    profileData.parent_address ||
-    profileData.father_address ||
-    profileData.mother_address ||
-    null;
+  const parentAddress = profileData.parent_address || profileData.father_address || profileData.mother_address || null;
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6 animate-fade-in">
-      {/* ส่วนหัว Card ข้อมูลส่วนตัว */}
+      
+      {/* 🎯 ส่วนหัว Card ข้อมูลส่วนตัว */}
       <div className="bg-card rounded-2xl shadow-lg p-8 relative">
         <div className="absolute top-6 right-6">
-          <Button
-            size="sm"
-            className="gap-2"
-            onClick={() => {
+          <Button 
+            size="sm" 
+            className="gap-2" 
+            onClick={() => { 
               setFormData({
                 ...profileData,
                 id_card_number: profileData.id_card_number || "",
                 parent_address: parentAddress || "",
-                home_address: profileData.home_address || profileData.address || "",
-              });
-              setEditing(true);
+                home_address: profileData.home_address || profileData.address || ""
+              }); 
+              setEditing(true); 
             }}
           >
             <Edit className="h-4 w-4" />
@@ -219,9 +217,7 @@ export default function ProfilePage() {
 
         <div className="flex flex-col md:flex-row items-center gap-8">
           <Avatar className="h-32 w-32 ring-4 ring-primary/20 shadow-md">
-            {profilePictureUrl ? (
-              <AvatarImage src={profilePictureUrl} alt={displayFullNameTH} />
-            ) : null}
+            {profilePictureUrl ? <AvatarImage src={profilePictureUrl} alt={displayFullNameTH} /> : null}
             <AvatarFallback className="bg-primary text-primary-foreground text-4xl font-bold">
               {userInitial}
             </AvatarFallback>
@@ -239,9 +235,7 @@ export default function ProfilePage() {
             </p>
             <div className="mt-3 flex flex-wrap items-center justify-center gap-2 md:justify-start">
               <Badge className="bg-primary hover:bg-primary/90 text-white font-normal">
-                {userRole === "student"
-                  ? "นักศึกษาพยาบาลศาสตร์"
-                  : "อาจารย์ / บุคลากร"}
+                {userRole === "student" ? "นักศึกษาพยาบาลศาสตร์" : "อาจารย์ / บุคลากร"}
               </Badge>
               {userRole === "teacher" && getWorkStatusBadge(profileData.status)}
             </div>
@@ -250,134 +244,48 @@ export default function ProfilePage() {
 
         <div className="border-t border-border my-8" />
 
-        {/* ข้อมูลที่ดึงมาแสดงตามสิทธิ์ */}
+        {/* 🎯 ข้อมูลอื่นๆ ที่ดึงมาแสดงตามสิทธิ์ */}
         <div className="grid md:grid-cols-2 gap-6 text-sm">
           {userRole === "teacher" ? (
             <>
-              {/* โครงสร้างเดิมของอาจารย์ ไม่แตะต้อง[cite: 23] */}
-              <InfoRow
-                icon={<User className="h-4 w-4 text-primary" />}
-                label="เพศ"
-                value={profileData.gender}
-              />
-              <InfoRow
-                icon={<Calendar className="h-4 w-4 text-primary" />}
-                label="วัน/เดือน/ปี เกิด"
-                value={formatThaiDate(profileData.birth_date)}
-              />
-              <InfoRow
-                icon={<Mail className="h-4 w-4 text-primary" />}
-                label="อีเมล"
-                value={displayEmail}
-              />
-              <InfoRow
-                icon={<Phone className="h-4 w-4 text-primary" />}
-                label="เบอร์โทรศัพท์"
-                value={profileData.phone}
-              />
-              <InfoRow
-                icon={<ShieldCheck className="h-4 w-4 text-primary" />}
-                label="เลขที่บัตรสภาการพยาบาล"
-                value={profileData.nursing_council_no}
-              />
-              <InfoRow
-                icon={<Calendar className="h-4 w-4 text-primary" />}
-                label="วันหมดอายุใบอนุญาต"
-                value={formatThaiDate(profileData.license_expiry)}
-              />
-              <InfoRow
-                icon={<Calendar className="h-4 w-4 text-primary" />}
-                label="วันที่เริ่มปฏิบัติงาน"
-                value={formatThaiDate(profileData.start_work_date)}
-              />
-              <InfoRow
-                icon={<Calendar className="h-4 w-4 text-primary" />}
-                label="วันที่รับตำแหน่งทางวิชาการ"
-                value={formatThaiDate(profileData.academic_position_date)}
-              />
+              {/* โครงสร้างเดิมของอาจารย์ ไม่แตะต้อง */}
+              <InfoRow icon={<User className="h-4 w-4 text-primary" />} label="เพศ" value={profileData.gender} />
+              <InfoRow icon={<Calendar className="h-4 w-4 text-primary" />} label="วัน/เดือน/ปี เกิด" value={formatThaiDate(profileData.birth_date)} />
+              <InfoRow icon={<Mail className="h-4 w-4 text-primary" />} label="อีเมล" value={displayEmail} />
+              <InfoRow icon={<Phone className="h-4 w-4 text-primary" />} label="เบอร์โทรศัพท์" value={profileData.phone} />
+              <InfoRow icon={<ShieldCheck className="h-4 w-4 text-primary" />} label="เลขที่บัตรสภาการพยาบาล" value={profileData.nursing_council_no} />
+              <InfoRow icon={<Calendar className="h-4 w-4 text-primary" />} label="วันหมดอายุใบอนุญาต" value={formatThaiDate(profileData.license_expiry)} />
+              <InfoRow icon={<Calendar className="h-4 w-4 text-primary" />} label="วันที่เริ่มปฏิบัติงาน" value={formatThaiDate(profileData.start_work_date)} />
+              <InfoRow icon={<Calendar className="h-4 w-4 text-primary" />} label="วันที่รับตำแหน่งทางวิชาการ" value={formatThaiDate(profileData.academic_position_date)} />
               <div className="md:col-span-2">
-                <InfoRow
-                  icon={<MapPin className="h-4 w-4 text-primary" />}
-                  label="ที่อยู่ปัจจุบัน"
-                  value={profileData.current_address}
-                />
+                <InfoRow icon={<MapPin className="h-4 w-4 text-primary" />} label="ที่อยู่ปัจจุบัน" value={profileData.current_address} />
               </div>
               <PdfDocumentsSection documents={pdfDocuments} />
             </>
           ) : (
             <>
-              {/* ส่วนแสดงผลของ Student */}
-              <InfoRow
-                icon={<User className="h-4 w-4 text-primary" />}
-                label="เพศ"
-                value={profileData.gender || "หญิง"}
-              />
-              <InfoRow
-                icon={<Calendar className="h-4 w-4 text-primary" />}
-                label="วัน/เดือน/ปี เกิด"
-                value={formatThaiDate(profileData.birth_date)}
-              />
-              <InfoRow
-                icon={<Mail className="h-4 w-4 text-primary" />}
-                label="อีเมล"
-                value={displayEmail}
-              />
-              <InfoRow
-                icon={<Phone className="h-4 w-4 text-primary" />}
-                label="เบอร์โทรศัพท์มือถือ"
-                value={profileData.phone}
-              />
-              <InfoRow
-                icon={<GraduationCap className="h-4 w-4 text-primary" />}
-                label="ชั้นปีปัจจุบัน"
-                value={academicCalculated.yearLevelText}
-              />
-              <InfoRow
-                icon={<GraduationCap className="h-4 w-4 text-primary" />}
-                label="เกรดเฉลี่ย (GPA)"
-                value={profileData.gpa}
-              />
-              <InfoRow
-                icon={<Activity className="h-4 w-4 text-primary" />}
-                label="ส่วนสูง / น้ำหนัก"
-                value={
-                  profileData.height && profileData.weight
-                    ? `${profileData.height} ซม. / ${profileData.weight} กก.`
-                    : null
-                }
-              />
-              <InfoRow
-                icon={<Activity className="h-4 w-4 text-primary" />}
-                label="ดัชนีมวลกาย (BMI)"
-                value={profileData.bmi || calculateBMI(profileData.height, profileData.weight)}
-              />
-              <InfoRow
-                icon={<ShieldCheck className="h-4 w-4 text-primary" />}
-                label="รหัสประจำตัวประชาชน"
-                value={profileData.id_card_number || "-"}
-              />
-              <InfoRow
-                icon={<Calendar className="h-4 w-4 text-primary" />}
-                label="ปีการศึกษาที่เข้าศึกษา"
-                value={academicCalculated.entryYear}
-              />
+              {/* ส่วนแสดงผลของ Student ที่คำนวณ Real-time */}
+              <InfoRow icon={<User className="h-4 w-4 text-primary" />} label="เพศ" value={profileData.gender || "หญิง"} />
+              <InfoRow icon={<Calendar className="h-4 w-4 text-primary" />} label="วัน/เดือน/ปี เกิด" value={formatThaiDate(profileData.birth_date)} />
+              <InfoRow icon={<Mail className="h-4 w-4 text-primary" />} label="อีเมล" value={displayEmail} />
+              <InfoRow icon={<Phone className="h-4 w-4 text-primary" />} label="เบอร์โทรศัพท์มือถือ" value={profileData.phone} />
+              <InfoRow icon={<GraduationCap className="h-4 w-4 text-primary" />} label="ชั้นปีปัจจุบัน" value={academicCalculated.yearLevelText} />
+              <InfoRow icon={<GraduationCap className="h-4 w-4 text-primary" />} label="เกรดเฉลี่ย (GPA)" value={profileData.gpa} />
+              <InfoRow icon={<Activity className="h-4 w-4 text-primary" />} label="ส่วนสูง / น้ำหนัก" value={profileData.height && profileData.weight ? `${profileData.height} ซม. / ${profileData.weight} กก.` : null} />
+              <InfoRow icon={<Activity className="h-4 w-4 text-primary" />} label="ดัชนีมวลกาย (BMI)" value={profileData.bmi || calculateBMI(profileData.height, profileData.weight)} />
+              <InfoRow icon={<ShieldCheck className="h-4 w-4 text-primary" />} label="รหัสประจำตัวประชาชน" value={profileData.id_card_number} />
+              <InfoRow icon={<Calendar className="h-4 w-4 text-primary" />} label="ปีการศึกษาที่เข้าศึกษา" value={academicCalculated.entryYear} />
               <div className="md:col-span-2">
-                <InfoRow
-                  icon={<MapPin className="h-4 w-4 text-primary" />}
-                  label="ที่อยู่ปัจจุบัน"
-                  value={profileData.home_address || profileData.address}
-                />
+                <InfoRow icon={<MapPin className="h-4 w-4 text-primary" />} label="ที่อยู่ปัจจุบัน" value={profileData.home_address || profileData.address} />
               </div>
 
-              {/* ส่วนข้อมูลครอบครัว (บิดา-มารดา) */}
+              {/* 👨‍👩‍👧 ส่วนข้อมูลครอบครัว (บิดา-มารดา) */}
               <div className="md:col-span-2 border-t border-border pt-6 mt-2">
                 <div className="flex items-center gap-2 mb-4">
                   <Users className="h-5 w-5 text-primary" />
-                  <h3 className="font-semibold text-foreground text-base">
-                    ข้อมูลครอบครัว (บิดา-มารดา)
-                  </h3>
+                  <h3 className="font-semibold text-foreground text-base">ข้อมูลครอบครัว (บิดา-มารดา)</h3>
                 </div>
-
+                
                 <div className="bg-muted/20 p-4 rounded-xl border border-border space-y-4">
                   <div className="grid md:grid-cols-2 gap-6">
                     {/* ข้อมูลบิดา */}
@@ -386,16 +294,8 @@ export default function ProfilePage() {
                         <User className="h-4 w-4" />
                         <span>ข้อมูลบิดา</span>
                       </div>
-                      <InfoRow
-                        icon={<User className="h-4 w-4 text-primary" />}
-                        label="ชื่อ-นามสกุลบิดา"
-                        value={fatherFullName || null}
-                      />
-                      <InfoRow
-                        icon={<Phone className="h-4 w-4 text-primary" />}
-                        label="เบอร์โทรศัพท์บิดา"
-                        value={profileData.father_phone}
-                      />
+                      <InfoRow icon={<User className="h-4 w-4 text-primary" />} label="ชื่อ-นามสกุลบิดา" value={fatherFullName || null} />
+                      <InfoRow icon={<Phone className="h-4 w-4 text-primary" />} label="เบอร์โทรศัพท์บิดา" value={profileData.father_phone} />
                     </div>
 
                     {/* ข้อมูลมารดา */}
@@ -404,26 +304,14 @@ export default function ProfilePage() {
                         <Heart className="h-4 w-4" />
                         <span>ข้อมูลมารดา</span>
                       </div>
-                      <InfoRow
-                        icon={<User className="h-4 w-4 text-primary" />}
-                        label="ชื่อ-นามสกุลมารดา"
-                        value={motherFullName || null}
-                      />
-                      <InfoRow
-                        icon={<Phone className="h-4 w-4 text-primary" />}
-                        label="เบอร์โทรศัพท์มารดา"
-                        value={profileData.mother_phone}
-                      />
+                      <InfoRow icon={<User className="h-4 w-4 text-primary" />} label="ชื่อ-นามสกุลมารดา" value={motherFullName || null} />
+                      <InfoRow icon={<Phone className="h-4 w-4 text-primary" />} label="เบอร์โทรศัพท์มารดา" value={profileData.mother_phone} />
                     </div>
                   </div>
 
-                  {/* ที่อยู่ผู้ปกครอง */}
+                  {/* ที่อยู่ผู้ปกครอง (รวมเป็นแถวเดียว) */}
                   <div className="border-t border-border pt-3">
-                    <InfoRow
-                      icon={<MapPin className="h-4 w-4 text-primary" />}
-                      label="ที่อยู่ผู้ปกครอง"
-                      value={parentAddress}
-                    />
+                    <InfoRow icon={<MapPin className="h-4 w-4 text-primary" />} label="ที่อยู่ผู้ปกครอง" value={parentAddress} />
                   </div>
                 </div>
               </div>
@@ -434,7 +322,7 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      {/* Dialog แบบฟอร์มแก้ไขข้อมูลส่วนตัว */}
+      {/* 🎯 Dialog แบบฟอร์มแก้ไขข้อมูลส่วนตัว */}
       <Dialog open={editing} onOpenChange={setEditing}>
         <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
@@ -560,18 +448,20 @@ export default function ProfilePage() {
                         id="phone"
                         name="phone"
                         value={formData.phone || ""}
-                        onChange={handleInputChange}
-                        placeholder="08X-XXX-XXXX"
+                        onChange={(e) => handleNumericInputChange(e, 10)}
+                        placeholder="08XXXXXXXX"
+                        maxLength={10}
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="id_card_number">รหัสประจำตัวประชาชน</Label>
+                      <Label htmlFor="id_card_number">รหัสประจำตัวประชาชน (13 หลัก)</Label>
                       <Input
                         id="id_card_number"
                         name="id_card_number"
                         value={formData.id_card_number || ""}
-                        onChange={handleInputChange}
-                        placeholder="เลขบัตรประชาชน 13 หลัก"
+                        onChange={(e) => handleNumericInputChange(e, 13)}
+                        placeholder="ตัวเลข 13 หลัก"
+                        maxLength={13}
                       />
                     </div>
                     <div className="space-y-2">
@@ -579,7 +469,11 @@ export default function ProfilePage() {
                       <Input
                         id="gpa"
                         name="gpa"
-                        value={formData.gpa || ""}
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="4"
+                        value={formData.gpa ?? ""}
                         onChange={handleInputChange}
                         placeholder="เช่น 3.50"
                       />
@@ -613,7 +507,9 @@ export default function ProfilePage() {
                       id="height"
                       name="height"
                       type="number"
-                      value={formData.height || ""}
+                      step="0.1"
+                      min="0"
+                      value={formData.height ?? ""}
                       onChange={handleInputChange}
                       placeholder="เช่น 160"
                     />
@@ -624,7 +520,9 @@ export default function ProfilePage() {
                       id="weight"
                       name="weight"
                       type="number"
-                      value={formData.weight || ""}
+                      step="0.1"
+                      min="0"
+                      value={formData.weight ?? ""}
                       onChange={handleInputChange}
                       placeholder="เช่น 48"
                     />
@@ -681,8 +579,9 @@ export default function ProfilePage() {
                       id="father_phone"
                       name="father_phone"
                       value={formData.father_phone || ""}
-                      onChange={handleInputChange}
-                      placeholder="ระบุเบอร์โทรศัพท์บิดา"
+                      onChange={(e) => handleNumericInputChange(e, 10)}
+                      placeholder="ระบุเบอร์โทรศัพท์บิดา (10 หลัก)"
+                      maxLength={10}
                     />
                   </div>
                 </div>
@@ -720,8 +619,9 @@ export default function ProfilePage() {
                       id="mother_phone"
                       name="mother_phone"
                       value={formData.mother_phone || ""}
-                      onChange={handleInputChange}
-                      placeholder="ระบุเบอร์โทรศัพท์มารดา"
+                      onChange={(e) => handleNumericInputChange(e, 10)}
+                      placeholder="ระบุเบอร์โทรศัพท์มารดา (10 หลัก)"
+                      maxLength={10}
                     />
                   </div>
                 </div>
@@ -796,11 +696,7 @@ const formatThaiDate = (value: unknown): string | null => {
 const getWorkStatusBadge = (status?: string | null) => {
   const normalized = String(status ?? "").trim().toLowerCase();
   if (normalized === "active") {
-    return (
-      <Badge className="bg-success text-success-foreground hover:bg-success/90">
-        Active
-      </Badge>
-    );
+    return <Badge className="bg-success text-success-foreground hover:bg-success/90">Active</Badge>;
   }
   if (normalized === "retired") {
     return (
@@ -816,14 +712,14 @@ const getWorkStatusBadge = (status?: string | null) => {
 const InfoRow = ({
   icon,
   label,
-  value,
+  value
 }: {
   icon: React.ReactNode;
   label: string;
   value: React.ReactNode;
 }) => (
   <div className="flex items-center gap-3">
-    <div className="bg-primary/10 p-2 rounded-full flex items-center justify-center shrink-0">
+    <div className="bg-primary/10 p-2 rounded-full flex items-center justify-center">
       {icon}
     </div>
     <div>
@@ -845,16 +741,13 @@ const PdfDocumentsSection = ({ documents }: { documents: any[] }) => {
   if (!documents || documents.length === 0) {
     return (
       <div className="md:col-span-2 rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
-        ยังไม่มีไฟล์ PDF ในระบบ — ลิงก์ Google Drive ในฐานข้อมูล (เช่น ประวัติ/Resume)
-        หรือไฟล์ที่อัปโหลดผ่านผู้ดูแลระบบจะแสดงที่นี่
-        เอกสารรับรองอื่น (บัตรสภา, ใบอนุญาต, ใบรับรองการสอน) ให้ผู้ใช้อัปโหลดภายหลัง[cite: 23]
+        ยังไม่มีไฟล์ PDF ในระบบ — ลิงก์ Google Drive ในฐานข้อมูล (เช่น ประวัติ/Resume) หรือไฟล์ที่อัปโหลดผ่านผู้ดูแลระบบจะแสดงที่นี่
+        เอกสารรับรองอื่น (บัตรสภา, ใบอนุญาต, ใบรับรองการสอน) ให้ผู้ใช้อัปโหลดภายหลัง[cite: 16]
       </div>
     );
   }
 
-  const apiBaseUrl = (
-    import.meta.env.VITE_API_BASE_URL || "http://localhost:8080"
-  ).replace(/\/$/, "");
+  const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8080").replace(/\/$/, "");
 
   return (
     <div className="md:col-span-2 space-y-3">
@@ -871,46 +764,33 @@ const PdfDocumentsSection = ({ documents }: { documents: any[] }) => {
             doc.source === "google_drive"
               ? "Google Drive"
               : doc.source === "local"
-              ? "ไฟล์ในระบบ"
-              : doc.source === "missing"
-              ? "ยังไม่มีไฟล์บนเซิร์ฟเวอร์"
-              : "ลิงก์ภายนอก";
+                ? "ไฟล์ในระบบ"
+                : doc.source === "missing"
+                  ? "ยังไม่มีไฟล์บนเซิร์ฟเวอร์"
+                  : "ลิงก์ภายนอก";
 
           const iconWrapClass =
             kind === "pdf" || kind === "drive"
               ? "bg-red-50 text-red-600 ring-red-100"
               : kind === "image"
-              ? "bg-sky-50 text-sky-700 ring-sky-100"
-              : "bg-amber-50 text-amber-700 ring-amber-100";
+                ? "bg-sky-50 text-sky-700 ring-sky-100"
+                : "bg-amber-50 text-amber-700 ring-amber-100";
 
           const content = (
             <>
-              <div
-                className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-lg ring-1 ${iconWrapClass}`}
-              >
+              <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-lg ring-1 ${iconWrapClass}`}>
                 {kind === "image" ? (
                   <ImageIcon className="h-6 w-6" />
                 ) : kind === "pdf" || kind === "drive" ? (
-                  <img
-                    src="/pdf.svg"
-                    alt=""
-                    className="h-8 w-8 object-contain"
-                    aria-hidden="true"
-                  />
+                  <img src="/pdf.svg" alt="" className="h-8 w-8 object-contain" aria-hidden="true" />
                 ) : (
                   <FileText className="h-6 w-6" />
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate font-medium text-foreground">
-                  {doc.title || "เอกสารแนบ"}
-                </p>
-                <p className="truncate text-xs text-muted-foreground">
-                  {doc.file_name || doc.file_path}
-                </p>
-                <p className="truncate text-[11px] text-muted-foreground/80">
-                  {sourceLabel}
-                </p>
+                <p className="truncate font-medium text-foreground">{doc.title || "เอกสารแนบ"}</p>
+                <p className="truncate text-xs text-muted-foreground">{doc.file_name || doc.file_path}</p>
+                <p className="truncate text-[11px] text-muted-foreground/80">{sourceLabel}</p>
               </div>
               {available ? (
                 <ExternalLink className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-primary" />

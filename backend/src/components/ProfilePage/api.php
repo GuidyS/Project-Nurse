@@ -418,7 +418,8 @@ try {
             $profile['year_level']     = $academicInfo['year_level'];
             $profile['academic_year']  = $academicInfo['academic_year'];
 
-            // แมปฟิลด์ที่อยู่ผู้ปกครองและที่อยู่ปัจจุบัน
+            // แมปฟิลด์ที่อยู่และรหัสประจำตัวประชาชน
+            $profile['id_card_number'] = $profile['id_card_number'] ?? null;
             $profile['parent_address'] = $profile['father_address'] ?? $profile['mother_address'] ?? null;
             $profile['home_address']   = $profile['home_address'] ?? $profile['address'] ?? null;
 
@@ -460,7 +461,7 @@ try {
 
             echo json_encode(["status" => "success", "role" => "student", "data" => $profile], JSON_UNESCAPED_UNICODE);
         } else {
-            // โค้ดเดิมของ Teacher / Other Roles ไม่แตะต้อง[cite: 22]
+            // โค้ดเดิมของ Teacher / Other Roles ไม่แตะต้อง[cite: 15]
             $stmt = $db->prepare("SELECT * FROM faculty WHERE faculty_id = :id LIMIT 1");
             $stmt->execute(['id' => $u_info['username']]);
             $profile = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
@@ -489,9 +490,9 @@ try {
         // เฉพาะ Role Student (role_id = 3)
         // ==========================================
         if ((int)$u_info['role_id'] === 3) {
-            $parentAddress = !empty($input['parent_address']) ? trim($input['parent_address']) : (!empty($input['father_address']) ? trim($input['father_address']) : null);
+            $parentAddress = !empty($input['parent_address']) ? trim((string)$input['parent_address']) : (!empty($input['father_address']) ? trim((string)$input['father_address']) : null);
             
-            // ตรวจสอบและแปลงตัวเลขให้ปลอดภัย ป้องกัน SQL Type Error
+            // ดักจับและแปลงตัวเลขให้ถูกต้อง ป้องกัน Database Type Error
             $rawHeight = isset($input['height']) ? trim((string)$input['height']) : '';
             $height    = ($rawHeight !== '' && is_numeric($rawHeight)) ? floatval($rawHeight) : null;
 
@@ -507,8 +508,19 @@ try {
                 $bmi = round($weight / ($hMeter * $hMeter), 1);
             }
 
-            $idCardNumber = !empty($input['id_card_number']) ? trim($input['id_card_number']) : null;
-            $homeAddress = !empty($input['home_address']) ? trim($input['home_address']) : (!empty($input['address']) ? trim($input['address']) : null);
+            // กรองรหัสประจำตัวประชาชนให้เหลือเฉพาะตัวเลขความยาวสูงสุด 13 หลัก
+            $rawIdCard = !empty($input['id_card_number']) ? trim((string)$input['id_card_number']) : '';
+            $idCardNumber = $rawIdCard !== '' ? substr(preg_replace('/\D/', '', $rawIdCard), 0, 13) : null;
+            if ($idCardNumber === '') {
+                $idCardNumber = null;
+            }
+
+            $homeAddress = !empty($input['home_address']) ? trim((string)$input['home_address']) : (!empty($input['address']) ? trim((string)$input['address']) : null);
+
+            // กรองเบอร์โทรศัพท์ให้เหลือเฉพาะตัวเลข
+            $phone = !empty($input['phone']) ? substr(preg_replace('/\D/', '', (string)$input['phone']), 0, 15) : null;
+            $fatherPhone = !empty($input['father_phone']) ? substr(preg_replace('/\D/', '', (string)$input['father_phone']), 0, 15) : null;
+            $motherPhone = !empty($input['mother_phone']) ? substr(preg_replace('/\D/', '', (string)$input['mother_phone']), 0, 15) : null;
 
             $sql = "UPDATE student SET 
                         first_name_en = :first_name_en, 
@@ -535,30 +547,30 @@ try {
             
             $stmtUpdate = $db->prepare($sql);
             $stmtUpdate->execute([
-                ':first_name_en'    => !empty($input['first_name_en']) ? trim($input['first_name_en']) : null,
-                ':last_name_en'     => !empty($input['last_name_en']) ? trim($input['last_name_en']) : null,
-                ':gender'           => !empty($input['gender']) ? trim($input['gender']) : null,
-                ':birth_date'       => !empty($input['birth_date']) ? trim($input['birth_date']) : null,
-                ':email'            => !empty($input['email']) ? trim($input['email']) : null,
-                ':phone'            => !empty($input['phone']) ? trim($input['phone']) : null,
+                ':first_name_en'    => !empty($input['first_name_en']) ? trim((string)$input['first_name_en']) : null,
+                ':last_name_en'     => !empty($input['last_name_en']) ? trim((string)$input['last_name_en']) : null,
+                ':gender'           => !empty($input['gender']) ? trim((string)$input['gender']) : null,
+                ':birth_date'       => !empty($input['birth_date']) ? trim((string)$input['birth_date']) : null,
+                ':email'            => !empty($input['email']) ? trim((string)$input['email']) : null,
+                ':phone'            => $phone,
                 ':id_card_number'   => $idCardNumber,
                 ':gpa'              => $gpa,
                 ':height'           => $height,
                 ':weight'           => $weight,
                 ':bmi'              => $bmi,
                 ':home_address'     => $homeAddress,
-                ':father_first_name'=> !empty($input['father_first_name']) ? trim($input['father_first_name']) : null,
-                ':father_last_name' => !empty($input['father_last_name']) ? trim($input['father_last_name']) : null,
-                ':father_phone'     => !empty($input['father_phone']) ? trim($input['father_phone']) : null,
+                ':father_first_name'=> !empty($input['father_first_name']) ? trim((string)$input['father_first_name']) : null,
+                ':father_last_name' => !empty($input['father_last_name']) ? trim((string)$input['father_last_name']) : null,
+                ':father_phone'     => $fatherPhone,
                 ':father_address'   => $parentAddress,
-                ':mother_first_name'=> !empty($input['mother_first_name']) ? trim($input['mother_first_name']) : null,
-                ':mother_last_name' => !empty($input['mother_last_name']) ? trim($input['mother_last_name']) : null,
-                ':mother_phone'     => !empty($input['mother_phone']) ? trim($input['mother_phone']) : null,
+                ':mother_first_name'=> !empty($input['mother_first_name']) ? trim((string)$input['mother_first_name']) : null,
+                ':mother_last_name' => !empty($input['mother_last_name']) ? trim((string)$input['mother_last_name']) : null,
+                ':mother_phone'     => $motherPhone,
                 ':mother_address'   => $parentAddress,
                 ':student_id'       => $u_info['username']
             ]);
         } else {
-            // โค้ดเดิมของ Teacher / Other Roles ไม่แตะต้อง[cite: 22]
+            // โค้ดเดิมของ Teacher / Other Roles ไม่แตะต้อง[cite: 15]
             $sql = "UPDATE faculty SET first_name_en = ?, last_name_en = ?, gender = ?, birth_date = ?, email = ?, phone = ?, current_address = ?, nursing_council_no = ? WHERE faculty_id = ?";
             $db->prepare($sql)->execute([
                 $input['first_name_en'] ?? null,

@@ -6,6 +6,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 if (session_status() == PHP_SESSION_NONE) { session_start(); }
 require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/../../../config/academic_helper.php';
 
 header("Content-Type: application/json; charset=UTF-8");
 
@@ -19,14 +20,6 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
     echo json_encode(["status" => "error", "message" => "Method not allowed"], JSON_UNESCAPED_UNICODE);
     exit;
-}
-
-function getCurrentThaiAcademicYear(): int {
-    $now = new DateTime();
-    $ceYear = (int)$now->format('Y');
-    $month = (int)$now->format('n');
-    $thaiYear = $ceYear + 543;
-    return $month >= 6 ? $thaiYear : $thaiYear - 1;
 }
 
 try {
@@ -78,7 +71,8 @@ try {
         }
     }
 
-    $academicYear = getCurrentThaiAcademicYear();
+    $info = calculateRealtimeAcademicInfo($targetStudentId);
+    $academicYear = $info['academic_year'];
 
     $itemIds = array_map(fn($s) => (int)($s['competency_item_id'] ?? 0), $scores);
     $itemIds = array_filter($itemIds, fn($id) => $id > 0);
