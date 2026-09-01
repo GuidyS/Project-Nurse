@@ -3,9 +3,9 @@ import {
   BarChart3,
   CalendarDays,
   CheckCircle2,
-  FilePlus2,
   Loader2,
   Microscope,
+  MinusCircle,
   PlusCircle,
   Search,
   ShieldCheck,
@@ -17,9 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
@@ -192,8 +190,8 @@ const authorCountsForYear = (publications: Publication[], facultyId: number, yea
 
 const formatCell = (counts: { kpi: number; coAuthor: number; academic: number }) => {
   const parts = [];
-  if (counts.coAuthor) parts.push({ value: counts.coAuthor, className: "font-semibold text-zinc-100" });
   if (counts.kpi) parts.push({ value: counts.kpi, className: "font-semibold text-red-600" });
+  if (counts.coAuthor) parts.push({ value: counts.coAuthor, className: "font-semibold text-zinc-100" });
   if (counts.academic) parts.push({ value: counts.academic, className: "font-semibold text-sky-600" });
   return parts;
 };
@@ -206,11 +204,6 @@ export default function ResearchSummary() {
   const [journals, setJournals] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const [selectedJournal, setSelectedJournal] = useState("");
-  const [selectedFacultyId, setSelectedFacultyId] = useState("");
-  const [selectedAuthorRole, setSelectedAuthorRole] = useState<AuthorRole>("first_author");
-  const [selectedType, setSelectedType] = useState<PublicationType>("research");
-  const [draftTitle, setDraftTitle] = useState("");
-  const [draftDate, setDraftDate] = useState("2026-08-01");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -231,7 +224,6 @@ export default function ResearchSummary() {
         setPublications(response.data.data.publications);
         setJournals(response.data.data.journals);
         setSelectedJournal(response.data.data.journals[0] || "");
-        setSelectedFacultyId(String(response.data.data.faculty[0]?.faculty_id || ""));
       } catch (err: unknown) {
         if (!mounted) return;
         console.warn("Using local research preview data:", err);
@@ -240,7 +232,6 @@ export default function ResearchSummary() {
         setPublications(fallbackResearchData.publications);
         setJournals(fallbackResearchData.journals);
         setSelectedJournal(fallbackResearchData.journals[0] || "");
-        setSelectedFacultyId(String(fallbackResearchData.faculty[0]?.faculty_id || ""));
       } finally {
         if (mounted) setIsLoading(false);
       }
@@ -312,25 +303,6 @@ export default function ResearchSummary() {
     );
   }, [publications, search]);
 
-  const addDraftPublication = () => {
-    const person = faculty.find((item) => String(item.faculty_id) === selectedFacultyId);
-    if (!person || !draftTitle.trim() || !selectedJournal) return;
-
-    const nextPublication: Publication = {
-      id: Date.now(),
-      title: draftTitle.trim(),
-      journal: selectedJournal,
-      publication_date: draftDate,
-      buddhist_year: getBuddhistYear(draftDate, "calendar"),
-      publication_type: selectedType,
-      database_level: selectedJournal.includes("ตำรา") ? "ตำรา" : "รอตรวจสอบ",
-      authors: [{ faculty_id: person.faculty_id, name: person.name, role: selectedAuthorRole }],
-    };
-
-    setPublications((current) => [nextPublication, ...current]);
-    setDraftTitle("");
-  };
-
   const addQuickCellPublication = (
     person: Faculty,
     year: number,
@@ -355,6 +327,37 @@ export default function ResearchSummary() {
     };
 
     setPublications((current) => [nextPublication, ...current]);
+  };
+
+  const removeQuickCellPublication = (
+    person: Faculty,
+    year: number,
+    kind: "kpi" | "co_author" | "academic"
+  ) => {
+    setPublications((current) => {
+      const targetIndex = current.findIndex((publication) => {
+        if (getBuddhistYear(publication.publication_date, yearMode) !== year) return false;
+
+        const author = publication.authors.find((item) => item.faculty_id === person.faculty_id);
+        if (!author) return false;
+
+        const isAcademic = publication.publication_type === "academic" || publication.publication_type === "textbook";
+        if (kind === "academic") return isAcademic;
+        if (isAcademic) return false;
+        if (kind === "kpi") return author.role === "first_author" || author.role === "corresponding";
+        return author.role === "co_author";
+      });
+
+      if (targetIndex < 0) return current;
+
+      return current.flatMap((publication, index) => {
+        if (index !== targetIndex) return [publication];
+
+        const nextAuthors = publication.authors.filter((author) => author.faculty_id !== person.faculty_id);
+        if (nextAuthors.length === 0) return [];
+        return [{ ...publication, authors: nextAuthors }];
+      });
+    });
   };
 
   if (isLoading) {
@@ -439,101 +442,31 @@ export default function ResearchSummary() {
         </Card>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5" />
-              แนวโน้มผลงานตามรอบปี
-            </CardTitle>
-            <CardDescription>
-              {yearMode === "calendar" ? "ปีปฏิทิน: 1 มกราคม - 31 ธันวาคม" : "ปีการศึกษา: 1 สิงหาคม - 31 กรกฎาคม"}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="year" />
-                <YAxis allowDecimals={false} />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="นับ KPI" fill="#dc2626" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="ชื่อร่วม" fill="#27272a" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="วิชาการ/ตำรา" fill="#0284c7" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FilePlus2 className="h-5 w-5" />
-              บันทึกผลงานทดลอง
-            </CardTitle>
-            <CardDescription>จำกัดให้ Admin/Research เลือกวารสารจาก master เท่านั้น</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>ชื่อผลงาน</Label>
-              <Input value={draftTitle} onChange={(event) => setDraftTitle(event.target.value)} placeholder="กรอกชื่อบทความ / ตำรา" />
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>วันที่ตีพิมพ์</Label>
-                <Input type="date" value={draftDate} onChange={(event) => setDraftDate(event.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label>ประเภท</Label>
-                <Select value={selectedType} onValueChange={(value) => setSelectedType(value as PublicationType)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="research">วิจัย</SelectItem>
-                    <SelectItem value="academic">บทความวิชาการ</SelectItem>
-                    <SelectItem value="textbook">ตำรา</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>วารสาร / แหล่งพิมพ์</Label>
-              <Select value={selectedJournal} onValueChange={setSelectedJournal}>
-                <SelectTrigger><SelectValue placeholder="เลือกจาก master" /></SelectTrigger>
-                <SelectContent>
-                  {journals.map((journal) => <SelectItem key={journal} value={journal}>{journal}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>อาจารย์</Label>
-                <Select value={selectedFacultyId} onValueChange={setSelectedFacultyId}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {faculty.map((person) => <SelectItem key={person.faculty_id} value={String(person.faculty_id)}>{person.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>สถานะผู้แต่ง</Label>
-                <Select value={selectedAuthorRole} onValueChange={(value) => setSelectedAuthorRole(value as AuthorRole)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="first_author">First Author</SelectItem>
-                    <SelectItem value="corresponding">Corresponding Author</SelectItem>
-                    <SelectItem value="co_author">Co-author</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <Button onClick={addDraftPublication} className="w-full gap-2">
-              <FilePlus2 className="h-4 w-4" />
-              เพิ่มเข้าตารางทดลอง
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BarChart3 className="h-5 w-5" />
+            แนวโน้มผลงานตามรอบปี
+          </CardTitle>
+          <CardDescription>
+            {yearMode === "calendar" ? "ปีปฏิทิน: 1 มกราคม - 31 ธันวาคม" : "ปีการศึกษา: 1 สิงหาคม - 31 กรกฎาคม"}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="year" />
+              <YAxis allowDecimals={false} />
+              <Tooltip />
+              <Legend />
+              <Bar dataKey="นับ KPI" fill="#dc2626" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="ชื่อร่วม" fill="#27272a" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="วิชาการ/ตำรา" fill="#0284c7" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -594,36 +527,75 @@ export default function ResearchSummary() {
                                 <div className="space-y-3">
                                   <div>
                                     <p className="text-sm font-medium">{person.name}</p>
-                                    <p className="text-xs text-muted-foreground">เพิ่มจำนวนในปี {year}</p>
+                                    <p className="text-xs text-muted-foreground">เพิ่มหรือลดจำนวนในปี {year}</p>
                                   </div>
                                   <div className="grid gap-2">
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      className="justify-between border-red-200 text-red-700 hover:bg-red-50 hover:text-red-700"
-                                      onClick={() => addQuickCellPublication(person, year, "kpi")}
-                                    >
-                                      เพิ่มผลงานนับ KPI
-                                      <span className="font-semibold">+1</span>
-                                    </Button>
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      className="justify-between"
-                                      onClick={() => addQuickCellPublication(person, year, "co_author")}
-                                    >
-                                      เพิ่มผลงานชื่อร่วม
-                                      <span className="font-semibold">+1</span>
-                                    </Button>
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      className="justify-between border-sky-200 text-sky-700 hover:bg-sky-50 hover:text-sky-700"
-                                      onClick={() => addQuickCellPublication(person, year, "academic")}
-                                    >
-                                      เพิ่มวิชาการ/ตำรา
-                                      <span className="font-semibold">+1</span>
-                                    </Button>
+                                    <div className="grid grid-cols-[1fr_auto_auto] items-center gap-2">
+                                      <span className="text-sm font-medium text-red-500">ผลงานนับ KPI</span>
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="icon"
+                                        disabled={counts.kpi === 0}
+                                        className="h-8 w-8 border-red-400/60 text-red-500 hover:bg-red-500/10 hover:text-red-400 disabled:opacity-40"
+                                        onClick={() => removeQuickCellPublication(person, year, "kpi")}
+                                      >
+                                        <MinusCircle className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-8 w-8 border-red-400/60 text-red-500 hover:bg-red-500/10 hover:text-red-400"
+                                        onClick={() => addQuickCellPublication(person, year, "kpi")}
+                                      >
+                                        <PlusCircle className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                    <div className="grid grid-cols-[1fr_auto_auto] items-center gap-2">
+                                      <span className="text-sm font-medium">ผลงานชื่อร่วม</span>
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="icon"
+                                        disabled={counts.coAuthor === 0}
+                                        className="h-8 w-8 disabled:opacity-40"
+                                        onClick={() => removeQuickCellPublication(person, year, "co_author")}
+                                      >
+                                        <MinusCircle className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={() => addQuickCellPublication(person, year, "co_author")}
+                                      >
+                                        <PlusCircle className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                    <div className="grid grid-cols-[1fr_auto_auto] items-center gap-2">
+                                      <span className="text-sm font-medium text-sky-500">วิชาการ/ตำรา</span>
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="icon"
+                                        disabled={counts.academic === 0}
+                                        className="h-8 w-8 border-sky-400/60 text-sky-500 hover:bg-sky-500/10 hover:text-sky-400 disabled:opacity-40"
+                                        onClick={() => removeQuickCellPublication(person, year, "academic")}
+                                      >
+                                        <MinusCircle className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-8 w-8 border-sky-400/60 text-sky-500 hover:bg-sky-500/10 hover:text-sky-400"
+                                        onClick={() => addQuickCellPublication(person, year, "academic")}
+                                      >
+                                        <PlusCircle className="h-4 w-4" />
+                                      </Button>
+                                    </div>
                                   </div>
                                 </div>
                               </PopoverContent>
