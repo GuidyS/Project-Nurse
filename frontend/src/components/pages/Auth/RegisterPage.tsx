@@ -26,6 +26,7 @@ const RegisterPage = ({ onBackToLogin }: RegisterPageProps) => {
   const [showPassword, setShowPassword] = useState(false);
   const [role, setRole] = useState("student");
   const [isLoading, setIsLoading] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const clearError = (field: keyof RegisterErrors) => {
     if (errors[field]) {

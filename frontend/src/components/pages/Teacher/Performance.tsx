@@ -241,7 +241,7 @@ export default function Performance() {
           </CardHeader>
         <CardContent>
             <Table>
-              <TableHeader>
+              <TableHeader className="bg-[#f8fafc]">
                 <TableRow>
                   <TableHead className="w-[120px]">รหัสนักศึกษา</TableHead>
                   <TableHead>ชื่อ-นามสกุล</TableHead>
