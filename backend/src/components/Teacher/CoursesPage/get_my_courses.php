@@ -2,6 +2,7 @@
 if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../CLOPage/curriculum_repository.php';
+require_once __DIR__ . '/../AssignInstructors/subject_term_helpers.php';
 
 header('Access-Control-Allow-Origin: ' . (in_array($_SERVER['HTTP_ORIGIN'] ?? '', ['http://localhost:5173', 'http://127.0.0.1:5173'], true) ? ($_SERVER['HTTP_ORIGIN'] ?? '') : 'http://localhost:5173'));
 header('Vary: Origin');
@@ -55,11 +56,13 @@ try {
     }
 
     // 3. ดึงรายละเอียดวิชา และ จำนวนนักศึกษาที่ลงทะเบียน
+    subjectTermEnsureColumn($db);
     $inQuery = implode(',', array_fill(0, count($my_subject_codes), '?'));
-    $sql = "SELECT s.subject_id as id, s.subject_code as code, s.subject_name_th as name, s.credit as credits, s.semester,
+    $sql = "SELECT s.subject_id as id, s.subject_code as code, s.subject_name_th as name, s.credit as credits,
+                   s.semester, s.academic_year,
             (SELECT COUNT(*) FROM enrollment e WHERE e.subject_id = s.subject_id) as students
             FROM subject s WHERE s.subject_code IN ($inQuery) AND s.is_active = 1";
-    
+
     $stmt = $db->prepare($sql);
     $stmt->execute($my_subject_codes);
     $courses = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -68,6 +71,8 @@ try {
         $course['cloCount'] = $cloCounts[$course['code']] ?? 0;
         $course['section'] = '01'; // Default
         $course['instructor'] = $instructor_name;
+        // ข้อความภาคเรียนคำนวณจากข้อมูลจริงที่เดียว ไม่ให้หน้าเว็บเดาค่าเอง
+        $course['term_label'] = subjectTermLabel($course['semester'], $course['academic_year']);
     }
 
     echo json_encode(["status" => "success", "data" => $courses]);

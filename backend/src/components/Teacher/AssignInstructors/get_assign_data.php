@@ -1,7 +1,8 @@
 <?php
 if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/../../../config/config.php';
-require_once __DIR__ . '/../CLOPage/curriculum_repository.php'; 
+require_once __DIR__ . '/../CLOPage/curriculum_repository.php';
+require_once __DIR__ . '/subject_term_helpers.php';
 
 header('Access-Control-Allow-Origin: ' . (in_array($_SERVER['HTTP_ORIGIN'] ?? '', ['http://localhost:5173', 'http://127.0.0.1:5173'], true) ? ($_SERVER['HTTP_ORIGIN'] ?? '') : 'http://localhost:5173'));
 header('Vary: Origin');
@@ -64,7 +65,8 @@ try {
     }
 
     // 4. ดึงรายวิชาทั้งหมด
-    $sql_subject = "SELECT subject_id, subject_code, subject_name_th, credit, semester FROM subject WHERE is_active = 1 ORDER BY subject_code ASC";
+    subjectTermEnsureColumn($db);
+    $sql_subject = "SELECT subject_id, subject_code, subject_name_th, credit, semester, academic_year FROM subject WHERE is_active = 1 ORDER BY subject_code ASC";
     $stmt_subject = $db->query($sql_subject);
     $subjects = $stmt_subject->fetchAll(PDO::FETCH_ASSOC);
 
@@ -80,7 +82,9 @@ try {
             "name" => $s['subject_name_th'],
             "credits" => (int)$s['credit'],
             "students" => $enrollment[$s['subject_id']] ?? 0,
-            "semester" => (string)$s['semester'],
+            "semester" => $s['semester'] === null ? null : (int)$s['semester'],
+            "academic_year" => $s['academic_year'] === null ? null : (int)$s['academic_year'],
+            "term_label" => subjectTermLabel($s['semester'], $s['academic_year']),
             "instructor_id" => (string)$instructorId,
             "instructor" => $instructorName
         ];

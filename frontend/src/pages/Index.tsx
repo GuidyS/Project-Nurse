@@ -42,6 +42,7 @@ import ImportData from "@/components/pages/Admin/ImportData";
 import Reports from "@/components/pages/Admin/Reports";
 import RolesManagement from "@/components/pages/Admin/RolesManagement";
 import UsersManagement from "@/components/pages/Admin/UsersManagement";
+import AssignStudents from "@/components/pages/Admin/AssignStudents";
 import DeanDashboard from "@/components/pages/Teacher/DeanDashboard";
 import Retention from "@/components/pages/Teacher/Retention";
 import PracticalPage from '@/components/pages/Teacher/PracticalPage';
@@ -66,7 +67,8 @@ const Index = () => {
           if (positionId === 3) return "advises";
           if (positionId === 4) return "practical-students";
           if (positionId === 5) return "clos";
-          if (positionId === 6) return "projectspage";
+          // หน้าโครงการรวมเป็นของแอดมินแล้ว ตำแหน่ง 6 จึงเข้า "โครงการของฉัน" แทน
+          if (positionId === 6) return "my-projects";
         case 3:
           return "transcript";
       }
@@ -124,7 +126,7 @@ const Index = () => {
                 else if (pId === 3) setActiveItem("advises");
                 else if (pId === 4) setActiveItem("practical-students");
                 else if (pId === 5) setActiveItem("clos");
-                else if (pId === 6) setActiveItem("projectspage");
+                else if (pId === 6) setActiveItem("my-projects");
                 break;
               case 3: setActiveItem("transcript"); break;
               default: setActiveItem("profile");
@@ -139,6 +141,9 @@ const Index = () => {
     if (activeItem === "profile") return <ProfilePage />;
     if (activeItem === "notifications") return <NotificationsPage />; //*
     if (activeItem === "settings") return <SettingsPage />;
+    // "โครงการของฉัน" เป็นหน้าเดียวของหมวดโครงการที่เปิดให้ทุก Role
+    // (หน้าโครงการที่เหลือเป็นของแอดมินอย่างเดียว — คุมสิทธิ์จริงที่ backend อีกชั้น)
+    if (activeItem === "my-projects") return <MyProjects />;
 
     // 3. 🔒 หมวดสิทธิ์ผู้ดูแลระบบ (Admin - Role 1)
     const adminPages = ["approvals", "audit-log", "export-data", "import-data", "reports", "roles-management", "users-management"];
@@ -146,12 +151,31 @@ const Index = () => {
       if (roleId !== 1 && !(roleId == 2 && positionId == 1)) return <UnauthorizedView />;
       switch (activeItem) {
         case "approvals": return <Approvals />;                                 //*
-        case "audit-log": return <AuditLog />;                                     //*                                 
+        case "audit-log": return <AuditLog />;                                     //*
         case "export-data": return <ExportData />;                                 //*
         case "import-data": return <ImportData />;                                 //*
-        case "reports": return <Reports />;                                        
+        case "reports": return <Reports />;
         case "roles-management": return <RolesManagement />;                       //*
         case "users-management": return <UsersManagement />;                       //*
+      }
+    }
+
+    // 3.1 🔒 มอบหมายนักศึกษาให้อาจารย์ — แอดมินเท่านั้น (คณบดีก็เข้าไม่ได้)
+    if (activeItem === "assign-students") {
+      if (roleId !== 1) return <UnauthorizedView />;
+      return <AssignStudents />;
+    }
+
+    // 3.2 🔒 หมวดโครงการ — แอดมินจัดการคนเดียวทั้งหมด
+    // (ยกเว้น "โครงการของฉัน" ที่เปิดให้ทุก Role ไปแล้วด้านบน)
+    const projectAdminPages = ["projectspage", "project-docs", "project-links", "project-reports"];
+    if (projectAdminPages.includes(activeItem)) {
+      if (roleId !== 1) return <UnauthorizedView />;
+      switch (activeItem) {
+        case "projectspage": return <ProjectsPage />;
+        case "project-docs": return <ProjectDocs />;
+        case "project-links": return <ProjectLinks />;
+        case "project-reports": return <ProjectReports />;
       }
     }
 
@@ -170,8 +194,7 @@ const Index = () => {
       "courses", "five-year-summary", "clo-management", "clos",
       "plo-ylo-report", "course-report", "course-students", "documents", "assign-instructors", "clo-map",
       "evidence", "grades", "my-courses", "performance", "practical-students",
-      "program-reports", "schedule-tasks", "projectspage", "my-projects", "project-docs",
-      "project-links", "project-reports", "advise-notes", "advisor-notifications", "advises",
+      "program-reports", "schedule-tasks", "advise-notes", "advisor-notifications", "advises",
       "students", "students-info", "transfer-requests"
     ];
     
@@ -195,11 +218,6 @@ const Index = () => {
         case "practical-students": return <PracticalPage />;                    //* /* ดูรายชื่อนศ.และประเมินผลการฝึกปฏิบัติของเด็กได้*/ /* อจ.ปฏิบัติ */
         case "program-reports": return <ProgramReports />;                          //*
         case "schedule-tasks": return <ScheduleTasks />;                            //*
-        case "projectspage": return <ProjectsPage />;                               //*
-        case "my-projects": return <MyProjects />;                                  //*
-        case "project-docs": return <ProjectDocs />;                                //*
-        case "project-links": return <ProjectLinks />;                              //*
-        case "project-reports": return <ProjectReports />;                          //*
         case "advise-notes": return <AdviseNotes />;                                      //*
         case "advisor-notifications": return <AdvisorNotifications />;
         case "advises": return <Advises />;

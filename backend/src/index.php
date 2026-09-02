@@ -148,6 +148,14 @@
                 require_once 'components/Teacher/AdvisorNotifications/update_notification_read.php';
                 break;
 
+            // AssignStudents (มอบหมายนักศึกษาให้อาจารย์ — เฉพาะผู้ดูแลระบบ)
+            case 'get-assign-students':
+                require_once 'components/Admin/AssignStudents/get_assign_students.php';
+                break;
+            case 'save-assign-students':
+                require_once 'components/Admin/AssignStudents/save_assign_students.php';
+                break;
+
             // AssignInstructors
             case 'get-assign-data':
                 require_once 'components/Teacher/AssignInstructors/get_assign_data.php';

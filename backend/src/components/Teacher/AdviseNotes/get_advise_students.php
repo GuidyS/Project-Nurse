@@ -1,5 +1,6 @@
 <?php
 if (session_status() === PHP_SESSION_NONE) session_start();
+require_once __DIR__ . '/../../Admin/AssignStudents/assign_students_helpers.php';
 header('Access-Control-Allow-Origin: ' . (in_array($_SERVER['HTTP_ORIGIN'] ?? '', ['http://localhost:5173', 'http://127.0.0.1:5173'], true) ? ($_SERVER['HTTP_ORIGIN'] ?? '') : 'http://localhost:5173'));
 header('Vary: Origin');
 header("Access-Control-Allow-Credentials: true");
@@ -20,13 +21,17 @@ try {
     $faculty_id = $stmt_fac->fetchColumn();
 
     // ดึงเฉพาะนักศึกษาในความดูแล (student_advisor_mapping) ถ้ามีการ map ไว้
+    // บันทึกการให้คำปรึกษาใช้เฉพาะนักศึกษาฝั่งอาจารย์ที่ปรึกษา ไม่รวมฝั่งปฏิบัติ
+    [$typeSql, $typeParams] = assignStudentsTypeCondition(assignStudentsResolveType('advisor'), 'sam');
     $sql = "SELECT s.student_id as id, CONCAT(IFNULL(s.title,''), s.first_name_th, ' ', s.last_name_th) as name
             FROM student_advisor_mapping sam
             JOIN student s ON sam.student_id = s.student_id
-            WHERE sam.faculty_id = ?
+            WHERE sam.faculty_id = :faculty_id
+              AND $typeSql
+            GROUP BY s.student_id
             ORDER BY s.student_id ASC";
     $stmt = $pdo->prepare($sql);
-    $stmt->execute([$faculty_id]);
+    $stmt->execute([':faculty_id' => $faculty_id] + $typeParams);
     $students = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     // ถ้ายังไม่มีการ map ที่ปรึกษา ให้เลือกจากนักศึกษาทั้งหมดไปก่อน (ระบบยังใช้งานได้)

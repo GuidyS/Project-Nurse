@@ -25,7 +25,8 @@ export default function CourseStudents() {
   const [courses, setCourses] = useState<any[]>([]);
   const [selectedCourse, setSelectedCourse] = useState<string>('');
   const [students, setStudents] = useState<any[]>([]);
-  const [cloHeaders, setCloHeaders] = useState<string[]>([]);
+  /** หัวตาราง CLO — เป็น object {clo_id, clo_code, sub_plos, ...} จาก get-course-students-clo */
+  const [cloHeaders, setCloHeaders] = useState<any[]>([]);
   
   const [isLoadingCourses, setIsLoadingCourses] = useState(true);
   const [isLoadingStudents, setIsLoadingStudents] = useState(false);
@@ -61,8 +62,9 @@ export default function CourseStudents() {
       try {
         const res = await api.get(`/index.php?page=get-course-students-clo&subject_id=${selectedCourse}`);
         if (res.data.status === 'success') {
-          setStudents(res.data.data.students || []);
-          setCloHeaders(res.data.data.clo_headers || []);
+          const payload = res.data.data || {};
+          setStudents(Array.isArray(payload.students) ? payload.students : []);
+          setCloHeaders(Array.isArray(payload.clo_headers) ? payload.clo_headers : []);
         }
       } catch (error) {
         toast({ title: 'ข้อผิดพลาด', description: 'ไม่สามารถโหลดข้อมูลคะแนน CLO ได้', variant: 'destructive' });
@@ -138,7 +140,13 @@ export default function CourseStudents() {
                     <TableHead>ชื่อ-นามสกุล</TableHead>
                     {/* 🔧 วนลูปหัวตาราง CLO แบบอัตโนมัติตามที่หลังบ้านส่งมา */}
                     {cloHeaders.map((clo) => (
-                      <TableHead key={clo} className="text-center">{clo}</TableHead>
+                      <TableHead key={clo.clo_id} className="text-center whitespace-nowrap">
+                        {clo.clo_code}
+                        <br />
+                        <span className="text-[10px] font-normal text-muted-foreground">
+                          ({clo.sub_plos?.length || 0} Sub PLO)
+                        </span>
+                      </TableHead>
                     ))}
                     <TableHead className="text-center">ภาพรวมวิชา</TableHead>
                     <TableHead>ผลประเมิน</TableHead>
@@ -158,14 +166,29 @@ export default function CourseStudents() {
                         <TableCell className="font-medium font-mono">{student.studentId}</TableCell>
                         <TableCell>{student.name}</TableCell>
                         
-                        {/* 🔧 ดึงคะแนน CLO มาแสดงผลตาม Key ไดนามิก */}
-                        {cloHeaders.map((clo) => (
-                          <TableCell key={clo} className="text-center">
-                            {student.scores && student.scores[clo] !== undefined ? `${student.scores[clo]}%` : '-'}
-                          </TableCell>
-                        ))}
-                        
-                        <TableCell className="text-center font-bold">{student.overall}%</TableCell>
+                        {/* คะแนนของแต่ละ CLO — key เป็น clo_id ตามที่ backend ส่งมา */}
+                        {cloHeaders.map((clo) => {
+                          const score = student.clo_scores?.[String(clo.clo_id)];
+                          return (
+                            <TableCell key={clo.clo_id} className="text-center">
+                              {score === null || score === undefined ? (
+                                <span className="text-muted-foreground">-</span>
+                              ) : (
+                                <span className={score >= 70 ? 'text-success font-medium' : 'text-destructive font-medium'}>
+                                  {score}
+                                </span>
+                              )}
+                            </TableCell>
+                          );
+                        })}
+
+                        <TableCell className="text-center font-bold">
+                          {student.overall === null || student.overall === undefined ? (
+                            <span className="text-muted-foreground font-normal">-</span>
+                          ) : (
+                            student.overall
+                          )}
+                        </TableCell>
                         <TableCell>{getStatusBadge(student.status)}</TableCell>
                         <TableCell>
                           <HasPermission permission="manage_course_grading">

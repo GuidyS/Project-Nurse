@@ -1,6 +1,11 @@
 <?php
 if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/../../Admin/AssignStudents/assign_students_helpers.php';
+
+// หน้านี้แสดงเฉพาะนักศึกษาของ "อาจารย์ปฏิบัติ"
+// (นักศึกษาในที่ปรึกษาอยู่ที่หน้า นักศึกษาในความดูแล แยกกันคนละหน้า)
+[$typeSql, $typeParams] = assignStudentsTypeCondition(assignStudentsResolveType('practical'), 'sam');
 
 header('Access-Control-Allow-Origin: ' . (in_array($_SERVER['HTTP_ORIGIN'] ?? '', ['http://localhost:5173', 'http://127.0.0.1:5173'], true) ? ($_SERVER['HTTP_ORIGIN'] ?? '') : 'http://localhost:5173'));
 header('Vary: Origin');
@@ -37,11 +42,13 @@ try {
         FROM student s
         JOIN student_advisor_mapping sam ON s.student_id = sam.student_id
         WHERE sam.faculty_id = :faculty_id
+          AND $typeSql
+        GROUP BY s.student_id
         ORDER BY s.student_id ASC
     ";
-    
+
     $stmt = $db->prepare($sql);
-    $stmt->execute([':faculty_id' => $my_faculty_id]);
+    $stmt->execute([':faculty_id' => $my_faculty_id] + $typeParams);
     $students_raw = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     $students = [];
