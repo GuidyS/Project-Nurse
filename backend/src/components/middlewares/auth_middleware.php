@@ -17,16 +17,17 @@ if (!isset($_SESSION['user_id'])) {
     exit(); // 🚨 หยุดการทำงานของสคริปต์ทันที ห้ามลบคำสั่งนี้เด็ดขาด!
 }
 
-// 🌟 (ทางเลือก) สามารถเพิ่มการตรวจเช็ค Role ได้ด้วย
-// เช่น หน้า API นี้อนุญาตเฉพาะ อาจารย์ (Role ID = 2) และ Admin (Role ID = 1)
-/*
-if ($_SESSION['role_id'] != 1 && $_SESSION['role_id'] != 2) {
-    http_response_code(403); // 403 Forbidden (ไม่มีสิทธิ์เข้าถึง)
-    echo json_encode([
-        "status" => "error",
-        "message" => "Forbidden: คุณไม่มีสิทธิ์ใช้งานส่วนนี้"
-    ]);
-    exit();
+// 🌟 ฟังก์ชันสำหรับตรวจสอบ Role (ใช้งานในไฟล์ API ที่ต้องการดักสิทธิ์)
+if (!function_exists('requireRole')) {
+    function requireRole($allowedRoleIds) {
+        if (!isset($_SESSION['role_id']) || !in_array($_SESSION['role_id'], $allowedRoleIds)) {
+            http_response_code(403);
+            echo json_encode([
+                "status" => "error",
+                "message" => "Forbidden: คุณไม่มีสิทธิ์ใช้งานส่วนนี้"
+            ]);
+            exit();
+        }
+    }
 }
-*/
 ?>

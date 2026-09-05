@@ -33,7 +33,7 @@ services:
   # Database
   db:
     container_name: db
-    image: mysql
+    image: mysql:8.4.11
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD: MYSQL_ROOT_PASSWORD

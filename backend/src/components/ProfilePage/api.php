@@ -444,8 +444,8 @@ try {
         $u_info = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ((int)$u_info['role_id'] === 3) {
-            $sql = "UPDATE student SET first_name_en = ?, last_name_en = ?, gender = ?, birth_date = ?, email = ?, phone = ?, home_phone = ?, home_address = ?, hometown_province = ? WHERE student_id = ?";
-            $db->prepare($sql)->execute([$input['first_name_en']??null, $input['last_name_en']??null, $input['gender']??null, $input['birth_date']??null, $input['email']??null, $input['phone']??null, $input['home_phone']??null, $input['home_address']??null, $input['hometown_province']??null, $u_info['username']]);
+            $sql = "UPDATE student SET first_name_en = ?, last_name_en = ?, gender = ?, birth_date = ?, email = ?, phone = ?, home_phone = ?, home_address = ?, hometown_province = ?, health_conditions = ?, vaccine_history = ? WHERE student_id = ?";
+            $db->prepare($sql)->execute([$input['first_name_en']??null, $input['last_name_en']??null, $input['gender']??null, $input['birth_date']??null, $input['email']??null, $input['phone']??null, $input['home_phone']??null, $input['home_address']??null, $input['hometown_province']??null, $input['health_conditions']??null, $input['vaccine_history']??null, $u_info['username']]);
         } else {
             $sql = "UPDATE faculty SET first_name_en = ?, last_name_en = ?, gender = ?, birth_date = ?, email = ?, phone = ?, current_address = ?, nursing_council_no = ? WHERE faculty_id = ?";
             $db->prepare($sql)->execute([$input['first_name_en']??null, $input['last_name_en']??null, $input['gender']??null, $input['birth_date']??null, $input['email']??null, $input['phone']??null, $input['current_address']??null, $input['nursing_council_no']??null, $u_info['username']]);

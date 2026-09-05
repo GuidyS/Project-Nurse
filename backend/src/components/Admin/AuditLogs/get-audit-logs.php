@@ -2,6 +2,12 @@
 require_once __DIR__ . '/../../../config/config.php';
 header("Content-Type: application/json");
 
+// ใช้งาน Middleware ป้องกันสิทธิ์
+require_once __DIR__ . '/../../middlewares/auth_middleware.php';
+
+// เฉพาะ admin (role_id = 1) เท่านั้น
+requireRole([1]);
+
 try {
     $db = new Connect();
     

@@ -162,6 +162,22 @@ export default function ProfilePage() {
               <div className="md:col-span-2">
                 <InfoRow icon={<MapPin className="h-4 w-4 text-primary" />} label="ที่อยู่ตามทะเบียนบ้าน" value={profileData.home_address} />
               </div>
+              <div className="md:col-span-2 rounded-lg border p-4 bg-muted/10 space-y-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Activity className="h-5 w-5 text-primary" />
+                  <h3 className="font-semibold text-foreground">ข้อมูลสุขภาพ / โรคประจำตัว</h3>
+                </div>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">โรคประจำตัว / ข้อควรระวังด้านสุขภาพ</p>
+                    <p className="font-medium whitespace-pre-wrap">{profileData.health_conditions || "-"}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">ประวัติการรับวัคซีน</p>
+                    <p className="font-medium whitespace-pre-wrap">{profileData.vaccine_history || "-"}</p>
+                  </div>
+                </div>
+              </div>
               <PdfDocumentsSection documents={pdfDocuments} />
             </>
           )}
@@ -250,6 +266,19 @@ export default function ProfilePage() {
                 <div className="space-y-2">
                   <Label>ที่อยู่ตามทะเบียนบ้าน</Label>
                   <Textarea value={formData.home_address || ""} onChange={e => setFormData({...formData, home_address: e.target.value})} rows={2} />
+                </div>
+                <div className="border-t my-4 pt-4 space-y-4">
+                  <h3 className="font-semibold flex items-center gap-2">
+                    <Activity className="h-4 w-4 text-primary" /> ข้อมูลสุขภาพ
+                  </h3>
+                  <div className="space-y-2">
+                    <Label>โรคประจำตัว / ข้อควรระวังด้านสุขภาพ</Label>
+                    <Textarea placeholder="ระบุโรคประจำตัว หรือแพ้ยา/อาหาร..." value={formData.health_conditions || ""} onChange={e => setFormData({...formData, health_conditions: e.target.value})} rows={2} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>ประวัติการรับวัคซีน</Label>
+                    <Textarea placeholder="ระบุประวัติการรับวัคซีน..." value={formData.vaccine_history || ""} onChange={e => setFormData({...formData, vaccine_history: e.target.value})} rows={2} />
+                  </div>
                 </div>
               </>
             )}

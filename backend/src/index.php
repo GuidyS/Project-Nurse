@@ -424,6 +424,20 @@
                 require_once 'components/Student/Portfolio/delete_portfolio.php';
                 break;
                 
+            /* -------- Research -------- */
+            case 'get-research-faculty':
+                require_once 'components/Research/get_faculty.php';
+                break;
+            case 'get-research':
+                require_once 'components/Research/get_research.php';
+                break;
+            case 'save-research':
+                require_once 'components/Research/save_research.php';
+                break;
+            case 'delete-research':
+                require_once 'components/Research/delete_research.php';
+                break;
+                
             case 'sidebar':
                 require_once 'components/sidebar.php';
                 break;

@@ -11,8 +11,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit();
 
 $user_id = $_SESSION['user_id'] ?? null;
 
+// ใช้งาน Middleware ป้องกันสิทธิ์
+require_once __DIR__ . '/../../middlewares/auth_middleware.php';
+
+// อนุญาตให้ Teacher (2) หรือ Dean (5) หรือ Admin (1) ดูข้อมูลที่ปรึกษาได้
+requireRole([1, 2, 5]);
+
 try {
     if (!$user_id) {
+        http_response_code(401);
         echo json_encode(["status" => "error", "message" => "Unauthorized"]);
         exit();
     }
@@ -28,6 +35,10 @@ try {
     $has_advice_log = $db->query("SHOW TABLES LIKE 'advice_log'")->rowCount() > 0;
 
     // 3. ดึงนักศึกษาในความดูแล พร้อม GPA จริง และวันที่ให้คำปรึกษาล่าสุดจาก advice_log
+    $lastContactSubquery = $has_advice_log 
+        ? "(SELECT DATE_FORMAT(MAX(al.created_at), '%Y-%m-%d') FROM advice_log al WHERE al.student_id = s.student_id AND al.advisor_id = :advisor_uid) as lastContact"
+        : "NULL as lastContact";
+
     $sql = "
         SELECT
             s.student_id as id,
@@ -35,12 +46,13 @@ try {
             CONCAT(IFNULL(s.title,''), s.first_name_th, ' ', s.last_name_th) as name,
             IFNULL(s.year_level, 1) as year,
             IFNULL(s.gpa, 0) as gpa,
-            (SELECT DATE_FORMAT(MAX(al.created_at), '%Y-%m-%d')
-             FROM advice_log al
-             WHERE al.student_id = s.student_id AND al.advisor_id = :advisor_uid) as lastContact
+            s.email,
+            s.health_conditions,
+            s.vaccine_history,
+            $lastContactSubquery
         FROM student s
         JOIN student_advisor_mapping sam ON s.student_id = sam.student_id
-        WHERE sam.faculty_id = :faculty_id
+        WHERE sam.faculty_id = :faculty_id AND sam.status = 'active'
         ORDER BY s.year_level DESC, s.student_id ASC
     ";
 

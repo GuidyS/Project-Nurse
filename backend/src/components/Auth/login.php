@@ -125,6 +125,7 @@ try {
         $_SESSION['permissions'] = $permissions;
         $_SESSION['user_id'] = $user['user_id'];
         $_SESSION['username'] = $user['username'];
+        $_SESSION['role_id'] = (int)$user['role_id'];
 
         $ip_address = authClientIp();
         $log_sql = "INSERT INTO audit_log (user_id, action_type, resource, details, ip_address)

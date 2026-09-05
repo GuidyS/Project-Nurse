@@ -42,6 +42,8 @@ import ImportData from "@/components/pages/Admin/ImportData";
 import Reports from "@/components/pages/Admin/Reports";
 import RolesManagement from "@/components/pages/Admin/RolesManagement";
 import UsersManagement from "@/components/pages/Admin/UsersManagement";
+import MyResearch from "@/components/pages/Teacher/MyResearch";
+import ResearchManagement from "@/components/pages/Admin/ResearchManagement";
 import DeanDashboard from "@/components/pages/Teacher/DeanDashboard";
 import Retention from "@/components/pages/Teacher/Retention";
 import PracticalPage from '@/components/pages/Teacher/PracticalPage';
@@ -67,6 +69,7 @@ const Index = () => {
           if (positionId === 4) return "practical-students";
           if (positionId === 5) return "clos";
           if (positionId === 6) return "projectspage";
+          break;
         case 3:
           return "transcript";
       }
@@ -141,9 +144,12 @@ const Index = () => {
     if (activeItem === "settings") return <SettingsPage />;
 
     // 3. 🔒 หมวดสิทธิ์ผู้ดูแลระบบ (Admin - Role 1)
-    const adminPages = ["approvals", "audit-log", "export-data", "import-data", "reports", "roles-management", "users-management"];
+    const adminPages = [
+      "approvals", "audit-log", "export-data", "import-data", "reports",
+      "roles-management", "users-management", "research-management"
+    ];
     if (adminPages.includes(activeItem)) {
-      if (roleId !== 1 && !(roleId == 2 && positionId == 1)) return <UnauthorizedView />;
+      if (roleId !== 1 && roleId !== 5 && !(roleId == 2 && positionId == 1)) return <UnauthorizedView />;
       switch (activeItem) {
         case "approvals": return <Approvals />;                                 //*
         case "audit-log": return <AuditLog />;                                     //*                                 
@@ -152,13 +158,14 @@ const Index = () => {
         case "reports": return <Reports />;                                        
         case "roles-management": return <RolesManagement />;                       //*
         case "users-management": return <UsersManagement />;                       //*
+        case "research-management": return <ResearchManagement />;
       }
     }
 
     // 4. 🔒 หมวดสิทธิ์คณบดี (Role 2 + Position 1) หรือ Admin
     const deanPages = ["dean-dashboard", "retention"];
     if (deanPages.includes(activeItem)) {
-      if (roleId !== 1 && !(roleId == 2 && positionId == 1)) return <UnauthorizedView />;
+      if (roleId !== 1 && roleId !== 5 && !(roleId == 2 && positionId == 1)) return <UnauthorizedView />;
       switch (activeItem) {
         case "dean-dashboard": return <DeanDashboard />;
         case "retention": return <Retention />;
@@ -169,43 +176,64 @@ const Index = () => {
     const teacherPages = [
       "courses", "five-year-summary", "clo-management", "clos",
       "plo-ylo-report", "course-report", "course-students", "documents", "assign-instructors", "clo-map",
-      "evidence", "grades", "my-courses", "performance", "practical-students",
+      "evidence", "grades", "my-courses", "performance",
       "program-reports", "schedule-tasks", "projectspage", "my-projects", "project-docs",
-      "project-links", "project-reports", "advise-notes", "advisor-notifications", "advises",
-      "students", "students-info", "transfer-requests"
+      "project-links", "project-reports", "students", "my-research"
+    ];
+
+    const advisorPages = [
+      "advise-notes", "advisor-notifications", "advises",
+      "students-info", "transfer-requests"
+    ];
+
+    const practicalPages = [
+      "practical-students"
     ];
     
     if (teacherPages.includes(activeItem)) {
-      if (roleId !== 1 && roleId !== 2) return <UnauthorizedView />;
+      if (roleId !== 1 && roleId !== 2 && roleId !== 5) return <UnauthorizedView />;
       switch (activeItem) {
-        case "courses": return <CoursesPage />;                                     //*
-        case "five-year-summary": return <FiveYearSummary />;                       //*
-        case "clo-management": return <CLOManagement />;                            //*
-        case "clos": return <CLOPage />; // แก้ไขให้ใช้ CLOPage หน้าเดียว                //*
-        case "plo-ylo-report": return <PLOYLOReport />;                                  //*
-        case "course-report": return <CourseReports />;                             //*
-        case "course-students": return <CourseStudents />;                          //* /* ผลการประเมิน CLO รายบุคคล */ /* อจ.ติ้กว่าเด็กคนไหนผ่านบ้าง */
-        case "documents": return <Documents />;                                     //*
-        case "assign-instructors": return <AssignInstructors />;                    //*
-        case "clo-map": return <CLOMap />;                                          //*
-        case "evidence": return <Evidence />;                                       //*
-        case "grades": return <Grades />;                                           //*
-        case "my-courses": return <MyCourses />;                                    //*
+        case "courses": return <CoursesPage />;
+        case "five-year-summary": return <FiveYearSummary />;
+        case "clo-management": return <CLOManagement />;
+        case "clos": return <CLOPage />;
+        case "plo-ylo-report": return <PLOYLOReport />;
+        case "course-report": return <CourseReports />;
+        case "course-students": return <CourseStudents />;
+        case "documents": return <Documents />;
+        case "assign-instructors": return <AssignInstructors />;
+        case "clo-map": return <CLOMap />;
+        case "evidence": return <Evidence />;
+        case "grades": return <Grades />;
+        case "my-courses": return <MyCourses />;
         case "performance": return <Performance />;
-        case "practical-students": return <PracticalPage />;                    //* /* ดูรายชื่อนศ.และประเมินผลการฝึกปฏิบัติของเด็กได้*/ /* อจ.ปฏิบัติ */
-        case "program-reports": return <ProgramReports />;                          //*
-        case "schedule-tasks": return <ScheduleTasks />;                            //*
-        case "projectspage": return <ProjectsPage />;                               //*
-        case "my-projects": return <MyProjects />;                                  //*
-        case "project-docs": return <ProjectDocs />;                                //*
-        case "project-links": return <ProjectLinks />;                              //*
-        case "project-reports": return <ProjectReports />;                          //*
-        case "advise-notes": return <AdviseNotes />;                                      //*
+        case "program-reports": return <ProgramReports />;
+        case "schedule-tasks": return <ScheduleTasks />;
+        case "projectspage": return <ProjectsPage />;
+        case "my-projects": return <MyProjects />;
+        case "project-docs": return <ProjectDocs />;
+        case "project-links": return <ProjectLinks />;
+        case "project-reports": return <ProjectReports />;
+        case "students": return <Students />;
+        case "my-research": return <MyResearch />;
+      }
+    }
+
+    if (advisorPages.includes(activeItem)) {
+      if (roleId !== 1 && roleId !== 2 && roleId !== 5) return <UnauthorizedView />;
+      switch (activeItem) {
+        case "advise-notes": return <AdviseNotes />;
         case "advisor-notifications": return <AdvisorNotifications />;
         case "advises": return <Advises />;
-        case "students": return <Students />;                                       /* รายชื่อเด็กทั้งระบบ */
-        case "students-info": return <StudentsInfo />;                              /* รายชื่อเด็กในที่ปรึกษาของอจ. */
-        case "transfer-requests": return <TransferRequests />;                      //*
+        case "students-info": return <StudentsInfo />;
+        case "transfer-requests": return <TransferRequests />;
+      }
+    }
+
+    if (practicalPages.includes(activeItem)) {
+      if (roleId !== 1 && roleId !== 2 && roleId !== 4 && roleId !== 5) return <UnauthorizedView />;
+      switch (activeItem) {
+        case "practical-students": return <PracticalPage />;
       }
     }
 

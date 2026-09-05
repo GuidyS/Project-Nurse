@@ -48,6 +48,8 @@ interface Student {
   gpa: number;
   status: string;
   email: string;
+  health_conditions?: string;
+  vaccine_history?: string;
 }
 
 // Course-PLO Mapping Matrix interfaces
@@ -577,6 +579,20 @@ const StudentsInfo = () => {
                   <div className="sm:col-span-2">
                     <p className="text-sm text-muted-foreground">อีเมล</p>
                     <p className="font-semibold">{selectedStudent.email}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-lg border bg-card p-4">
+                <h3 className="mb-4 font-semibold text-primary">ข้อมูลสุขภาพและวัคซีน (Health & Vaccine)</h3>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <p className="text-sm text-muted-foreground">โรคประจำตัว / ข้อควรระวัง</p>
+                    <p className="font-medium whitespace-pre-wrap">{selectedStudent.health_conditions || "-"}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">ประวัติการรับวัคซีน</p>
+                    <p className="font-medium whitespace-pre-wrap">{selectedStudent.vaccine_history || "-"}</p>
                   </div>
                 </div>
               </div>
