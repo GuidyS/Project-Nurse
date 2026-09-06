@@ -75,7 +75,7 @@ export default function AssessmentPage({ student, onBack }: AssessmentPageProps)
 
   return (
     <Dialog open={!!assessStudent} onOpenChange={(open) => { if (!open && onBack) onBack(); }}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="app-dialog-2xl">
         {assessStudent && (
           <>
             <DialogHeader>

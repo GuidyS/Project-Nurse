@@ -1,7 +1,8 @@
 <?php
 if (session_status() === PHP_SESSION_NONE) { session_start(); }
 require_once __DIR__ . '/../../../config/config.php';
-header("Access-Control-Allow-Origin: http://localhost:5173");
+header('Access-Control-Allow-Origin: ' . (in_array($_SERVER['HTTP_ORIGIN'] ?? '', ['http://localhost:5173', 'http://127.0.0.1:5173'], true) ? ($_SERVER['HTTP_ORIGIN'] ?? '') : 'http://localhost:5173'));
+header('Vary: Origin');
 header("Access-Control-Allow-Credentials: true");
 header("Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
@@ -609,7 +610,14 @@ try {
             ];
 
             foreach ($studentPdfFields as $fileField => $meta) {
+                // Handle file uploads if any (legacy compatibility)
                 $uploadedPaths = savePdfUploads($fileField, $u_info['username']);
+                
+                // Add google drive link from pdfLinks if provided
+                if (!empty($input['pdfLinks'][$fileField])) {
+                    $uploadedPaths[] = trim($input['pdfLinks'][$fileField]);
+                }
+
                 if (!empty($uploadedPaths)) {
                     $uploadedDocuments[$fileField] = $uploadedPaths;
                 }
@@ -623,10 +631,10 @@ try {
                         ':student_id' => $u_info['username'],
                         ':title' => $meta['title'],
                         ':type' => $meta['type'],
-                        ':description' => 'อัปโหลดโดยผู้ดูแลระบบจากหน้าจัดการผู้ใช้',
-                        ':file_name' => basename($uploadedPath),
+                        ':description' => 'อัปโหลดโดยผู้ดูแลระบบจากหน้าจัดการผู้ใช้ (Google Drive Link)',
+                        ':file_name' => str_starts_with($uploadedPath, 'http') ? $meta['title'] : basename($uploadedPath),
                         ':file_path' => $uploadedPath,
-                        ':mime_type' => 'application/pdf',
+                        ':mime_type' => str_starts_with($uploadedPath, 'http') ? 'text/uri-list' : 'application/pdf',
                         ':file_category' => 'document'
                     ]);
                 }
@@ -666,6 +674,12 @@ try {
 
             foreach (facultyColumnPdfFields() as $fileField) {
                 $uploadedPaths = savePdfUploads($fileField, $u_info['username']);
+                
+                // Add google drive link from pdfLinks if provided
+                if (!empty($input['pdfLinks'][$fileField])) {
+                    $uploadedPaths[] = trim($input['pdfLinks'][$fileField]);
+                }
+
                 if (!empty($uploadedPaths)) {
                     $existingPaths = normalizeSavedPdfPaths($currentDetails[$fileField] ?? null);
                     $mergedPaths = array_values(array_unique(array_merge($existingPaths, $uploadedPaths)));
@@ -675,6 +689,9 @@ try {
             }
 
             $degreeUploads = savePdfUploads('teaching_degree_file', $u_info['username']);
+            if (!empty($input['pdfLinks']['teaching_degree_file'])) {
+                $degreeUploads[] = trim($input['pdfLinks']['teaching_degree_file']);
+            }
             if (!empty($degreeUploads)) {
                 $uploadedDocuments['teaching_degree_file'] = mergeDegreeFileUploads(
                     $db,

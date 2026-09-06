@@ -228,7 +228,7 @@ export default function ScheduleTaskPage({
   if (mode === "edit-only") {
     return (
       <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen && onBack) onBack(); }}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="app-dialog-lg">
           <DialogHeader>
             <DialogTitle>แก้ไขงาน</DialogTitle>
           </DialogHeader>
@@ -259,7 +259,7 @@ export default function ScheduleTaskPage({
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen && onBack) onBack(); }}>
-      <DialogContent className="max-w-6xl max-h-[88vh] overflow-y-auto">
+      <DialogContent className="app-dialog-6xl">
         <div className="space-y-6">
           {/* Header */}
           <div className="flex items-center justify-between">
@@ -350,7 +350,7 @@ export default function ScheduleTaskPage({
 
       {/* Edit Dialog */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="app-dialog-lg">
           <DialogHeader>
             <DialogTitle>แก้ไขงาน</DialogTitle>
           </DialogHeader>
@@ -364,7 +364,7 @@ export default function ScheduleTaskPage({
 
       {/* Create Dialog */}
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="app-dialog-lg">
           <DialogHeader>
             <DialogTitle>สร้างงานใหม่</DialogTitle>
           </DialogHeader>

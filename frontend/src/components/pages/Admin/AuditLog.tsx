@@ -225,7 +225,7 @@ export default function AuditLog() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge className={`gap-1 ${actionColors[entry.action]}`}>
+                      <Badge className={`gap-1 whitespace-nowrap ${actionColors[entry.action]}`}>
                         {actionIcons[entry.action]}
                         {actionLabels[entry.action]}
                       </Badge>

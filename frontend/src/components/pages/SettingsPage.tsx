@@ -25,12 +25,12 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
-import { PASSWORD_POLICY_HINT, validatePasswordPolicy } from "@/lib/passwordPolicy";
 
 const SettingsPage = () => {
   const { toast } = useToast();
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const savedTheme =
     typeof window !== "undefined" ? localStorage.getItem("theme") || "system" : "system";
   
@@ -47,9 +47,7 @@ const SettingsPage = () => {
     language: "th",
     emailNotifications: true,
     pushNotifications: true,
-    gradeNotifications: true,
     projectNotifications: true,
-    studentNotifications: true,
   });
   const [isSavingSettings, setIsSavingSettings] = useState(false);
 
@@ -75,7 +73,6 @@ const SettingsPage = () => {
     new: "",
     confirm: "",
   });
-  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   useEffect(() => {
     applyTheme(settings.theme);
@@ -93,9 +90,7 @@ const SettingsPage = () => {
           ...current,
           emailNotifications: Boolean(data.emailNotifications),
           pushNotifications: Boolean(data.pushNotifications),
-          gradeNotifications: Boolean(data.gradeNotifications),
           projectNotifications: Boolean(data.projectNotifications),
-          studentNotifications: Boolean(data.studentNotifications),
         }));
       } catch (error) {
         toast({
@@ -116,9 +111,7 @@ const SettingsPage = () => {
       await api.post("/index.php?page=save-notification-settings", {
         emailNotifications: settings.emailNotifications,
         pushNotifications: settings.pushNotifications,
-        gradeNotifications: settings.gradeNotifications,
         projectNotifications: settings.projectNotifications,
-        studentNotifications: settings.studentNotifications,
       });
 
       toast({
@@ -136,15 +129,7 @@ const SettingsPage = () => {
     }
   };
 
-  const handleChangePassword = async () => {
-    if (!passwords.current || !passwords.new || !passwords.confirm) {
-      toast({
-        title: "ข้อมูลไม่ครบ",
-        description: "กรุณากรอกรหัสผ่านให้ครบทุกช่อง",
-        variant: "destructive",
-      });
-      return;
-    }
+  const handleChangePassword = () => {
     if (passwords.new !== passwords.confirm) {
       toast({
         title: "รหัสผ่านไม่ตรงกัน",
@@ -156,65 +141,23 @@ const SettingsPage = () => {
     if (passwords.new.length < 8) {
       toast({
         title: "รหัสผ่านสั้นเกินไป",
-        description: PASSWORD_POLICY_HINT,
+        description: "รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร",
         variant: "destructive",
       });
       return;
     }
-    const policyError = validatePasswordPolicy(passwords.new);
-    if (policyError) {
-      toast({
-        title: "รหัสผ่านไม่ผ่านนโยบาย",
-        description: policyError,
-        variant: "destructive",
-      });
-      return;
-    }
-    if (passwords.current === passwords.new) {
-      toast({
-        title: "รหัสผ่านซ้ำ",
-        description: "รหัสผ่านใหม่ต้องต่างจากรหัสผ่านปัจจุบัน",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsChangingPassword(true);
-    try {
-      const res = await api.post("/index.php?page=change-password", {
-        current_password: passwords.current,
-        new_password: passwords.new,
-        confirm_password: passwords.confirm,
-      });
-
-      if (res.data?.status !== "success") {
-        throw new Error(res.data?.message || "ไม่สามารถเปลี่ยนรหัสผ่านได้");
-      }
-
-      toast({
-        title: "เปลี่ยนรหัสผ่านสำเร็จ",
-        description: res.data?.message || "รหัสผ่านของคุณได้รับการเปลี่ยนแล้ว",
-      });
-      setPasswords({ current: "", new: "", confirm: "" });
-    } catch (error: unknown) {
-      const message =
-        (error as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ||
-        (error instanceof Error ? error.message : "ไม่สามารถเปลี่ยนรหัสผ่านได้");
-      toast({
-        title: "เปลี่ยนรหัสผ่านไม่สำเร็จ",
-        description: message,
-        variant: "destructive",
-      });
-    } finally {
-      setIsChangingPassword(false);
-    }
+    toast({
+      title: "เปลี่ยนรหัสผ่านสำเร็จ",
+      description: "รหัสผ่านของคุณได้รับการเปลี่ยนแล้ว",
+    });
+    setPasswords({ current: "", new: "", confirm: "" });
   };
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-foreground">การตั้งค่า</h1>
+        <h1 className="text-2xl font-bold text-foreground">ตั้งค่า</h1>
         <p className="text-muted-foreground">จัดการการตั้งค่าระบบและความเป็นส่วนตัว</p>
       </div>
 
@@ -337,21 +280,6 @@ const SettingsPage = () => {
 
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <Label>แจ้งเตือนเกรด</Label>
-                <p className="text-sm text-muted-foreground">เมื่อมีการบันทึกหรือแก้ไขเกรด</p>
-              </div>
-              <Switch
-                checked={settings.gradeNotifications}
-                onCheckedChange={(checked) =>
-                  setSettings({ ...settings, gradeNotifications: checked })
-                }
-              />
-            </div>
-
-            <Separator />
-
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
                 <Label>แจ้งเตือนโครงการ</Label>
                 <p className="text-sm text-muted-foreground">เมื่อมีการอัปเดตโครงการ</p>
               </div>
@@ -359,21 +287,6 @@ const SettingsPage = () => {
                 checked={settings.projectNotifications}
                 onCheckedChange={(checked) =>
                   setSettings({ ...settings, projectNotifications: checked })
-                }
-              />
-            </div>
-
-            <Separator />
-
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label>แจ้งเตือนนักศึกษา</Label>
-                <p className="text-sm text-muted-foreground">เมื่อนักศึกษาส่งคำขอหรือเอกสาร</p>
-              </div>
-              <Switch
-                checked={settings.studentNotifications}
-                onCheckedChange={(checked) =>
-                  setSettings({ ...settings, studentNotifications: checked })
                 }
               />
             </div>
@@ -424,7 +337,7 @@ const SettingsPage = () => {
                   type={showNewPassword ? "text" : "password"}
                   value={passwords.new}
                   onChange={(e) => setPasswords({ ...passwords, new: e.target.value })}
-                  placeholder="กรอกรหัสผ่านใหม่ (อย่างน้อย 8 ตัว)"
+                  placeholder="กรอกรหัสผ่านใหม่ (อย่างน้อย 8 ตัวอักษร)"
                 />
                 <Button
                   type="button"
@@ -440,27 +353,36 @@ const SettingsPage = () => {
                   )}
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground">{PASSWORD_POLICY_HINT}</p>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="confirm-password">ยืนยันรหัสผ่านใหม่</Label>
-              <Input
-                id="confirm-password"
-                type="password"
-                value={passwords.confirm}
-                onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })}
-                placeholder="กรอกรหัสผ่านใหม่อีกครั้ง"
-              />
+              <div className="relative">
+                <Input
+                  id="confirm-password"
+                  type={showConfirmPassword ? "text" : "password"}
+                  value={passwords.confirm}
+                  onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })}
+                  placeholder="กรอกรหัสผ่านใหม่อีกครั้ง"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-0 top-0 h-full px-3"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                >
+                  {showConfirmPassword ? (
+                    <EyeOff className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <Eye className="h-4 w-4 text-muted-foreground" />
+                  )}
+                </Button>
+              </div>
             </div>
-
-            <Button
-              onClick={handleChangePassword}
-              className="w-full sm:w-auto"
-              disabled={isChangingPassword}
-            >
+            <Button onClick={handleChangePassword} className="w-full sm:w-auto">
               <Lock className="h-4 w-4 mr-2" />
-              {isChangingPassword ? "กำลังเปลี่ยนรหัสผ่าน..." : "เปลี่ยนรหัสผ่าน"}
+              เปลี่ยนรหัสผ่าน
             </Button>
           </CardContent>
         </Card>

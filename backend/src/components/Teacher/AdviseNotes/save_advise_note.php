@@ -1,6 +1,7 @@
 <?php
 if (session_status() === PHP_SESSION_NONE) session_start();
-header("Access-Control-Allow-Origin: http://localhost:5173");
+header('Access-Control-Allow-Origin: ' . (in_array($_SERVER['HTTP_ORIGIN'] ?? '', ['http://localhost:5173', 'http://127.0.0.1:5173'], true) ? ($_SERVER['HTTP_ORIGIN'] ?? '') : 'http://localhost:5173'));
+header('Vary: Origin');
 header("Access-Control-Allow-Credentials: true");
 header("Content-Type: application/json; charset=UTF-8");
 
@@ -17,7 +18,7 @@ try {
     if (!empty($input['studentId']) && !empty($input['topic']) && !empty($input['summary'])) {
 
         // หา student_id (PK) จาก student_code ที่หน้าเว็บส่งมา
-        $stmt_find_std = $pdo->prepare("SELECT student_id FROM student WHERE student_code = ? OR student_id = ? LIMIT 1");
+        $stmt_find_std = $pdo->prepare("SELECT student_id FROM student WHERE student_id = ? LIMIT 1");
         $stmt_find_std->execute([$input['studentId'], $input['studentId']]);
         $student = $stmt_find_std->fetch(PDO::FETCH_ASSOC);
 

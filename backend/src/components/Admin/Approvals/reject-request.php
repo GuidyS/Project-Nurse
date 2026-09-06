@@ -10,7 +10,9 @@ header("Content-Type: application/json; charset=UTF-8");
 
 try {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        throw new Exception('Method not allowed');
+        http_response_code(405);
+        echo json_encode(['status' => 'error', 'message' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
+        exit;
     }
 
     $payload = json_decode(file_get_contents('php://input'), true) ?: [];
@@ -18,20 +20,22 @@ try {
     $reviewNote = $payload['reviewNote'] ?? null;
 
     if ($id <= 0) {
-        throw new Exception('ไม่พบรหัสคำขออนุมัติ');
+        throw new InvalidArgumentException('Missing approval request id');
     }
 
     $db = new Connect();
     ensureApprovalRequestsSchema($db);
+    $reviewerId = approvalRequireAdmin($db);
 
-    $reviewerId = $_SESSION['user_id'] ?? 1;
     $stmt = $db->prepare("
         UPDATE approval_requests
         SET status = 'rejected',
             review_note = :review_note,
             reviewed_by = :reviewed_by,
-            reviewed_at = NOW()
+            reviewed_at = NOW(),
+            updated_at = NOW()
         WHERE approval_request_id = :id
+          AND status = 'pending'
     ");
     $stmt->execute([
         ':review_note' => $reviewNote,
@@ -40,13 +44,16 @@ try {
     ]);
 
     if ($stmt->rowCount() === 0) {
-        throw new Exception('ไม่พบคำขออนุมัติที่ต้องการอัปเดต');
+        throw new RuntimeException('Approval request not found or already reviewed');
     }
 
-    logApprovalAction($db, 'ปฏิเสธ', $id, (int)$reviewerId);
-    echo json_encode(['status' => 'success', 'message' => 'ปฏิเสธคำขอสำเร็จ'], JSON_UNESCAPED_UNICODE);
-} catch (Exception $e) {
+    approvalLogAction($db, 'reject', $id, $reviewerId);
+    echo json_encode(['status' => 'success', 'message' => 'Approval request rejected'], JSON_UNESCAPED_UNICODE);
+} catch (InvalidArgumentException $e) {
     http_response_code(400);
+    echo json_encode(['status' => 'error', 'message' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+} catch (Exception $e) {
+    http_response_code(500);
     echo json_encode(['status' => 'error', 'message' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
 }
 

@@ -22,7 +22,8 @@ Frontend ใช้ Vite + React + TypeScript เป็นโครงหลั�
 
 ## การติดตั้งและรัน
 
-ติดตั้ง dependencies:
+* **Directory:** `frontend/`
+* **File:** `.env`
 
 ```bash
 npm install

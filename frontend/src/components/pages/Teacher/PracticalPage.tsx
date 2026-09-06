@@ -37,7 +37,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import api from "@/lib/axios";
-import { Student, getStatusBadge } from "@/components/pages/Teacher/PracticalStudents";
+import { Student } from "@/components/pages/Teacher/PracticalStudents";
 import { StudentDetailsDialog } from "@/components/ui/StudentDetailsDialog";
 import { StudentEvaluateDialog } from "@/components/ui/StudentEvaluateDialog";
 import { useToast } from "@/hooks/use-toast";
@@ -45,9 +45,17 @@ import { useToast } from "@/hooks/use-toast";
 export interface PracticalStudent extends Student {
   hospital: string;
   ward: string;
-  performance: number;
+  performance: number | null;
+  hasPerformanceEval: boolean;
+  performanceComment: string;
   totalTasks: number;
 }
+
+type PracticalStudentApiRow = Student &
+  Partial<Omit<PracticalStudent, "performance" | "performanceComment">> & {
+    performance?: number | string | null;
+    performanceComment?: string | null;
+  };
 
 const PracticalPage = () => {
   const { toast } = useToast();
@@ -81,18 +89,31 @@ const PracticalPage = () => {
       setError(null);
       const response = await api.get("/index.php?page=get-practical-students");
       if (response.data.status === "success") {
-        const rows = (response.data.data || []).map((s: Student & Partial<PracticalStudent>) => {
+        const data = Array.isArray(response.data.data)
+          ? (response.data.data as PracticalStudentApiRow[])
+          : [];
+        const rows = data.map((s) => {
           const tasksCompleted = Number(s.tasksCompleted ?? 0);
           const tasksPending = Number(s.tasksPending ?? 0);
           const totalTasks = Number(s.totalTasks ?? tasksCompleted + tasksPending);
           const progress = Number(s.progress ?? 0);
           const hospital = s.hospital || s.workplace || "โรงพยาบาลเครือข่ายฝึกปฏิบัติ";
+          const rawPerformance = s.performance;
+          const performance =
+            rawPerformance === null || rawPerformance === undefined || rawPerformance === ""
+              ? null
+              : Number(rawPerformance);
           return {
             ...s,
+            id: String(s.id ?? s.studentId ?? ""),
+            studentId: String(s.studentId ?? s.id ?? ""),
+            name: String(s.name ?? ""),
             hospital,
             workplace: s.workplace || hospital,
             ward: s.ward || "—",
-            performance: Number(s.performance ?? progress),
+            performance: Number.isFinite(performance) ? performance : null,
+            hasPerformanceEval: Boolean(s.hasPerformanceEval),
+            performanceComment: String(s.performanceComment ?? ""),
             totalTasks,
             tasksCompleted,
             tasksPending,
@@ -131,8 +152,12 @@ const PracticalPage = () => {
 
   const openEvaluate = (student: PracticalStudent) => {
     setSelectedStudent(student);
-    setEvaluateScore("");
-    setEvaluateComment("");
+    setEvaluateScore(
+      student.hasPerformanceEval && student.performance !== null
+        ? String(student.performance)
+        : ""
+    );
+    setEvaluateComment(student.performanceComment || "");
     setIsEvaluateOpen(true);
   };
 
@@ -248,13 +273,19 @@ const PracticalPage = () => {
     }
   };
 
-  const filteredStudents = students.filter(
-    (s) =>
-      s.name.includes(searchQuery) ||
-      s.studentId.includes(searchQuery) ||
-      s.hospital.includes(searchQuery) ||
-      (s.workplace || "").includes(searchQuery)
-  );
+  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+  const matchesSearch = (value: unknown) =>
+    String(value ?? "").toLowerCase().includes(normalizedSearchQuery);
+
+  const filteredStudents = normalizedSearchQuery
+    ? students.filter(
+        (s) =>
+          matchesSearch(s.name) ||
+          matchesSearch(s.studentId) ||
+          matchesSearch(s.hospital) ||
+          matchesSearch(s.workplace)
+      )
+    : students;
 
   const getPerformanceBadge = (score: number) => {
     if (score >= 90) return <Badge className="bg-success text-success-foreground">ดีเยี่ยม</Badge>;
@@ -263,9 +294,13 @@ const PracticalPage = () => {
     return <Badge variant="destructive">ต้องปรับปรุง</Badge>;
   };
 
+  const evaluatedStudents = students.filter((s) => s.hasPerformanceEval && s.performance !== null);
   const avgPerformance =
-    students.length > 0
-      ? Math.round(students.reduce((sum, s) => sum + s.performance, 0) / students.length)
+    evaluatedStudents.length > 0
+      ? Math.round(
+          evaluatedStudents.reduce((sum, s) => sum + (s.performance ?? 0), 0) /
+            evaluatedStudents.length
+        )
       : 0;
 
   return (
@@ -292,19 +327,21 @@ const PracticalPage = () => {
         </div>
         <div className="bg-card rounded-xl shadow-card p-4 text-center">
           <p className="text-2xl font-bold text-success">
-            {students.filter((s) => s.performance >= 80).length}
+            {evaluatedStudents.filter((s) => (s.performance ?? 0) >= 80).length}
           </p>
-          <p className="text-xs text-muted-foreground">ผลงานดี</p>
+          <p className="text-xs text-muted-foreground">คะแนนดี</p>
         </div>
         <div className="bg-card rounded-xl shadow-card p-4 text-center">
           <p className="text-2xl font-bold text-warning">
-            {students.filter((s) => s.performance < 80 && s.performance >= 70).length}
+            {students.length - evaluatedStudents.length}
           </p>
-          <p className="text-xs text-muted-foreground">ต้องติดตาม</p>
+          <p className="text-xs text-muted-foreground">ยังไม่ประเมิน</p>
         </div>
         <div className="bg-card rounded-xl shadow-card p-4 text-center">
-          <p className="text-2xl font-bold text-primary">{avgPerformance}%</p>
-          <p className="text-xs text-muted-foreground">เฉลี่ย Performance</p>
+          <p className="text-2xl font-bold text-primary">
+            {evaluatedStudents.length > 0 ? `${avgPerformance}%` : "-"}
+          </p>
+          <p className="text-xs text-muted-foreground">เฉลี่ยคะแนนประเมิน</p>
         </div>
       </div>
 
@@ -332,7 +369,7 @@ const PracticalPage = () => {
               <TableHead>สถานที่ฝึก</TableHead>
               <TableHead>หอผู้ป่วย</TableHead>
               <TableHead>ความคืบหน้า</TableHead>
-              <TableHead>Performance</TableHead>
+              <TableHead>คะแนนประเมิน</TableHead>
               <TableHead className="text-right">การดำเนินการ</TableHead>
             </TableRow>
           </TableHeader>
@@ -362,7 +399,6 @@ const PracticalPage = () => {
                       <div>
                         <p className="font-medium text-foreground">{student.name}</p>
                         <p className="text-xs text-muted-foreground">{student.studentId}</p>
-                        <div className="mt-1">{getStatusBadge(student.status)}</div>
                       </div>
                     </div>
                   </TableCell>
@@ -385,8 +421,14 @@ const PracticalPage = () => {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      <span className="font-medium">{student.performance}%</span>
-                      {getPerformanceBadge(student.performance)}
+                      {student.hasPerformanceEval && student.performance !== null ? (
+                        <>
+                          <span className="font-medium">{student.performance}%</span>
+                          {getPerformanceBadge(student.performance)}
+                        </>
+                      ) : (
+                        <Badge variant="outline">ยังไม่ประเมิน</Badge>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell className="text-right">
@@ -407,7 +449,7 @@ const PracticalPage = () => {
                           <Eye className="h-4 w-4" /> ดูข้อมูล
                         </DropdownMenuItem>
                         <DropdownMenuItem className="gap-2" onClick={() => openEvaluate(student)}>
-                          <Star className="h-4 w-4" /> บันทึก Performance
+                          <Star className="h-4 w-4" /> บันทึกการประเมิน
                         </DropdownMenuItem>
                         <DropdownMenuItem className="gap-2" onClick={() => openAssign(student)}>
                           <Calendar className="h-4 w-4" /> มอบหมายงาน
@@ -444,7 +486,7 @@ const PracticalPage = () => {
       />
 
       <Dialog open={isAssignOpen} onOpenChange={setIsAssignOpen}>
-        <DialogContent>
+        <DialogContent className="app-dialog-lg">
           <DialogHeader>
             <DialogTitle>มอบหมายงาน</DialogTitle>
             <DialogDescription>
@@ -488,7 +530,7 @@ const PracticalPage = () => {
       </Dialog>
 
       <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
-        <DialogContent>
+        <DialogContent className="app-dialog-lg">
           <DialogHeader>
             <DialogTitle>อัปโหลดหลักฐาน</DialogTitle>
             <DialogDescription>

@@ -13,6 +13,27 @@ import { useState, useEffect } from 'react';
 import api from '@/lib/axios';
 import { ConfirmActionDialog } from '@/components/ui/ConfirmActionDialog';
 
+interface TransferRequestItem {
+  id: string;
+  studentId: string;
+  studentName: string;
+  otherAdvisor: string;
+  reason: string;
+  date: string;
+  status: string;
+  type?: string;
+}
+
+interface TransferDropdownOption {
+  id: string | number;
+  name: string;
+}
+
+interface TransferDropdowns {
+  students: TransferDropdownOption[];
+  advisors: TransferDropdownOption[];
+}
+
 const getStatusBadge = (status: string) => {
   switch (status) {
     case 'pending':
@@ -27,10 +48,10 @@ const getStatusBadge = (status: string) => {
 };
 
 export default function TransferRequests() {
-  const [incomingRequests, setIncomingRequests] = useState<any[]>([]);
-  const [outgoingRequests, setOutgoingRequests] = useState<any[]>([]);
-  const [historyRequests, setHistoryRequests] = useState<any[]>([]);
-  const [dropdowns, setDropdowns] = useState<{students: any[], advisors: any[]}>({students: [], advisors: []});
+  const [incomingRequests, setIncomingRequests] = useState<TransferRequestItem[]>([]);
+  const [outgoingRequests, setOutgoingRequests] = useState<TransferRequestItem[]>([]);
+  const [historyRequests, setHistoryRequests] = useState<TransferRequestItem[]>([]);
+  const [dropdowns, setDropdowns] = useState<TransferDropdowns>({students: [], advisors: []});
 
   const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
@@ -41,6 +62,8 @@ export default function TransferRequests() {
   const [pendingApproveId, setPendingApproveId] = useState<string | null>(null);
   const [isApproveOpen, setIsApproveOpen] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
+  const pendingIncomingCount = incomingRequests.filter((request) => request.status === 'pending').length;
+  const pendingOutgoingCount = outgoingRequests.filter((request) => request.status === 'pending').length;
 
   const fetchData = async () => {
     try {
@@ -150,7 +173,7 @@ export default function TransferRequests() {
               <UserPlus className="h-4 w-4 text-green-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{incomingRequests.length}</div>
+              <div className="text-2xl font-bold">{pendingIncomingCount}</div>
               <p className="text-xs text-muted-foreground">รอดำเนินการ</p>
             </CardContent>
           </Card>
@@ -160,7 +183,7 @@ export default function TransferRequests() {
               <UserCheck className="h-4 w-4 text-blue-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{outgoingRequests.length}</div>
+              <div className="text-2xl font-bold">{pendingOutgoingCount}</div>
               <p className="text-xs text-muted-foreground">รอดำเนินการ</p>
             </CardContent>
           </Card>
@@ -192,11 +215,16 @@ export default function TransferRequests() {
           <TabsList>
             <TabsTrigger value="incoming">
               คำขอเข้า
-              {incomingRequests.length > 0 && (
-                <Badge className="ml-2 bg-primary">{incomingRequests.length}</Badge>
+              {pendingIncomingCount > 0 && (
+                <Badge className="ml-2 bg-primary">{pendingIncomingCount}</Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="outgoing">คำขอออก</TabsTrigger>
+            <TabsTrigger value="outgoing">
+              คำขอออก
+              {pendingOutgoingCount > 0 && (
+                <Badge className="ml-2 bg-primary">{pendingOutgoingCount}</Badge>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="history">ประวัติ</TabsTrigger>
           </TabsList>
 
@@ -235,16 +263,7 @@ export default function TransferRequests() {
                         <TableCell>{request.date}</TableCell>
                         <TableCell>{getStatusBadge(request.status)}</TableCell>
                         <TableCell>
-                          <div className="flex gap-2">
-                            <Button size="sm" onClick={() => openApproveConfirm(request.id)}>
-                              <CheckCircle className="mr-1 h-3 w-3" />
-                              รับ
-                            </Button>
-                            <Button variant="outline" size="sm" onClick={() => openRejectDialog(request.id)}>
-                              <XCircle className="mr-1 h-3 w-3" />
-                              ปฏิเสธ
-                            </Button>
-                          </div>
+                          <Badge variant="outline">Admin review</Badge>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -343,7 +362,7 @@ export default function TransferRequests() {
 
         {/* Reject Dialog */}
         <Dialog open={isRejectDialogOpen} onOpenChange={setIsRejectDialogOpen}>
-          <DialogContent>
+          <DialogContent className="app-dialog-md">
             <DialogHeader>
               <DialogTitle>ปฏิเสธคำขอรับมอบ</DialogTitle>
               <DialogDescription>
@@ -373,7 +392,7 @@ export default function TransferRequests() {
 
         {/* Create Request Dialog */}
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogContent>
+          <DialogContent className="app-dialog-lg">
             <DialogHeader>
               <DialogTitle>สร้างคำขอมอบนักศึกษา (ส่งออก)</DialogTitle>
               <DialogDescription>

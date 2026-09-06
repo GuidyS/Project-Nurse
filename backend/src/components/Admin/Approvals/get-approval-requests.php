@@ -11,15 +11,23 @@ header("Content-Type: application/json; charset=UTF-8");
 try {
     $db = new Connect();
     ensureApprovalRequestsSchema($db);
+    approvalRequireAdmin($db);
 
     $status = $_GET['status'] ?? 'all';
+    $requestType = trim((string)($_GET['request_type'] ?? ''));
     $params = [];
-    $where = '';
+    $whereParts = [];
 
     if (in_array($status, ['pending', 'approved', 'rejected'], true)) {
-        $where = 'WHERE ar.status = :status';
+        $whereParts[] = 'ar.status = :status';
         $params[':status'] = $status;
     }
+    if ($requestType !== '') {
+        $whereParts[] = 'ar.request_type = :request_type';
+        $params[':request_type'] = $requestType;
+    }
+
+    $where = empty($whereParts) ? '' : 'WHERE ' . implode(' AND ', $whereParts);
 
     $stmt = $db->prepare("
         SELECT
@@ -30,9 +38,12 @@ try {
             ar.title,
             ar.description,
             ar.payload_json,
+            ar.before_json,
+            ar.after_json,
             ar.status,
             ar.review_note,
             ar.reviewed_at,
+            ar.applied_at,
             ar.created_at,
             requester.username AS requester_username,
             reviewer.username AS reviewer_username,
@@ -40,76 +51,32 @@ try {
         FROM approval_requests ar
         LEFT JOIN users requester ON ar.requester_user_id = requester.user_id
         LEFT JOIN users reviewer ON ar.reviewed_by = reviewer.user_id
-        LEFT JOIN faculty f ON requester.user_id = f.faculty_id
+        LEFT JOIN faculty f ON requester.user_id = f.user_id OR requester.username = CAST(f.faculty_id AS CHAR)
         $where
         ORDER BY
             CASE ar.status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END,
-            ar.created_at DESC
+            ar.created_at DESC,
+            ar.approval_request_id DESC
     ");
     $stmt->execute($params);
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     $requests = array_map(function ($row) {
-        $requesterName = trim($row['requester_full_name'] ?? '');
+        $requesterName = trim((string)($row['requester_full_name'] ?? ''));
         if ($requesterName === '') {
-            $requesterName = $row['requester_username'] ?: 'ไม่ระบุผู้ร้องขอ';
+            $requesterName = $row['requester_username'] ?: 'Unknown requester';
         }
 
-        $payload = [];
-        if (!empty($row['payload_json'])) {
-            $decodedPayload = json_decode($row['payload_json'], true);
-            $payload = is_array($decodedPayload) ? $decodedPayload : [];
-        } elseif (!empty($row['description']) && json_decode($row['description'], true) !== null) {
-            $decodedPayload = json_decode($row['description'], true);
-            $payload = is_array($decodedPayload) ? $decodedPayload : [];
-        }
-
-        $detail = $payload;
-        $targetRefType = $row['target_ref_type'];
-        $targetRefId = $row['target_ref_id'];
-
-        if ($row['request_type'] === 'grade_change') {
-            $detail = [
-                'studentId' => $payload['student_id'] ?? null,
-                'subjectCode' => $payload['subject_code'] ?? null,
-                'currentGrade' => $payload['current_grade'] ?? null,
-                'requestedGrade' => $payload['requested_grade'] ?? null,
-            ];
-            $targetRefType = 'assessment';
-            $targetRefId = trim(($payload['student_id'] ?? '') . '-' . ($payload['subject_code'] ?? ''), '-') ?: $targetRefId;
-        } elseif ($row['request_type'] === 'student_transfer') {
-            $detail = [
-                'studentId' => $payload['student_id'] ?? null,
-                'fromAdvisorUserId' => $payload['from_advisor_user_id'] ?? null,
-                'toAdvisorUserId' => $payload['to_advisor_user_id'] ?? null,
-            ];
-            $targetRefType = 'student';
-            $targetRefId = $payload['student_id'] ?? $targetRefId;
-        } elseif ($row['request_type'] === 'project_request') {
-            $detail = [
-                'projectId' => $payload['project_id'] ?? null,
-                'projectName' => $payload['project_name'] ?? null,
-                'academicYear' => $payload['academic_year'] ?? null,
-                'budgetRequested' => $payload['budget_requested'] ?? null,
-            ];
-            $targetRefType = 'project';
-            $targetRefId = $payload['project_id'] ?? ($payload['project_name'] ?? $targetRefId);
-        } elseif ($row['request_type'] === 'document_approve') {
-            $detail = [
-                'documentRef' => $payload['document_ref'] ?? null,
-                'documentTitle' => $payload['document_title'] ?? null,
-                'documentType' => $payload['document_type'] ?? null,
-                'filePath' => $payload['file_path'] ?? null,
-            ];
-            $targetRefType = 'document';
-            $targetRefId = $payload['document_ref'] ?? $targetRefId;
-        }
+        $payload = approvalDecodePayload($row['payload_json'] ?? null);
+        $before = approvalDecodePayload($row['before_json'] ?? null);
+        $after = approvalDecodePayload($row['after_json'] ?? null);
+        $documentUrl = $payload['document_url'] ?? $payload['google_drive_url'] ?? $payload['file_path'] ?? null;
 
         return [
             'id' => (string)$row['approval_request_id'],
             'type' => $row['request_type'],
-            'targetRefType' => $targetRefType,
-            'targetRefId' => $targetRefId,
+            'targetRefType' => $row['target_ref_type'],
+            'targetRefId' => $row['target_ref_id'],
             'title' => $row['title'],
             'requester' => $requesterName,
             'description' => $row['description'],
@@ -117,8 +84,19 @@ try {
             'status' => $row['status'],
             'reviewNote' => $row['review_note'],
             'reviewedAt' => $row['reviewed_at'],
+            'appliedAt' => $row['applied_at'],
             'reviewer' => $row['reviewer_username'],
-            'detail' => $detail,
+            'payload' => $payload,
+            'before' => $before,
+            'after' => $after,
+            'documentUrl' => $documentUrl,
+            'detail' => [
+                'targetRefType' => $row['target_ref_type'],
+                'targetRefId' => $row['target_ref_id'],
+                'payload' => $payload,
+                'before' => $before,
+                'after' => $after,
+            ],
         ];
     }, $rows);
 

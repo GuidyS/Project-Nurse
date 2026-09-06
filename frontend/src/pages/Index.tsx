@@ -42,9 +42,18 @@ import ImportData from "@/components/pages/Admin/ImportData";
 import Reports from "@/components/pages/Admin/Reports";
 import RolesManagement from "@/components/pages/Admin/RolesManagement";
 import UsersManagement from "@/components/pages/Admin/UsersManagement";
+import AssignStudents from "@/components/pages/Admin/AssignStudents";
+import ResearchSummary from "@/components/pages/Teacher/ResearchSummary";
 import DeanDashboard from "@/components/pages/Teacher/DeanDashboard";
 import Retention from "@/components/pages/Teacher/Retention";
 import PracticalPage from '@/components/pages/Teacher/PracticalPage';
+import FacultyDimensionPage from '@/components/pages/Teacher/FacultyDimensionPage';
+import ProjectAssessments from "@/components/pages/Teacher/ProjectAssessments";
+
+type LoginUserPayload = Record<string, unknown> & {
+  role_id?: unknown;
+  position_id?: unknown;
+};
 
 const Index = () => {
   const [activeItem, setActiveItem] = useState(() => {
@@ -66,7 +75,9 @@ const Index = () => {
           if (positionId === 3) return "advises";
           if (positionId === 4) return "practical-students";
           if (positionId === 5) return "clos";
-          if (positionId === 6) return "projectspage";
+          if (positionId === 6) return "my-projects";
+          if (positionId === 9) return "research-summary";
+          return "profile";
         case 3:
           return "transcript";
       }
@@ -104,17 +115,29 @@ const Index = () => {
     const userObj = savedUser ? JSON.parse(savedUser) : null;
     const roleId = userObj ? Number(userObj.role_id) : 0;
     const positionId = userObj ? Number(userObj.position_id) : 0;
+    const permissions = Array.isArray(userObj?.permissions) ? userObj.permissions : [];
+    const hasPermission = (permission: string) => permissions.includes(permission);
+    const canViewResearchSummary =
+      roleId === 2 && (positionId === 1 || positionId === 9 || hasPermission("RESEARCH_SUMMARY_VIEW"));
+    const canViewProjectPage = roleId === 1 || hasPermission("PROJECT_VIEW");
+    const canViewProjectReports = roleId === 1 || hasPermission("PROJECT_REPORTS_VIEW");
+    const isResearchPreviewRoute =
+      import.meta.env.DEV &&
+      !userObj &&
+      activeItem === "research-summary" &&
+      new URLSearchParams(window.location.search).get("page") === "research-summary";
 
     // 2. หมวดทั่วไปที่ทุกคนเข้าถึงได้ (Public / All Roles)
     if (activeItem === "login") {
       return (
         <LoginPage 
-          onLoginSuccess={(userData: any) => {
-            if (!userData) return;
-            const rId = Number(userData.role_id);
-            const pId = Number(userData.position_id);
+          onLoginSuccess={(userData: unknown) => {
+            if (!userData || typeof userData !== "object") return;
+            const loginUser = userData as LoginUserPayload;
+            const rId = Number(loginUser.role_id);
+            const pId = Number(loginUser.position_id);
             
-            localStorage.setItem('user', JSON.stringify(userData));
+            localStorage.setItem('user', JSON.stringify(loginUser));
 
             switch (rId) {
               case 1: setActiveItem("users-management"); break;
@@ -124,7 +147,8 @@ const Index = () => {
                 else if (pId === 3) setActiveItem("advises");
                 else if (pId === 4) setActiveItem("practical-students");
                 else if (pId === 5) setActiveItem("clos");
-                else if (pId === 6) setActiveItem("projectspage");
+                else if (pId === 6) setActiveItem("my-projects");
+                else if (pId === 9) setActiveItem("research-summary");
                 break;
               case 3: setActiveItem("transcript"); break;
               default: setActiveItem("profile");
@@ -139,29 +163,65 @@ const Index = () => {
     if (activeItem === "profile") return <ProfilePage />;
     if (activeItem === "notifications") return <NotificationsPage />; //*
     if (activeItem === "settings") return <SettingsPage />;
+    // "โครงการของฉัน" เป็นหน้าเดียวของหมวดโครงการที่เปิดให้ทุก Role
+    // (หน้าโครงการที่เหลือเป็นของแอดมินอย่างเดียว — คุมสิทธิ์จริงที่ backend อีกชั้น)
+    if (activeItem === "my-projects") return <MyProjects />;
 
     // 3. 🔒 หมวดสิทธิ์ผู้ดูแลระบบ (Admin - Role 1)
     const adminPages = ["approvals", "audit-log", "export-data", "import-data", "reports", "roles-management", "users-management"];
     if (adminPages.includes(activeItem)) {
-      if (roleId !== 1) return <UnauthorizedView />;
+      if (roleId !== 1 && !(roleId == 2 && positionId == 1)) return <UnauthorizedView />;
       switch (activeItem) {
         case "approvals": return <Approvals />;                                 //*
-        case "audit-log": return <AuditLog />;                                     //*                                 
+        case "audit-log": return <AuditLog />;                                     //*
         case "export-data": return <ExportData />;                                 //*
         case "import-data": return <ImportData />;                                 //*
-        case "reports": return <Reports />;                                        
+        case "reports": return <Reports />;
         case "roles-management": return <RolesManagement />;                       //*
         case "users-management": return <UsersManagement />;                       //*
       }
     }
 
+    // 3.1 🔒 มอบหมายนักศึกษาให้อาจารย์ — แอดมินเท่านั้น (คณบดีก็เข้าไม่ได้)
+    if (activeItem === "assign-students") {
+      if (roleId !== 1) return <UnauthorizedView />;
+      return <AssignStudents />;
+    }
+
+    // 3.2 🔒 หมวดโครงการ — แอดมินจัดการคนเดียวทั้งหมด
+    // (ยกเว้น "โครงการของฉัน" ที่เปิดให้ทุก Role ไปแล้วด้านบน)
+    const projectAdminPages = ["projectspage", "project-docs", "project-links", "project-reports"];
+    if (projectAdminPages.includes(activeItem)) {
+      switch (activeItem) {
+        case "projectspage":
+          if (!canViewProjectPage) return <UnauthorizedView />;
+          return <ProjectsPage />;
+        case "project-docs":
+          if (roleId !== 1) return <UnauthorizedView />;
+          return <ProjectDocs />;
+        case "project-links":
+          if (roleId !== 1) return <UnauthorizedView />;
+          return <ProjectLinks />;
+        case "project-reports":
+          if (!canViewProjectReports) return <UnauthorizedView />;
+          return <ProjectReports />;
+      }
+    }
+
     // 4. 🔒 หมวดสิทธิ์คณบดี (Role 2 + Position 1) หรือ Admin
-    const deanPages = ["dean-dashboard", "retention"];
+    const deanPages = [
+      "dean-dashboard", "retention", "dean-teaching-workload", "dean-research-workload",
+      "dean-academic-service-workload", "dean-culture-workload"
+    ];
     if (deanPages.includes(activeItem)) {
       if (roleId !== 1 && !(roleId === 2 && positionId === 1)) return <UnauthorizedView />;
       switch (activeItem) {
         case "dean-dashboard": return <DeanDashboard />;
         case "retention": return <Retention />;
+        case "dean-teaching-workload": return <FacultyDimensionPage dimension="teaching" />;
+        case "dean-research-workload": return <FacultyDimensionPage dimension="research" />;
+        case "dean-academic-service-workload": return <FacultyDimensionPage dimension="academic-service" />;
+        case "dean-culture-workload": return <FacultyDimensionPage dimension="culture" />;
       }
     }
 
@@ -170,13 +230,13 @@ const Index = () => {
       "courses", "five-year-summary", "clo-management", "clos",
       "plo-ylo-report", "course-report", "course-students", "documents", "assign-instructors", "clo-map",
       "evidence", "grades", "my-courses", "performance", "practical-students",
-      "program-reports", "schedule-tasks", "projectspage", "my-projects", "project-docs",
-      "project-links", "project-reports", "advise-notes", "advisor-notifications", "advises",
-      "students", "students-info", "transfer-requests"
+      "program-reports", "schedule-tasks", "advise-notes", "advisor-notifications", "advises",
+      "students", "students-info", "transfer-requests", "my-research", "research-summary", "project-assessments"
     ];
     
     if (teacherPages.includes(activeItem)) {
-      if (roleId !== 1 && roleId !== 2) return <UnauthorizedView />;
+      if (activeItem === "research-summary" && !isResearchPreviewRoute && !canViewResearchSummary) return <UnauthorizedView />;
+      if (!isResearchPreviewRoute && roleId !== 1 && roleId !== 2) return <UnauthorizedView />;
       switch (activeItem) {
         case "courses": return <CoursesPage />;                                     //*
         case "five-year-summary": return <FiveYearSummary />;                       //*
@@ -195,17 +255,14 @@ const Index = () => {
         case "practical-students": return <PracticalPage />;                    //* /* ดูรายชื่อนศ.และประเมินผลการฝึกปฏิบัติของเด็กได้*/ /* อจ.ปฏิบัติ */
         case "program-reports": return <ProgramReports />;                          //*
         case "schedule-tasks": return <ScheduleTasks />;                            //*
-        case "projectspage": return <ProjectsPage />;                               //*
-        case "my-projects": return <MyProjects />;                                  //*
-        case "project-docs": return <ProjectDocs />;                                //*
-        case "project-links": return <ProjectLinks />;                              //*
-        case "project-reports": return <ProjectReports />;                          //*
         case "advise-notes": return <AdviseNotes />;                                      //*
         case "advisor-notifications": return <AdvisorNotifications />;
         case "advises": return <Advises />;
         case "students": return <Students />;                                       /* รายชื่อเด็กทั้งระบบ */
         case "students-info": return <StudentsInfo />;                              /* รายชื่อเด็กในที่ปรึกษาของอจ. */
         case "transfer-requests": return <TransferRequests />;                      //*
+        case "research-summary": return <ResearchSummary />;
+        case "project-assessments": return <ProjectAssessments />;
       }
     }
 

@@ -3,8 +3,9 @@ import { StatCard } from "@/components/dashboard/StatCard";
 import { StudentKPIChart, TeacherKPIChart, RetentionChart, ExitReasonsChart } from "@/components/dashboard/KPIChart";
 import { FinancialReport, ExecutiveSummary } from "@/components/dashboard/FinancialReport";
 import ExportButton from "@/components/dashboard/ExportButton";
-import { Users, GraduationCap, UserCheck, TrendingUp, Calendar, AlertCircle, Loader2 } from "lucide-react";
+import { Users, GraduationCap, UserCheck, TrendingUp, AlertCircle, Loader2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import FacultyWorkloadDashboard from "@/components/pages/Teacher/FacultyWorkloadDashboard";
 import api from "@/lib/axios";
 
 // ต้องตรงกับ JSON ที่ get_dean_dashboard.php ส่งกลับมา
@@ -101,60 +102,57 @@ export default function DeanDashboard() {
 
   return (
     <>
-      <div className="p-6 space-y-6 animate-fade-in">
+      <div className="space-y-6 animate-fade-in">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-foreground">แดชบอร์ดคณบดี</h1>
-            <p className="text-muted-foreground">ภาพรวม KPI และรายงานสำหรับผู้บริหาร</p>
+            <p className="text-muted-foreground">ภาพรวมผลการดำเนินงานและภาระงานอาจารย์ระดับคณะ</p>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Calendar className="h-4 w-4" />
-              <span>ปีการศึกษา 2568</span>
-            </div>
-            <ExportButton reportName="Dashboard-KPI-Report" />
-          </div>
-        </div>
-
-        {/* Stat Cards - ใช้ข้อมูลจริงจาก API */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <StatCard
-            title="นักศึกษาทั้งหมด"
-            value={formatNumber(data.stats.total_students)}
-            subtitle="กำลังศึกษาอยู่ในปัจจุบัน"
-            icon={GraduationCap}
-          />
-          <StatCard
-            title="อาจารย์ทั้งหมด"
-            value={formatNumber(data.stats.total_faculty)}
-            subtitle="อาจารย์ที่มีสถานะ Active"
-            icon={Users}
-          />
-          <StatCard
-            title="อัตราคงอยู่"
-            value={`${data.stats.retention_rate}%`}
-            subtitle="กำลังศึกษา + สำเร็จการศึกษา / ทั้งหมด"
-            icon={UserCheck}
-          />
-          <StatCard
-            title="งบประมาณโครงการรวม"
-            value={formatCurrency(data.stats.total_budget)}
-            subtitle="รวมทุกปีงบประมาณ"
-            icon={TrendingUp}
-          />
+          <ExportButton reportName="Dashboard-KPI-Report" />
         </div>
 
         {/* Tabs */}
-        <Tabs defaultValue="kpi" className="space-y-4">
-          <TabsList className="grid w-full max-w-md grid-cols-3">
-            <TabsTrigger value="kpi">KPI Dashboard</TabsTrigger>
+        <Tabs defaultValue="workload" className="space-y-5">
+          <TabsList className="grid h-auto w-full max-w-2xl grid-cols-2 sm:grid-cols-4">
+            <TabsTrigger value="workload">ภาระงาน 4 ด้าน</TabsTrigger>
+            <TabsTrigger value="kpi">KPI คณะ</TabsTrigger>
             <TabsTrigger value="retention">การคงอยู่</TabsTrigger>
             <TabsTrigger value="financial">รายงานการเงิน</TabsTrigger>
           </TabsList>
 
+          <TabsContent value="workload" className="mt-0">
+            <FacultyWorkloadDashboard />
+          </TabsContent>
+
           {/* KPI Tab — กราฟข้อมูลจริงจาก API */}
           <TabsContent value="kpi" className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <StatCard
+                title="นักศึกษาทั้งหมด"
+                value={formatNumber(data.stats.total_students)}
+                subtitle="กำลังศึกษาอยู่ในปัจจุบัน"
+                icon={GraduationCap}
+              />
+              <StatCard
+                title="อาจารย์ทั้งหมด"
+                value={formatNumber(data.stats.total_faculty)}
+                subtitle="อาจารย์ที่มีสถานะ Active"
+                icon={Users}
+              />
+              <StatCard
+                title="อัตราคงอยู่"
+                value={`${data.stats.retention_rate}%`}
+                subtitle="กำลังศึกษา + สำเร็จการศึกษา / ทั้งหมด"
+                icon={UserCheck}
+              />
+              <StatCard
+                title="งบประมาณโครงการรวม"
+                value={formatCurrency(data.stats.total_budget)}
+                subtitle="รวมทุกปีงบประมาณ"
+                icon={TrendingUp}
+              />
+            </div>
             <div className="grid gap-4 lg:grid-cols-2">
               <StudentKPIChart data={data.students_by_year || []} />
               <TeacherKPIChart data={data.faculty_by_position || []} />

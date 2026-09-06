@@ -1,6 +1,7 @@
 <?php
 if (session_status() === PHP_SESSION_NONE) session_start();
-header("Access-Control-Allow-Origin: http://localhost:5173");
+header('Access-Control-Allow-Origin: ' . (in_array($_SERVER['HTTP_ORIGIN'] ?? '', ['http://localhost:5173', 'http://127.0.0.1:5173'], true) ? ($_SERVER['HTTP_ORIGIN'] ?? '') : 'http://localhost:5173'));
+header('Vary: Origin');
 header("Access-Control-Allow-Credentials: true");
 header("Content-Type: application/json; charset=UTF-8");
 
@@ -19,19 +20,19 @@ try {
     $faculty_id = $stmt_fac->fetchColumn();
 
     // ดึงเฉพาะนักศึกษาในความดูแล (student_advisor_mapping) ถ้ามีการ map ไว้
-    $sql = "SELECT IF(s.student_code LIKE 'TEMP-%', s.student_id, s.student_code) as id, CONCAT(IFNULL(s.title,''), s.first_name_th, ' ', s.last_name_th) as name
+    $sql = "SELECT s.student_id as id, CONCAT(IFNULL(s.title,''), s.first_name_th, ' ', s.last_name_th) as name
             FROM student_advisor_mapping sam
             JOIN student s ON sam.student_id = s.student_id
             WHERE sam.faculty_id = ?
-            ORDER BY s.student_code ASC";
+            ORDER BY s.student_id ASC";
     $stmt = $pdo->prepare($sql);
     $stmt->execute([$faculty_id]);
     $students = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     // ถ้ายังไม่มีการ map ที่ปรึกษา ให้เลือกจากนักศึกษาทั้งหมดไปก่อน (ระบบยังใช้งานได้)
     if (empty($students)) {
-        $students = $pdo->query("SELECT IF(student_code LIKE 'TEMP-%', student_id, student_code) as id, CONCAT(IFNULL(title,''), first_name_th, ' ', last_name_th) as name
-                                 FROM student ORDER BY student_code ASC LIMIT 200")->fetchAll(PDO::FETCH_ASSOC);
+        $students = $pdo->query("SELECT student_id as id, CONCAT(IFNULL(title,''), first_name_th, ' ', last_name_th) as name
+                                 FROM student ORDER BY student_id ASC LIMIT 200")->fetchAll(PDO::FETCH_ASSOC);
     }
 
     echo json_encode(["status" => "success", "data" => $students], JSON_UNESCAPED_UNICODE);

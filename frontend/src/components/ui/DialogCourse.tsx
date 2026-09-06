@@ -49,7 +49,7 @@ export default function DialogCourse({ onAddCourse }: { onAddCourse?: (course: a
         </Button>
       </DialogTrigger>
       
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="app-dialog-lg">
         <DialogHeader>
           <DialogTitle>เพิ่มรายวิชาใหม่</DialogTitle>
           <DialogDescription>กรอกข้อมูลรายวิชาที่ต้องการเพิ่มเข้าสู่ระบบ</DialogDescription>

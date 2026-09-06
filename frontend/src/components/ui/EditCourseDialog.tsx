@@ -52,7 +52,7 @@ const EditCourseDialog = ({ course, open, onOpenChange, onSave, onDelete }: {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="app-dialog-md">
         <DialogHeader>
           <DialogTitle>แก้ไขรายวิชา</DialogTitle>
         </DialogHeader>

@@ -64,7 +64,7 @@ const CreateDocumentDialog = ({ open, onOpenChange, onCreate }: CreateDocumentDi
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) resetForm(); onOpenChange(v); }}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="app-dialog-lg">
         <DialogHeader>
           <DialogTitle className="text-xl font-semibold">สร้างเอกสารใหม่</DialogTitle>
         </DialogHeader>

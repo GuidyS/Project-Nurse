@@ -94,7 +94,7 @@ export default function AdvisorNotifications() {
       <div className="mx-auto min-h-[calc(100vh-5rem)] w-full max-w-7xl animate-fade-in space-y-4 overflow-x-hidden px-3 py-4 sm:space-y-6 sm:px-4 lg:px-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex min-w-0 flex-wrap items-center gap-3">
-            <h1 className="text-xl font-bold tracking-tight sm:text-2xl lg:text-3xl">การแจ้งเตือน</h1>
+            <h1 className="text-xl font-bold tracking-tight sm:text-2xl lg:text-3xl leading-snug">การแจ้งเตือน</h1>
             {unreadCount > 0 && (
               <Badge className="px-2.5 py-0.5 text-sm font-semibold bg-red-500 text-white animate-pulse rounded-full">
                 {unreadCount} ใหม่

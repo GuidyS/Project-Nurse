@@ -18,7 +18,7 @@ import {
   useSidebar
 } from '@/components/ui/sidebar';
 import { toast } from 'sonner';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import api from '@/lib/axios';
 
 interface SidebarProps {
@@ -57,6 +57,20 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
 
+  const fetchMenus = useCallback(async () => {
+    try {
+      const res = await api.get('/index.php?page=sidebar');
+      const sections = Array.isArray(res.data) ? res.data : [];
+      console.log('Menu Data:', sections);
+      setMenuSections(sections);
+    } catch (error) {
+      console.error('Failed to fetch menus:', error);
+      toast.error('โหลดเมนูไม่สำเร็จ');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   const fetchUnreadCount = async () => {
     try {
       const response = await api.get("/index.php?page=get-notifications");
@@ -70,21 +84,6 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
   };
 
   useEffect(() => {
-    const fetchMenus = async () => {
-      try {
-        // เรียก API (ตรวจสอบ Path ให้ตรงกับที่วาง index.php ไว้)
-        const res = await api.get(`/index.php?page=sidebar`);
-        
-        console.log("Menu Data:", res.data); // ลองเปิด console ดูว่าข้อมูลมาไหม
-        setMenuSections(res.data);
-      } catch (error) {
-        console.error("Failed to fetch menus:", error);
-        toast.error("โหลดเมนูไม่สำเร็จ");
-      } finally {
-        setIsLoading(false); // มั่นใจว่า Loading จะหายไปแน่นอน
-      }
-    };
-
     const fetchUserProfile = async () => {
       try {
         const response = await api.get("/index.php?page=profile");
@@ -104,7 +103,6 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
       }
     };
 
-    fetchMenus();
     fetchUserProfile();
 
     fetchUnreadCount();
@@ -117,6 +115,29 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
       window.removeEventListener("updateNotificationBadge", fetchUnreadCount);
     };
   }, []);
+
+  // โหลดใหม่เมื่อเปลี่ยนหน้า เพื่อไม่ให้ Sidebar ค้างอยู่กับข้อมูลจาก session ก่อนหน้า
+  useEffect(() => {
+    fetchMenus();
+  }, [activeItem, fetchMenus]);
+
+  // รองรับการอัปเดตเมนูจาก backend โดยไม่ต้อง logout/login ใหม่
+  useEffect(() => {
+    const refreshMenus = () => fetchMenus();
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') fetchMenus();
+    };
+
+    window.addEventListener('focus', refreshMenus);
+    window.addEventListener('app:sidebar-refresh', refreshMenus);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+
+    return () => {
+      window.removeEventListener('focus', refreshMenus);
+      window.removeEventListener('app:sidebar-refresh', refreshMenus);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
+  }, [fetchMenus]);
 
   // ฟังก์ชันแปลง String เป็น Component
   const getIcon = (iconName: string) => {

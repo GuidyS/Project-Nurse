@@ -88,7 +88,7 @@ const UploadDocumentDialog = ({
         onOpenChange(v);
       }}
     >
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="app-dialog-lg">
         <DialogHeader>
           <DialogTitle className="text-xl font-semibold">
             อัพโหลดเอกสาร

@@ -1,7 +1,5 @@
 <?php
 
-//require_once 'auth_middleware.php'; 
-
 $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
 
 try {
@@ -10,29 +8,40 @@ try {
     $stmt_courses = $pdo->query($sql_courses);
     $courses = $stmt_courses->fetchAll(PDO::FETCH_ASSOC);
 
-    // 2. ดึง JSON เพื่อกวาดหาเอกสาร
-    $sql_fw = "SELECT mapping_json FROM curriculum_framework WHERE is_active = 1 LIMIT 1";
-    $stmt_fw = $pdo->query($sql_fw);
-    $row_fw = $stmt_fw->fetch(PDO::FETCH_ASSOC);
-    $mappingData = $row_fw ? json_decode($row_fw['mapping_json'], true) : [];
+    // 2. ดึงข้อมูลเอกสารจากตาราง tqf_documents
+    $sql_docs = "SELECT * FROM tqf_documents ORDER BY created_at DESC";
+    $stmt_docs = $pdo->query($sql_docs);
+    $docs = $stmt_docs->fetchAll(PDO::FETCH_ASSOC);
 
     $all_documents = [];
+    foreach ($docs as $doc) {
+        // แมป status
+        $status = 'pending';
+        if ($doc['approval_status'] === 'อนุมัติแล้ว') {
+            $status = 'approved';
+        }
 
-    if (isset($mappingData['subject_mappings'])) {
-        foreach ($mappingData['subject_mappings'] as $courseCode => $data) {
-            if (isset($data['documents']) && is_array($data['documents'])) {
-                foreach ($data['documents'] as $doc) {
-                    $doc['course'] = $courseCode; // แปะรหัสวิชากลับเข้าไปให้ React รู้
-                    $all_documents[] = $doc;
-                }
+        // กำหนด URL ของไฟล์
+        $fileUrl = '';
+        if (!empty($doc['file_path'])) {
+            if (preg_match('/^https?:\/\//', $doc['file_path'])) {
+                $fileUrl = $doc['file_path'];
+            } else {
+                $fileUrl = 'http://localhost:8080/' . ltrim($doc['file_path'], '/');
             }
         }
-    }
 
-    // เรียงลำดับเอกสารใหม่ล่าสุดขึ้นก่อน
-    usort($all_documents, function($a, $b) {
-        return strtotime($b['uploadedAt']) - strtotime($a['uploadedAt']);
-    });
+        $all_documents[] = [
+            'id' => (string)$doc['id'],
+            'name' => $doc['file_name'],
+            'type' => $doc['tqf_type'],
+            'course' => $doc['subject_code'],
+            'uploadedAt' => substr($doc['created_at'], 0, 10),
+            'status' => $status,
+            'fileUrl' => $fileUrl,
+            'downloadUrl' => 'http://localhost:8080/index.php?page=download-document&id=' . $doc['id']
+        ];
+    }
 
     echo json_encode([
         "status" => "success", 

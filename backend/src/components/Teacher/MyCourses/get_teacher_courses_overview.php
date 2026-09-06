@@ -1,15 +1,13 @@
 <?php
 
-require_once __DIR__ . '/../../middlewares/auth_middleware.php';
-require_once __DIR__ . '/../CLOPage/curriculum_repository.php';
+require_once __DIR__ . '/../../middlewares/auth_middleware.php'; 
 $user_id = $_SESSION['user_id'];
 
 $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
-$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
 try {
-    // 1. หา faculty_id ของอาจารย์ที่ล็อกอิน
-    $stmt_fac = $pdo->prepare("SELECT faculty_id FROM faculty WHERE faculty_id = ? LIMIT 1");
+    // 1. หา faculty_id ของอาจารย์ที่ล็อกอิน (จากตาราง users ที่ใช้ username เก็บไอดีอาจารย์)
+    $stmt_fac = $pdo->prepare("SELECT faculty_id FROM faculty WHERE faculty_id = (SELECT username FROM users WHERE user_id = ?) LIMIT 1");
     $stmt_fac->execute([$user_id]);
     $my_faculty_id = $stmt_fac->fetchColumn();
 
@@ -17,18 +15,14 @@ try {
         echo json_encode(["status" => "success", "data" => []]); exit();
     }
 
-    // 2. วิชาที่สอน + จำนวน CLO
-    $frameworkId = getActiveFrameworkId($pdo);
-    $my_courses_data = [];
-    if ($frameworkId && curriculumTablesReady($pdo) && curriculumHasRelationalData($pdo, $frameworkId)) {
-        $codes = getInstructorSubjectCodes($pdo, $frameworkId, (string)$my_faculty_id);
-        $counts = countClosBySubject($pdo, $frameworkId);
-        foreach ($codes as $code) {
-            $my_courses_data[$code] = $counts[$code] ?? 0;
-        }
-    } else {
-        $mappingData = loadActiveMappingData($pdo);
-        foreach ($mappingData['subject_mappings'] ?? [] as $code => $data) {
+    // 2. ดึง JSON หลักสูตรเพื่อหาวิชาที่ตนเองสอน และจำนวน CLO
+    $stmt_fw = $pdo->query("SELECT mapping_json FROM curriculum_framework WHERE is_active = 1 LIMIT 1");
+    $row_fw = $stmt_fw->fetch(PDO::FETCH_ASSOC);
+    $mappingData = $row_fw ? json_decode($row_fw['mapping_json'], true) : [];
+
+    $my_courses_data = []; // เก็บ รหัสวิชา => จำนวน CLO
+    if (isset($mappingData['subject_mappings'])) {
+        foreach ($mappingData['subject_mappings'] as $code => $data) {
             if (isset($data['instructor_id']) && $data['instructor_id'] == $my_faculty_id) {
                 $my_courses_data[$code] = count($data['clos'] ?? []);
             }

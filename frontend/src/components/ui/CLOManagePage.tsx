@@ -141,7 +141,7 @@ export default function CLOManagePage({ courseCode, onBack, onBackToDetail }: CL
 
   return (
     <Dialog open={!!courseCode} onOpenChange={(open) => !open && handleBack()}>
-      <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="app-dialog-5xl">
         <DialogHeader>
           <DialogTitle>จัดการ CLO</DialogTitle>
           <p className="text-muted-foreground text-sm">
@@ -240,7 +240,7 @@ export default function CLOManagePage({ courseCode, onBack, onBackToDetail }: CL
 
         {/* Add/Edit Dialog */}
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="app-dialog-lg">
           <DialogHeader>
             <DialogTitle>{editingCLO ? "แก้ไข CLO" : "เพิ่ม CLO ใหม่"}</DialogTitle>
           </DialogHeader>
@@ -293,7 +293,7 @@ export default function CLOManagePage({ courseCode, onBack, onBackToDetail }: CL
 
         {/* Delete confirmation */}
         <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent className="app-dialog-md">
           <AlertDialogHeader>
             <AlertDialogTitle>ยืนยันการลบ CLO</AlertDialogTitle>
             <AlertDialogDescription>การลบ CLO นี้จะไม่สามารถกู้คืนได้ คุณต้องการดำเนินการต่อหรือไม่?</AlertDialogDescription>

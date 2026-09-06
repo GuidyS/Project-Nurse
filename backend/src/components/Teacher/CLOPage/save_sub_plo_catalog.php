@@ -4,6 +4,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 require_once __DIR__ . '/curriculum_repository.php';
+require_once __DIR__ . '/clo_access_helpers.php';
 
 $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -14,6 +15,9 @@ if (!isset($_SESSION['user_id'])) {
     echo json_encode(["status" => "error", "message" => "Unauthorized"]);
     exit();
 }
+
+// Sub PLO เป็นข้อมูลระดับหลักสูตร — เฉพาะ admin เท่านั้น
+cloAccessRequireAdmin($pdo, $_SESSION['user_id']);
 
 try {
     // รับ catalog ทั้งชุด (หลักสูตรเปลี่ยนทุก 5 ปี — เพิ่ม/ลด/แก้ Sub PLO ได้)
