@@ -16,10 +16,6 @@ ON DUPLICATE KEY UPDATE
 
 INSERT IGNORE INTO `position_permission` (`position_id`, `permission_id`)
 VALUES
-  (1, 53),
-  (1, 54),
-  (7, 53),
-  (7, 54),
   (9, 1),
   (9, 3),
   (9, 21),
