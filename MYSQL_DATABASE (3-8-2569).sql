@@ -2613,6 +2613,7 @@ CREATE TABLE `project` (
   `project_name_th` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL,
   `project_name_en` varchar(255) DEFAULT NULL,
   `description` text,
+  `project_type` enum('academic_service','culture','other') NOT NULL DEFAULT 'other',
   `mapping_json` json DEFAULT NULL,
   `responsible_faculty_id` bigint DEFAULT NULL COMMENT 'อาจารย์ผู้รับผิดชอบโครงการ',
   `academic_year` int DEFAULT NULL,
@@ -2627,10 +2628,10 @@ CREATE TABLE `project` (
 -- Dumping data for table `project`
 --
 
-INSERT INTO `project` (`project_id`, `project_name_th`, `project_name_en`, `description`, `mapping_json`, `responsible_faculty_id`, `academic_year`, `status`, `start_date`, `end_date`, `created_at`, `updated_at`) VALUES
-(1, 'โครงการพัฒนาทักษะการเขียนโปรแกรมเว็บแอปพลิเคชันยุคใหม่', 'Modern Web Application Development Skill Project', NULL, '{\"clos\": [\"CLO1\", \"CLO2\"], \"plos\": [\"PLO1\", \"PLO3\"], \"ylos\": [\"YLO1\", \"YLO2\"]}', NULL, NULL, 'active', NULL, NULL, '2026-07-11 13:34:30', '2026-07-11 13:34:30'),
-(2, 'โครงการประกวดนวัตกรรมซอฟต์แวร์เพื่อชุมชนและสังคม', 'Software Innovation for Community and Society Contest', NULL, '{\"clos\": [\"CLO3\", \"CLO4\"], \"plos\": [\"PLO2\", \"PLO4\"], \"ylos\": [\"YLO3\"]}', NULL, NULL, 'active', NULL, NULL, '2026-07-11 13:34:30', '2026-07-11 13:34:30'),
-(3, 'โครงการอบรมเชิงปฏิบัติการด้านความมั่นคงปลอดภัยไซเบอร์เบื้องต้น', 'Introduction to Cybersecurity Workshop', NULL, '{\"clos\": [\"CLO1\", \"CLO4\"], \"plos\": [\"PLO1\", \"PLO5\"], \"ylos\": [\"YLO2\", \"YLO4\"]}', NULL, NULL, 'active', NULL, NULL, '2026-07-11 13:34:30', '2026-07-11 13:34:30');
+INSERT INTO `project` (`project_id`, `project_name_th`, `project_name_en`, `description`, `project_type`, `mapping_json`, `responsible_faculty_id`, `academic_year`, `status`, `start_date`, `end_date`, `created_at`, `updated_at`) VALUES
+(1, 'โครงการพัฒนาทักษะการเขียนโปรแกรมเว็บแอปพลิเคชันยุคใหม่', 'Modern Web Application Development Skill Project', NULL, 'other', '{\"clos\": [\"CLO1\", \"CLO2\"], \"plos\": [\"PLO1\", \"PLO3\"], \"ylos\": [\"YLO1\", \"YLO2\"]}', NULL, NULL, 'active', NULL, NULL, '2026-07-11 13:34:30', '2026-07-11 13:34:30'),
+(2, 'โครงการประกวดนวัตกรรมซอฟต์แวร์เพื่อชุมชนและสังคม', 'Software Innovation for Community and Society Contest', NULL, 'other', '{\"clos\": [\"CLO3\", \"CLO4\"], \"plos\": [\"PLO2\", \"PLO4\"], \"ylos\": [\"YLO3\"]}', NULL, NULL, 'active', NULL, NULL, '2026-07-11 13:34:30', '2026-07-11 13:34:30'),
+(3, 'โครงการอบรมเชิงปฏิบัติการด้านความมั่นคงปลอดภัยไซเบอร์เบื้องต้น', 'Introduction to Cybersecurity Workshop', NULL, 'other', '{\"clos\": [\"CLO1\", \"CLO4\"], \"plos\": [\"PLO1\", \"PLO5\"], \"ylos\": [\"YLO2\", \"YLO4\"]}', NULL, NULL, 'active', NULL, NULL, '2026-07-11 13:34:30', '2026-07-11 13:34:30');
 
 -- --------------------------------------------------------
 
@@ -2735,6 +2736,23 @@ CREATE TABLE `project_participants` (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `project_satisfaction_responses`
+--
+
+CREATE TABLE `project_satisfaction_responses` (
+  `id` bigint NOT NULL,
+  `project_id` bigint NOT NULL,
+  `student_id` bigint NOT NULL,
+  `is_satisfied` tinyint(1) NOT NULL,
+  `comment` text,
+  `submitted_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT `chk_project_satisfaction_value` CHECK ((`is_satisfied` in (0,1)))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `project_progress_logs`
 --
 
@@ -2747,6 +2765,28 @@ CREATE TABLE `project_progress_logs` (
   `logged_at` date DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `student_project_outcome_results`
+--
+
+CREATE TABLE `student_project_outcome_results` (
+  `id` bigint NOT NULL,
+  `project_id` bigint NOT NULL,
+  `student_id` bigint NOT NULL,
+  `project_outcome_link_id` bigint NOT NULL,
+  `score_percent` decimal(5,2) DEFAULT NULL,
+  `pass_status` tinyint(1) DEFAULT NULL,
+  `assessed_by` bigint DEFAULT NULL,
+  `assessed_at` timestamp NULL DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT `chk_student_project_outcome_score` CHECK ((`score_percent` is null) or ((`score_percent` >= 0) and (`score_percent` <= 100))),
+  CONSTRAINT `chk_student_project_outcome_pass` CHECK ((`pass_status` is null) or (`pass_status` in (0,1))),
+  CONSTRAINT `chk_student_project_outcome_has_result` CHECK ((`score_percent` is not null) or (`pass_status` is not null))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- --------------------------------------------------------
 
@@ -3910,7 +3950,8 @@ ALTER TABLE `program`
 --
 ALTER TABLE `project`
   ADD PRIMARY KEY (`project_id`),
-  ADD KEY `responsible_faculty_id` (`responsible_faculty_id`);
+  ADD KEY `responsible_faculty_id` (`responsible_faculty_id`),
+  ADD KEY `idx_project_type_year` (`project_type`,`academic_year`);
 
 --
 -- Indexes for table `project_budget_years`
@@ -3944,11 +3985,27 @@ ALTER TABLE `project_participants`
   ADD KEY `student_id` (`student_id`);
 
 --
+-- Indexes for table `project_satisfaction_responses`
+--
+ALTER TABLE `project_satisfaction_responses`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uq_project_satisfaction_student` (`project_id`,`student_id`);
+
+--
 -- Indexes for table `project_progress_logs`
 --
 ALTER TABLE `project_progress_logs`
   ADD PRIMARY KEY (`id`),
   ADD KEY `idx_project_progress_project` (`project_id`);
+
+--
+-- Indexes for table `student_project_outcome_results`
+--
+ALTER TABLE `student_project_outcome_results`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uq_student_project_outcome` (`project_id`,`student_id`,`project_outcome_link_id`),
+  ADD KEY `idx_student_project_outcome_link` (`project_id`,`project_outcome_link_id`),
+  ADD KEY `idx_student_project_outcome_assessor` (`assessed_by`);
 
 --
 -- Indexes for table `report_import_batches`
@@ -4231,9 +4288,21 @@ ALTER TABLE `project_participants`
   MODIFY `id` bigint NOT NULL AUTO_INCREMENT;
 
 --
+-- AUTO_INCREMENT for table `project_satisfaction_responses`
+--
+ALTER TABLE `project_satisfaction_responses`
+  MODIFY `id` bigint NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `project_progress_logs`
 --
 ALTER TABLE `project_progress_logs`
+  MODIFY `id` bigint NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `student_project_outcome_results`
+--
+ALTER TABLE `student_project_outcome_results`
   MODIFY `id` bigint NOT NULL AUTO_INCREMENT;
 
 --
@@ -4448,7 +4517,6 @@ ALTER TABLE `project_participants`
   ADD CONSTRAINT `fk_pp_project` FOREIGN KEY (`project_id`) REFERENCES `project` (`project_id`) ON DELETE CASCADE,
   ADD CONSTRAINT `fk_pp_student` FOREIGN KEY (`student_id`) REFERENCES `student` (`student_id`) ON DELETE CASCADE ON UPDATE RESTRICT;
 
---
 -- Constraints for table `project_progress_logs`
 --
 ALTER TABLE `project_progress_logs`

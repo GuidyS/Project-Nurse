@@ -18,9 +18,18 @@ if (!isset($_SESSION['user_id'])) {
 
 try {
     if (!empty($input['project_id'])) {
-        $sql = "DELETE FROM project WHERE project_id = :id";
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute([':id' => $input['project_id']]);
+        $projectId = (int)$input['project_id'];
+        $pdo->beginTransaction();
+
+        // ตารางประเมินไม่ใช้ Foreign Key จึงลบข้อมูลลูกที่เกี่ยวข้องใน Backend
+        $stmt = $pdo->prepare("DELETE FROM student_project_outcome_results WHERE project_id = :id");
+        $stmt->execute([':id' => $projectId]);
+        $stmt = $pdo->prepare("DELETE FROM project_satisfaction_responses WHERE project_id = :id");
+        $stmt->execute([':id' => $projectId]);
+        $stmt = $pdo->prepare("DELETE FROM project WHERE project_id = :id");
+        $stmt->execute([':id' => $projectId]);
+
+        $pdo->commit();
 
         echo json_encode(["status" => "success", "message" => "ลบข้อมูลสำเร็จ"]);
     } else {
@@ -29,6 +38,9 @@ try {
     }
 
 } catch (Exception $e) {
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
     http_response_code(500);
     echo json_encode(["status" => "error", "message" => "ไม่สามารถลบได้ (อาจมีการใช้งานอยู่)"]);
 }

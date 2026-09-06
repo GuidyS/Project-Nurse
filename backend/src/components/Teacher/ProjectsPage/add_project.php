@@ -25,15 +25,35 @@ if (!isset($_SESSION['user_id'])) {
 try {
     //  VALIDATION: เช็คว่ากรอกชื่อโครงการมาไหม
     if (!empty($input['project_name_th'])) {
-        $facultyStmt = $pdo->prepare("SELECT faculty_id FROM faculty WHERE faculty_id = ? LIMIT 1");
+        $allowedProjectTypes = ['academic_service', 'culture', 'other'];
+        $projectType = $input['project_type'] ?? 'other';
+        if (!in_array($projectType, $allowedProjectTypes, true)) {
+            http_response_code(422);
+            echo json_encode(["status" => "error", "message" => "ประเภทโครงการไม่ถูกต้อง"], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $academicYear = (int)($input['academic_year'] ?? 0);
+        if ($academicYear < 2500 || $academicYear > 2700) {
+            http_response_code(422);
+            echo json_encode(["status" => "error", "message" => "ปีการศึกษาต้องอยู่ระหว่าง พ.ศ. 2500–2700"], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        $facultyStmt = $pdo->prepare("
+            SELECT f.faculty_id
+            FROM users u
+            INNER JOIN faculty f ON CAST(f.faculty_id AS CHAR) = CAST(u.username AS CHAR)
+            WHERE u.user_id = ?
+            LIMIT 1
+        ");
         $facultyStmt->execute([$_SESSION['user_id']]);
         $facultyId = $facultyStmt->fetchColumn() ?: null;
         
         $sql = "INSERT INTO project (
-                    project_name_th, project_name_en, description,
+                    project_name_th, project_name_en, description, project_type,
                     responsible_faculty_id, academic_year, status, start_date, end_date
                 ) VALUES (
-                    :name_th, :name_en, :desc,
+                    :name_th, :name_en, :desc, :project_type,
                     :responsible_faculty_id, :academic_year, :status, :start_date, :end_date
                 )";
         
@@ -42,14 +62,19 @@ try {
             ':name_th' => $input['project_name_th'],
             ':name_en' => $input['project_name_en'] ?? '',
             ':desc' => $input['description'] ?? '',
+            ':project_type' => $projectType,
             ':responsible_faculty_id' => $facultyId,
-            ':academic_year' => $input['academic_year'] ?? null,
+            ':academic_year' => $academicYear,
             ':status' => $input['status'] ?? 'active',
             ':start_date' => $input['start_date'] ?? null,
             ':end_date' => $input['end_date'] ?? null
         ]);
 
-        echo json_encode(["status" => "success", "message" => "เพิ่มโครงการสำเร็จ"]);
+        echo json_encode([
+            "status" => "success",
+            "message" => "เพิ่มโครงการสำเร็จ",
+            "data" => ["project_id" => (int)$pdo->lastInsertId()]
+        ], JSON_UNESCAPED_UNICODE);
     } else {
         http_response_code(400);
         echo json_encode(["status" => "error", "message" => "กรุณากรอกชื่อโครงการ"]);

@@ -13,47 +13,6 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-function workloadContains(string $haystack, string $needle): bool
-{
-    if ($needle === '') {
-        return false;
-    }
-
-    if (function_exists('mb_strpos')) {
-        return mb_strpos($haystack, $needle, 0, 'UTF-8') !== false;
-    }
-
-    return strpos($haystack, $needle) !== false;
-}
-
-function classifyWorkloadProject(array $row): ?string
-{
-    $strategy = (string)($row['strategy'] ?? '');
-    $text = implode(' ', [
-        $strategy,
-        (string)($row['project_name'] ?? ''),
-        (string)($row['activity_name'] ?? ''),
-    ]);
-
-    if (
-        workloadContains($strategy, 'ทำนุบำรุงศิลปวัฒนธรรม') ||
-        workloadContains($text, 'ศิลปวัฒนธรรม') ||
-        workloadContains($text, 'ศิลปะและวัฒนธรรม')
-    ) {
-        return 'culture';
-    }
-
-    if (
-        workloadContains($text, 'บริการวิชาการ') ||
-        workloadContains($text, 'บริการแก่สังคม') ||
-        workloadContains($text, 'บริการสังคม')
-    ) {
-        return 'academic_service';
-    }
-
-    return null;
-}
-
 function uniqueCount(array $values): int
 {
     return count(array_unique(array_filter(array_map('strval', $values), fn($value) => $value !== '')));
@@ -92,7 +51,13 @@ try {
     }
 
     $years = array_map('intval', $db->query(
-        'SELECT DISTINCT academic_year FROM annual_project_report_items ORDER BY academic_year DESC'
+        'SELECT academic_year
+         FROM (
+             SELECT academic_year FROM annual_project_report_items WHERE academic_year IS NOT NULL
+             UNION
+             SELECT academic_year FROM project WHERE academic_year IS NOT NULL
+         ) AS workload_years
+         ORDER BY academic_year DESC'
     )->fetchAll(PDO::FETCH_COLUMN));
 
     $defaultYear = $years[0] ?? ((int)date('Y') + 543);
@@ -267,37 +232,43 @@ try {
         ];
     }
 
-    $reportStmt = $db->prepare(
-        'SELECT id, strategy, project_code, project_name, activity_name, row_type,
-                parent_item_id, responsible_person
-         FROM annual_project_report_items
-         WHERE academic_year = :academic_year
-         ORDER BY sort_order ASC, id ASC'
+    $projectStmt = $db->prepare(
+        "SELECT
+            p.project_id,
+            p.project_name_th,
+            p.project_name_en,
+            p.project_type,
+            p.responsible_faculty_id,
+            TRIM(CONCAT(COALESCE(f.title, ''), COALESCE(f.first_name_th, ''), ' ', COALESCE(f.last_name_th, ''))) AS responsible_person
+         FROM project p
+         LEFT JOIN faculty f ON f.faculty_id = p.responsible_faculty_id
+         WHERE p.academic_year = :academic_year
+           AND p.project_type IN ('academic_service', 'culture')
+         ORDER BY p.project_id DESC"
     );
-    $reportStmt->execute([':academic_year' => $academicYear]);
+    $projectStmt->execute([':academic_year' => $academicYear]);
 
-    foreach ($reportStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-        $category = classifyWorkloadProject($row);
-        $responsible = trim((string)($row['responsible_person'] ?? ''));
-        if ($category === null || $responsible === '') {
+    foreach ($projectStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $facultyId = (string)($row['responsible_faculty_id'] ?? '');
+        if ($facultyId === '' || !isset($faculty[$facultyId])) {
             continue;
         }
 
-        $record = [
-            'id' => (string)$row['id'],
-            'project_code' => (string)($row['project_code'] ?? ''),
-            'project_name' => (string)$row['project_name'],
-            'activity_name' => $row['activity_name'] ?: null,
-            'row_type' => (string)$row['row_type'],
-            'strategy' => (string)($row['strategy'] ?? ''),
-            'responsible_person' => $responsible,
-        ];
-
-        foreach ($faculty as $facultyId => $person) {
-            if (workloadContains($responsible, (string)$person['first_name'])) {
-                $faculty[$facultyId][$category][] = $record;
-            }
+        $category = (string)$row['project_type'];
+        $projectName = trim((string)($row['project_name_th'] ?? ''));
+        if ($projectName === '') {
+            $projectName = trim((string)($row['project_name_en'] ?? '')) ?: ('Project #' . $row['project_id']);
         }
+
+        $faculty[$facultyId][$category][] = [
+            'id' => (string)$row['project_id'],
+            'project_code' => '',
+            'project_name' => $projectName,
+            'activity_name' => null,
+            'row_type' => 'project',
+            'strategy' => '',
+            'responsible_person' => trim((string)$row['responsible_person']),
+        ];
     }
 
     $totalCourses = 0;

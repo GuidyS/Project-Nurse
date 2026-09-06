@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Search, Filter, Eye, Edit, MoreVertical, Upload, Link2, FileText, Trash2, Loader2 } from "lucide-react";
+import { Plus, Search, Filter, Eye, Edit, MoreVertical, Upload, Link2, ClipboardCheck, Trash2, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -20,17 +20,28 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
 import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
 
 // โครงสร้างข้อมูลที่ตรงกับฐานข้อมูลจริง
+type ProjectType = "academic_service" | "culture" | "other";
+
 interface Project {
   project_id: number;
   project_name_th: string;
   project_name_en: string;
   description: string;
+  project_type: ProjectType;
+  academic_year: number | null;
 }
+
+const projectTypeLabels: Record<ProjectType, string> = {
+  academic_service: "บริการวิชาการ",
+  culture: "ทำนุบำรุงศิลปวัฒนธรรม",
+  other: "อื่น ๆ / ยังไม่จำแนก",
+};
 
 const ProjectsPage = () => {
   const { toast } = useToast();
@@ -52,9 +63,11 @@ const ProjectsPage = () => {
     project_name_th: "",
     project_name_en: "",
     description: "",
+    project_type: "other" as ProjectType,
+    academic_year: String(new Date().getFullYear() + 543),
   });
 
-  const navigateToProjectPage = (page: "project-docs" | "project-links", projectId: number) => {
+  const navigateToProjectPage = (page: "project-docs" | "project-links" | "project-assessments", projectId: number) => {
     sessionStorage.setItem("pendingProjectId", String(projectId));
     window.dispatchEvent(new CustomEvent("app:navigate", { detail: { page } }));
   };
@@ -92,7 +105,14 @@ const ProjectsPage = () => {
   // 2. เปิดฟอร์มสร้างโครงการใหม่
   const handleOpenCreateModal = () => {
     setEditMode(false);
-    setFormData({ project_id: "", project_name_th: "", project_name_en: "", description: "" });
+    setFormData({
+      project_id: "",
+      project_name_th: "",
+      project_name_en: "",
+      description: "",
+      project_type: "other",
+      academic_year: String(new Date().getFullYear() + 543),
+    });
     setIsModalOpen(true);
   };
 
@@ -104,6 +124,8 @@ const ProjectsPage = () => {
       project_name_th: project.project_name_th,
       project_name_en: project.project_name_en || "",
       description: project.description || "",
+      project_type: project.project_type || "other",
+      academic_year: project.academic_year ? String(project.academic_year) : String(new Date().getFullYear() + 543),
     });
     setIsModalOpen(true);
   };
@@ -114,14 +136,22 @@ const ProjectsPage = () => {
       toast({ title: "แจ้งเตือน", description: "กรุณากรอกชื่อโครงการ (ภาษาไทย)", variant: "destructive" });
       return;
     }
+    const academicYear = Number(formData.academic_year);
+    if (!Number.isInteger(academicYear) || academicYear < 2500 || academicYear > 2700) {
+      toast({ title: "แจ้งเตือน", description: "กรุณาระบุปีการศึกษา พ.ศ. 2500–2700", variant: "destructive" });
+      return;
+    }
 
     try {
       setIsSubmitting(true);
       const endpoint = editMode ? "/index.php?page=update-project" : "/index.php?page=add-project";
-      const payload = editMode ? formData : {
+      const payload = {
+        ...(editMode ? { project_id: formData.project_id } : {}),
         project_name_th: formData.project_name_th,
         project_name_en: formData.project_name_en,
-        description: formData.description
+        description: formData.description,
+        project_type: formData.project_type,
+        academic_year: academicYear,
       };
 
       const res = await api.post(endpoint, payload);
@@ -210,7 +240,7 @@ const ProjectsPage = () => {
               <div className="flex items-start justify-between mb-3">
                 <div className="flex-1 min-w-0 pr-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <Badge variant="outline" className="text-xs bg-primary/5">โครงการคณะ</Badge>
+                    <Badge variant="outline" className="text-xs bg-primary/5">{projectTypeLabels[project.project_type || "other"]}</Badge>
                     <Badge variant="secondary" className="text-xs">กำลังดำเนินการ</Badge>
                   </div>
                   <h3 className="font-semibold text-foreground line-clamp-2">{project.project_name_th}</h3>
@@ -239,12 +269,22 @@ const ProjectsPage = () => {
                     >
                       <Upload className="h-4 w-4 text-green-500" /> อัปโหลดเอกสาร
                     </DropdownMenuItem>
-                    <DropdownMenuItem
-                      className="gap-2"
-                      onClick={() => navigateToProjectPage("project-links", project.project_id)}
-                    >
-                      <Link2 className="h-4 w-4 text-purple-500" /> เชื่อมโยงระดับ LO
-                    </DropdownMenuItem>
+                    {project.project_type === "academic_service" && (
+                      <DropdownMenuItem
+                        className="gap-2"
+                        onClick={() => navigateToProjectPage("project-links", project.project_id)}
+                      >
+                        <Link2 className="h-4 w-4 text-purple-500" /> เชื่อมโยงระดับ LO
+                      </DropdownMenuItem>
+                    )}
+                    {project.project_type !== "other" && (
+                      <DropdownMenuItem
+                        className="gap-2"
+                        onClick={() => navigateToProjectPage("project-assessments", project.project_id)}
+                      >
+                        <ClipboardCheck className="h-4 w-4 text-cyan-600" /> ประเมินผู้เข้าร่วม
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem className="gap-2 text-red-600 focus:bg-red-50" onClick={() => openDeleteConfirm(project.project_id)}>
                       <Trash2 className="h-4 w-4" /> ลบโครงการ
@@ -284,11 +324,38 @@ const ProjectsPage = () => {
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
+              <Label>ประเภทโครงการ <span className="text-red-500">*</span></Label>
+              <Select
+                value={formData.project_type}
+                onValueChange={(value: ProjectType) => setFormData({ ...formData, project_type: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="เลือกประเภทโครงการ" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="academic_service">บริการวิชาการ</SelectItem>
+                  <SelectItem value="culture">ทำนุบำรุงศิลปวัฒนธรรม</SelectItem>
+                  <SelectItem value="other">อื่น ๆ / ยังไม่จำแนก</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
               <Label>ชื่อโครงการ (ภาษาไทย) <span className="text-red-500">*</span></Label>
               <Input
                 value={formData.project_name_th}
                 onChange={(e) => setFormData({ ...formData, project_name_th: e.target.value })}
                 placeholder="เช่น โครงการพัฒนาศักยภาพนักศึกษา..."
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>ปีการศึกษา</Label>
+              <Input
+                type="number"
+                min="2500"
+                max="2700"
+                value={formData.academic_year}
+                onChange={(e) => setFormData({ ...formData, academic_year: e.target.value })}
+                placeholder="เช่น 2569"
               />
             </div>
             <div className="grid gap-2">
@@ -339,6 +406,14 @@ const ProjectsPage = () => {
               <div className="space-y-1">
                 <p className="text-muted-foreground">รหัสโครงการ</p>
                 <p className="font-medium text-foreground">{viewProject.project_id}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-muted-foreground">ประเภทโครงการ</p>
+                <Badge variant="outline">{projectTypeLabels[viewProject.project_type || "other"]}</Badge>
+              </div>
+              <div className="space-y-1">
+                <p className="text-muted-foreground">ปีการศึกษา</p>
+                <p className="font-medium text-foreground">{viewProject.academic_year || "—"}</p>
               </div>
               <div className="space-y-1">
                 <p className="text-muted-foreground">ชื่อโครงการ (ภาษาไทย)</p>

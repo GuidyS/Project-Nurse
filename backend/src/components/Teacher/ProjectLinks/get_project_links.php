@@ -28,14 +28,22 @@ header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-W
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit(); }
 
+if (!isset($_SESSION['user_id'])) {
+    http_response_code(401);
+    echo json_encode(["status" => "error", "message" => "Unauthorized"]);
+    exit;
+}
+
 try {
     $db = new Connect();
 
     $stmt = $db->query("
         SELECT
             project_id AS id,
-            COALESCE(NULLIF(project_name_th, ''), NULLIF(project_name_en, ''), CONCAT('Project #', project_id)) AS name
+            COALESCE(NULLIF(project_name_th, ''), NULLIF(project_name_en, ''), CONCAT('Project #', project_id)) AS name,
+            project_type
         FROM project
+        WHERE project_type = 'academic_service'
         ORDER BY project_id ASC
     ");
     $projects_raw = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -45,12 +53,18 @@ try {
 
     foreach ($projects_raw as $row) {
         $pid = $row['id'];
-        $projects[] = ['id' => $pid, 'name' => $row['name']];
+        $projects[] = ['id' => $pid, 'name' => $row['name'], 'project_type' => $row['project_type']];
 
         $matrix[$pid] = ['plos' => [], 'ylos' => [], 'clos' => []];
     }
 
-    $linkStmt = $db->query("SELECT project_id, outcome_type, outcome_code FROM project_outcome_links ORDER BY project_id, outcome_type, outcome_code");
+    $linkStmt = $db->query("
+        SELECT l.project_id, l.outcome_type, l.outcome_code
+        FROM project_outcome_links l
+        INNER JOIN project p ON p.project_id = l.project_id
+        WHERE p.project_type = 'academic_service'
+        ORDER BY l.project_id, l.outcome_type, l.outcome_code
+    ");
     foreach ($linkStmt->fetchAll(PDO::FETCH_ASSOC) as $link) {
         $projectId = $link['project_id'];
         if (!isset($matrix[$projectId])) {

@@ -117,7 +117,7 @@ const formatNumber = (value: number) => new Intl.NumberFormat("th-TH").format(va
 
 const initials = (name: string) => {
   const words = name.trim().split(/\s+/).filter(Boolean);
-  return `${words.at(-2)?.charAt(0) || ""}${words.at(-1)?.charAt(0) || ""}` || "อ";
+  return `${words[words.length - 2]?.charAt(0) || ""}${words[words.length - 1]?.charAt(0) || ""}` || "อ";
 };
 
 function SummaryMetric({
@@ -126,15 +126,33 @@ function SummaryMetric({
   value,
   detail,
   tone,
+  barTone,
+  bars,
+  page,
 }: {
   icon: typeof BookOpenCheck;
   title: string;
   value: string;
   detail: string;
   tone: string;
+  barTone: string;
+  bars: { label: string; value: number }[];
+  page: string;
 }) {
+  const maxValue = Math.max(...bars.map((bar) => bar.value), 1);
+
+  const navigateToDimension = () => {
+    window.dispatchEvent(new CustomEvent("app:navigate", { detail: { page } }));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   return (
-    <div className="min-w-0 rounded-lg border bg-card p-4 shadow-sm">
+    <button
+      type="button"
+      onClick={navigateToDimension}
+      aria-label={`ดูรายละเอียด${title}`}
+      className="group flex h-full min-w-0 flex-col rounded-lg border bg-card p-4 text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm font-medium text-muted-foreground">{title}</p>
@@ -145,7 +163,43 @@ function SummaryMetric({
         </div>
       </div>
       <p className="mt-2 text-xs leading-5 text-muted-foreground">{detail}</p>
-    </div>
+
+      <div className="mt-auto pt-4">
+        <div
+          className="flex h-24 items-end gap-2 rounded-md bg-muted/30 px-3 pb-2 pt-3"
+          role="img"
+          aria-label={`กราฟแท่ง${title}: ${bars.map((bar) => `${bar.label} ${formatNumber(bar.value)}`).join(", ")}`}
+        >
+          {bars.map((bar) => {
+            const height = bar.value === 0 ? 4 : Math.max((bar.value / maxValue) * 100, 12);
+
+            return (
+              <div key={bar.label} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1">
+                <span className="text-[10px] font-semibold tabular-nums text-foreground">
+                  {formatNumber(bar.value)}
+                </span>
+                <div className="flex h-11 w-full items-end justify-center">
+                  <div
+                    className={`w-full max-w-8 rounded-t-sm transition-all duration-300 ${
+                      bar.value === 0 ? "bg-muted-foreground/20" : barTone
+                    }`}
+                    style={{ height: `${height}%` }}
+                  />
+                </div>
+                <span className="w-full truncate text-center text-[10px] text-muted-foreground" title={bar.label}>
+                  {bar.label}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="mt-3 flex items-center justify-end gap-1 text-xs font-medium text-primary">
+        <span>ดูรายละเอียด</span>
+        <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+      </div>
+    </button>
   );
 }
 
@@ -301,6 +355,14 @@ export default function FacultyWorkloadDashboard() {
           value={`${formatNumber(data.summary.teaching.courses)} รายวิชา`}
           detail={`${formatNumber(data.summary.teaching.faculty)} คน · YLO ${data.summary.teaching.ylo} · PLO ${data.summary.teaching.plo} · CLO ${data.summary.teaching.clo}`}
           tone="bg-blue-500/10 text-blue-600 dark:text-blue-400"
+          barTone="bg-blue-500/80 group-hover:bg-blue-500"
+          bars={[
+            { label: "รายวิชา", value: data.summary.teaching.courses },
+            { label: "YLO", value: data.summary.teaching.ylo },
+            { label: "PLO", value: data.summary.teaching.plo },
+            { label: "CLO", value: data.summary.teaching.clo },
+          ]}
+          page="dean-teaching-workload"
         />
         <SummaryMetric
           icon={FlaskConical}
@@ -308,6 +370,13 @@ export default function FacultyWorkloadDashboard() {
           value={`${formatNumber(data.summary.research.outputs)} ผลงาน`}
           detail={`${formatNumber(data.summary.research.meeting_target)} คนผ่านเกณฑ์ · สัดส่วน ${data.summary.research.ratio.toFixed(2)} ผลงาน/คน`}
           tone="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+          barTone="bg-emerald-500/80 group-hover:bg-emerald-500"
+          bars={[
+            { label: "ผลงาน", value: data.summary.research.outputs },
+            { label: "ผ่านเกณฑ์", value: data.summary.research.meeting_target },
+            { label: "ต่ำกว่าเกณฑ์", value: data.summary.research.below_target },
+          ]}
+          page="dean-research-workload"
         />
         <SummaryMetric
           icon={Users}
@@ -315,6 +384,13 @@ export default function FacultyWorkloadDashboard() {
           value={`${formatNumber(data.summary.academic_service.projects)} โครงการ`}
           detail={`${formatNumber(data.summary.academic_service.items)} โครงการ/กิจกรรม · ผู้รับผิดชอบ ${data.summary.academic_service.faculty} คน`}
           tone="bg-amber-500/10 text-amber-600 dark:text-amber-400"
+          barTone="bg-amber-500/80 group-hover:bg-amber-500"
+          bars={[
+            { label: "โครงการ", value: data.summary.academic_service.projects },
+            { label: "ทุกรายการ", value: data.summary.academic_service.items },
+            { label: "ผู้รับผิดชอบ", value: data.summary.academic_service.faculty },
+          ]}
+          page="dean-academic-service-workload"
         />
         <SummaryMetric
           icon={Landmark}
@@ -322,6 +398,13 @@ export default function FacultyWorkloadDashboard() {
           value={`${formatNumber(data.summary.culture.projects)} โครงการ`}
           detail={`${formatNumber(data.summary.culture.items)} โครงการ/กิจกรรม · ผู้รับผิดชอบ ${data.summary.culture.faculty} คน`}
           tone="bg-rose-500/10 text-rose-600 dark:text-rose-400"
+          barTone="bg-rose-500/80 group-hover:bg-rose-500"
+          bars={[
+            { label: "โครงการ", value: data.summary.culture.projects },
+            { label: "ทุกรายการ", value: data.summary.culture.items },
+            { label: "ผู้รับผิดชอบ", value: data.summary.culture.faculty },
+          ]}
+          page="dean-culture-workload"
         />
       </div>
 

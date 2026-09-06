@@ -21,11 +21,60 @@ if (!isset($_SESSION['user_id'])) {
 try {
     // VALIDATION: ต้องมี ID และชื่อโครงการ
     if (!empty($input['project_id']) && !empty($input['project_name_th'])) {
+        $allowedProjectTypes = ['academic_service', 'culture', 'other'];
+        $projectType = $input['project_type'] ?? 'other';
+        if (!in_array($projectType, $allowedProjectTypes, true)) {
+            http_response_code(422);
+            echo json_encode(["status" => "error", "message" => "ประเภทโครงการไม่ถูกต้อง"], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $academicYear = (int)($input['academic_year'] ?? 0);
+        if ($academicYear < 2500 || $academicYear > 2700) {
+            http_response_code(422);
+            echo json_encode(["status" => "error", "message" => "ปีการศึกษาต้องอยู่ระหว่าง พ.ศ. 2500–2700"], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        $currentStmt = $pdo->prepare("SELECT project_type FROM project WHERE project_id = ? LIMIT 1");
+        $currentStmt->execute([$input['project_id']]);
+        $currentProjectType = $currentStmt->fetchColumn();
+        if ($currentProjectType === false) {
+            http_response_code(404);
+            echo json_encode(["status" => "error", "message" => "ไม่พบโครงการ"], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        if ($projectType !== 'academic_service') {
+            $linkStmt = $pdo->prepare("SELECT COUNT(*) FROM project_outcome_links WHERE project_id = ?");
+            $linkStmt->execute([$input['project_id']]);
+            if ((int)$linkStmt->fetchColumn() > 0) {
+                http_response_code(409);
+                echo json_encode([
+                    "status" => "error",
+                    "message" => "โครงการนี้มีการเชื่อม CLO/PLO/YLO อยู่ กรุณานำการเชื่อมโยงออกก่อนเปลี่ยนประเภท"
+                ], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+        }
+
+        if ($projectType !== 'culture') {
+            $satisfactionStmt = $pdo->prepare("SELECT COUNT(*) FROM project_satisfaction_responses WHERE project_id = ?");
+            $satisfactionStmt->execute([$input['project_id']]);
+            if ((int)$satisfactionStmt->fetchColumn() > 0) {
+                http_response_code(409);
+                echo json_encode([
+                    "status" => "error",
+                    "message" => "โครงการนี้มีข้อมูลความพึงพอใจอยู่ กรุณาลบข้อมูลก่อนเปลี่ยนประเภท"
+                ], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+        }
         
         $sql = "UPDATE project 
                 SET project_name_th = :name_th, 
                     project_name_en = :name_en, 
                     description = :desc,
+                    project_type = :project_type,
                     academic_year = :academic_year,
                     status = :status,
                     start_date = :start_date,
@@ -37,7 +86,8 @@ try {
             ':name_th' => $input['project_name_th'],
             ':name_en' => $input['project_name_en'] ?? '',
             ':desc' => $input['description'] ?? '',
-            ':academic_year' => $input['academic_year'] ?? null,
+            ':project_type' => $projectType,
+            ':academic_year' => $academicYear,
             ':status' => $input['status'] ?? 'active',
             ':start_date' => $input['start_date'] ?? null,
             ':end_date' => $input['end_date'] ?? null,

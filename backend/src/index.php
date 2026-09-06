@@ -345,6 +345,11 @@
                 require_once 'components/Teacher/ProjectLinks/save_project_links.php';
                 break;
 
+            // ProjectAssessments
+            case 'project-assessments':
+                require_once 'components/Teacher/ProjectAssessments/project_assessments.php';
+                break;
+
             // ProjectReports
             case 'get-project-reports':
                 require_once 'components/Teacher/ProjectReports/get_project_reports.php';

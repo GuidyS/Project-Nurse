@@ -33,6 +33,7 @@ import Students from "@/components/pages/Teacher/Students";
 import ScheduleTasks from "@/components/pages/Teacher/ScheduleTasks";
 import ProjectReports from "@/components/pages/Teacher/ProjectReports";
 import ProjectLinks from "@/components/pages/Teacher/ProjectLinks";
+import ProjectAssessments from "@/components/pages/Teacher/ProjectAssessments";
 import ProjectDocs from "@/components/pages/Teacher/ProjectDocs";
 import ProgramReports from "@/components/pages/Teacher/ProgramReports";
 import Approvals from "@/components/pages/Admin/Approvals";
@@ -179,7 +180,7 @@ const Index = () => {
       "plo-ylo-report", "course-report", "course-students", "documents", "assign-instructors", "clo-map",
       "evidence", "grades", "my-courses", "performance", "practical-students",
       "program-reports", "schedule-tasks", "projectspage", "my-projects", "project-docs",
-      "project-links", "project-reports", "advise-notes", "advisor-notifications", "advises",
+      "project-links", "project-assessments", "project-reports", "advise-notes", "advisor-notifications", "advises",
       "students", "students-info", "transfer-requests"
     ];
     
@@ -207,6 +208,7 @@ const Index = () => {
         case "my-projects": return <MyProjects />;                                  //*
         case "project-docs": return <ProjectDocs />;                                //*
         case "project-links": return <ProjectLinks />;                              //*
+        case "project-assessments": return <ProjectAssessments />;                 //*
         case "project-reports": return <ProjectReports />;                          //*
         case "advise-notes": return <AdviseNotes />;                                      //*
         case "advisor-notifications": return <AdvisorNotifications />;
