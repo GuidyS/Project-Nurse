@@ -14,8 +14,12 @@ ON DUPLICATE KEY UPDATE
   `module_group` = VALUES(`module_group`),
   `description_th` = VALUES(`description_th`);
 
+DELETE FROM `position_permission`
+WHERE `permission_id` IN (53, 54);
+
 INSERT IGNORE INTO `position_permission` (`position_id`, `permission_id`)
 VALUES
+  (1, 53),
   (9, 1),
   (9, 3),
   (9, 21),

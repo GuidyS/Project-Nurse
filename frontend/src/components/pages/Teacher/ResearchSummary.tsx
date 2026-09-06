@@ -214,7 +214,7 @@ export default function ResearchSummary() {
       const roleId = Number(currentUser?.role_id || 0);
       const positionId = Number(currentUser?.position_id || 0);
 
-      return roleId === 2 && (positionId === 9 || permissions.includes("RESEARCH_RECORD_MANAGE"));
+      return roleId === 2 && positionId !== 1 && (positionId === 9 || permissions.includes("RESEARCH_RECORD_MANAGE"));
     } catch {
       return false;
     }
@@ -485,7 +485,7 @@ export default function ResearchSummary() {
         <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <CardTitle>Flow การบันทึกผลงานวิจัย</CardTitle>
-            <CardDescription>ให้อาจารย์งานวิจัยเป็นผู้แก้ไขข้อมูล ส่วน role อื่นเปิดดูได้อย่างเดียว</CardDescription>
+            <CardDescription>ให้อาจารย์งานวิจัยแก้ไขข้อมูลได้ ส่วนคณบดีเปิดดูได้อย่างเดียว</CardDescription>
           </div>
           <Badge variant={canManageResearch ? "default" : "outline"} className={canManageResearch ? "bg-emerald-600" : ""}>
             {canManageResearch ? "โหมดแก้ไข" : "อ่านอย่างเดียว"}
