@@ -1,6 +1,18 @@
 <?php
 if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/../../Admin/AssignStudents/assign_students_helpers.php';
+
+// ค่าเริ่มต้นคือฝั่ง "อาจารย์ที่ปรึกษา" แต่ส่ง ?advisor_type=practical มาเพื่อดูฝั่งปฏิบัติได้
+// (หน้าจอทั้งสองฝั่งใช้โครงสร้างข้อมูลเดียวกัน จึงใช้ endpoint ร่วมกัน)
+try {
+    $requestedType = assignStudentsResolveType($_GET['advisor_type'] ?? 'advisor');
+} catch (InvalidArgumentException $e) {
+    http_response_code(400);
+    echo json_encode(["status" => "error", "message" => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    exit();
+}
+[$typeSql, $typeParams] = assignStudentsTypeCondition($requestedType, 'sam');
 
 header('Access-Control-Allow-Origin: ' . (in_array($_SERVER['HTTP_ORIGIN'] ?? '', ['http://localhost:5173', 'http://127.0.0.1:5173'], true) ? ($_SERVER['HTTP_ORIGIN'] ?? '') : 'http://localhost:5173'));
 header('Vary: Origin');
@@ -41,11 +53,13 @@ try {
         FROM student s
         JOIN student_advisor_mapping sam ON s.student_id = sam.student_id
         WHERE sam.faculty_id = :faculty_id
+          AND $typeSql
+        GROUP BY s.student_id
         ORDER BY s.year_level DESC, s.student_id ASC
     ";
 
     $stmt = $db->prepare($sql);
-    $stmt->execute([':faculty_id' => $my_faculty_id, ':advisor_uid' => $user_id]);
+    $stmt->execute([':faculty_id' => $my_faculty_id, ':advisor_uid' => $user_id] + $typeParams);
     $advisees = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     // 4. คำนวณสถานะจาก GPA จริง (< 2.00 วิกฤต, < 2.50 ต้องติดตาม)

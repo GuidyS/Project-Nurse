@@ -36,6 +36,19 @@ const SessionGateway = ({ children }: { children: React.ReactNode }) => {
     api.get("/index.php?page=profile")
       .then((res) => {
         if (res.data.status === "success") {
+          const currentUser = JSON.parse(savedUser);
+          const profileData = res.data.data || {};
+          const mergedUser = {
+            ...currentUser,
+            ...profileData,
+            role_id: profileData.role_id ?? currentUser.role_id,
+            position_id: profileData.position_id ?? currentUser.position_id,
+            permissions: Array.isArray(profileData.permissions)
+              ? profileData.permissions
+              : currentUser.permissions,
+          };
+
+          localStorage.setItem("user", JSON.stringify(mergedUser));
           setHasSession(true);
         }
       })

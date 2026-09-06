@@ -48,9 +48,9 @@ export default function Documents() {
     course: string;
     academic_year: string;
     semester: string;
-    file: File | null;
+    google_drive_link: string;
   }>({
-    name: '', type: '', course: '', academic_year: '2567', semester: '1', file: null
+    name: '', type: '', course: '', academic_year: '2567', semester: '1', google_drive_link: ''
   });
 
   // 🌟 ดึงข้อมูลจาก API เมื่อเปิดหน้าเว็บ
@@ -95,28 +95,28 @@ export default function Documents() {
 
   // 🌟 ฟังก์ชันส่งข้อมูลอัปโหลดไปบันทึก
   const handleUpload = async () => {
-    if (!newDocument.name || !newDocument.type || !newDocument.course || !newDocument.file) {
-      toast({ title: "แจ้งเตือน", description: "กรุณากรอกข้อมูลและแนบไฟล์ให้ครบถ้วน", variant: "destructive" });
+    if (!newDocument.name || !newDocument.type || !newDocument.course || !newDocument.google_drive_link) {
+      toast({ title: "แจ้งเตือน", description: "กรุณากรอกข้อมูลและแนบลิงก์ให้ครบถ้วน", variant: "destructive" });
       return;
     }
 
     try {
-      const formData = new FormData();
-      formData.append('name', newDocument.name);
-      formData.append('type', newDocument.type);
-      formData.append('course', newDocument.course);
-      formData.append('academic_year', newDocument.academic_year);
-      formData.append('semester', newDocument.semester);
-      formData.append('file', newDocument.file);
+      // Send as JSON since we don't have files anymore
+      const payload = {
+        name: newDocument.name,
+        type: newDocument.type,
+        course: newDocument.course,
+        academic_year: newDocument.academic_year,
+        semester: newDocument.semester,
+        google_drive_link: newDocument.google_drive_link
+      };
 
-      const response = await api.post('/index.php?page=upload-document', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+      const response = await api.post('/index.php?page=upload-document', payload);
       
       if (response.data.status === 'success') {
         toast({ title: "สำเร็จ", description: "บันทึกข้อมูลเอกสารเรียบร้อยแล้ว" });
         setIsDialogOpen(false);
-        setNewDocument({ name: '', type: '', course: '', academic_year: '2567', semester: '1', file: null });
+        setNewDocument({ name: '', type: '', course: '', academic_year: '2567', semester: '1', google_drive_link: '' });
         fetchDocuments(); // รีเฟรชข้อมูล
       } else {
         toast({ title: "ข้อผิดพลาด", description: response.data.message || "ไม่สามารถอัปโหลดได้", variant: "destructive" });
@@ -230,15 +230,12 @@ export default function Documents() {
                 </div>
 
                 <div className="grid gap-2">
-                  <Label>ไฟล์เอกสาร</Label>
+                  <Label>ลิงก์ Google Drive</Label>
                   <Input 
-                    type="file" 
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files.length > 0) {
-                        const file = e.target.files[0];
-                        setNewDocument({ ...newDocument, file, name: newDocument.name || file.name });
-                      }
-                    }} 
+                    type="url" 
+                    placeholder="https://drive.google.com/file/d/..."
+                    value={newDocument.google_drive_link}
+                    onChange={(e) => setNewDocument({ ...newDocument, google_drive_link: e.target.value })} 
                   />
                 </div>
               </div>

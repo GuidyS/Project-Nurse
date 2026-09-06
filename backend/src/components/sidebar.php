@@ -28,6 +28,7 @@ $positionSectionMap = [
     6 => 'โครงการ คณะ',
     7 => 'จัดการระบบ',
     8 => 'เมนูหลัก', // student menus ที่ section_title เป็น NULL
+    9 => 'งานวิจัย',
 ];
 
 // 2. SQL Query ดึงเมนูตามระบบสิทธิ์
@@ -74,6 +75,10 @@ $posStmt = $db->prepare("
 $posStmt->execute([':user_id' => $user_id]);
 $userPositions = $posStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
+$roleStmt = $db->prepare("SELECT role_id FROM users WHERE user_id = :user_id LIMIT 1");
+$roleStmt->execute([':user_id' => $user_id]);
+$roleId = (int)($roleStmt->fetchColumn() ?: 0);
+
 $prioritySections = [];
 foreach ($userPositions as $row) {
     $pid = (int)($row['position_id'] ?? 0);
@@ -88,9 +93,6 @@ foreach ($userPositions as $row) {
 
 // Admin ที่ไม่มี user_position → ดัน "จัดการระบบ" ขึ้นก่อน
 if (empty($prioritySections)) {
-    $roleStmt = $db->prepare("SELECT role_id FROM users WHERE user_id = :user_id LIMIT 1");
-    $roleStmt->execute([':user_id' => $user_id]);
-    $roleId = (int)($roleStmt->fetchColumn() ?: 0);
     if ($roleId === 1) {
         $prioritySections[] = 'จัดการระบบ';
     }

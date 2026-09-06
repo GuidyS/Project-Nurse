@@ -2,6 +2,7 @@
 if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../CLOPage/curriculum_repository.php';
+require_once __DIR__ . '/subject_term_helpers.php';
 
 header('Access-Control-Allow-Origin: ' . (in_array($_SERVER['HTTP_ORIGIN'] ?? '', ['http://localhost:5173', 'http://127.0.0.1:5173'], true) ? ($_SERVER['HTTP_ORIGIN'] ?? '') : 'http://localhost:5173'));
 header('Vary: Origin');
@@ -38,10 +39,32 @@ try {
         exit();
     }
 
+    // ตรวจค่าภาคเรียน/ปีการศึกษาให้ผ่านก่อน แล้วค่อยเขียนอะไรลงฐานข้อมูล
+    // (ไม่งั้นกรอกปีผิดแล้วอาจารย์จะถูกมอบหมายไปแล้วทั้งที่ขึ้น error)
+    $semester = array_key_exists('semester', $input) ? subjectTermNormalizeSemester($input['semester']) : null;
+    $academicYear = array_key_exists('academic_year', $input) ? subjectTermNormalizeYear($input['academic_year']) : null;
+
     $msg = empty($faculty_id) ? "ยกเลิกการมอบหมายอาจารย์สำเร็จ" : "มอบหมายอาจารย์สำเร็จ";
     setSubjectInstructor($db, $frameworkId, (string)$subject_code, empty($faculty_id) ? null : (string)$faculty_id);
 
-    echo json_encode(["status" => "success", "message" => $msg]);
+    if (array_key_exists('semester', $input) || array_key_exists('academic_year', $input)) {
+        // ส่งคีย์มาแล้วแต่ค่าว่าง = ตั้งใจล้างค่า จึงเขียนทับด้วย NULL
+        subjectTermSave($db, (string)$subject_code, $semester, $academicYear, true);
+        $msg .= ' (ภาคเรียน ' . subjectTermLabel($semester, $academicYear) . ')';
+    }
+
+    echo json_encode([
+        "status" => "success",
+        "message" => $msg,
+        "data" => [
+            "semester" => $semester,
+            "academic_year" => $academicYear,
+            "term_label" => subjectTermLabel($semester, $academicYear),
+        ],
+    ], JSON_UNESCAPED_UNICODE);
+} catch (InvalidArgumentException $e) {
+    http_response_code(400);
+    echo json_encode(["status" => "error", "message" => $e->getMessage()], JSON_UNESCAPED_UNICODE);
 } catch (Exception $e) {
     http_response_code(500);
     echo json_encode(["status" => "error", "message" => $e->getMessage()]);

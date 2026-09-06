@@ -21,7 +21,8 @@ try {
         'advisor' => 3,
         'practical_instructor' => 4,
         'program_manager' => 5,
-        'project_manager' => 6
+        'project_manager' => 6,
+        'research' => 9
     ];
     $positionSlugMap = array_flip($positionMap);
 

@@ -39,12 +39,10 @@ function studentName(PDO $db, string $studentId): string
         SELECT TRIM(CONCAT(COALESCE(title, ''), COALESCE(first_name_th, ''), ' ', COALESCE(last_name_th, ''))) AS name
         FROM student
         WHERE CAST(student_id AS CHAR) = :student_id
-           OR CAST(student_code AS CHAR) = :student_code
         LIMIT 1
     ");
     $stmt->execute([
         ':student_id' => $studentId,
-        ':student_code' => $studentId,
     ]);
     $name = trim((string)$stmt->fetchColumn());
     return $name !== '' ? $name : $studentId;

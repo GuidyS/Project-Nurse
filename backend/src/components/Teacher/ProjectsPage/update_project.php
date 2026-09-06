@@ -3,11 +3,11 @@ require_once __DIR__ . '/../ProjectShared/project_helpers.php';
 require_once __DIR__ . '/../MyProjects/my_project_member_helpers.php';
 
 $db = project_db();
-$auth = project_require_auth($db, ['PROJECT_VIEW', 'PROJECT_MY_VIEW']);
+$auth = project_require_auth($db, ['PROJECT_VIEW']);
 project_require_admin_write($auth);
 $input = project_payload();
 
-function update_project_nullable_number(mixed $value, string $label): ?float
+function update_project_page_nullable_number(mixed $value, string $label): ?float
 {
     if ($value === null || $value === '') {
         return null;
@@ -20,173 +20,185 @@ function update_project_nullable_number(mixed $value, string $label): ?float
     return (float) $value;
 }
 
-function update_project_nullable_percent(mixed $value): ?float
+function update_project_page_budget_result(array $input): ?string
 {
-    if ($value === null || $value === '') {
-        return null;
+    $source = trim((string)($input['budget_source'] ?? ''));
+    $note = trim((string)($input['budget_note'] ?? ''));
+    $parts = [];
+
+    if ($source !== '') {
+        $parts[] = 'แหล่งงบ: ' . $source;
     }
 
-    if (!is_numeric($value)) {
-        throw new InvalidArgumentException('ความคืบหน้าต้องเป็นตัวเลข');
+    if ($note !== '') {
+        $parts[] = $note;
     }
 
-    return max(0, min(100, (float) $value));
+    return empty($parts) ? null : implode(' | ', $parts);
+}
+
+function update_project_page_responsible_faculty_id(PDO $db, array $input): int
+{
+    $facultyId = filter_var($input['responsible_faculty_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+    if ($facultyId === false) {
+        throw new InvalidArgumentException('กรุณาเลือกผู้ดำเนินโครงการ');
+    }
+
+    $stmt = $db->prepare('SELECT faculty_id FROM faculty WHERE faculty_id = :faculty_id LIMIT 1');
+    $stmt->execute([':faculty_id' => (int)$facultyId]);
+    if ($stmt->fetchColumn() === false) {
+        throw new InvalidArgumentException('ไม่พบอาจารย์ผู้ดำเนินโครงการในระบบ');
+    }
+
+    return (int)$facultyId;
 }
 
 try {
-    $projectId = isset($input['project_id']) ? (int) $input['project_id'] : 0;
-    $nameTh = trim((string) ($input['project_name_th'] ?? ''));
+    $projectId = isset($input['project_id']) ? (int)$input['project_id'] : 0;
+    $nameTh = trim((string)($input['project_name_th'] ?? ''));
 
     if ($projectId <= 0 || $nameTh === '') {
         project_json(["status" => "error", "message" => "ข้อมูลไม่ครบถ้วน"], 400);
         exit;
     }
 
-    $project = project_require_existing_project($db, $projectId);
-    if (!project_has_permission($auth, 'PROJECT_VIEW')) {
-        $facultyId = project_resolve_faculty_id($db, $auth['user_id']);
-        if ($facultyId === null || (int) ($project['responsible_faculty_id'] ?? 0) !== $facultyId) {
-            project_json(["status" => "error", "message" => "ไม่มีสิทธิ์แก้ไขโครงการนี้"], 403);
+    $allowedProjectTypes = ['academic_service', 'culture', 'other'];
+    $projectType = $input['project_type'] ?? 'other';
+    if (!in_array($projectType, $allowedProjectTypes, true)) {
+        project_json(["status" => "error", "message" => "ประเภทโครงการไม่ถูกต้อง"], 422);
+        exit;
+    }
+
+    $academicYear = (int)($input['academic_year'] ?? 0);
+    if ($academicYear < 2500 || $academicYear > 2700) {
+        project_json(["status" => "error", "message" => "ปีการศึกษาต้องอยู่ระหว่าง พ.ศ. 2500-2700"], 422);
+        exit;
+    }
+
+    $startDate = !empty($input['start_date']) ? (string)$input['start_date'] : null;
+    $endDate = !empty($input['end_date']) ? (string)$input['end_date'] : null;
+    if ($startDate !== null && $endDate !== null && $endDate < $startDate) {
+        project_json(["status" => "error", "message" => "วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่มต้น"], 400);
+        exit;
+    }
+
+    $budgetAllocated = update_project_page_nullable_number($input['budget_allocated'] ?? null, 'งบเสนอ');
+    $budgetSpent = update_project_page_nullable_number($input['budget_spent'] ?? null, 'งบใช้จริง');
+    if ($budgetAllocated !== null && $budgetAllocated < 0) {
+        project_json(["status" => "error", "message" => "งบเสนอต้องไม่ติดลบ"], 400);
+        exit;
+    }
+    if ($budgetSpent !== null && $budgetSpent < 0) {
+        project_json(["status" => "error", "message" => "งบใช้จริงต้องไม่ติดลบ"], 400);
+        exit;
+    }
+
+    $status = project_normalize_status($input['status'] ?? 'active');
+    $responsibleFacultyId = update_project_page_responsible_faculty_id($db, $input);
+    my_project_ensure_member_table($db);
+    $memberFacultyIds = my_project_normalize_member_faculty_ids($db, $input, $responsibleFacultyId);
+    $memberCount = count($memberFacultyIds) + 1;
+
+    $currentStmt = $db->prepare("SELECT project_type FROM project WHERE project_id = :project_id LIMIT 1");
+    $currentStmt->execute([':project_id' => $projectId]);
+    $currentProjectType = $currentStmt->fetchColumn();
+    if ($currentProjectType === false) {
+        project_json(["status" => "error", "message" => "ไม่พบโครงการ"], 404);
+        exit;
+    }
+
+    if ($projectType !== 'academic_service') {
+        $linkStmt = $db->prepare("SELECT COUNT(*) FROM project_outcome_links WHERE project_id = :project_id");
+        $linkStmt->execute([':project_id' => $projectId]);
+        if ((int)$linkStmt->fetchColumn() > 0) {
+            project_json([
+                "status" => "error",
+                "message" => "โครงการนี้มีการเชื่อม CLO/PLO/YLO อยู่ กรุณานำการเชื่อมโยงออกก่อนเปลี่ยนประเภท",
+            ], 409);
             exit;
         }
     }
 
-    my_project_ensure_member_table($db);
-    $memberFacultyIds = array_key_exists('member_faculty_ids', $input)
-        ? my_project_normalize_member_faculty_ids($db, $input, 0)
-        : [];
-    $memberCount = array_key_exists('member_faculty_ids', $input)
-        ? count($memberFacultyIds)
-        : project_nullable_non_negative_int($input, 'member_count', 'จำนวนสมาชิก');
-
-    $hasBudgetInput = array_key_exists('budget_allocated', $input) || array_key_exists('budget_spent', $input);
-    $hasProgressInput = array_key_exists('progress_percent', $input);
-    $budgetAllocated = $hasBudgetInput ? update_project_nullable_number($input['budget_allocated'] ?? null, 'งบประมาณที่ได้รับ') : null;
-    $budgetSpent = $hasBudgetInput ? update_project_nullable_number($input['budget_spent'] ?? null, 'งบที่ใช้จริง') : null;
-    $progressPercent = $hasProgressInput ? update_project_nullable_percent($input['progress_percent'] ?? null) : null;
-
-    if ($budgetAllocated !== null && $budgetAllocated < 0) {
-        project_json(["status" => "error", "message" => "งบประมาณที่ได้รับต้องไม่ติดลบ"], 400);
-        exit;
+    if ($status === 'completed') {
+        $progressStmt = $db->prepare("SELECT COALESCE(MAX(actual_percent), 0) FROM project_progress_logs WHERE project_id = :project_id");
+        $progressStmt->execute([':project_id' => $projectId]);
+        if ((float)$progressStmt->fetchColumn() < 100) {
+            project_json(["status" => "error", "message" => "ต้องมีความคืบหน้า 100% ก่อนเปลี่ยนเป็นเสร็จสิ้น"], 400);
+            exit;
+        }
     }
 
-    if ($budgetSpent !== null && $budgetSpent < 0) {
-        project_json(["status" => "error", "message" => "งบที่ใช้จริงต้องไม่ติดลบ"], 400);
-        exit;
-    }
-
-    $fields = [
-        'project_name_th = :name_th',
-        'project_name_en = :name_en',
-        'description = :description',
-    ];
-    $params = [
-        ':name_th' => $nameTh,
-        ':name_en' => trim((string) ($input['project_name_en'] ?? '')),
-        ':description' => trim((string) ($input['description'] ?? '')),
-        ':project_id' => $projectId,
-    ];
-
-    if (array_key_exists('strategy', $input)) {
-        $fields[] = 'strategy = :strategy';
-        $params[':strategy'] = trim((string) ($input['strategy'] ?? '')) ?: null;
-    }
-
-    if (array_key_exists('academic_year', $input)) {
-        $fields[] = 'academic_year = :academic_year';
-        $params[':academic_year'] = $input['academic_year'] !== '' && $input['academic_year'] !== null
-            ? (int) $input['academic_year']
-            : null;
-    }
-
-    if (array_key_exists('status', $input)) {
-        $fields[] = 'status = :status';
-        $params[':status'] = project_normalize_status($input['status'] ?? 'active');
-    }
-
-    if (array_key_exists('start_date', $input)) {
-        $fields[] = 'start_date = :start_date';
-        $params[':start_date'] = !empty($input['start_date']) ? $input['start_date'] : null;
-    }
-
-    if (array_key_exists('end_date', $input)) {
-        $fields[] = 'end_date = :end_date';
-        $params[':end_date'] = !empty($input['end_date']) ? $input['end_date'] : null;
-    }
-
-    if (array_key_exists('member_faculty_ids', $input) || array_key_exists('member_count', $input)) {
-        $fields[] = "mapping_json = JSON_SET(COALESCE(mapping_json, JSON_OBJECT()), '$.member_count', :member_count)";
-        $params[':member_count'] = $memberCount;
+    if ($projectType !== 'culture') {
+        $satisfactionStmt = $db->prepare("SELECT COUNT(*) FROM project_satisfaction_responses WHERE project_id = :project_id");
+        $satisfactionStmt->execute([':project_id' => $projectId]);
+        if ((int)$satisfactionStmt->fetchColumn() > 0) {
+            project_json([
+                "status" => "error",
+                "message" => "โครงการนี้มีข้อมูลความพึงพอใจอยู่ กรุณาลบข้อมูลก่อนเปลี่ยนประเภท",
+            ], 409);
+            exit;
+        }
     }
 
     $db->beginTransaction();
 
-    $sql = 'UPDATE project SET ' . implode(', ', $fields) . ' WHERE project_id = :project_id';
-    $stmt = $db->prepare($sql);
-    $stmt->execute($params);
+    $stmt = $db->prepare("
+        UPDATE project
+        SET project_name_th = :name_th,
+            project_name_en = :name_en,
+            description = :description,
+            project_type = :project_type,
+            responsible_faculty_id = :responsible_faculty_id,
+            academic_year = :academic_year,
+            status = :status,
+            start_date = :start_date,
+            end_date = :end_date,
+            mapping_json = JSON_SET(COALESCE(mapping_json, JSON_OBJECT()), '$.member_count', :member_count)
+        WHERE project_id = :project_id
+    ");
+    $stmt->execute([
+        ':name_th' => $nameTh,
+        ':name_en' => trim((string)($input['project_name_en'] ?? '')),
+        ':description' => trim((string)($input['description'] ?? '')),
+        ':project_type' => $projectType,
+        ':responsible_faculty_id' => $responsibleFacultyId,
+        ':academic_year' => $academicYear,
+        ':status' => $status,
+        ':start_date' => $startDate,
+        ':end_date' => $endDate,
+        ':member_count' => $memberCount,
+        ':project_id' => $projectId,
+    ]);
 
-    if (array_key_exists('member_faculty_ids', $input)) {
-        my_project_replace_faculty_members($db, $projectId, $memberFacultyIds);
-    }
+    my_project_replace_faculty_members($db, $projectId, $memberFacultyIds);
 
-    if ($hasBudgetInput) {
-        $deleteBudgetStmt = $db->prepare('DELETE FROM project_budget_years WHERE project_id = :project_id');
-        $deleteBudgetStmt->execute([':project_id' => $projectId]);
+    $budgetResult = update_project_page_budget_result($input);
+    $deleteBudgetStmt = $db->prepare('DELETE FROM project_budget_years WHERE project_id = :project_id');
+    $deleteBudgetStmt->execute([':project_id' => $projectId]);
 
-        if ($budgetAllocated !== null || $budgetSpent !== null) {
-            $fiscalYear = isset($input['academic_year']) && $input['academic_year'] !== '' && $input['academic_year'] !== null
-                ? (int) $input['academic_year']
-                : (int) date('Y') + 543;
-            $budgetStmt = $db->prepare("
-                INSERT INTO project_budget_years (
-                    project_id,
-                    fiscal_year,
-                    budget_allocated,
-                    budget_spent
-                ) VALUES (
-                    :project_id,
-                    :fiscal_year,
-                    :budget_allocated,
-                    :budget_spent
-                )
-            ");
-            $budgetStmt->execute([
-                ':project_id' => $projectId,
-                ':fiscal_year' => $fiscalYear,
-                ':budget_allocated' => $budgetAllocated ?? 0,
-                ':budget_spent' => $budgetSpent ?? 0,
-            ]);
-        }
-    }
-
-    if ($hasProgressInput) {
-        $deleteProgressStmt = $db->prepare('DELETE FROM project_progress_logs WHERE project_id = :project_id');
-        $deleteProgressStmt->execute([':project_id' => $projectId]);
-
-        if ($progressPercent !== null) {
-            $progressStmt = $db->prepare("
-                INSERT INTO project_progress_logs (
-                    project_id,
-                    period_label,
-                    planned_percent,
-                    actual_percent,
-                    logged_at
-                ) VALUES (
-                    :project_id,
-                    :period_label,
-                    :planned_percent,
-                    :actual_percent,
-                    :logged_at
-                )
-            ");
-            $progressStmt->execute([
-                ':project_id' => $projectId,
-                ':period_label' => 'อัปเดตความคืบหน้า',
-                ':planned_percent' => 100,
-                ':actual_percent' => $progressPercent,
-                ':logged_at' => !empty($input['start_date']) ? $input['start_date'] : date('Y-m-d'),
-            ]);
-        }
+    if ($budgetAllocated !== null || $budgetSpent !== null || $budgetResult !== null) {
+        $budgetStmt = $db->prepare("
+            INSERT INTO project_budget_years (
+                project_id,
+                fiscal_year,
+                budget_allocated,
+                budget_spent,
+                result
+            ) VALUES (
+                :project_id,
+                :fiscal_year,
+                :budget_allocated,
+                :budget_spent,
+                :result
+            )
+        ");
+        $budgetStmt->execute([
+            ':project_id' => $projectId,
+            ':fiscal_year' => $academicYear,
+            ':budget_allocated' => $budgetAllocated ?? 0,
+            ':budget_spent' => $budgetSpent ?? 0,
+            ':result' => $budgetResult,
+        ]);
     }
 
     $db->commit();

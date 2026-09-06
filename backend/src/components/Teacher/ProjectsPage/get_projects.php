@@ -30,6 +30,7 @@ try {
             p.project_name_th,
             p.project_name_en,
             p.description,
+            p.project_type,
             p.strategy,
             p.responsible_faculty_id,
             CONCAT_WS(' ', NULLIF(f.title, ''), NULLIF(f.first_name_th, ''), NULLIF(f.last_name_th, '')) AS responsible_name,
@@ -43,6 +44,11 @@ try {
             END AS members,
             COALESCE(pb.budget, 0) AS budget,
             COALESCE(pb.spent, 0) AS spent,
+            COALESCE(pb.budget, 0) AS budget_allocated,
+            COALESCE(pb.spent, 0) AS budget_spent,
+            pb.project_budget_years_id,
+            pb.fiscal_year,
+            pb.budget_note,
             COALESCE(pl.progress, 0) AS progress
         FROM project p
         LEFT JOIN faculty f ON f.faculty_id = p.responsible_faculty_id
@@ -58,8 +64,11 @@ try {
         ) pfm ON pfm.project_id = p.project_id
         LEFT JOIN (
             SELECT project_id,
+                   MAX(project_budget_years_id) AS project_budget_years_id,
+                   MAX(fiscal_year) AS fiscal_year,
                    SUM(COALESCE(budget_allocated, 0)) AS budget,
-                   SUM(COALESCE(budget_spent, 0)) AS spent
+                   SUM(COALESCE(budget_spent, 0)) AS spent,
+                   MAX(result) AS budget_note
             FROM project_budget_years
             GROUP BY project_id
         ) pb ON pb.project_id = p.project_id
@@ -136,7 +145,7 @@ try {
                     "id" => (int) ($project['responsible_faculty_id'] ?? 0),
                     "name" => $responsibleName,
                     "type" => "faculty",
-                    "role" => "ผู้รับผิดชอบโครงการ",
+                    "role" => "ผู้ดำเนินโครงการ",
                 ];
             }
         }
@@ -217,6 +226,15 @@ try {
             static fn(array $member): string => (string) $member['name'],
             $project['member_details']
         );
+        $project['member_faculty_ids'] = array_values(array_map(
+            static fn(array $member): int => (int) $member['id'],
+            array_filter(
+                $project['member_details'],
+                static fn(array $member): bool => ($member['type'] ?? '') === 'faculty'
+                    && (int) ($member['id'] ?? 0) > 0
+                    && (int) ($member['id'] ?? 0) !== (int) ($project['responsible_faculty_id'] ?? 0)
+            )
+        ));
     }
     unset($project);
 

@@ -11,6 +11,10 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
+    environment:
+      # 🔧 vite.config.ts อ่านค่านี้จาก process.env — ถ้าไม่เปิด Hot Reload จะไม่ทำงาน
+      # บน Windows/macOS ที่ใช้ bind mount เพราะ container ไม่ได้รับ event การแก้ไฟล์
+      - VITE_USE_POLLING=true
     stdin_open: true # จำเป็นสำหรับ React Docker
     tty: true
 

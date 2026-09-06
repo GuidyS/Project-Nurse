@@ -546,16 +546,7 @@ export default function MyProjects() {
                       </CardTitle>
                       <CardDescription className="mt-1">ประเภท: {project.type}</CardDescription>
                     </div>
-                    {project.can_edit !== false && (
-                      <div>
-                        <Button
-                          variant="ghost"
-                          onClick={() => openEditDialog(project)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    )}
+
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">

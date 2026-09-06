@@ -22,14 +22,6 @@ interface UserWithRole {
   teacherSubRole?: string;
 }
 
-interface ApiUser {
-  id: string | number;
-  email: string;
-  fullName: string;
-  role: string;
-  teacherSubRole?: string;
-}
-
 type RoleTab = "teacher" | "student" | "admin" | "unassigned";
 
 const roles = [
@@ -42,6 +34,7 @@ const teacherSubRoles = [
   { value: "dean", label: "คณบดี" },
   { value: "instructor", label: "อาจารย์ประจำ" },
   { value: "project_manager", label: "อาจารย์รับผิดชอบโครงการ" },
+  { value: "research", label: "อาจารย์งานวิจัย" },
   { value: "program_manager", label: "อาจารย์รับผิดชอบหลักสูตร" },
   { value: "advisor", label: "อาจารย์ที่ปรึกษา" },
   { value: "practical_instructor", label: "อาจารย์ภาคปฏิบัติ" },
@@ -55,9 +48,9 @@ const roleLabels: Record<string, string> = {
 };
 
 const roleTabs: { value: RoleTab; label: string }[] = [
-  { value: "admin", label: "ผู้ดูแลระบบ" },
   { value: "teacher", label: "อาจารย์" },
   { value: "student", label: "นักศึกษา" },
+  { value: "admin", label: "ผู้ดูแลระบบ" },
   { value: "unassigned", label: "รอจัดบทบาท" },
 ];
 
@@ -65,6 +58,7 @@ const subRoleLabels: Record<string, string> = {
   dean: "คณบดี",
   instructor: "อาจารย์ประจำ",
   project_manager: "อาจารย์รับผิดชอบโครงการ",
+  research: "อาจารย์งานวิจัย",
   program_manager: "อาจารย์รับผิดชอบหลักสูตร",
   advisor: "อาจารย์ที่ปรึกษา",
   practical_instructor: "อาจารย์ภาคปฏิบัติ",
@@ -98,10 +92,10 @@ export default function RolesManagement() {
 // ดึงข้อมูลผู้ใช้จาก API ตัวเดียวกัน
   const fetchUsers = async () => {
     try {
-      const response = await api.get<ApiUser[]>("/index.php?page=get-users");
+      const response = await api.get("/index.php?page=get-users");
       // Map ให้ตรงกับ Interface UserWithRole
-      setUsers(response.data.map((u) => ({
-        id: String(u.id), email: u.email, fullName: u.fullName,
+      setUsers(response.data.map((u: any) => ({
+        id: u.id, email: u.email, fullName: u.fullName, 
         currentRole: u.role, teacherSubRole: u.teacherSubRole
       })));
     } catch (error) {
@@ -139,15 +133,10 @@ export default function RolesManagement() {
       toast({ title: "มอบหมาย Role สำเร็จ" });
       setIsDialogOpen(false);
       fetchUsers(); // โหลดข้อมูลใหม่เพื่อให้ UI อัปเดต
-    } catch (error: unknown) {
-      const message =
-        typeof error === "object" && error !== null && "response" in error
-          ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
-          : undefined;
-
+    } catch (error: any) {
       toast({
         title: "เกิดข้อผิดพลาด",
-        description: message || "ไม่สามารถอัปเดต Role ได้",
+        description: error.response?.data?.message || "ไม่สามารถอัปเดต Role ได้",
         variant: "destructive",
       });
     }
@@ -213,18 +202,16 @@ export default function RolesManagement() {
       <div className="p-6 space-y-6 animate-fade-in">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-foreground py-1">จัดการ Role</h1>
+            <h1 className="text-3xl font-bold text-foreground">จัดการ Role</h1>
             <p className="text-muted-foreground">มอบหมายและถอด Role ของผู้ใช้ในระบบ</p>
           </div>
         </div>
-
-        
 
         <Card>
           <CardHeader className="space-y-4">
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <div>
-                <CardTitle className="py-2">ตำแหน่งผู้ใช้</CardTitle>
+                <CardTitle>จัดการ Role ผู้ใช้</CardTitle>
                 <CardDescription>
                   {roleLabels[roleTab]} {tabCount(roleTab)} คน · ทั้งหมด {users.length} คน
                 </CardDescription>
@@ -315,7 +302,7 @@ export default function RolesManagement() {
         </Card>
 
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="app-dialog-2xl">
+          <DialogContent className="sm:max-w-2xl">
             <DialogHeader className="space-y-1.5">
               <DialogTitle>มอบหมาย Role</DialogTitle>
               <DialogDescription>
@@ -378,20 +365,19 @@ export default function RolesManagement() {
                             key={subRole.value}
                             type="button"
                             variant="outline"
-                            aria-disabled={isPrimary}
-                            tabIndex={isPrimary ? -1 : undefined}
+                            disabled={isPrimary}
                             className={cn(
                               "h-auto min-h-[52px] items-center justify-between gap-3 whitespace-normal rounded-lg px-3 py-2.5 text-left leading-snug transition-all",
-                              "role-position-option",
-                              isSelected && "role-position-option-selected",
-                              isPrimary && "role-position-option-primary"
+                              "border-border/80 bg-background/60 hover:border-primary/60 hover:bg-primary/5",
+                              isSelected && "border-primary/70 bg-primary/10 text-primary hover:bg-primary/15",
+                              isPrimary && "border-muted bg-muted/30 text-muted-foreground opacity-70"
                             )}
                             onClick={() => toggleSecondaryPosition(subRole.value)}
                           >
                             <span className="min-w-0 flex-1 break-words">
                               {subRole.label}
                               {isPrimary && (
-                                <span className="role-position-option-note mt-1 block text-xs">
+                                <span className="mt-1 block text-xs text-muted-foreground">
                                   ตำแหน่งหลัก
                                 </span>
                               )}

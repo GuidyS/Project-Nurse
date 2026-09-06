@@ -7,19 +7,29 @@ project_require_admin_write($auth);
 $input = project_payload();
 
 try {
-    $projectId = isset($input['project_id']) ? (int) $input['project_id'] : 0;
+    $projectId = isset($input['project_id']) ? (int)$input['project_id'] : 0;
     if ($projectId <= 0) {
         project_json(["status" => "error", "message" => "Missing ID"], 400);
         exit;
     }
 
-    project_require_existing_project($db, $projectId);
+    $db->beginTransaction();
 
-    $stmt = $db->prepare("DELETE FROM project WHERE project_id = :project_id");
-    $stmt->execute([':project_id' => $projectId]);
+    $stmt = $db->prepare("DELETE FROM student_project_outcome_results WHERE project_id = :id");
+    $stmt->execute([':id' => $projectId]);
+    $stmt = $db->prepare("DELETE FROM project_satisfaction_responses WHERE project_id = :id");
+    $stmt->execute([':id' => $projectId]);
+    $stmt = $db->prepare("DELETE FROM project WHERE project_id = :id");
+    $stmt->execute([':id' => $projectId]);
+
+    $db->commit();
 
     project_json(["status" => "success", "message" => "ลบข้อมูลสำเร็จ"]);
 } catch (Exception $e) {
-    project_json(["status" => "error", "message" => "ไม่สามารถลบได้: " . $e->getMessage()], 500);
+    if ($db->inTransaction()) {
+        $db->rollBack();
+    }
+
+    project_json(["status" => "error", "message" => "ไม่สามารถลบได้ (อาจมีการใช้งานอยู่)"], 500);
 }
 ?>

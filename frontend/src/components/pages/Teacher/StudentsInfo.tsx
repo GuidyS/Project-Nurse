@@ -155,7 +155,9 @@ const StudentsInfo = () => {
   const fetchStudents = async () => {
     try {
       setLoading(true);
-      const res = await api.get('/components/Teacher/Advises/get_advises.php');
+      // หน้านี้แสดงเฉพาะนักศึกษาฝั่ง "ภาคปฏิบัติ" (สัดส่วน 1:8)
+      // ส่วนนักศึกษาในที่ปรึกษา (1:12) อยู่ที่หน้า "นักศึกษาในความดูแล"
+      const res = await api.get('/index.php?page=get-advises&advisor_type=practical');
       if (res.data.status === 'success') {
         const formattedData = res.data.data.map((item: any) => ({
           ...item,
@@ -442,8 +444,10 @@ const StudentsInfo = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">นักศึกษาในที่ปรึกษา</h1>
-          <p className="text-muted-foreground mt-1">จัดการข้อมูลนักศึกษาและติดตาม PLO/YLO/CLO</p>
+          <h1 className="text-3xl font-bold tracking-tight">นักศึกษาภาคปฏิบัติ</h1>
+          <p className="text-muted-foreground mt-1">
+            จัดการข้อมูลนักศึกษาที่อยู่ในความดูแลภาคปฏิบัติ (สัดส่วน 1:8)
+          </p>
         </div>
         <Button variant="outline" className="gap-2" onClick={handleExport}>
           <Download className="h-4 w-4" />
@@ -474,7 +478,6 @@ const StudentsInfo = () => {
               <TableHead>ชั้นปี</TableHead>
               <TableHead>เกรดเฉลี่ย</TableHead>
               <TableHead>สถานะ</TableHead>
-              <TableHead>PLO Mapping</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -501,12 +504,6 @@ const StudentsInfo = () => {
                   </span>
                 </TableCell>
                 <TableCell>{getStatusBadge(student.status)}</TableCell>
-                <TableCell>
-                  <Button variant="outline" size="sm" className="gap-2" onClick={(e) => { e.stopPropagation(); openMappingDialog(student); }}>
-                    <Target className="h-4 w-4" />
-                    ติ้ก PLO/CLO
-                  </Button>
-                </TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -585,10 +582,6 @@ const StudentsInfo = () => {
                 <Button variant="outline" className="gap-2" onClick={() => openMessageDialog()}>
                   <Mail className="h-4 w-4" />
                   ส่งข้อความ
-                </Button>
-                <Button className="gap-2" onClick={() => openMappingDialog()}>
-                  <Target className="h-4 w-4" />
-                  ติ๊ก PLO/CLO
                 </Button>
               </div>
             </div>

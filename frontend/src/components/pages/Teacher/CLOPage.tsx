@@ -465,6 +465,8 @@ export default function CLOPage() {
 
   const [addFormData, setAddFormData] = useState<CLOFormData>(EMPTY_FORM);
   const [editFormData, setEditFormData] = useState<CLOFormData>(EMPTY_FORM);
+  // เฉพาะ admin เท่านั้นที่แก้ YLO / Sub PLO ของหลักสูตรได้ (backend ตรวจซ้ำอีกชั้น)
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     const fetchCourses = async () => {
@@ -473,6 +475,7 @@ export default function CLOPage() {
         if (res.data.status === 'success') {
           const list: Course[] = res.data.data || [];
           setCourses(list);
+          setIsAdmin(res.data.is_admin === true);
           // เลือกวิชาแรกอัตโนมัติ เพื่อให้ matrix/catalog โหลดก่อนเปิด dialog "แก้ไข YLO"
           if (list.length > 0) {
             setSelectedCourse((prev) => prev || `${list[0].subject_id}`);
@@ -655,9 +658,11 @@ export default function CLOPage() {
           <h1 className="text-3xl font-bold tracking-tight leading-snug">การจัดการ CLO รายวิชา</h1>
           <p className="text-muted-foreground">Course Learning Outcomes Management</p>
         </div>
-        <Button variant="outline" className="gap-2" onClick={() => setYloEditorOpen(true)}>
-          <Settings2 className="h-4 w-4" /> แก้ไข YLO
-        </Button>
+        {isAdmin && (
+          <Button variant="outline" className="gap-2" onClick={() => setYloEditorOpen(true)}>
+            <Settings2 className="h-4 w-4" /> แก้ไข YLO
+          </Button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -807,8 +812,21 @@ export default function CLOPage() {
           ) : (
             <div className="bg-card rounded-xl shadow-card p-12 text-center">
               <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="font-semibold text-foreground mb-2">เลือกรายวิชา</h3>
-              <p className="text-sm text-muted-foreground">กรุณาเลือกรายวิชาด้านซ้ายมือเพื่อดูและแก้ไข CLO</p>
+              {courses.length === 0 ? (
+                <>
+                  <h3 className="font-semibold text-foreground mb-2">ไม่มีรายวิชาที่คุณรับผิดชอบ</h3>
+                  <p className="text-sm text-muted-foreground">
+                    คุณยังไม่ได้เป็นผู้สอนรายวิชาใด จึงยังไม่มีวิชาให้จัดการ CLO
+                    <br />
+                    หากต้องการสิทธิ์ กรุณาติดต่อผู้ดูแลระบบเพื่อมอบหมายรายวิชา
+                  </p>
+                </>
+              ) : (
+                <>
+                  <h3 className="font-semibold text-foreground mb-2">เลือกรายวิชา</h3>
+                  <p className="text-sm text-muted-foreground">กรุณาเลือกรายวิชาด้านซ้ายมือเพื่อดูและแก้ไข CLO</p>
+                </>
+              )}
             </div>
           )}
         </div>

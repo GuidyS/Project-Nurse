@@ -4,6 +4,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 require_once __DIR__ . '/curriculum_repository.php';
+require_once __DIR__ . '/clo_access_helpers.php';
 
 $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -37,6 +38,20 @@ try {
         $subjectStmt = $pdo->prepare("SELECT subject_code FROM subject WHERE subject_id = :subject_id LIMIT 1");
         $subjectStmt->execute([':subject_id' => $input['subject_id']]);
         $subjectCode = $subjectStmt->fetchColumn() ?: null;
+    }
+
+    // ลบ CLO ได้เฉพาะวิชาที่ตนเองสอน (admin ลบได้ทุกวิชา)
+    $ownerCode = $subjectCode;
+    if ($ownerCode === null) {
+        foreach (listAllClosDetailed($pdo, $frameworkId) as $clo) {
+            if ((int)$clo['id'] === (int)$input['clo_id']) {
+                $ownerCode = $clo['subject_code'] ?? null;
+                break;
+            }
+        }
+    }
+    if ($ownerCode !== null && !cloAccessCanEditSubject($pdo, $_SESSION['user_id'], (string)$ownerCode)) {
+        cloAccessDenySubject((string)$ownerCode);
     }
 
     $pdo->beginTransaction();

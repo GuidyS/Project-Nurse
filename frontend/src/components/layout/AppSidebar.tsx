@@ -2,7 +2,6 @@ import * as Icons from 'lucide-react';
 import { 
   ChevronLeft,
   LogOut,
-  type LucideIcon,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -19,7 +18,7 @@ import {
   useSidebar
 } from '@/components/ui/sidebar';
 import { toast } from 'sonner';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import api from '@/lib/axios';
 
 interface SidebarProps {
@@ -27,31 +26,7 @@ interface SidebarProps {
   activeItem: string;
 }
 
-interface SidebarUser {
-  username?: string;
-  full_name_th?: string;
-  first_name_th?: string;
-  last_name_th?: string;
-  first_name_en?: string;
-  last_name_en?: string;
-  name?: string;
-  permissions?: string[];
-  [key: string]: unknown;
-}
-
-interface MenuItem {
-  title: string;
-  url: string;
-  icon: string;
-  permission?: string;
-}
-
-interface MenuSection {
-  sectionTitle?: string;
-  items: MenuItem[];
-}
-
-const readStoredUser = (): SidebarUser => {
+const readStoredUser = () => {
   try {
     return JSON.parse(localStorage.getItem('user') || '{}');
   } catch {
@@ -59,7 +34,7 @@ const readStoredUser = (): SidebarUser => {
   }
 };
 
-const getDisplayName = (user: SidebarUser) => {
+const getDisplayName = (user: any) => {
   const username = typeof user.username === 'string' ? user.username.trim() : '';
   const candidates = [
     user.full_name_th,
@@ -75,19 +50,33 @@ const getDisplayName = (user: SidebarUser) => {
 
 export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
 
-  const [menuSections, setMenuSections] = useState<MenuSection[]>([]);
+  const [menuSections, setMenuSections] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [sidebarUser, setSidebarUser] = useState<SidebarUser>(() => readStoredUser());
+  const [sidebarUser, setSidebarUser] = useState<any>(() => readStoredUser());
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
+
+  const fetchMenus = useCallback(async () => {
+    try {
+      const res = await api.get('/index.php?page=sidebar');
+      const sections = Array.isArray(res.data) ? res.data : [];
+      console.log('Menu Data:', sections);
+      setMenuSections(sections);
+    } catch (error) {
+      console.error('Failed to fetch menus:', error);
+      toast.error('โหลดเมนูไม่สำเร็จ');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   const fetchUnreadCount = async () => {
     try {
       const response = await api.get("/index.php?page=get-notifications");
       const data = Array.isArray(response.data) ? response.data : (response.data?.data || []);
       // กรองเฉพาะการแจ้งเตือนที่ได้รับและยังไม่ได้อ่าน
-      const count = data.filter((n: { direction?: string; isRead?: boolean }) => n.direction === "received" && !n.isRead).length;
+      const count = data.filter((n: any) => n.direction === "received" && !n.isRead).length;
       setUnreadCount(count);
     } catch (error) {
       console.error("Failed to fetch unread notifications count");
@@ -95,21 +84,6 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
   };
 
   useEffect(() => {
-    const fetchMenus = async () => {
-      try {
-        // เรียก API (ตรวจสอบ Path ให้ตรงกับที่วาง index.php ไว้)
-        const res = await api.get(`/index.php?page=sidebar`);
-        
-        console.log("Menu Data:", res.data); // ลองเปิด console ดูว่าข้อมูลมาไหม
-        setMenuSections(Array.isArray(res.data) ? res.data : []);
-      } catch (error) {
-        console.error("Failed to fetch menus:", error);
-        toast.error("โหลดเมนูไม่สำเร็จ");
-      } finally {
-        setIsLoading(false); // มั่นใจว่า Loading จะหายไปแน่นอน
-      }
-    };
-
     const fetchUserProfile = async () => {
       try {
         const response = await api.get("/index.php?page=profile");
@@ -129,7 +103,6 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
       }
     };
 
-    fetchMenus();
     fetchUserProfile();
 
     fetchUnreadCount();
@@ -143,9 +116,32 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
     };
   }, []);
 
+  // โหลดใหม่เมื่อเปลี่ยนหน้า เพื่อไม่ให้ Sidebar ค้างอยู่กับข้อมูลจาก session ก่อนหน้า
+  useEffect(() => {
+    fetchMenus();
+  }, [activeItem, fetchMenus]);
+
+  // รองรับการอัปเดตเมนูจาก backend โดยไม่ต้อง logout/login ใหม่
+  useEffect(() => {
+    const refreshMenus = () => fetchMenus();
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') fetchMenus();
+    };
+
+    window.addEventListener('focus', refreshMenus);
+    window.addEventListener('app:sidebar-refresh', refreshMenus);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+
+    return () => {
+      window.removeEventListener('focus', refreshMenus);
+      window.removeEventListener('app:sidebar-refresh', refreshMenus);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
+  }, [fetchMenus]);
+
   // ฟังก์ชันแปลง String เป็น Component
   const getIcon = (iconName: string) => {
-    const IconComponent = (Icons as unknown as Record<string, LucideIcon>)[iconName];
+    const IconComponent = (Icons as any)[iconName];
     return IconComponent || Icons.HelpCircle; // ถ้าหาไม่เจอให้ใช้ HelpCircle แทน
   };
 
@@ -155,7 +151,7 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
   // หากไม่มีชื่อจะใช้ 'U' เป็นค่าเริ่มต้น
   const userInitial = userName.trim().charAt(0) || 'U';
 
-  const userPermissions = Array.isArray(sidebarUser.permissions) ? sidebarUser.permissions : [];
+  const userPermissions = sidebarUser.permissions || [];
 
   if (isLoading) return <div className="p-4">กำลังโหลดเมนู...</div>;
 
@@ -200,13 +196,13 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
           
           {/* พื้นที่ Logo */}
           <div className="relative h-10 w-10 shrink-0">
-            <div className="sidebar-brand-bg flex h-full w-full items-center justify-center rounded-full overflow-hidden shadow-sm">
+            <div className="flex h-full w-full items-center justify-center rounded-full bg-[#8a2be2] overflow-hidden shadow-sm">
               <img src="../../Nurse_logo.jpg" alt="Logo" className="object-cover w-full h-full" />
             </div>
 
             {/* ปุ่ม Trigger ตอน "หุบ" (จะแสดงทับ Logo เป๊ะๆ เมื่อ Hover) */}
             {collapsed && (
-              <SidebarTrigger className="sidebar-logo-trigger">
+              <SidebarTrigger className="absolute inset-0 h-full w-full opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-[#8a2be2]/80 text-white rounded-lg flex items-center justify-center border-none hover:bg-[#8a2be2]">
                 <ChevronLeft className="h-4 w-4 rotate-180" />
               </SidebarTrigger>
             )}
@@ -221,7 +217,7 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
               </div>
               
               {/* ปุ่ม Trigger กลับไปอยู่ที่เดิม (ขวาบน) เมื่อเปิดแถบ */}
-              <SidebarTrigger className="sidebar-toggle-button">
+              <SidebarTrigger className="text-sidebar-foreground/70 hover:bg-[#8a2be2]/10 hover:text-[#8a2be2]">
                 <ChevronLeft className="h-4 w-4" />
               </SidebarTrigger>
             </>
@@ -234,7 +230,7 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
         {menuSections.map((section, idx) => {
           // 1. กรองรายการเมนูที่ต้องการซ่อนออกก่อนเก็บไว้ในตัวแปร
           const filteredItems = section.items.filter(
-            (item) => !['notifications', 'profile', 'settings'].includes(item.url)
+            (item: any) => !['notifications', 'profile', 'settings'].includes(item.url)
           );
 
           // 2. ถ้ากลุ่มนี้ไม่มีเมนูเหลืออยู่เลย (ความยาวเป็น 0) ให้ส่งค่า null เพื่อไม่เรนเดอร์ทั้ง Section
@@ -250,7 +246,7 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
               )}
 
               <SidebarMenu>
-                {filteredItems.map((item) => {
+                {filteredItems.map((item: any) => {
                   const Icon = getIcon(item.icon);
                   const isActive = activeItem === item.url;
                   return (
@@ -260,8 +256,11 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
                         onClick={() => onItemClick(item.url)}
                         className={cn(
                           "w-full transition-all duration-200 mb-1 group",
-                          "sidebar-menu-action",
-                          isActive && "active",
+                          isActive 
+                            ? "bg-[#8a2be2]/10 text-[#8a2be2]" 
+                            : "hover:bg-[#8a2be2]/10 hover:text-[#8a2be2]",
+                          "active:bg-[#8a2be2]/10 active:text-[#8a2be2]",
+                          "focus:bg-[#8a2be2]/10 focus:text-[#8a2be2]",
                           "select-none"
                         )}
                       >
@@ -297,8 +296,13 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
                     onClick={() => onItemClick(item.url)}
                     className={cn(
                       "w-full transition-all duration-200 mb-1 group",
-                      "sidebar-menu-action focus-visible:ring-2",
-                      isActive && "active",
+                      isActive 
+                        ? "bg-[#8a2be2]/10 text-[#8a2be2]" 
+                        // เอา text-slate-600 ออกเพื่อให้สีสอดคล้องกับเมนูด้านบน
+                        : "hover:bg-[#8a2be2]/10 hover:text-[#8a2be2]", 
+                      "active:bg-[#8a2be2]/10 active:text-[#8a2be2]",
+                      "focus:bg-[#8a2be2]/10 focus:text-[#8a2be2]",
+                      "focus-visible:ring-2 focus-visible:ring-[#8a2be2]/50",
                       "select-none"
                     )}
                   >

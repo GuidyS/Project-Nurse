@@ -11,7 +11,42 @@ function project_json(array $payload, int $statusCode = 200): void
 
 function project_db(): Connect
 {
-    return new Connect();
+    $db = new Connect();
+    project_ensure_schema($db);
+
+    return $db;
+}
+
+/**
+ * เติมคอลัมน์ที่โค้ดโครงการต้องใช้ให้ตาราง project ถ้ายังไม่มี (รันซ้ำได้)
+ * ฐานข้อมูลบางชุดยังเป็น schema เก่ากว่าโค้ด เช่น dump 3-8-2569 ที่ไม่มีคอลัมน์ strategy
+ */
+function project_ensure_schema(PDO $db): void
+{
+    static $checked = false;
+    if ($checked) {
+        return;
+    }
+    $checked = true;
+
+    $columns = [
+        'strategy' => "ALTER TABLE project ADD COLUMN strategy VARCHAR(255) NULL DEFAULT NULL AFTER description",
+    ];
+
+    foreach ($columns as $column => $alterSql) {
+        $stmt = $db->prepare("
+            SELECT COUNT(*)
+            FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'project'
+              AND COLUMN_NAME = :column_name
+        ");
+        $stmt->execute([':column_name' => $column]);
+
+        if ((int) $stmt->fetchColumn() === 0) {
+            $db->exec($alterSql);
+        }
+    }
 }
 
 function project_require_auth(PDO $db, array $requiredPermissions = []): array

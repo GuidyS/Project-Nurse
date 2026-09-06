@@ -41,8 +41,12 @@ const Portfolio = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [newItem, setNewItem] = useState({ title: "", type: "certificate" as PortfolioItem["type"], description: "" });
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [newItem, setNewItem] = useState<{ title: string; type: PortfolioItem["type"]; description: string, google_drive_link: string }>({
+    title: "",
+    type: "certificate",
+    description: "",
+    google_drive_link: "",
+  });
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [detailItem, setDetailItem] = useState<any>(null);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
@@ -69,35 +73,29 @@ const Portfolio = () => {
     fetchPortfolio();
   }, []);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
-    }
-  };
+
 
   const handleAddItem = async () => {
-    if (!newItem.title || !selectedFile) {
-      toast({ title: "กรุณากรอกข้อมูลและแนบไฟล์ให้ครบถ้วน", variant: "destructive" });
+    if (!newItem.title || !newItem.google_drive_link) {
+      toast({ title: "กรุณากรอกข้อมูลและแนบลิงก์ Google Drive ให้ครบถ้วน", variant: "destructive" });
       return;
     }
 
     setIsUploading(true);
-    const formData = new FormData();
-    formData.append('title', newItem.title);
-    formData.append('type', newItem.type);
-    formData.append('description', newItem.description);
-    formData.append('file', selectedFile);
+    const payload = {
+      title: newItem.title,
+      type: newItem.type,
+      description: newItem.description,
+      google_drive_link: newItem.google_drive_link,
+    };
 
     try {
-      const res = await api.post('/index.php?page=save-portfolio', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+      const res = await api.post('/index.php?page=save-portfolio', payload);
 
       if (res.data.status === 'success') {
         toast({ title: "อัปโหลดสำเร็จ", description: `เพิ่ม ${newItem.title} เรียบร้อยแล้ว` });
         setIsAddDialogOpen(false);
-        setNewItem({ title: "", type: "certificate", description: "" });
-        setSelectedFile(null);
+        setNewItem({ title: "", type: "certificate", description: "", google_drive_link: "" });
         fetchPortfolio(); // รีเฟรชข้อมูลใหม่
       }
     } catch (error) {
@@ -207,23 +205,13 @@ const Portfolio = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>ไฟล์แนบ</Label>
-                  <div className="border-2 border-dashed border-border rounded-lg p-4 text-center">
-                    <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                    <Label htmlFor="portfolio-upload" className="cursor-pointer text-sm">
-                      <span className="text-primary font-medium">คลิกเพื่อเลือกไฟล์</span>
-                    </Label>
-                    <Input
-                      id="portfolio-upload"
-                      type="file"
-                      accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-                      className="hidden"
-                      onChange={handleFileChange}
-                    />
-                    {selectedFile && (
-                      <p className="mt-2 text-xs text-foreground">{selectedFile.name}</p>
-                    )}
-                  </div>
+                  <Label>ลิงก์ Google Drive (ต้องตั้งค่าเป็น Anyone with the link)</Label>
+                  <Input 
+                    type="url" 
+                    placeholder="https://drive.google.com/file/d/..."
+                    value={newItem.google_drive_link}
+                    onChange={(e) => setNewItem({ ...newItem, google_drive_link: e.target.value })} 
+                  />
                 </div>
               </div>
               <DialogFooter>

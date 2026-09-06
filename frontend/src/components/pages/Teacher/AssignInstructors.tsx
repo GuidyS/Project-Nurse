@@ -5,8 +5,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Users, Search, UserPlus, BookOpen, Edit, Loader2 } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
+import { Users, Search, UserPlus, BookOpen, Edit, Loader2, Check, ChevronsUpDown, CalendarRange } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import api from '@/lib/axios';
 import { useToast } from '@/hooks/use-toast';
@@ -17,6 +25,21 @@ export default function AssignInstructors() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState<string | null>(null);
   const [selectedInstructor, setSelectedInstructor] = useState('');
+  const [instructorSearch, setInstructorSearch] = useState('');
+  const [instructorPickerOpen, setInstructorPickerOpen] = useState(false);
+
+  // ค่าตั้งต้นระดับหน้า — กำหนดครั้งเดียวแล้วทุกวิชาที่มอบหมายจะใช้ค่านี้
+  // จำไว้ในเครื่องผู้ใช้ จะได้ไม่ต้องกรอกใหม่ทุกครั้งที่เปิดหน้า
+  const [defaultSemester, setDefaultSemester] = useState<string>(
+    () => localStorage.getItem('assignDefaultSemester') || ''
+  );
+  const [defaultAcademicYear, setDefaultAcademicYear] = useState<string>(
+    () => localStorage.getItem('assignDefaultAcademicYear') || ''
+  );
+
+  // ค่าของวิชาที่กำลังมอบหมาย (เริ่มจากค่าตั้งต้น แต่แก้รายวิชาได้)
+  const [formSemester, setFormSemester] = useState<string>('');
+  const [formAcademicYear, setFormAcademicYear] = useState<string>('');
 
   const [coursesList, setCoursesList] = useState<any[]>([]);
   const [instructorsList, setInstructorsList] = useState<any[]>([]);
@@ -60,6 +83,20 @@ export default function AssignInstructors() {
       (course.instructor && course.instructor.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
+  const filteredInstructors = instructorsList.filter((instructor) => {
+    const keyword = instructorSearch.trim().toLowerCase();
+    if (!keyword) return true;
+    return (
+      String(instructor.name || '').toLowerCase().includes(keyword) ||
+      String(instructor.id || '').toLowerCase().includes(keyword)
+    );
+  });
+
+  const selectedInstructorLabel = (() => {
+    const found = instructorsList.find((i) => i.id === selectedInstructor);
+    return found ? `${found.name} (${found.courses_count} วิชา)` : '';
+  })();
+
   const stats = {
     totalCourses: coursesList.length,
     assigned: coursesList.filter(c => c.instructor_id).length,
@@ -77,17 +114,29 @@ export default function AssignInstructors() {
       return;
     }
 
+    if (formSemester && !['1', '2', '3'].includes(formSemester)) {
+      toast({ title: "แจ้งเตือน", description: "ภาคเรียนต้องเป็น 1, 2 หรือ 3", variant: "destructive" });
+      return;
+    }
+
+    if (formAcademicYear && !/^25\d{2}$/.test(formAcademicYear)) {
+      toast({ title: "แจ้งเตือน", description: "ปีการศึกษาต้องเป็น พ.ศ. 4 หลัก เช่น 2567", variant: "destructive" });
+      return;
+    }
+
     try {
       setIsSaving(true);
       const response = await api.post('/index.php?page=save-assign-instructor', {
         subject_code: selectedCourse,
-        faculty_id: selectedInstructor
+        faculty_id: selectedInstructor,
+        semester: formSemester || null,
+        academic_year: formAcademicYear || null
       });
 
       if (response.data.status === 'success') {
         toast({
           title: "สำเร็จ",
-          description: "มอบหมายอาจารย์ผู้รับผิดชอบรายวิชาเรียบร้อยแล้ว"
+          description: response.data.message || "มอบหมายอาจารย์ผู้รับผิดชอบรายวิชาเรียบร้อยแล้ว"
         });
         setIsDialogOpen(false);
         setSelectedCourse(null);
@@ -155,6 +204,13 @@ export default function AssignInstructors() {
     // ดึงค่าอาจารย์คนเดิมที่สอนอยู่ออกมารอใน dropdown ถ้ามี
     const currentCourse = coursesList.find(c => c.id === courseId);
     setSelectedInstructor(currentCourse?.instructor_id || '');
+    setInstructorSearch('');
+    setInstructorPickerOpen(false);
+    // ใช้ค่าที่วิชานั้นเคยบันทึกไว้ก่อน ถ้ายังไม่เคยตั้งค่อยใช้ค่าตั้งต้นของหน้า
+    setFormSemester(currentCourse?.semester ? String(currentCourse.semester) : defaultSemester);
+    setFormAcademicYear(
+      currentCourse?.academic_year ? String(currentCourse.academic_year) : defaultAcademicYear
+    );
     setIsDialogOpen(true);
   };
 
@@ -211,14 +267,49 @@ export default function AssignInstructors() {
           <CardHeader>
             <CardTitle>รายวิชาในหลักสูตร</CardTitle>
             <CardDescription>รายวิชาทั้งหมดและอาจารย์ผู้รับผิดชอบ</CardDescription>
-            <div className="flex items-center gap-2 pt-4">
-              <Search className="h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="ค้นหารหัสวิชา, ชื่อวิชา หรืออาจารย์..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="max-w-sm"
-              />
+            <div className="flex flex-col gap-3 pt-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex items-center gap-2 flex-1">
+                <Search className="h-4 w-4 text-muted-foreground shrink-0" />
+                <Input
+                  placeholder="ค้นหารหัสวิชา, ชื่อวิชา หรืออาจารย์..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="max-w-sm"
+                />
+              </div>
+
+              {/* ค่าตั้งต้นของทั้งหน้า — กรอกครั้งเดียวใช้กับทุกวิชาที่มอบหมายต่อจากนี้ */}
+              <div className="flex items-center gap-2 rounded-lg border bg-muted/30 px-3 py-2">
+                <CalendarRange className="h-4 w-4 text-primary shrink-0" />
+                <Label className="text-xs text-muted-foreground whitespace-nowrap">
+                  ใช้กับทุกวิชา
+                </Label>
+                <Input
+                  type="number"
+                  min="1"
+                  max="3"
+                  placeholder="เทอม"
+                  value={defaultSemester}
+                  onChange={(e) => {
+                    setDefaultSemester(e.target.value);
+                    localStorage.setItem('assignDefaultSemester', e.target.value);
+                  }}
+                  className="w-20 h-9 text-center"
+                />
+                <span className="text-muted-foreground">/</span>
+                <Input
+                  type="number"
+                  min="2500"
+                  max="2600"
+                  placeholder="ปีการศึกษา"
+                  value={defaultAcademicYear}
+                  onChange={(e) => {
+                    setDefaultAcademicYear(e.target.value);
+                    localStorage.setItem('assignDefaultAcademicYear', e.target.value);
+                  }}
+                  className="w-28 h-9 text-center"
+                />
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -231,12 +322,17 @@ export default function AssignInstructors() {
                 ไม่พบวิชาตามเงื่อนไขที่สืบค้น
               </div>
             ) : (
+              // แสดงประมาณ 10 แถวแล้วเลื่อนดูส่วนที่เหลือ (หัวตารางตรึงไว้ด้านบน)
+              // [&>div]:overflow-visible จำเป็น เพราะ <Table> มี wrapper overflow ของตัวเอง
+              // ถ้าไม่ปิด หัวตาราง sticky จะไปยึดกับ wrapper นั้นแทนกล่องนี้ แล้วเลื่อนตามเนื้อหา
+              <div className="max-h-[47rem] overflow-auto overscroll-contain rounded-lg border [&>div]:overflow-visible">
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-10 bg-card">
                   <TableRow>
                     <TableHead className="whitespace-nowrap">รหัสวิชา</TableHead>
                     <TableHead>ชื่อวิชา</TableHead>
                     <TableHead className="text-center">หน่วยกิต</TableHead>
+                    <TableHead className="text-center whitespace-nowrap">ภาคเรียน</TableHead>
                     <TableHead className="text-center">อาจารย์ประจำวิชา</TableHead>
                     <TableHead className="text-center">การดำเนินการ</TableHead>
                   </TableRow>
@@ -247,6 +343,13 @@ export default function AssignInstructors() {
                       <TableCell className="font-medium whitespace-nowrap">{course.code}</TableCell>
                       <TableCell>{course.name}</TableCell>
                       <TableCell className="text-center">{course.credits}</TableCell>
+                      <TableCell className="text-center whitespace-nowrap">
+                        {course.term_label && course.term_label !== '-' ? (
+                          <Badge variant="secondary">{course.term_label}</Badge>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-center">
                         {course.instructor ? (
                           <Badge className="bg-green-500 hover:bg-green-600 px-2.5 py-0.5">{course.instructor}</Badge>
@@ -278,6 +381,7 @@ export default function AssignInstructors() {
                   ))}
                 </TableBody>
               </Table>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -296,7 +400,8 @@ export default function AssignInstructors() {
             ) : instructorsList.length === 0 ? (
               <div className="text-center py-6 text-muted-foreground">ไม่พบข้อมูลอาจารย์</div>
             ) : (
-              <div className="grid gap-4 md:grid-cols-3">
+              // แสดงประมาณ 10 คนแล้วเลื่อนดูส่วนที่เหลือ
+              <div className="max-h-[23rem] overflow-y-auto overscroll-contain rounded-lg border p-3 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {instructorsList.map((instructor) => (
                   <div
                     key={instructor.id}
@@ -318,7 +423,7 @@ export default function AssignInstructors() {
 
         {/* Assign Dialog */}
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="app-dialog-lg">
+          <DialogContent className="app-dialog-md">
             <DialogHeader>
               <DialogTitle>มอบหมายอาจารย์ผู้รับผิดชอบรายวิชา</DialogTitle>
               <DialogDescription>
@@ -332,20 +437,108 @@ export default function AssignInstructors() {
                   {coursesList.find(c => c.id === selectedCourse)?.code} - {coursesList.find(c => c.id === selectedCourse)?.name}
                 </p>
               </div>
+              {/* ภาคเรียน/ปีการศึกษาของวิชานี้ — เริ่มจากค่าตั้งต้นด้านบน แก้รายวิชาได้ */}
+              <div className="grid gap-2">
+                <Label className="font-semibold">ภาคเรียน / ปีการศึกษา</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min="1"
+                    max="3"
+                    placeholder="เทอม"
+                    value={formSemester}
+                    onChange={(e) => setFormSemester(e.target.value)}
+                    className="w-24 text-center"
+                  />
+                  <span className="text-muted-foreground">/</span>
+                  <Input
+                    type="number"
+                    min="2500"
+                    max="2600"
+                    placeholder="ปีการศึกษา (พ.ศ.)"
+                    value={formAcademicYear}
+                    onChange={(e) => setFormAcademicYear(e.target.value)}
+                    className="flex-1 text-center"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  เว้นว่างได้ถ้ายังไม่กำหนด — ระบบจะแสดงเป็น "-" แทนการเดาค่า
+                </p>
+              </div>
+
               <div className="grid gap-2">
                 <Label className="font-semibold">อาจารย์ประจำวิชา</Label>
-                <Select value={selectedInstructor} onValueChange={setSelectedInstructor}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="กรุณาเลือกอาจารย์..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {instructorsList.map((instructor) => (
-                      <SelectItem key={instructor.id} value={instructor.id}>
-                        {instructor.name} ({instructor.courses_count} วิชา)
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {/*
+                  ใช้ Combobox (Popover + Command) แทน Select เพราะ Select ของ Radix
+                  มี typeahead ในตัวที่แย่งโฟกัสจากช่องค้นหา และจัดตำแหน่ง popup ใหม่ทุกครั้ง
+                  ทำให้ช่องค้นหาเด้งขึ้นลงและพิมพ์ต่อเนื่องไม่ได้
+                */}
+                <Popover
+                  open={instructorPickerOpen}
+                  onOpenChange={setInstructorPickerOpen}
+                  // modal จำเป็นเมื่อ Popover อยู่ใน Dialog — ไม่งั้น scroll lock ของ Dialog
+                  // จะบล็อกล้อเมาส์/ทัชแพดในรายการ (เพราะ popover ถูก portal ออกไปนอก dialog)
+                  modal
+                >
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={instructorPickerOpen}
+                      className="w-full justify-between font-normal"
+                    >
+                      <span className={selectedInstructorLabel ? "" : "text-muted-foreground"}>
+                        {selectedInstructorLabel || "กรุณาเลือกอาจารย์..."}
+                      </span>
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    className="w-[--radix-popover-trigger-width] p-0"
+                    align="start"
+                    sideOffset={4}
+                    // ความสูงกล่องคงที่เสมอ (ดูที่ CommandList) กล่องจึงไม่ถูกคำนวณตำแหน่งใหม่
+                    // ตอนพิมพ์ค้นหา — ปล่อยให้ Radix เลือกด้านบน/ล่างเองครั้งเดียวตอนเปิด
+                    // เพื่อไม่ให้รายการล้นออกนอกจอด้านล่าง
+                    collisionPadding={12}
+                  >
+                    <Command
+                      // ค้นเองด้วย filteredInstructors จึงปิดตัวกรองในตัวของ cmdk
+                      shouldFilter={false}
+                      loop
+                    >
+                      <CommandInput
+                        placeholder="ค้นหาชื่อหรือรหัสอาจารย์..."
+                        value={instructorSearch}
+                        onValueChange={setInstructorSearch}
+                      />
+                      {/* ตรึงความสูงไว้ (ไม่ใช่ max-h) กล่องจะได้ไม่หดขยายตอนกรอง
+                          overscroll-contain กัน scroll ทะลุไปเลื่อนหน้าหลังเมื่อเลื่อนสุดรายการ */}
+                      <CommandList className="h-[220px] max-h-[220px] overflow-y-auto overscroll-contain">
+                        <CommandEmpty>ไม่พบอาจารย์ที่ตรงกับ "{instructorSearch}"</CommandEmpty>
+                        <CommandGroup>
+                          {filteredInstructors.map((instructor) => (
+                            <CommandItem
+                              key={instructor.id}
+                              value={instructor.id}
+                              onSelect={() => {
+                                setSelectedInstructor(instructor.id);
+                                setInstructorPickerOpen(false);
+                              }}
+                            >
+                              <Check
+                                className={`mr-2 h-4 w-4 ${
+                                  selectedInstructor === instructor.id ? "opacity-100" : "opacity-0"
+                                }`}
+                              />
+                              {instructor.name} ({instructor.courses_count} วิชา)
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
             <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-between sm:items-center gap-2">

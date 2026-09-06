@@ -2,7 +2,7 @@
 require_once __DIR__ . '/../ProjectShared/project_helpers.php';
 
 $db = project_db();
-$auth = project_require_auth($db, ['PROJECT_MY_VIEW']);
+$auth = project_require_auth($db, ['PROJECT_VIEW', 'PROJECT_MY_VIEW']);
 
 try {
     $currentFacultyId = project_resolve_faculty_id($db, $auth['user_id']);
