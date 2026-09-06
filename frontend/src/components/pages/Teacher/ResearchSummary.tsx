@@ -207,6 +207,19 @@ export default function ResearchSummary() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const canManageResearch = useMemo(() => {
+    try {
+      const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+      const permissions = Array.isArray(currentUser?.permissions) ? currentUser.permissions : [];
+      const roleId = Number(currentUser?.role_id || 0);
+      const positionId = Number(currentUser?.position_id || 0);
+
+      return roleId === 2 && (positionId === 9 || permissions.includes("RESEARCH_RECORD_MANAGE"));
+    } catch {
+      return false;
+    }
+  }, []);
+
   useEffect(() => {
     let mounted = true;
     const loadData = async () => {
@@ -383,7 +396,7 @@ export default function ResearchSummary() {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">สรุปผลงานวิจัย 5 ปี</h1>
-          <p className="text-muted-foreground">บันทึกและตรวจสอบผลงานวิจัยสำหรับ Admin และ Research</p>
+          <p className="text-muted-foreground">บันทึกและตรวจสอบผลงานวิจัยสำหรับอาจารย์งานวิจัย</p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
           <Tabs value={yearMode} onValueChange={(value) => setYearMode(value as YearMode)}>
@@ -471,8 +484,64 @@ export default function ResearchSummary() {
       <Card>
         <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
+            <CardTitle>Flow การบันทึกผลงานวิจัย</CardTitle>
+            <CardDescription>ให้อาจารย์งานวิจัยเป็นผู้แก้ไขข้อมูล ส่วน role อื่นเปิดดูได้อย่างเดียว</CardDescription>
+          </div>
+          <Badge variant={canManageResearch ? "default" : "outline"} className={canManageResearch ? "bg-emerald-600" : ""}>
+            {canManageResearch ? "โหมดแก้ไข" : "อ่านอย่างเดียว"}
+          </Badge>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-3 md:grid-cols-4">
+            {[
+              {
+                icon: ShieldCheck,
+                title: "กำหนดสิทธิ์",
+                detail: "อาจารย์งานวิจัยจัดการข้อมูลวารสารและผลงาน",
+              },
+              {
+                icon: CalendarDays,
+                title: "เลือกรอบปี",
+                detail: "สลับปีปฏิทินหรือปีการศึกษาก่อนตรวจนับ",
+              },
+              {
+                icon: PlusCircle,
+                title: "เพิ่ม/ลดจากตาราง",
+                detail: "กดช่องปีของอาจารย์เพื่อปรับจำนวนตามประเภทสี",
+              },
+              {
+                icon: CheckCircle2,
+                title: "สรุปอัตโนมัติ",
+                detail: "ช่อง KPI รวมรับเฉพาะผลงานสีแดงเท่านั้น",
+              },
+            ].map((step, index) => {
+              const Icon = step.icon;
+              return (
+                <div key={step.title} className="rounded-md border bg-muted/30 p-4">
+                  <div className="mb-3 flex items-center gap-2">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10 text-primary">
+                      <Icon className="h-4 w-4" />
+                    </span>
+                    <span className="text-xs font-semibold text-muted-foreground">STEP {index + 1}</span>
+                  </div>
+                  <div className="font-semibold">{step.title}</div>
+                  <p className="mt-1 text-sm leading-6 text-muted-foreground">{step.detail}</p>
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
             <CardTitle>ตารางจำนวนผลงานวิจัยและวิชาการตีพิมพ์ของอาจารย์</CardTitle>
-            <CardDescription>รูปแบบใกล้เคียง D74: ช่องรวมเฉพาะผลงานสีแดง First/Corresponding</CardDescription>
+            <CardDescription>
+              {canManageResearch
+                ? "กดช่องปีเพื่อเพิ่ม/ลดจำนวน โดยช่องรวมเฉพาะ KPI รับเฉพาะผลงานสีแดง First/Corresponding"
+                : "รูปแบบใกล้เคียง D74: ช่องรวมเฉพาะผลงานสีแดง First/Corresponding"}
+            </CardDescription>
           </div>
           <div className="flex flex-wrap gap-2 text-xs">
             <Badge className="bg-red-600">แดง: นับ KPI</Badge>
@@ -504,102 +573,114 @@ export default function ResearchSummary() {
                         const parts = formatCell(counts);
                         return (
                           <TableCell key={year} className="text-center">
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-8 min-w-16 gap-1 px-2 text-center hover:bg-primary/10"
-                                >
-                                  {parts.length ? (
-                                    <span className="inline-flex items-center justify-center gap-1">
-                                      {parts.map((part, partIndex) => (
-                                        <span key={`${part.value}-${partIndex}`} className={part.className}>{part.value}</span>
-                                      ))}
-                                    </span>
-                                  ) : (
-                                    <span className="text-muted-foreground">-</span>
-                                  )}
-                                  <PlusCircle className="h-3.5 w-3.5 text-muted-foreground" />
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-64 p-3" align="center">
-                                <div className="space-y-3">
-                                  <div>
-                                    <p className="text-sm font-medium">{person.name}</p>
-                                    <p className="text-xs text-muted-foreground">เพิ่มหรือลดจำนวนในปี {year}</p>
+                            {canManageResearch ? (
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 min-w-16 gap-1 px-2 text-center hover:bg-primary/10"
+                                  >
+                                    {parts.length ? (
+                                      <span className="inline-flex items-center justify-center gap-1">
+                                        {parts.map((part, partIndex) => (
+                                          <span key={`${part.value}-${partIndex}`} className={part.className}>{part.value}</span>
+                                        ))}
+                                      </span>
+                                    ) : (
+                                      <span className="text-muted-foreground">-</span>
+                                    )}
+                                    <PlusCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-64 p-3" align="center">
+                                  <div className="space-y-3">
+                                    <div>
+                                      <p className="text-sm font-medium">{person.name}</p>
+                                      <p className="text-xs text-muted-foreground">เพิ่มหรือลดจำนวนในปี {year}</p>
+                                    </div>
+                                    <div className="grid gap-2">
+                                      <div className="grid grid-cols-[1fr_auto_auto] items-center gap-2">
+                                        <span className="text-sm font-medium text-red-500">ผลงานนับ KPI</span>
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          size="icon"
+                                          disabled={counts.kpi === 0}
+                                          className="h-8 w-8 border-red-400/60 text-red-500 hover:bg-red-500/10 hover:text-red-400 disabled:opacity-40"
+                                          onClick={() => removeQuickCellPublication(person, year, "kpi")}
+                                        >
+                                          <MinusCircle className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          size="icon"
+                                          className="h-8 w-8 border-red-400/60 text-red-500 hover:bg-red-500/10 hover:text-red-400"
+                                          onClick={() => addQuickCellPublication(person, year, "kpi")}
+                                        >
+                                          <PlusCircle className="h-4 w-4" />
+                                        </Button>
+                                      </div>
+                                      <div className="grid grid-cols-[1fr_auto_auto] items-center gap-2">
+                                        <span className="text-sm font-medium">ผลงานชื่อร่วม</span>
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          size="icon"
+                                          disabled={counts.coAuthor === 0}
+                                          className="h-8 w-8 disabled:opacity-40"
+                                          onClick={() => removeQuickCellPublication(person, year, "co_author")}
+                                        >
+                                          <MinusCircle className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          size="icon"
+                                          className="h-8 w-8"
+                                          onClick={() => addQuickCellPublication(person, year, "co_author")}
+                                        >
+                                          <PlusCircle className="h-4 w-4" />
+                                        </Button>
+                                      </div>
+                                      <div className="grid grid-cols-[1fr_auto_auto] items-center gap-2">
+                                        <span className="text-sm font-medium text-sky-500">วิชาการ/ตำรา</span>
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          size="icon"
+                                          disabled={counts.academic === 0}
+                                          className="h-8 w-8 border-sky-400/60 text-sky-500 hover:bg-sky-500/10 hover:text-sky-400 disabled:opacity-40"
+                                          onClick={() => removeQuickCellPublication(person, year, "academic")}
+                                        >
+                                          <MinusCircle className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          size="icon"
+                                          className="h-8 w-8 border-sky-400/60 text-sky-500 hover:bg-sky-500/10 hover:text-sky-400"
+                                          onClick={() => addQuickCellPublication(person, year, "academic")}
+                                        >
+                                          <PlusCircle className="h-4 w-4" />
+                                        </Button>
+                                      </div>
+                                    </div>
                                   </div>
-                                  <div className="grid gap-2">
-                                    <div className="grid grid-cols-[1fr_auto_auto] items-center gap-2">
-                                      <span className="text-sm font-medium text-red-500">ผลงานนับ KPI</span>
-                                      <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="icon"
-                                        disabled={counts.kpi === 0}
-                                        className="h-8 w-8 border-red-400/60 text-red-500 hover:bg-red-500/10 hover:text-red-400 disabled:opacity-40"
-                                        onClick={() => removeQuickCellPublication(person, year, "kpi")}
-                                      >
-                                        <MinusCircle className="h-4 w-4" />
-                                      </Button>
-                                      <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="icon"
-                                        className="h-8 w-8 border-red-400/60 text-red-500 hover:bg-red-500/10 hover:text-red-400"
-                                        onClick={() => addQuickCellPublication(person, year, "kpi")}
-                                      >
-                                        <PlusCircle className="h-4 w-4" />
-                                      </Button>
-                                    </div>
-                                    <div className="grid grid-cols-[1fr_auto_auto] items-center gap-2">
-                                      <span className="text-sm font-medium">ผลงานชื่อร่วม</span>
-                                      <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="icon"
-                                        disabled={counts.coAuthor === 0}
-                                        className="h-8 w-8 disabled:opacity-40"
-                                        onClick={() => removeQuickCellPublication(person, year, "co_author")}
-                                      >
-                                        <MinusCircle className="h-4 w-4" />
-                                      </Button>
-                                      <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="icon"
-                                        className="h-8 w-8"
-                                        onClick={() => addQuickCellPublication(person, year, "co_author")}
-                                      >
-                                        <PlusCircle className="h-4 w-4" />
-                                      </Button>
-                                    </div>
-                                    <div className="grid grid-cols-[1fr_auto_auto] items-center gap-2">
-                                      <span className="text-sm font-medium text-sky-500">วิชาการ/ตำรา</span>
-                                      <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="icon"
-                                        disabled={counts.academic === 0}
-                                        className="h-8 w-8 border-sky-400/60 text-sky-500 hover:bg-sky-500/10 hover:text-sky-400 disabled:opacity-40"
-                                        onClick={() => removeQuickCellPublication(person, year, "academic")}
-                                      >
-                                        <MinusCircle className="h-4 w-4" />
-                                      </Button>
-                                      <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="icon"
-                                        className="h-8 w-8 border-sky-400/60 text-sky-500 hover:bg-sky-500/10 hover:text-sky-400"
-                                        onClick={() => addQuickCellPublication(person, year, "academic")}
-                                      >
-                                        <PlusCircle className="h-4 w-4" />
-                                      </Button>
-                                    </div>
-                                  </div>
-                                </div>
-                              </PopoverContent>
-                            </Popover>
+                                </PopoverContent>
+                              </Popover>
+                            ) : (
+                              <span className="inline-flex h-8 min-w-16 items-center justify-center gap-1 px-2">
+                                {parts.length ? (
+                                  parts.map((part, partIndex) => (
+                                    <span key={`${part.value}-${partIndex}`} className={part.className}>{part.value}</span>
+                                  ))
+                                ) : (
+                                  <span className="text-muted-foreground">-</span>
+                                )}
+                              </span>
+                            )}
                           </TableCell>
                         );
                       })}

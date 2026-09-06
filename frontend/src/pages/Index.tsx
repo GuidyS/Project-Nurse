@@ -105,8 +105,12 @@ const Index = () => {
     const userObj = savedUser ? JSON.parse(savedUser) : null;
     const roleId = userObj ? Number(userObj.role_id) : 0;
     const positionId = userObj ? Number(userObj.position_id) : 0;
+    const permissions = Array.isArray(userObj?.permissions) ? userObj.permissions : [];
+    const isResearchTeacher =
+      roleId === 2 && (positionId === 9 || permissions.includes("RESEARCH_SUMMARY_VIEW"));
     const isResearchPreviewRoute =
       import.meta.env.DEV &&
+      !userObj &&
       activeItem === "research-summary" &&
       new URLSearchParams(window.location.search).get("page") === "research-summary";
 
@@ -181,6 +185,7 @@ const Index = () => {
     ];
     
     if (teacherPages.includes(activeItem)) {
+      if (activeItem === "research-summary" && !isResearchPreviewRoute && !isResearchTeacher) return <UnauthorizedView />;
       if (!isResearchPreviewRoute && roleId !== 1 && roleId !== 2) return <UnauthorizedView />;
       switch (activeItem) {
         case "courses": return <CoursesPage />;                                     //*
