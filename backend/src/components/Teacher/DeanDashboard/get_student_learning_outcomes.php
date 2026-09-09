@@ -85,23 +85,39 @@ try {
         $placeholders = implode(',', array_fill(0, count($studentIds), '?'));
 
         $cloStmt = $db->prepare(
-            "SELECT e.student_id, COUNT(DISTINCT c.id) AS defined_clo
+            "SELECT e.student_id, s.subject_id, s.subject_code,
+                    COALESCE(s.subject_name_th, s.subject_name_en, s.subject_code) AS subject_name,
+                    COUNT(DISTINCT c.id) AS defined_clo
              FROM enrollment e
              INNER JOIN subject s ON s.subject_id = e.subject_id
-             INNER JOIN curriculum_clo c ON c.subject_code = s.subject_code
+             LEFT JOIN curriculum_clo c ON c.subject_code = s.subject_code
              WHERE e.academic_year = ? AND e.status = 'Active'
                AND e.student_id IN ($placeholders)
-             GROUP BY e.student_id"
+             GROUP BY e.student_id, s.subject_id, s.subject_code, s.subject_name_th, s.subject_name_en
+             ORDER BY s.subject_code"
         );
         $cloStmt->execute(array_merge([$academicYear], $studentIds));
         $definedClo = [];
+        $cloSubjects = [];
         foreach ($cloStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $definedClo[(string)$row['student_id']] = (int)$row['defined_clo'];
+            $studentId = (string)$row['student_id'];
+            $definedCount = (int)$row['defined_clo'];
+            $definedClo[$studentId] = ($definedClo[$studentId] ?? 0) + $definedCount;
+            $cloSubjects[$studentId][(string)$row['subject_id']] = [
+                'subject_id' => (string)$row['subject_id'],
+                'subject_code' => (string)$row['subject_code'],
+                'subject_name' => (string)$row['subject_name'],
+                'defined' => $definedCount,
+                'assessed' => 0,
+                'passed' => 0,
+                'rate' => 0,
+                'items' => [],
+            ];
         }
 
         $cloResultStmt = $db->prepare(
             "SELECT r.student_id, r.subject_id, r.clo_id, r.semester,
-                    r.score_percent, r.pass_status, c.clo_code, c.framework_id,
+                    r.score_percent, r.pass_status, c.clo_code, c.description AS clo_description, c.framework_id,
                     s.subject_code, p.plo_code, cp.weight AS plo_weight
              FROM student_clo_results r
              INNER JOIN curriculum_clo c ON c.id = r.clo_id
@@ -146,6 +162,7 @@ try {
             $cloItems[$studentId][$resultKey] = [
                 'code' => $cloCode,
                 'subject_code' => (string)$row['subject_code'],
+                'description' => trim((string)($row['clo_description'] ?? '')),
                 'score' => $row['score_percent'] !== null ? (float)$row['score_percent'] : null,
                 'passed' => $isPassed,
             ];
@@ -265,6 +282,22 @@ try {
                 : 0;
             $student['clo']['codes'] = array_keys($cloCodeSets[$studentId] ?? []);
             $student['clo']['items'] = array_values($cloItems[$studentId] ?? []);
+            foreach ($cloItems[$studentId] ?? [] as $resultKey => $item) {
+                $subjectId = explode(':', $resultKey, 2)[0];
+                if (!isset($cloSubjects[$studentId][$subjectId])) continue;
+                $cloSubjects[$studentId][$subjectId]['items'][] = $item;
+                $cloSubjects[$studentId][$subjectId]['assessed']++;
+                if ($item['passed']) {
+                    $cloSubjects[$studentId][$subjectId]['passed']++;
+                }
+            }
+            foreach ($cloSubjects[$studentId] ?? [] as &$subjectOutcome) {
+                $subjectOutcome['rate'] = $subjectOutcome['assessed'] > 0
+                    ? round($subjectOutcome['passed'] / $subjectOutcome['assessed'] * 100, 1)
+                    : 0;
+            }
+            unset($subjectOutcome);
+            $student['clo']['subjects'] = array_values($cloSubjects[$studentId] ?? []);
 
             $assessedOutcomes = array_filter(
                 [$student['ylo'], $student['plo'], $student['clo']],
