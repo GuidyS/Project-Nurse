@@ -176,6 +176,17 @@
                 require_once 'components/Admin/AssignStudents/save_assign_students.php';
                 break;
 
+            // CurriculumCycles (จัดการหลักสูตรรอบ 5 ปี — เฉพาะผู้ดูแลระบบ)
+            case 'get-curriculum-cycles':
+            case 'save-curriculum-cycle':
+            case 'delete-curriculum-cycle':
+            case 'save-curriculum-subject':
+            case 'delete-curriculum-subject':
+            case 'delete-curriculum-subjects':
+            case 'import-curriculum-subjects':
+                require_once 'components/Admin/CurriculumCycles/curriculum_cycles_api.php';
+                break;
+
             // AssignInstructors
             case 'get-assign-data':
                 require_once 'components/Teacher/AssignInstructors/get_assign_data.php';

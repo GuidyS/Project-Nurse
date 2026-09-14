@@ -43,6 +43,7 @@ import Reports from "@/components/pages/Admin/Reports";
 import RolesManagement from "@/components/pages/Admin/RolesManagement";
 import UsersManagement from "@/components/pages/Admin/UsersManagement";
 import AssignStudents from "@/components/pages/Admin/AssignStudents";
+import CurriculumCycles from "@/components/pages/Admin/CurriculumCycles";
 import ResearchSummary from "@/components/pages/Teacher/ResearchSummary";
 import DeanDashboard from "@/components/pages/Teacher/DeanDashboard";
 import Retention from "@/components/pages/Teacher/Retention";
@@ -186,6 +187,12 @@ const Index = () => {
     if (activeItem === "assign-students") {
       if (roleId !== 1) return <UnauthorizedView />;
       return <AssignStudents />;
+    }
+
+    // 3.1.1 🔒 จัดการหลักสูตรรอบ 5 ปี — แอดมินเท่านั้น
+    if (activeItem === "curriculum-cycles") {
+      if (roleId !== 1) return <UnauthorizedView />;
+      return <CurriculumCycles />;
     }
 
     // 3.2 🔒 หมวดโครงการ — แอดมินจัดการคนเดียวทั้งหมด
