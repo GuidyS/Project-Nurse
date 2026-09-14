@@ -46,6 +46,14 @@
                 require_once 'components/ProfilePage/get_profile.php';
                 break;
 
+            // LicenseReminder (ใบประกอบวิชาชีพ: อัปโหลดรูป + แจ้งเตือนใกล้หมดอายุ)
+            case 'upload-license-image':
+                require_once 'components/Teacher/LicenseReminder/upload_license_image.php';
+                break;
+            case 'run-license-reminders':
+                require_once 'components/Teacher/LicenseReminder/run_license_reminders.php';
+                break;
+
             // NotificationPage
             case 'get-notifications':
                 require_once 'components/NotificationPage/get_notifications.php';
