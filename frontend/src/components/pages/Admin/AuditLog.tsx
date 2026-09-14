@@ -1,11 +1,10 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar, Search, Filter, Download, User, FileEdit, Trash2, Plus, LogIn, LogOut, Shield } from "lucide-react";
+import { Calendar, Search, User, FileEdit, Trash2, Plus } from "lucide-react";
 import ExportButton from "@/components/dashboard/ExportButton";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
@@ -15,7 +14,7 @@ interface AuditEntry {
   timestamp: string;
   user: string;
   userRole: string;
-  action: "create" | "update" | "delete" | "login" | "logout" | "role_change";
+  action: "create" | "update" | "delete";
   resource: string;
   details: string;
   ipAddress: string;
@@ -25,31 +24,22 @@ const actionIcons: Record<AuditEntry["action"], React.ReactNode> = {
   create: <Plus className="h-4 w-4" />,
   update: <FileEdit className="h-4 w-4" />,
   delete: <Trash2 className="h-4 w-4" />,
-  login: <LogIn className="h-4 w-4" />,
-  logout: <LogOut className="h-4 w-4" />,
-  role_change: <Shield className="h-4 w-4" />,
 };
 
 const actionLabels: Record<AuditEntry["action"], string> = {
-  create: "สร้าง",
+  create: "สร้างใหม่",
   update: "แก้ไข",
   delete: "ลบ",
-  login: "เข้าสู่ระบบ",
-  logout: "ออกจากระบบ",
-  role_change: "เปลี่ยน Role",
 };
 
 const actionColors: Record<AuditEntry["action"], string> = {
   create: "bg-success",
   update: "bg-primary",
   delete: "bg-destructive",
-  login: "bg-success",
-  logout: "bg-muted-foreground",
-  role_change: "bg-warning",
 };
 
 export default function AuditLog() {
-  const [logs, setLogs] = useState<AuditEntry[]>([]); // 👈 เก็บข้อมูลจริง
+  const [logs, setLogs] = useState<AuditEntry[]>([]); 
   const [searchQuery, setSearchQuery] = useState("");
   const [actionFilter, setActionFilter] = useState("all");
   const [roleFilter, setRoleFilter] = useState("all");
@@ -61,7 +51,11 @@ export default function AuditLog() {
       try {
         const response = await api.get("/index.php?page=get-audit-logs");
         if (Array.isArray(response.data)) {
-          setLogs(response.data);
+          // ดักกรองให้ชัวร์ว่า frontend แสดงแค่ 3 ประเภทเท่านั้น
+          const filteredData = response.data.filter(log => 
+            ["create", "update", "delete"].includes(log.action)
+          );
+          setLogs(filteredData);
         } else {
           setLogs([]);
         }
@@ -71,7 +65,7 @@ export default function AuditLog() {
       }
     };
     fetchLogs();
-  }, []);
+  }, [toast]);
 
   const filteredLogs = logs.filter((entry) => {
     const matchesSearch = 
@@ -89,13 +83,13 @@ export default function AuditLog() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-foreground">Audit Log</h1>
-            <p className="text-muted-foreground">ประวัติการใช้งานระบบของผู้ใช้ทั้งหมด</p>
+            <p className="text-muted-foreground">ประวัติการใช้งานระบบของผู้ใช้ทั้งหมด (สร้าง/แก้ไข/ลบ)</p>
           </div>
           <ExportButton reportName="Audit-Log" />
         </div>
 
-        {/* Summary Cards */}
-        <div className="grid gap-4 md:grid-cols-4">
+        {/* Summary Cards เปลี่ยนเป็น 3 คอลัมน์ (ตัดเข้า/ออกระบบทิ้ง) */}
+        <div className="grid gap-4 md:grid-cols-3">
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center gap-3">
@@ -135,19 +129,6 @@ export default function AuditLog() {
               </div>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-warning/10">
-                  <LogIn className="h-5 w-5 text-warning" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{logs.filter((e) => e.action === "login" || e.action === "logout").length}</p>
-                  <p className="text-xs text-muted-foreground">เข้า/ออกระบบ</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </div>
 
         <Card>
@@ -167,18 +148,16 @@ export default function AuditLog() {
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
                 </div>
+                {/* ดรอปดาวน์การกระทำเอาเหลือ 3 อัน */}
                 <Select value={actionFilter} onValueChange={setActionFilter}>
                   <SelectTrigger className="w-32">
                     <SelectValue placeholder="การกระทำ" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">ทั้งหมด</SelectItem>
-                    <SelectItem value="create">สร้าง</SelectItem>
+                    <SelectItem value="create">สร้างใหม่</SelectItem>
                     <SelectItem value="update">แก้ไข</SelectItem>
                     <SelectItem value="delete">ลบ</SelectItem>
-                    <SelectItem value="login">เข้าสู่ระบบ</SelectItem>
-                    <SelectItem value="logout">ออกจากระบบ</SelectItem>
-                    <SelectItem value="role_change">เปลี่ยน Role</SelectItem>
                   </SelectContent>
                 </Select>
                 <Select value={roleFilter} onValueChange={setRoleFilter}>
@@ -207,35 +186,41 @@ export default function AuditLog() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredLogs.map((entry) => (
-                  <TableRow key={entry.id}>
-                    <TableCell className="text-muted-foreground whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4" />
-                        {entry.timestamp}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <User className="h-4 w-4 text-muted-foreground" />
-                        <div>
-                          <p className="font-medium">{entry.user}</p>
-                          <Badge variant="outline" className="text-xs">{entry.userRole}</Badge>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={`gap-1 ${actionColors[entry.action]}`}>
-                        {actionIcons[entry.action]}
-                        {actionLabels[entry.action]}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-muted-foreground">[{entry.resource}]</span> {entry.details}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground font-mono text-sm">{entry.ipAddress}</TableCell>
+                {filteredLogs.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">ไม่มีประวัติการใช้งาน</TableCell>
                   </TableRow>
-                ))}
+                ) : (
+                  filteredLogs.map((entry) => (
+                    <TableRow key={entry.id}>
+                      <TableCell className="text-muted-foreground whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4" />
+                          {entry.timestamp}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4 text-muted-foreground" />
+                          <div>
+                            <p className="font-medium">{entry.user}</p>
+                            <Badge variant="outline" className="text-xs">{entry.userRole}</Badge>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={`gap-1 whitespace-nowrap ${actionColors[entry.action]}`}>
+                          {actionIcons[entry.action]}
+                          {actionLabels[entry.action]}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-muted-foreground">[{entry.resource}]</span> {entry.details}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground font-mono text-sm">{entry.ipAddress}</TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </CardContent>
