@@ -24,13 +24,6 @@ $format = $data['format'] ?? 'csv';
 $requestedFields = $data['fields'] ?? [];
 $academicYear = $data['academicYear'] ?? '';
 
-/**
- * Schema ของแต่ละประเภท map ตรงกับฐานข้อมูลจริง
- * - table      : ชื่อตาราง
- * - order_by   : คอลัมน์เรียงลำดับ
- * - select     : คอลัมน์ที่ต้อง SELECT จาก DB
- * - fields[key]: ['label' => หัวตาราง, 'resolve' => fn($row) => ค่า]
- */
 function getExportSchema(): array
 {
     $fullNameTh = function ($row) {
@@ -122,18 +115,14 @@ try {
 
     $schema = $schemas[$category];
 
-    // ถ้า frontend ส่ง key ฟิลด์มา ใช้เฉพาะ key ที่มีจริงใน schema (เรียงตามที่ส่งมา)
-    // ถ้าไม่ส่งมา ใช้ทุกฟิลด์ตามลำดับใน schema
     $availableKeys = array_keys($schema['fields']);
     $selectedKeys = array_values(array_filter($requestedFields, fn($k) => isset($schema['fields'][$k])));
     if (empty($selectedKeys)) {
         $selectedKeys = $availableKeys;
     }
 
-    // หัวตาราง
     $headers = array_map(fn($k) => $schema['fields'][$k]['label'], $selectedKeys);
 
-    // ดึงข้อมูลจาก DB
     $columns = implode(', ', array_map(fn($c) => "`$c`", $schema['select']));
     
     $whereClause = "";
@@ -164,9 +153,8 @@ try {
     }
 
     $fileSuffix = $academicYear !== '' ? '_' . $academicYear : '';
-    approvalLogAction($db, 'export', 0, $adminUserId, "category={$category}; format={$format}; rows=" . count($exportData));
 
-    // 🌟 กรณีส่งออกเป็น Excel (.xlsx)
+    // ส่งออก Excel (.xlsx)
     if ($format === 'xlsx') {
         $spreadsheet = new Spreadsheet();
         $sheet = $spreadsheet->getActiveSheet();
@@ -199,13 +187,13 @@ try {
         $writer->save('php://output');
         exit;
     }
-    // 🌟 กรณีส่งออกเป็น CSV
+    // ส่งออก CSV
     else {
         header('Content-Type: text/csv; charset=UTF-8');
         header('Content-Disposition: attachment; filename="export_' . $category . $fileSuffix . '.csv"');
 
         $output = fopen('php://output', 'w');
-        fputs($output, "\xEF\xBB\xBF"); // แก้ภาษาไทยเพี้ยน
+        fputs($output, "\xEF\xBB\xBF");
         fputcsv($output, $headers);
 
         foreach ($exportData as $rowData) {

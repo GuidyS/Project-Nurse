@@ -46,6 +46,14 @@
                 require_once 'components/ProfilePage/get_profile.php';
                 break;
 
+            // LicenseReminder (ใบประกอบวิชาชีพ: อัปโหลดรูป + แจ้งเตือนใกล้หมดอายุ)
+            case 'upload-license-image':
+                require_once 'components/Teacher/LicenseReminder/upload_license_image.php';
+                break;
+            case 'run-license-reminders':
+                require_once 'components/Teacher/LicenseReminder/run_license_reminders.php';
+                break;
+
             // NotificationPage
             case 'get-notifications':
                 require_once 'components/NotificationPage/get_notifications.php';
@@ -138,6 +146,17 @@
                 require_once 'components/Teacher/CoursesPage/api.php';
                 break;
 
+            // CurriculumCycles (จัดการหลักสูตรรอบ 5 ปี — เฉพาะผู้ดูแลระบบ)
+            case 'get-curriculum-cycles':
+            case 'save-curriculum-cycle':
+            case 'delete-curriculum-cycle':
+            case 'save-curriculum-subject':
+            case 'delete-curriculum-subject':
+            case 'delete-curriculum-subjects':
+            case 'import-curriculum-subjects':
+                require_once 'components/Admin/CurriculumCycles/curriculum_cycles_api.php';
+                break;
+
             /* -------- Teacher -------- */
 
             // Advises
@@ -166,6 +185,24 @@
                 break;
             case 'save-student-competency':
                 require_once 'components/Teacher/student_competency/save_student_competency.php';
+                break;
+                
+           // StudentCompetency (ฝั่งอาจารย์)
+            case 'student-competency':
+            case 'get-student-competency':
+            case 'advisor-competency':
+                $compPath = 'components/Teacher/StudentCompetency/get_student_competency.php';
+                if (!file_exists(__DIR__ . '/' . $compPath)) {
+                    $compPath = 'components/Teacher/student_competency/get_student_competency.php';
+                }
+                require_once $compPath;
+                break;
+            case 'save-student-competency':
+                $saveCompPath = 'components/Teacher/StudentCompetency/save_student_competency.php';
+                if (!file_exists(__DIR__ . '/' . $saveCompPath)) {
+                    $saveCompPath = 'components/Teacher/student_competency/save_student_competency.php';
+                }
+                require_once $saveCompPath;
                 break;
 
             // AssignStudents (มอบหมายนักศึกษาให้อาจารย์ — เฉพาะผู้ดูแลระบบ)
@@ -336,7 +373,7 @@
                 require_once 'components/Teacher/ResearchSummary/get_research_summary.php';
                 break;
 
-            /* -------- Research -------- */
+            // Research
             case 'get-research-faculty':
                 require_once 'components/Research/get_faculty.php';
                 break;

@@ -6,6 +6,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 if (session_status() == PHP_SESSION_NONE) { session_start(); }
 require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/../../../config/audit_helper.php';
 
 if (!isset($_SESSION['user_id'])) {
     http_response_code(401);
@@ -92,6 +93,10 @@ try {
                 ]);
             }
             $db->commit();
+
+            // บันทึก Audit Log เมื่อข้อมูลถูก commit สำเร็จ
+            logAudit($db, $_SESSION['user_id'] ?? null, 'update', 'student_health_records', "บันทึกข้อมูลภาวะสุขภาพนักศึกษา รหัส: {$student_id}");
+
         } catch (Throwable $e) {
             $db->rollBack();
             throw $e;

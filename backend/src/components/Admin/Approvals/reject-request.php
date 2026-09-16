@@ -27,6 +27,11 @@ try {
     ensureApprovalRequestsSchema($db);
     $reviewerId = approvalRequireAdmin($db);
 
+    // ดึงหัวข้อคำร้องเดิมก่อนอัปเดต
+    $titleStmt = $db->prepare("SELECT title FROM approval_requests WHERE approval_request_id = :id AND status = 'pending' LIMIT 1");
+    $titleStmt->execute([':id' => $id]);
+    $requestTitle = $titleStmt->fetchColumn() ?: '';
+
     $stmt = $db->prepare("
         UPDATE approval_requests
         SET status = 'rejected',
@@ -47,7 +52,12 @@ try {
         throw new RuntimeException('Approval request not found or already reviewed');
     }
 
-    approvalLogAction($db, 'reject', $id, $reviewerId);
+    $rejectDetail = $requestTitle !== '' ? $requestTitle : '';
+    if ($reviewNote) {
+        $rejectDetail .= " (เหตุผล: {$reviewNote})";
+    }
+    approvalLogAction($db, 'reject', $id, $reviewerId, $rejectDetail);
+
     echo json_encode(['status' => 'success', 'message' => 'Approval request rejected'], JSON_UNESCAPED_UNICODE);
 } catch (InvalidArgumentException $e) {
     http_response_code(400);
@@ -56,5 +66,4 @@ try {
     http_response_code(500);
     echo json_encode(['status' => 'error', 'message' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
 }
-
 ?>

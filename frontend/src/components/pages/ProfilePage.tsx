@@ -15,6 +15,8 @@ import {
   Users,
   Heart,
   Loader2,
+  Upload,
+  BellRing,
 } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -32,7 +34,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
 
@@ -84,7 +86,12 @@ export default function ProfilePage() {
   const [editing, setEditing] = useState(false);
   const [formData, setFormData] = useState<any>({});
   const [isSaving, setIsSaving] = useState(false);
-  
+  // รูปใบประกอบวิชาชีพที่เลือกไว้ (อัปโหลดตอนกดบันทึก)
+  const [licenseFile, setLicenseFile] = useState<File | null>(null);
+  const [licensePreviewUrl, setLicensePreviewUrl] = useState("");
+  const [licenseFileError, setLicenseFileError] = useState("");
+  const licenseInputRef = useRef<HTMLInputElement>(null);
+
   const { toast } = useToast();
 
   const fetchProfile = async () => {
@@ -105,6 +112,33 @@ export default function ProfilePage() {
   useEffect(() => {
     fetchProfile();
   }, []);
+
+  // สร้าง/คืนหน่วยความจำรูปตัวอย่างเมื่อเปลี่ยนรูป
+  useEffect(() => {
+    if (!licenseFile) {
+      setLicensePreviewUrl("");
+      return;
+    }
+    const url = URL.createObjectURL(licenseFile);
+    setLicensePreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [licenseFile]);
+
+  const handleLicenseFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] ?? null;
+    e.target.value = "";
+    if (!file) return;
+    if (!LICENSE_IMAGE_TYPES.includes(file.type)) {
+      setLicenseFileError("รองรับเฉพาะรูปภาพ JPG, PNG หรือ WEBP");
+      return;
+    }
+    if (file.size > LICENSE_IMAGE_MAX_BYTES) {
+      setLicenseFileError("รูปภาพต้องมีขนาดไม่เกิน 5 MB");
+      return;
+    }
+    setLicenseFileError("");
+    setLicenseFile(file);
+  };
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -152,6 +186,26 @@ export default function ProfilePage() {
       setIsSaving(true);
       const res = await api.post("/index.php?page=profile", formData);
       if (res.data.status === "success") {
+        // บันทึกข้อมูลแล้วค่อยอัปโหลดรูปใบประกอบวิชาชีพ (ถ้าเลือกรูปใหม่)
+        if (userRole === "teacher" && licenseFile) {
+          try {
+            const upload = new FormData();
+            upload.append("file", licenseFile);
+            await api.post("/index.php?page=upload-license-image", upload, {
+              headers: { "Content-Type": "multipart/form-data" },
+            });
+            setLicenseFile(null);
+          } catch (uploadError) {
+            // ข้อมูลอื่นบันทึกแล้ว — เปิด dialog ค้างไว้ให้ลองอัปโหลดรูปใหม่
+            const uploadMessage = (uploadError as { response?: { data?: { message?: string } } })?.response?.data?.message;
+            toast({
+              title: "บันทึกข้อมูลแล้ว แต่อัปโหลดรูปไม่สำเร็จ",
+              description: uploadMessage || "กรุณาลองอัปโหลดรูปใบประกอบวิชาชีพอีกครั้ง",
+              variant: "destructive",
+            });
+            return;
+          }
+        }
         toast({ title: "อัปเดตข้อมูลส่วนตัวเรียบร้อยแล้ว" });
         setEditing(false);
         fetchProfile();
@@ -187,6 +241,8 @@ export default function ProfilePage() {
     ? (profilePictureRaw.startsWith("http") ? profilePictureRaw : `${apiBaseUrl}/${profilePictureRaw.replace(/^\//, "")}`)
     : "";
 
+  const currentLicenseImageUrl = resolveUploadUrl(profileData.license_image, apiBaseUrl);
+
   const fatherFullName = `${profileData.father_first_name || ""} ${profileData.father_last_name || ""}`.trim();
   const motherFullName = `${profileData.mother_first_name || ""} ${profileData.mother_last_name || ""}`.trim();
   const parentAddress = profileData.parent_address || profileData.father_address || profileData.mother_address || null;
@@ -206,7 +262,9 @@ export default function ProfilePage() {
                 id_card_number: profileData.id_card_number || "",
                 parent_address: parentAddress || "",
                 home_address: profileData.home_address || profileData.address || ""
-              }); 
+              });
+              setLicenseFile(null);
+              setLicenseFileError(""); 
               setEditing(true); 
             }}
           >
@@ -257,11 +315,25 @@ export default function ProfilePage() {
                 <InfoRow icon={<Mail className="h-4 w-4 text-primary" />} label="อีเมล" value={displayEmail} />
                 <InfoRow icon={<Phone className="h-4 w-4 text-primary" />} label="เบอร์โทรศัพท์" value={profileData.phone} />
                 <InfoRow icon={<ShieldCheck className="h-4 w-4 text-primary" />} label="เลขที่บัตรสภาการพยาบาล" value={profileData.nursing_council_no} />
-                <InfoRow icon={<Calendar className="h-4 w-4 text-primary" />} label="วันหมดอายุใบอนุญาต" value={formatThaiDate(profileData.license_expiry)} />
+                <InfoRow
+                  icon={<Calendar className="h-4 w-4 text-primary" />}
+                  label="วันหมดอายุใบอนุญาต"
+                  value={
+                    profileData.license_expiry ? (
+                      <span className="flex flex-wrap items-center gap-2">
+                        {formatThaiDate(profileData.license_expiry)}
+                        <LicenseStatusBadge expiry={profileData.license_expiry} />
+                      </span>
+                    ) : null
+                  }
+                />
                 <InfoRow icon={<Calendar className="h-4 w-4 text-primary" />} label="วันที่เริ่มปฏิบัติงาน" value={formatThaiDate(profileData.start_work_date)} />
                 <InfoRow icon={<Calendar className="h-4 w-4 text-primary" />} label="วันที่รับตำแหน่งทางวิชาการ" value={formatThaiDate(profileData.academic_position_date)} />
                 <div className="md:col-span-2">
                   <InfoRow icon={<MapPin className="h-4 w-4 text-primary" />} label="ที่อยู่ปัจจุบัน" value={profileData.current_address} />
+                </div>
+                <div className="md:col-span-2">
+                  <LicenseImageRow url={currentLicenseImageUrl} />
                 </div>
                 <PdfDocumentsSection documents={pdfDocuments} />
               </>
@@ -496,6 +568,94 @@ export default function ProfilePage() {
               </div>
             </div>
 
+            {/* หมวดที่ 2: ใบประกอบวิชาชีพการพยาบาล (เฉพาะอาจารย์) */}
+            {userRole === "teacher" && (
+              <div className="space-y-4">
+                <h4 className="font-semibold text-primary border-b border-border pb-1">
+                  2. ใบประกอบวิชาชีพการพยาบาล
+                </h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="nursing_council_no">เลขที่ใบประกอบวิชาชีพ</Label>
+                    <Input
+                      id="nursing_council_no"
+                      name="nursing_council_no"
+                      value={formData.nursing_council_no || ""}
+                      onChange={handleInputChange}
+                      placeholder="เลขที่ใบอนุญาต"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="license_expiry">วันหมดอายุใบประกอบวิชาชีพ</Label>
+                    <Input
+                      id="license_expiry"
+                      name="license_expiry"
+                      type="date"
+                      value={formData.license_expiry || ""}
+                      onChange={handleInputChange}
+                    />
+                    {formData.license_expiry && (
+                      <div>
+                        <LicenseStatusBadge expiry={formData.license_expiry} showRemaining />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2 col-span-2">
+                    <Label>รูปใบประกอบวิชาชีพ</Label>
+                    <div className="flex flex-wrap items-center gap-4 rounded-lg border border-dashed p-3">
+                      {licensePreviewUrl || currentLicenseImageUrl ? (
+                        <img
+                          src={licensePreviewUrl || currentLicenseImageUrl}
+                          alt="ตัวอย่างรูปใบประกอบวิชาชีพ"
+                          className="h-24 w-36 rounded-md border object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-24 w-36 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                          <ImageIcon className="h-8 w-8" />
+                        </div>
+                      )}
+                      <div className="space-y-1">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => licenseInputRef.current?.click()}
+                          disabled={isSaving}
+                        >
+                          <Upload className="mr-2 h-4 w-4" />
+                          {licensePreviewUrl || currentLicenseImageUrl ? "เปลี่ยนรูป" : "เลือกรูปภาพ"}
+                        </Button>
+                        <p className="text-xs text-muted-foreground">
+                          {licenseFile
+                            ? `รูปใหม่: ${licenseFile.name} (อัปโหลดเมื่อกดบันทึกข้อมูล)`
+                            : "JPG, PNG หรือ WEBP ขนาดไม่เกิน 5 MB"}
+                        </p>
+                        {licenseFileError && <p className="text-xs text-red-600">{licenseFileError}</p>}
+                      </div>
+                      <input
+                        ref={licenseInputRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        className="hidden"
+                        onChange={handleLicenseFileChange}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="col-span-2 flex items-start gap-2 rounded-md bg-muted/40 p-3 text-xs text-muted-foreground">
+                    <BellRing className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                    <div className="space-y-1">
+                      <p>ระบบจะแจ้งเตือนในระบบและทางอีเมล ก่อนใบประกอบวิชาชีพหมดอายุ 6 เดือน, 3 เดือน และ 1 เดือน</p>
+                      {!String(formData.email || "").trim() && (
+                        <p className="text-red-600">ยังไม่ได้กรอกอีเมลติดต่อ — จะได้รับแจ้งเตือนเฉพาะในระบบ</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* หมวดที่ 2: ข้อมูลสุขภาพ (เฉพาะ Student) */}
             {userRole === "student" && (
               <div className="space-y-4">
@@ -679,6 +839,71 @@ const THAI_MONTHS = [
   "พฤศจิกายน",
   "ธันวาคม",
 ];
+
+const LICENSE_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const LICENSE_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+
+const resolveUploadUrl = (path: unknown, apiBaseUrl: string) => {
+  const raw = String(path ?? "").trim();
+  if (!raw) return "";
+  if (/^https?:\/\//i.test(raw)) return raw;
+  return `${apiBaseUrl}/${raw.replace(/^\//, "")}`;
+};
+
+// จำนวนวันจากวันนี้ถึงวันหมดอายุ (เทียบเฉพาะวันที่)
+const daysUntil = (value: unknown): number | null => {
+  const match = String(value ?? "").match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return null;
+  const now = new Date();
+  const target = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.round((target - today) / 86_400_000);
+};
+
+// ป้ายสถานะ: หมดอายุแล้ว / ใกล้หมดอายุ (ภายใน 6 เดือน) — showRemaining แสดงวันคงเหลือแม้ยังไม่ใกล้หมด
+const LicenseStatusBadge = ({ expiry, showRemaining = false }: { expiry: unknown; showRemaining?: boolean }) => {
+  const days = daysUntil(expiry);
+  if (days === null) return null;
+  if (days < 0) {
+    return <Badge variant="destructive">หมดอายุแล้ว</Badge>;
+  }
+  if (days <= 180) {
+    return (
+      <Badge
+        className={
+          days <= 30
+            ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            : "bg-warning text-warning-foreground hover:bg-warning/90"
+        }
+      >
+        ใกล้หมดอายุ · เหลือ {days} วัน
+      </Badge>
+    );
+  }
+  return showRemaining ? <Badge variant="secondary">เหลือ {days} วัน</Badge> : null;
+};
+
+const LicenseImageRow = ({ url }: { url: string }) => (
+  <div className="flex items-start gap-3">
+    <div className="bg-primary/10 p-2 rounded-full flex items-center justify-center">
+      <ImageIcon className="h-4 w-4 text-primary" />
+    </div>
+    <div className="min-w-0">
+      <p className="text-muted-foreground text-xs">รูปใบประกอบวิชาชีพการพยาบาล</p>
+      {url ? (
+        <a href={url} target="_blank" rel="noopener noreferrer" className="mt-1 block" title="เปิดดูรูปขนาดเต็ม">
+          <img
+            src={url}
+            alt="ใบประกอบวิชาชีพการพยาบาล"
+            className="h-28 max-w-[14rem] rounded-md border object-cover transition-opacity hover:opacity-90"
+          />
+        </a>
+      ) : (
+        <div className="font-medium text-foreground">-</div>
+      )}
+    </div>
+  </div>
+);
 
 const formatThaiDate = (value: unknown): string | null => {
   if (value === null || value === undefined || value === "") return null;

@@ -7,6 +7,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 if (session_status() == PHP_SESSION_NONE) { session_start(); }
 require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/../../../config/audit_helper.php';
 
 ob_end_clean();
 header("Content-Type: application/json; charset=UTF-8");
@@ -77,7 +78,7 @@ try {
     }
 
     // ตรวจสอบว่า PLO มีอยู่จริง
-    $checkPlo = $db->prepare("SELECT framework_id FROM curriculum_plo WHERE id = :pid");
+    $checkPlo = $db->prepare("SELECT framework_id, plo_code FROM curriculum_plo WHERE id = :pid");
     $checkPlo->execute([':pid' => $ploId]);
     $ploData = $checkPlo->fetch(PDO::FETCH_ASSOC);
     if (!$ploData) {
@@ -86,6 +87,7 @@ try {
         exit;
     }
     $frameworkId = (int)$ploData['framework_id'];
+    $ploCode = $ploData['plo_code'] ?? '';
 
     if ($yearLevel < 1 || $yearLevel > 8 || $competencyName === '') {
         http_response_code(400);
@@ -110,8 +112,10 @@ try {
             ':scorable' => $isScorable,
             ':id' => $id,
         ]);
+
+        logAudit($db, $userId, 'update', 'competency_items', "แก้ไขรายการประเมินสมรรถนะ: {$competencyName} (ID: {$id}, ชั้นปีที่ {$yearLevel}, {$ploCode})");
     } else {
-        // เพิ่มรายการใหม่: หาตำแหน่งลำดับข้อสุดท้ายของ PLO นี้เพื่อแทรกลงไป
+        // เพิ่มรายการใหม่
         $posStmt = $db->prepare("
             SELECT COALESCE(MAX(sequence_no), 0) 
             FROM competency_items 
@@ -131,6 +135,9 @@ try {
             ':name' => $competencyName,
             ':scorable' => $isScorable,
         ]);
+
+        $newId = (int)$db->lastInsertId();
+        logAudit($db, $userId, 'create', 'competency_items', "เพิ่มรายการประเมินสมรรถนะ: {$competencyName} (ID: {$newId}, ชั้นปีที่ {$yearLevel}, {$ploCode})");
     }
 
     // จัดเรียง Sequence Number 1..N ใหม่ทันที

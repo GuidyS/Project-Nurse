@@ -27,6 +27,17 @@ try {
     }
 
     $user_id = $_SESSION['user_id'];
+    // ไฟล์นี้อ่าน session อย่างเดียว — ปลดล็อกไว้ เผื่อรอบเช็กด้านล่างใช้เวลาส่งอีเมล
+    session_write_close();
+
+    // เช็กใบประกอบวิชาชีพใกล้หมดอายุ (ไม่เกินชั่วโมงละครั้ง) — ถ้าพังต้องไม่กระทบการโหลดแจ้งเตือน
+    try {
+        require_once __DIR__ . '/../Teacher/LicenseReminder/license_reminder_helpers.php';
+        licenseReminderMaybeRunScheduled($pdo);
+    } catch (Throwable $e) {
+        error_log('license reminder: ' . $e->getMessage());
+    }
+
     $sql = "SELECT
                 n.notification_id AS id,
                 n.title,

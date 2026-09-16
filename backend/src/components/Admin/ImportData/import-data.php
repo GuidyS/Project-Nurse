@@ -3,18 +3,15 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// upload.php
 require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/../../../config/audit_helper.php';
 require_once __DIR__ . '/../Approvals/approval-schema.php';
-header("Content-Type: application/json");
+header("Content-Type: application/json; charset=UTF-8");
 
 require_once __DIR__ . '/../../../vendor/autoload.php';
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 
-/**
- * ฟังก์ชันหลักในการอ่านไฟล์และบันทึกลงฐานข้อมูล
- */
 function getImportSchema($importType) {
     $schemas = [
         'students' => [
@@ -291,7 +288,6 @@ try {
         throw new Exception("รองรับเฉพาะไฟล์ .xlsx, .xls และ .csv เท่านั้น");
     }
 
-    // Central storage: backend/src/uploads/imports/{type}/
     $uploadDir = __DIR__ . "/../../../uploads/imports/$importType/";
     if (!file_exists($uploadDir)) {
         mkdir($uploadDir, 0777, true);
@@ -301,8 +297,6 @@ try {
     $uploadPath = $uploadDir . $newFileName;
 
     if (move_uploaded_file($file['tmp_name'], $uploadPath)) {
-        
-        // 1. บันทึกประวัติเริ่มต้นก่อน (ต้องมีค่า 'processing' ใน ENUM ของ DB)
         $sql = "INSERT INTO import_history (user_id, type, file_name, status, created_at) 
                 VALUES (:uid, :type, :fname, 'processing', NOW())";
         $stmt = $db->prepare($sql);
@@ -313,27 +307,30 @@ try {
         ]);
         $importId = $db->lastInsertId();
 
-        // 2. รันกระบวนการอ่านไฟล์
         try {
             $finalCount = processExcelToDatabase($uploadPath, $importType, $db, $fileExt);
 
             if ($finalCount !== false) {
-                // 3. ถ้าสำเร็จ: UPDATE เป็น 'success'
                 $update = $db->prepare("UPDATE import_history SET status = 'success', record_count = :count WHERE id = :id");
                 $update->execute([':count' => $finalCount, ':id' => $importId]);
-                approvalLogAction($db, 'import', (int)$importId, $adminUserId, "type={$importType}; rows={$finalCount}");
+
+                logAudit(
+                    $db,
+                    $adminUserId,
+                    'create',
+                    'import_data',
+                    "นำเข้าข้อมูล {$importType} สำเร็จ: {$finalCount} รายการ (ไฟล์: {$file['name']})"
+                );
 
                 echo json_encode([
                     "status" => "success",
                     "message" => "นำเข้าข้อมูลสำเร็จจำนวน $finalCount รายการ",
                     "importId" => $importId
-                ]);
+                ], JSON_UNESCAPED_UNICODE);
             }
         } catch (Exception $e) {
-            // 4. ถ้าพลาด: UPDATE เป็น 'failed'
             $errorUpdate = $db->prepare("UPDATE import_history SET status = 'failed', error_details = :msg WHERE id = :id");
             $errorUpdate->execute([':msg' => $e->getMessage(), ':id' => $importId]);
-            approvalLogAction($db, 'import_failed', (int)$importId, $adminUserId, "type={$importType}; error=" . $e->getMessage());
             throw $e; 
         }
     } else {
@@ -342,5 +339,5 @@ try {
 
 } catch (Exception $e) {
     http_response_code(400);
-    echo json_encode(["status" => "error", "message" => $e->getMessage()]);
+    echo json_encode(["status" => "error", "message" => $e->getMessage()], JSON_UNESCAPED_UNICODE);
 }

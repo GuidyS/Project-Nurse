@@ -7,6 +7,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 if (session_status() == PHP_SESSION_NONE) { session_start(); }
 require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/../../../config/audit_helper.php';
 
 ob_end_clean();
 header("Content-Type: application/json; charset=UTF-8");
@@ -39,9 +40,9 @@ try {
         exit;
     }
 
-    // 2. ดึงข้อมูลก่อนลบ เพื่อนำ framework_id และ year_level มาจัดเรียงลำดับใหม่
+    // 2. ดึงข้อมูลก่อนลบเพื่อเก็บชื่อและชั้นปีไว้บันทึก Log
     $itemInfoStmt = $db->prepare("
-        SELECT ci.year_level, cp.framework_id 
+        SELECT ci.year_level, ci.competency_name, cp.framework_id, cp.plo_code
         FROM competency_items ci
         JOIN curriculum_plo cp ON cp.id = ci.plo_id
         WHERE ci.id = :id
@@ -58,15 +59,13 @@ try {
     // 3. เริ่ม Transaction ลบทั้งผลประเมินที่เกี่ยวข้องและตัวรายการข้อประเมิน
     $db->beginTransaction();
 
-    // ลบคะแนนประเมินที่เคยลงไว้สำหรับข้อนี้
     $delAssessStmt = $db->prepare("DELETE FROM student_competency_assessments WHERE competency_item_id = :id");
     $delAssessStmt->execute([':id' => $itemId]);
 
-    // ลบตัวข้อประเมิน
     $delStmt = $db->prepare("DELETE FROM competency_items WHERE id = :id");
     $delStmt->execute([':id' => $itemId]);
 
-    // 4. Re-index จัดเรียง sequence_no ของข้อที่เหลือทั้งหมดใหม่ 1..N ตามลำดับ PLO
+    // 4. Re-index จัดเรียง sequence_no ใหม่
     $reorderStmt = $db->prepare("
         SELECT ci.id 
         FROM competency_items ci
@@ -87,6 +86,16 @@ try {
     }
 
     $db->commit();
+
+    // 5. บันทึก Audit Log เมื่อลบจริงสำเร็จ
+    $compTitle = !empty($itemInfo['competency_name']) ? ": " . $itemInfo['competency_name'] : "";
+    logAudit(
+        $db,
+        $userId,
+        'delete',
+        'competency_items',
+        "ลบรายการประเมินสมรรถนะ (ID: {$itemId}){$compTitle} ชั้นปีที่ {$itemInfo['year_level']}"
+    );
 
     echo json_encode(["status" => "success", "message" => "ลบรายการและผลประเมินที่เกี่ยวข้องเรียบร้อยแล้ว"], JSON_UNESCAPED_UNICODE);
 

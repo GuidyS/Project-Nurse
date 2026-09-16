@@ -1,6 +1,8 @@
 <?php
 if (session_status() == PHP_SESSION_NONE) { session_start(); }
 require_once __DIR__ . '/../../config/config.php';
+require_once __DIR__ . '/../Teacher/LicenseReminder/license_reminder_helpers.php';
+require_once __DIR__ . '/../../config/audit_helper.php';
 
 if (!isset($_SESSION['user_id'])) {
     http_response_code(401);
@@ -503,6 +505,7 @@ try {
             echo json_encode(["status" => "success", "role" => "student", "data" => $profile], JSON_UNESCAPED_UNICODE);
         } else {
             // โค้ดเดิมของ Teacher / Other Roles ไม่แตะต้อง[cite: 15]
+            licenseReminderEnsureSchema($db); // ให้มีคอลัมน์ license_image ก่อน SELECT *
             $stmt = $db->prepare("SELECT * FROM faculty WHERE faculty_id = :id LIMIT 1");
             $stmt->execute(['id' => $u_info['username']]);
             $profile = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
@@ -612,19 +615,54 @@ try {
                 ':student_id'       => $u_info['username']
             ]);
         } else {
-            // โค้ดเดิมของ Teacher / Other Roles ไม่แตะต้อง[cite: 15]
-            $sql = "UPDATE faculty SET first_name_en = ?, last_name_en = ?, gender = ?, birth_date = ?, email = ?, phone = ?, current_address = ?, nursing_council_no = ? WHERE faculty_id = ?";
+            // อีเมลใช้ส่งแจ้งเตือนใบประกอบวิชาชีพ จึงต้องเป็นรูปแบบที่ถูกต้อง (เว้นว่างได้)
+            $email = trim((string)($input['email'] ?? ''));
+            if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                http_response_code(400);
+                echo json_encode(["status" => "error", "message" => "รูปแบบอีเมลไม่ถูกต้อง"], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+
+            // วันหมดอายุใบประกอบวิชาชีพ (YYYY-MM-DD ปี ค.ศ.) — เว้นว่างได้
+            $licenseExpiry = trim((string)($input['license_expiry'] ?? ''));
+            if ($licenseExpiry === '') {
+                $licenseExpiry = null;
+            } else {
+                $parts = explode('-', $licenseExpiry);
+                $validDate = preg_match('/^\d{4}-\d{2}-\d{2}$/', $licenseExpiry)
+                    && checkdate((int)$parts[1], (int)$parts[2], (int)$parts[0])
+                    && (int)$parts[0] >= 1950 && (int)$parts[0] <= 2200;
+                if (!$validDate) {
+                    http_response_code(400);
+                    echo json_encode(["status" => "error", "message" => "วันหมดอายุใบประกอบวิชาชีพไม่ถูกต้อง"], JSON_UNESCAPED_UNICODE);
+                    exit;
+                }
+            }
+
+            $sql = "UPDATE faculty SET first_name_en = ?, last_name_en = ?, gender = ?, birth_date = ?, email = ?, phone = ?, current_address = ?, nursing_council_no = ?, license_expiry = ? WHERE faculty_id = ?";
             $db->prepare($sql)->execute([
                 $input['first_name_en'] ?? null,
                 $input['last_name_en'] ?? null,
                 $input['gender'] ?? null,
                 $input['birth_date'] ?? null,
-                $input['email'] ?? null,
+                $email !== '' ? $email : null,
                 $input['phone'] ?? null,
                 $input['current_address'] ?? null,
                 $input['nursing_council_no'] ?? null,
+                $licenseExpiry,
                 $u_info['username']
             ]);
+
+            // บันทึก Audit Log เมื่ออาจารย์อัปเดตข้อมูล
+            logAudit($db, $id, 'update', 'profile', 'อาจารย์/บุคลากรแก้ไขข้อมูลส่วนตัว (รหัส: ' . $u_info['username'] . ')');
+
+            // เพิ่งแก้วันหมดอายุ/อีเมล → เช็กแจ้งเตือนของคนนี้ทันที (พังก็ไม่กระทบการบันทึก)
+            try {
+                session_write_close();
+                licenseReminderProcess($db, (string)$u_info['username']);
+            } catch (Throwable $e) {
+                error_log('license reminder: ' . $e->getMessage());
+            }
         }
         echo json_encode(["status" => "success"], JSON_UNESCAPED_UNICODE);
         exit;
