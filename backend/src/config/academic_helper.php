@@ -1,36 +1,35 @@
 <?php
 /**
- * คำนวณปีการศึกษาและชั้นปีของนักศึกษาแบบ Real-time ตัดรอบวันที่ 10 สิงหาคม
+ * บันทึกประวัติการใช้งานระบบ (Audit Log)
+ * เรียกใช้ทุกครั้งหลัง insert/update/delete สำเร็จ ในทุกไฟล์ CRUD ทุก role
+ *
+ * @param PDO         $db         instance ของ Connect/PDO ที่เปิดอยู่แล้วในไฟล์ที่เรียก
+ * @param int|string  $userId     user_id ของผู้กระทำ (จาก $_SESSION['user_id'])
+ * @param string      $actionType 'create' | 'update' | 'delete' | 'role_change'
+ * @param string      $resource   ชื่อฟีเจอร์ที่กระทำ เช่น 'portfolio', 'student_vaccinations'
+ * @param string      $details    รายละเอียดที่อ่านเข้าใจได้ เช่น 'ลบผลงาน: ใบประกาศนียบัตร IELTS'
  */
-function calculateRealtimeAcademicInfo($studentId, $entryYearCandidate = null): array {
-    $now = new DateTime();
-    $currentYearBE = (int)$now->format('Y') + 543;
+function logAudit(PDO $db, $userId, string $actionType, string $resource, string $details = ''): void {
+    try {
+        // รองรับกรณีอยู่หลัง Reverse Proxy หรือ Docker Network
+        $ipAddress = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
+        if ($ipAddress && strpos($ipAddress, ',') !== false) {
+            $ipAddress = trim(explode(',', $ipAddress)[0]);
+        }
 
-    // ตัดรอบเลื่อนชั้นปี: วันที่ 10 สิงหาคม ของทุกปี
-    $cutOffDate = new DateTime($now->format('Y') . '-08-10 00:00:00');
-    $academicYear = ($now >= $cutOffDate) ? $currentYearBE : ($currentYearBE - 1);
-
-    // ดึงปีที่เข้าศึกษาจาก 2 ตัวแรกของรหัสนักศึกษาเป็นหลัก (เช่น 6603400001 -> 2566)
-    $cleanId = trim((string)$studentId);
-    $entryYear = 0;
-
-    if (strlen($cleanId) >= 2 && is_numeric(substr($cleanId, 0, 2))) {
-        $entryYear = 2500 + (int)substr($cleanId, 0, 2);
-    } elseif (!empty($entryYearCandidate) && is_numeric($entryYearCandidate) && (int)$entryYearCandidate >= 2500) {
-        $entryYear = (int)$entryYearCandidate;
-    } else {
-        $entryYear = $academicYear; // Fallback
+        $stmt = $db->prepare("
+            INSERT INTO audit_log (user_id, action_type, resource, details, ip_address, created_at)
+            VALUES (:user_id, :action_type, :resource, :details, :ip_address, NOW())
+        ");
+        $stmt->execute([
+            ':user_id'     => $userId,
+            ':action_type' => $actionType,
+            ':resource'    => $resource,
+            ':details'     => $details,
+            ':ip_address'  => $ipAddress,
+        ]);
+    } catch (Exception $e) {
+        // ไม่ให้กระทบการทำงานหลักของระบบหากบันทึก Log ล้มเหลว
+        error_log('logAudit failed: ' . $e->getMessage());
     }
-
-    // สูตรคำนวณชั้นปี
-    $yearLevel = $academicYear - $entryYear + 1;
-
-    if ($yearLevel < 1) $yearLevel = 1;
-    if ($yearLevel > 8) $yearLevel = 8;
-
-    return [
-        'academic_year' => $academicYear,
-        'year_level'    => $yearLevel,
-        'entry_year'    => $entryYear
-    ];
 }

@@ -6,10 +6,16 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { TrendingUp, Save, Link } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import api from '@/lib/axios'; 
+import { consumePendingProjectNavigation } from '@/lib/projectNavigation';
 
 interface TargetOption {
   code: string;
   description: string;
+}
+
+interface ProjectOption {
+  id: number;
+  name: string;
 }
 
 interface LinkMatrix {
@@ -21,7 +27,7 @@ interface LinkMatrix {
 }
 
 export default function ProjectLinks() {
-  const [projects, setProjects] = useState<any[]>([]);
+  const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [plos, setPlos] = useState<TargetOption[]>([]);
   const [ylos, setYlos] = useState<TargetOption[]>([]);
   const [clos, setClos] = useState<TargetOption[]>([]);
@@ -45,10 +51,9 @@ export default function ProjectLinks() {
           setClos(data.clos || []);
           setLinks(data.links || {});
           
-          const pending = sessionStorage.getItem("pendingProjectId");
-          if (pending && (data.projects || []).some((p: any) => String(p.id) === pending)) {
-            setSelectedProjectId(pending);
-            sessionStorage.removeItem("pendingProjectId");
+          const pending = consumePendingProjectNavigation();
+          if (pending?.projectId && (data.projects || []).some((p: ProjectOption) => String(p.id) === pending.projectId)) {
+            setSelectedProjectId(pending.projectId);
           } else if (data.projects && data.projects.length > 0) {
             setSelectedProjectId(data.projects[0].id.toString());
           }

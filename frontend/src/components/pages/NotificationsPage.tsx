@@ -398,7 +398,7 @@ const NotificationsPage = () => {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={markAllAsRead} className="gap-2">
+          <Button onClick={markAllAsRead} className="gap-2">
             <CheckCheck className="h-4 w-4" />
             อ่านทั้งหมด
           </Button>

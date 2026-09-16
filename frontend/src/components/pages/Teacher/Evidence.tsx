@@ -218,7 +218,7 @@ export default function Evidence() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">หลักฐานการปฏิบัติงาน</h1>
+            <h1 className="text-3xl font-bold tracking-tight leading-snug">หลักฐานการปฏิบัติงาน</h1>
             <p className="text-muted-foreground">จัดการหลักฐานการปฏิบัติงานของนักศึกษา</p>
           </div>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -228,7 +228,7 @@ export default function Evidence() {
                 อัปโหลดหลักฐาน
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="app-dialog-lg">
               <DialogHeader>
                 <DialogTitle>อัปโหลดหลักฐาน</DialogTitle>
                 <DialogDescription>

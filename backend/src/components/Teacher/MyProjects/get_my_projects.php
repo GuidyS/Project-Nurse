@@ -35,6 +35,7 @@ try {
         SELECT 
             p.project_id as id, 
             COALESCE(NULLIF(p.project_name_th, ''), NULLIF(p.project_name_en, ''), CONCAT('Project #', p.project_id)) AS name,
+            p.project_type,
             p.academic_year,
             p.status,
             p.end_date,
@@ -67,10 +68,16 @@ try {
 
     $my_projects = [];
     foreach ($projects_raw as $p) {
+        $projectType = (string)($p['project_type'] ?? 'other');
         $my_projects[] = [
             "id" => (string)$p['id'],
             "name" => $p['name'],
-            "type" => "โครงการ",
+            "project_type" => $projectType,
+            "type" => match ($projectType) {
+                'academic_service' => 'บริการวิชาการ',
+                'culture' => 'ทำนุบำรุงศิลปวัฒนธรรม',
+                default => 'โครงการอื่น',
+            },
             "status" => strtolower($p['status'] ?? 'pending'),
             "progress" => (int)round((float)$p['progress']),
             "budget" => (float)$p['budget'],

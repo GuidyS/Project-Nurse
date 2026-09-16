@@ -21,6 +21,10 @@ interface ApprovalRequest {
   description: string;
   date: string;
   status: ApprovalStatus;
+  payload?: Record<string, unknown> | null;
+  before?: Record<string, unknown> | null;
+  after?: Record<string, unknown> | null;
+  documentUrl?: string | null;
   reviewNote?: string | null;
   reviewedAt?: string | null;
   reviewer?: string | null;
@@ -45,6 +49,20 @@ const getTypeBadge = (type: string) => (
     {typeLabels[type] || type}
   </Badge>
 );
+
+Object.assign(typeLabels, {
+  permission_change: "Permission request",
+  student_transfer: "Advisor transfer",
+  document_link_approval: "Document link",
+  sensitive_change: "Sensitive change",
+});
+
+Object.assign(typeColors, {
+  permission_change: "bg-blue-500",
+  student_transfer: "bg-purple-500",
+  document_link_approval: "bg-orange-500",
+  sensitive_change: "bg-slate-700",
+});
 
 const getStatusBadge = (status: ApprovalStatus) => {
   switch (status) {
@@ -111,12 +129,13 @@ export default function Approvals() {
     if (!pendingAction) return;
     const { id, action } = pendingAction;
     const endpoint = action === "approve" ? "approve-request" : "reject-request";
+    const reviewNote = window.prompt(action === "reject" ? "Review note / reject reason" : "Review note (optional)") || null;
     const successTitle = action === "approve" ? "อนุมัติคำขอสำเร็จ" : "ปฏิเสธคำขอสำเร็จ";
     const failureTitle = action === "approve" ? "อนุมัติคำขอไม่สำเร็จ" : "ปฏิเสธคำขอไม่สำเร็จ";
 
     try {
       setUpdatingId(id);
-      await api.post(`/index.php?page=${endpoint}`, { id });
+      await api.post(`/index.php?page=${endpoint}`, { id, reviewNote });
       toast({ title: successTitle });
       setIsConfirmOpen(false);
       setPendingAction(null);
@@ -135,6 +154,10 @@ export default function Approvals() {
   const pendingApprovals = approvals.filter((approval) => approval.status === "pending");
   const approvedCount = approvals.filter((approval) => approval.status === "approved").length;
   const rejectedCount = approvals.filter((approval) => approval.status === "rejected").length;
+  const formatJsonDetail = (value?: Record<string, unknown> | null) => {
+    if (!value || Object.keys(value).length === 0) return null;
+    return JSON.stringify(value);
+  };
 
   const renderRows = (rows: ApprovalRequest[], showActions: boolean) => {
     if (isLoading) {
@@ -168,6 +191,31 @@ export default function Approvals() {
             {approval.targetRefId && (
               <p className="text-xs text-muted-foreground">
                 อ้างอิง: {approval.targetRefType || "-"} / {approval.targetRefId}
+              </p>
+            )}
+            {approval.documentUrl && (
+              <a
+                href={approval.documentUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="block text-xs text-primary underline-offset-2 hover:underline"
+              >
+                Open document link
+              </a>
+            )}
+            {formatJsonDetail(approval.payload) && (
+              <p className="truncate text-xs text-muted-foreground">
+                Payload: {formatJsonDetail(approval.payload)}
+              </p>
+            )}
+            {formatJsonDetail(approval.before) && (
+              <p className="truncate text-xs text-muted-foreground">
+                Before: {formatJsonDetail(approval.before)}
+              </p>
+            )}
+            {formatJsonDetail(approval.after) && (
+              <p className="truncate text-xs text-muted-foreground">
+                After: {formatJsonDetail(approval.after)}
               </p>
             )}
           </div>
@@ -210,7 +258,7 @@ export default function Approvals() {
     <>
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">อนุมัติคำขอ</h1>
+        <h1 className="text-3xl font-bold tracking-tight py-1">อนุมัติคำขอ</h1>
         <p className="text-muted-foreground">ดำเนินการตามคำขอจากอาจารย์และผู้ใช้งานในระบบ</p>
       </div>
 

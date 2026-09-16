@@ -3,7 +3,8 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 require_once __DIR__ . '/../../../config/config.php';
-header("Content-Type: application/json");
+require_once __DIR__ . '/../../../config/audit_helper.php';
+header("Content-Type: application/json; charset=UTF-8");
 
 try {
     if (!isset($_SESSION['user_id'])) {
@@ -21,7 +22,8 @@ try {
         'advisor' => 3,
         'practical_instructor' => 4,
         'program_manager' => 5,
-        'project_manager' => 6
+        'project_manager' => 6,
+        'research' => 9
     ];
     $positionSlugMap = array_flip($positionMap);
 
@@ -59,13 +61,12 @@ try {
     $data = json_decode(file_get_contents("php://input"), true) ?: [];
 
     $userId = $data['userId'] ?? null;
-    $newRole = $data['newRole'] ?? null; // admin, teacher, student
+    $newRole = $data['newRole'] ?? null;
     $primaryPosition = $data['primaryPosition'] ?? ($data['newSubRole'] ?? null);
     $secondaryPositions = is_array($data['secondaryPositions'] ?? null) ? $data['secondaryPositions'] : [];
 
     if (!$userId || !$newRole) throw new Exception("ข้อมูลไม่ครบถ้วน");
 
-    // กันผู้ดูแลแก้ role/position ของตัวเอง
     if ((int)$userId === $actorUserId) {
         http_response_code(403);
         echo json_encode([
@@ -75,16 +76,13 @@ try {
         exit();
     }
 
-    // แปลง Role
     $roleId = ($newRole == 'admin') ? 1 : (($newRole == 'teacher') ? 2 : 3);
 
     $db->beginTransaction();
 
-    // 1. อัปเดตตาราง users
     $stmt = $db->prepare("UPDATE users SET role_id = :role_id WHERE user_id = :user_id");
     $stmt->execute([':role_id' => $roleId, ':user_id' => $userId]);
 
-    // 2. อัปเดตตาราง user_position
     $db->prepare("DELETE FROM user_position WHERE user_id = :id")->execute([':id' => $userId]);
 
     if ($newRole == 'teacher') {
@@ -112,7 +110,20 @@ try {
         }
     }
 
+    $uStmt = $db->prepare("SELECT username FROM users WHERE user_id = ?");
+    $uStmt->execute([$userId]);
+    $targetUser = $uStmt->fetchColumn() ?: "ID: {$userId}";
+
+    $roleLabel = ($newRole === 'admin') ? 'ผู้ดูแลระบบ' : (($newRole === 'teacher') ? 'อาจารย์' : 'นักศึกษา');
+    $logDetail = "เปลี่ยนบทบาทผู้ใช้ {$targetUser} เป็น {$roleLabel}";
+    if ($newRole === 'teacher' && $primaryPosition) {
+        $logDetail .= " (ตำแหน่งหลัก: {$primaryPosition})";
+    }
+
     $db->commit();
+
+    logAudit($db, $actorUserId, 'role_change', 'roles_management', $logDetail);
+
     echo json_encode(["status" => "success", "message" => "อัปเดต Role สำเร็จ"], JSON_UNESCAPED_UNICODE);
 } catch (Exception $e) {
     if (isset($db) && $db->inTransaction()) $db->rollBack();

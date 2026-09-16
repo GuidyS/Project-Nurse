@@ -166,7 +166,7 @@ export default function ExportData() {
     <>
       <div className="p-6 space-y-6 animate-fade-in">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">ส่งออกข้อมูล</h1>
+          <h1 className="text-3xl font-bold text-foreground py-1">ส่งออกข้อมูล</h1>
           <p className="text-muted-foreground">เลือกข้อมูลที่ต้องการส่งออกเป็นไฟล์ Excel หรือ CSV</p>
         </div>
 

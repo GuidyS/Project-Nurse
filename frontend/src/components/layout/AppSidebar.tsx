@@ -18,7 +18,7 @@ import {
   useSidebar
 } from '@/components/ui/sidebar';
 import { toast } from 'sonner';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import api from '@/lib/axios';
 
 interface SidebarProps {
@@ -57,10 +57,25 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
 
+  const fetchMenus = useCallback(async () => {
+    try {
+      const res = await api.get('/index.php?page=sidebar');
+      const sections = Array.isArray(res.data) ? res.data : [];
+      console.log('Menu Data:', sections);
+      setMenuSections(sections);
+    } catch (error) {
+      console.error('Failed to fetch menus:', error);
+      toast.error('โหลดเมนูไม่สำเร็จ');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   const fetchUnreadCount = async () => {
     try {
       const response = await api.get("/index.php?page=get-notifications");
       const data = Array.isArray(response.data) ? response.data : (response.data?.data || []);
+      // กรองเฉพาะการแจ้งเตือนที่ได้รับและยังไม่ได้อ่าน
       const count = data.filter((n: any) => n.direction === "received" && !n.isRead).length;
       setUnreadCount(count);
     } catch (error) {
@@ -69,115 +84,6 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
   };
 
   useEffect(() => {
-    const fetchMenus = async () => {
-      try {
-        const res = await api.get(`/index.php?page=sidebar`);
-        let data = res.data;
-
-        const currentUser = readStoredUser();
-        const roleId = Number(currentUser.role_id);
-
-        if (Array.isArray(data)) {
-          // 1. เมนูสำหรับนักศึกษา (role_id = 3)
-          if (roleId === 3 && data.length > 0) {
-            const hasVac = data.some((s: any) => s.items?.some((i: any) => i.url === "student-vaccinations"));
-            const hasHealth = data.some((s: any) => s.items?.some((i: any) => i.url === "student-health-records"));
-            const hasCompetency = data.some((s: any) => s.items?.some((i: any) => i.url === "student-competency-view"));
-
-            const newItems = [...(data[0].items || [])];
-            if (!hasVac) {
-              newItems.push({
-                title: "ประวัติการได้รับวัคซีน",
-                url: "student-vaccinations",
-                icon: "ShieldAlert",
-              });
-            }
-            if (!hasHealth) {
-              newItems.push({
-                title: "ข้อมูลภาวะสุขภาพ",
-                url: "student-health-records",
-                icon: "Activity",
-              });
-            }
-            if (!hasCompetency) {
-              newItems.push({
-                title: "ผลการประเมินสมรรถนะหลัก",
-                url: "student-competency-view",
-                icon: "ClipboardCheck",
-              });
-            }
-            data[0] = { ...data[0], items: newItems };
-          }
-
-          // 2. เมนูสำหรับอาจารย์ที่ปรึกษา / Admin (role_id = 1 หรือ 2)
-          if (roleId === 1 || roleId === 2) {
-            data = data.map((section: any) => {
-              if (section.sectionTitle === "งานที่ปรึกษา") {
-                const hasVac = section.items?.some((item: any) => item.url === "advisor-vaccination-view");
-                const hasHealth = section.items?.some((item: any) => item.url === "advisor-health-records-view");
-                const hasCompetency = section.items?.some((item: any) => item.url === "advisor-competency-view");
-                const newItems = [...(section.items || [])];
-
-                if (!hasVac) {
-                  newItems.push({
-                    title: "ข้อมูลวัคซีนนักศึกษา",
-                    url: "advisor-vaccination-view",
-                    icon: "ShieldAlert",
-                  });
-                }
-                if (!hasHealth) {
-                  newItems.push({
-                    title: "ข้อมูลสุขภาพนักศึกษา",
-                    url: "advisor-health-records-view",
-                    icon: "Activity",
-                  });
-                }
-                if (!hasCompetency) {
-                  newItems.push({
-                    title: "ประเมินสมรรถนะหลัก",
-                    url: "advisor-competency-view",
-                    icon: "ClipboardCheck",
-                  });
-                }
-                return { ...section, items: newItems };
-              }
-              return section;
-            });
-          }
-
-          // 3. เมนูจัดการของ Admin (role_id = 1)
-          if (roleId === 1) {
-            data = data.map((section: any) => {
-              if (
-                section.sectionTitle === "จัดการระบบ" || 
-                section.sectionTitle === "การจัดการระบบ" || 
-                section.sectionTitle === "ผู้ดูแลระบบ"
-              ) {
-                const hasCompMgmt = section.items?.some((item: any) => item.url === "competency-items-management");
-                if (!hasCompMgmt) {
-                  const newItems = [...(section.items || [])];
-                  newItems.push({
-                    title: "จัดการรายการประเมินสมรรถนะ",
-                    url: "competency-items-management",
-                    icon: "ListChecks",
-                  });
-                  return { ...section, items: newItems };
-                }
-              }
-              return section;
-            });
-          }
-        }
-
-        setMenuSections(data);
-      } catch (error) {
-        console.error("Failed to fetch menus:", error);
-        toast.error("โหลดเมนูไม่สำเร็จ");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     const fetchUserProfile = async () => {
       try {
         const response = await api.get("/index.php?page=profile");
@@ -197,7 +103,6 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
       }
     };
 
-    fetchMenus();
     fetchUserProfile();
 
     fetchUnreadCount();
@@ -211,25 +116,57 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
     };
   }, []);
 
+  // โหลดใหม่เมื่อเปลี่ยนหน้า เพื่อไม่ให้ Sidebar ค้างอยู่กับข้อมูลจาก session ก่อนหน้า
+  useEffect(() => {
+    fetchMenus();
+  }, [activeItem, fetchMenus]);
+
+  // รองรับการอัปเดตเมนูจาก backend โดยไม่ต้อง logout/login ใหม่
+  useEffect(() => {
+    const refreshMenus = () => fetchMenus();
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') fetchMenus();
+    };
+
+    window.addEventListener('focus', refreshMenus);
+    window.addEventListener('app:sidebar-refresh', refreshMenus);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+
+    return () => {
+      window.removeEventListener('focus', refreshMenus);
+      window.removeEventListener('app:sidebar-refresh', refreshMenus);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
+  }, [fetchMenus]);
+
+  // ฟังก์ชันแปลง String เป็น Component
   const getIcon = (iconName: string) => {
     const IconComponent = (Icons as any)[iconName];
-    return IconComponent || Icons.HelpCircle;
+    return IconComponent || Icons.HelpCircle; // ถ้าหาไม่เจอให้ใช้ HelpCircle แทน
   };
 
   const userName = getDisplayName(sidebarUser);
+
+  // ดึงตัวอักษรตัวแรกจากชื่อ (เช่น 'สมชาย' จะได้ 'ส') 
+  // หากไม่มีชื่อจะใช้ 'U' เป็นค่าเริ่มต้น
   const userInitial = userName.trim().charAt(0) || 'U';
+
   const userPermissions = sidebarUser.permissions || [];
 
   if (isLoading) return <div className="p-4">กำลังโหลดเมนู...</div>;
 
+  // เพิ่มฟังก์ชัน Logout ตรงนี้
   const handleLogout = () => {
+    // 1. ล้างข้อมูล User และ Permissions ออกจากเครื่อง
     localStorage.removeItem('user');
-    sessionStorage.clear();
+    sessionStorage.clear(); // ล้าง session (ถ้ามี)
+
+    // 3. ส่งผู้ใช้กลับไปหน้า Login และรีโหลดเพื่อล้าง State ทั้งหมด
     window.location.href = "/"; 
   };
 
   const hasPermission = (name?: string) => {
-    if (!name) return true;
+    if (!name) return true; // ถ้าไม่ได้ระบุสิทธิ์ ให้แสดงปกติ
     return userPermissions.includes(name);
   };
 
@@ -242,6 +179,7 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
   return (
     <Sidebar 
       collapsible="icon" 
+      // ใช้สไตล์แบบแปรผันเพื่อบังคับความกว้างตอนหุบให้เป็น 72px เป๊ะๆ
       style={{ 
         "--sidebar-width-icon": "72px", 
         "--sidebar-width": "260px" 
@@ -256,11 +194,13 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
       <SidebarHeader className="border-b border-sidebar-border p-4">
         <div className="flex items-center justify-between relative group gap-3">
           
+          {/* พื้นที่ Logo */}
           <div className="relative h-10 w-10 shrink-0">
             <div className="flex h-full w-full items-center justify-center rounded-full bg-[#8a2be2] overflow-hidden shadow-sm">
               <img src="../../Nurse_logo.jpg" alt="Logo" className="object-cover w-full h-full" />
             </div>
 
+            {/* ปุ่ม Trigger ตอน "หุบ" (จะแสดงทับ Logo เป๊ะๆ เมื่อ Hover) */}
             {collapsed && (
               <SidebarTrigger className="absolute inset-0 h-full w-full opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-[#8a2be2]/80 text-white rounded-lg flex items-center justify-center border-none hover:bg-[#8a2be2]">
                 <ChevronLeft className="h-4 w-4 rotate-180" />
@@ -268,6 +208,7 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
             )}
           </div>
 
+          {/* ชื่อระบบ และ ปุ่ม Trigger ตอน "ขยาย" */}
           {!collapsed && (
             <>
               <div className="flex-1 min-w-0">
@@ -275,6 +216,7 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
                 <p className="text-[10px] text-muted-foreground font-medium whitespace-nowrap uppercase tracking-tighter">Management System</p>
               </div>
               
+              {/* ปุ่ม Trigger กลับไปอยู่ที่เดิม (ขวาบน) เมื่อเปิดแถบ */}
               <SidebarTrigger className="text-sidebar-foreground/70 hover:bg-[#8a2be2]/10 hover:text-[#8a2be2]">
                 <ChevronLeft className="h-4 w-4" />
               </SidebarTrigger>
@@ -283,17 +225,20 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
         </div>
       </SidebarHeader>
 
-      {/* Main Menu */}
+      {/* Main Menu with Sections */}
       <SidebarContent>
         {menuSections.map((section, idx) => {
-          const filteredItems = (section.items || []).filter(
+          // 1. กรองรายการเมนูที่ต้องการซ่อนออกก่อนเก็บไว้ในตัวแปร
+          const filteredItems = section.items.filter(
             (item: any) => !['notifications', 'profile', 'settings'].includes(item.url)
           );
 
+          // 2. ถ้ากลุ่มนี้ไม่มีเมนูเหลืออยู่เลย (ความยาวเป็น 0) ให้ส่งค่า null เพื่อไม่เรนเดอร์ทั้ง Section
           if (filteredItems.length === 0) return null;
 
           return (
             <div key={idx} className="px-4 py-2">
+              {/* แสดงหัวข้อกลุ่มเฉพาะตอนที่ไม่หุบ และมีเมนูในกลุ่มนั้นจริงๆ */}
               {!collapsed && section.sectionTitle && (
                 <p className="px-4 text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">
                   {section.sectionTitle}
@@ -334,7 +279,7 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
         })}
       </SidebarContent>
 
-      {/* Bottom Menu */}
+      {/* --- Bottom Menu Section --- */}
       <div className="mt-auto border-t border-sidebar-border p-4">
         <SidebarMenu>
           {bottomMenuItems
@@ -353,6 +298,7 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
                       "w-full transition-all duration-200 mb-1 group",
                       isActive 
                         ? "bg-[#8a2be2]/10 text-[#8a2be2]" 
+                        // เอา text-slate-600 ออกเพื่อให้สีสอดคล้องกับเมนูด้านบน
                         : "hover:bg-[#8a2be2]/10 hover:text-[#8a2be2]", 
                       "active:bg-[#8a2be2]/10 active:text-[#8a2be2]",
                       "focus:bg-[#8a2be2]/10 focus:text-[#8a2be2]",
@@ -366,12 +312,15 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
                     )} />
                     {!collapsed && <span>{item.title}</span>}
 
+                    {/* 🎯 5. ส่วนแสดงตัวเลข Badge แจ้งเตือนสีแดง */}
                     {isNotification && unreadCount > 0 && (
                       collapsed ? (
+                        // กรณีหุบ Sidebar: โชว์เป็นวงกลมเล็กๆ ซ้อนบนไอคอน
                         <span className="absolute top-1 right-2 flex h-3 w-3 items-center justify-center rounded-full bg-destructive text-[8px] font-bold text-destructive-foreground ring-2 ring-sidebar">
                           {unreadCount > 9 ? '9+' : unreadCount}
                         </span>
                       ) : (
+                        // กรณีขยาย Sidebar: โชว์เป็น Badge ตัวเลขต่อท้ายข้อความ
                         <Badge variant="destructive" className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full px-1 text-[10px]">
                           {unreadCount > 99 ? '99+' : unreadCount}
                         </Badge>
@@ -385,20 +334,22 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
         </SidebarMenu>
       </div>
 
-      {/* Footer Profile */}
+      {/* --- User Profile & Logout --- */}
       <SidebarFooter className="border-t border-sidebar-border p-4">
         <div className="flex items-center justify-between relative group">
           <div className="relative h-10 w-10 shrink-0">
+            {/* เรียกใช้ Class จาก index.css */}
             <Avatar className="sidebar-profile-avatar">
               <AvatarFallback className="sidebar-profile-fallback">
                 {userInitial}
               </AvatarFallback>
             </Avatar>
 
+            {/* ปุ่ม Logout (แสดงทับ Avatar เมื่อ Hover) */}
             <button 
               onClick={handleLogout}
               className={cn(
-                "sidebar-logout-overlay", 
+                "sidebar-logout-overlay", // เรียกใช้ Class จาก index.css
                 !collapsed && "hidden" 
               )}
             >
@@ -409,8 +360,10 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
           {!collapsed && (
             <>
               <div className="flex-1 min-w-0 ml-2">
+                {/* เรียกใช้ Class จาก index.css */}
                 <p className="sidebar-profile-name">{ userName }</p>
               </div>
+              {/* เรียกใช้ Class จาก index.css */}
               <button 
                 onClick={handleLogout}
                 className="sidebar-logout-btn"

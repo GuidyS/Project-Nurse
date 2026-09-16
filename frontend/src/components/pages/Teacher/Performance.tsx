@@ -98,7 +98,7 @@ export default function Performance() {
     <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">ประเมิน Performance</h1>
+            <h1 className="text-3xl font-bold tracking-tight leading-snug">ประเมิน Performance</h1>
             <p className="text-muted-foreground">บันทึกและประเมินผลการปฏิบัติงานของนักศึกษา</p>
           </div>
 
@@ -111,7 +111,7 @@ export default function Performance() {
               </Button>
             </DialogTrigger>
 
-            <DialogContent className="sm:max-w-[600px]">
+            <DialogContent className="app-dialog-3xl">
               <DialogHeader>
                 <DialogTitle>ประเมินผลการปฏิบัติงาน</DialogTitle>
               </DialogHeader>

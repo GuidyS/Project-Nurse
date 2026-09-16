@@ -90,7 +90,7 @@ export default function StudentsPage({ student: detailStudent = null, onBack }: 
 
   return (
     <Dialog open={!!detailStudent} onOpenChange={handleOpen}>
-      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="app-dialog-3xl">
         {detailStudent && (
           <>
             <DialogHeader>

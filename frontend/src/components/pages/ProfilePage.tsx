@@ -243,88 +243,90 @@ export default function ProfilePage() {
         </div>
 
         <div className="border-t border-border my-8" />
+          <div className="flex items-center gap-2 mb-4">
+            <h3 className="font-semibold text-foreground text-base">ข้อมูลทั่วไป</h3>
+          </div>
 
-        {/* 🎯 ข้อมูลอื่นๆ ที่ดึงมาแสดงตามสิทธิ์ */}
-        <div className="grid md:grid-cols-2 gap-6 text-sm">
-          {userRole === "teacher" ? (
-            <>
-              {/* โครงสร้างเดิมของอาจารย์ ไม่แตะต้อง */}
-              <InfoRow icon={<User className="h-4 w-4 text-primary" />} label="เพศ" value={profileData.gender} />
-              <InfoRow icon={<Calendar className="h-4 w-4 text-primary" />} label="วัน/เดือน/ปี เกิด" value={formatThaiDate(profileData.birth_date)} />
-              <InfoRow icon={<Mail className="h-4 w-4 text-primary" />} label="อีเมล" value={displayEmail} />
-              <InfoRow icon={<Phone className="h-4 w-4 text-primary" />} label="เบอร์โทรศัพท์" value={profileData.phone} />
-              <InfoRow icon={<ShieldCheck className="h-4 w-4 text-primary" />} label="เลขที่บัตรสภาการพยาบาล" value={profileData.nursing_council_no} />
-              <InfoRow icon={<Calendar className="h-4 w-4 text-primary" />} label="วันหมดอายุใบอนุญาต" value={formatThaiDate(profileData.license_expiry)} />
-              <InfoRow icon={<Calendar className="h-4 w-4 text-primary" />} label="วันที่เริ่มปฏิบัติงาน" value={formatThaiDate(profileData.start_work_date)} />
-              <InfoRow icon={<Calendar className="h-4 w-4 text-primary" />} label="วันที่รับตำแหน่งทางวิชาการ" value={formatThaiDate(profileData.academic_position_date)} />
-              <div className="md:col-span-2">
-                <InfoRow icon={<MapPin className="h-4 w-4 text-primary" />} label="ที่อยู่ปัจจุบัน" value={profileData.current_address} />
-              </div>
-              <PdfDocumentsSection documents={pdfDocuments} />
-            </>
-          ) : (
-            <>
-              {/* ส่วนแสดงผลของ Student ที่คำนวณ Real-time */}
-              <InfoRow icon={<User className="h-4 w-4 text-primary" />} label="เพศ" value={profileData.gender || "หญิง"} />
-              <InfoRow icon={<Calendar className="h-4 w-4 text-primary" />} label="วัน/เดือน/ปี เกิด" value={formatThaiDate(profileData.birth_date)} />
-              <InfoRow icon={<Mail className="h-4 w-4 text-primary" />} label="อีเมล" value={displayEmail} />
-              <InfoRow icon={<Phone className="h-4 w-4 text-primary" />} label="เบอร์โทรศัพท์มือถือ" value={profileData.phone} />
-              <InfoRow icon={<GraduationCap className="h-4 w-4 text-primary" />} label="ชั้นปีปัจจุบัน" value={academicCalculated.yearLevelText} />
-              <InfoRow icon={<GraduationCap className="h-4 w-4 text-primary" />} label="เกรดเฉลี่ย (GPA)" value={profileData.gpa} />
-              <InfoRow icon={<Activity className="h-4 w-4 text-primary" />} label="ส่วนสูง / น้ำหนัก" value={profileData.height && profileData.weight ? `${profileData.height} ซม. / ${profileData.weight} กก.` : null} />
-              <InfoRow icon={<Activity className="h-4 w-4 text-primary" />} label="ดัชนีมวลกาย (BMI)" value={profileData.bmi || calculateBMI(profileData.height, profileData.weight)} />
-              <InfoRow icon={<ShieldCheck className="h-4 w-4 text-primary" />} label="รหัสประจำตัวประชาชน" value={profileData.id_card_number} />
-              <InfoRow icon={<Calendar className="h-4 w-4 text-primary" />} label="ปีการศึกษาที่เข้าศึกษา" value={academicCalculated.entryYear} />
-              <div className="md:col-span-2">
-                <InfoRow icon={<MapPin className="h-4 w-4 text-primary" />} label="ที่อยู่ปัจจุบัน" value={profileData.home_address || profileData.address} />
-              </div>
-
-              {/* 👨‍👩‍👧 ส่วนข้อมูลครอบครัว (บิดา-มารดา) */}
-              <div className="md:col-span-2 border-t border-border pt-6 mt-2">
-                <div className="flex items-center gap-2 mb-4">
-                  <Users className="h-5 w-5 text-primary" />
-                  <h3 className="font-semibold text-foreground text-base">ข้อมูลครอบครัว (บิดา-มารดา)</h3>
+          {/* 🎯 ข้อมูลอื่นๆ ที่ดึงมาแสดงตามสิทธิ์ */}
+          <div className="grid md:grid-cols-2 gap-6 text-sm">
+            {userRole === "teacher" ? (
+              <>
+                {/* โครงสร้างเดิมของอาจารย์ ไม่แตะต้อง */}
+                <InfoRow icon={<User className="h-4 w-4 text-primary" />} label="เพศ" value={profileData.gender} />
+                <InfoRow icon={<Calendar className="h-4 w-4 text-primary" />} label="วัน/เดือน/ปี เกิด" value={formatThaiDate(profileData.birth_date)} />
+                <InfoRow icon={<Mail className="h-4 w-4 text-primary" />} label="อีเมล" value={displayEmail} />
+                <InfoRow icon={<Phone className="h-4 w-4 text-primary" />} label="เบอร์โทรศัพท์" value={profileData.phone} />
+                <InfoRow icon={<ShieldCheck className="h-4 w-4 text-primary" />} label="เลขที่บัตรสภาการพยาบาล" value={profileData.nursing_council_no} />
+                <InfoRow icon={<Calendar className="h-4 w-4 text-primary" />} label="วันหมดอายุใบอนุญาต" value={formatThaiDate(profileData.license_expiry)} />
+                <InfoRow icon={<Calendar className="h-4 w-4 text-primary" />} label="วันที่เริ่มปฏิบัติงาน" value={formatThaiDate(profileData.start_work_date)} />
+                <InfoRow icon={<Calendar className="h-4 w-4 text-primary" />} label="วันที่รับตำแหน่งทางวิชาการ" value={formatThaiDate(profileData.academic_position_date)} />
+                <div className="md:col-span-2">
+                  <InfoRow icon={<MapPin className="h-4 w-4 text-primary" />} label="ที่อยู่ปัจจุบัน" value={profileData.current_address} />
                 </div>
-                
-                <div className="bg-muted/20 p-4 rounded-xl border border-border space-y-4">
-                  <div className="grid md:grid-cols-2 gap-6">
-                    {/* ข้อมูลบิดา */}
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-2 text-primary font-medium border-b border-border pb-1">
-                        <User className="h-4 w-4" />
-                        <span>ข้อมูลบิดา</span>
+                <PdfDocumentsSection documents={pdfDocuments} />
+              </>
+            ) : (
+              <>
+                {/* ส่วนแสดงผลของ Student ที่คำนวณ Real-time */}
+                <InfoRow icon={<User className="h-4 w-4 text-primary" />} label="เพศ" value={profileData.gender || "หญิง"} />
+                <InfoRow icon={<Calendar className="h-4 w-4 text-primary" />} label="วัน/เดือน/ปี เกิด" value={formatThaiDate(profileData.birth_date)} />
+                <InfoRow icon={<Mail className="h-4 w-4 text-primary" />} label="อีเมล" value={displayEmail} />
+                <InfoRow icon={<Phone className="h-4 w-4 text-primary" />} label="เบอร์โทรศัพท์มือถือ" value={profileData.phone} />
+                <InfoRow icon={<GraduationCap className="h-4 w-4 text-primary" />} label="ชั้นปีปัจจุบัน" value={academicCalculated.yearLevelText} />
+                <InfoRow icon={<GraduationCap className="h-4 w-4 text-primary" />} label="เกรดเฉลี่ย (GPA)" value={profileData.gpa} />
+                <InfoRow icon={<Activity className="h-4 w-4 text-primary" />} label="ส่วนสูง / น้ำหนัก" value={profileData.height && profileData.weight ? `${profileData.height} ซม. / ${profileData.weight} กก.` : null} />
+                <InfoRow icon={<Activity className="h-4 w-4 text-primary" />} label="ดัชนีมวลกาย (BMI)" value={profileData.bmi || calculateBMI(profileData.height, profileData.weight)} />
+                <InfoRow icon={<ShieldCheck className="h-4 w-4 text-primary" />} label="รหัสประจำตัวประชาชน" value={profileData.id_card_number} />
+                <InfoRow icon={<Calendar className="h-4 w-4 text-primary" />} label="ปีการศึกษาที่เข้าศึกษา" value={academicCalculated.entryYear} />
+                <div className="md:col-span-2">
+                  <InfoRow icon={<MapPin className="h-4 w-4 text-primary" />} label="ที่อยู่ปัจจุบัน" value={profileData.home_address || profileData.address} />
+                </div>
+
+                {/* 👨‍👩‍👧 ส่วนข้อมูลครอบครัว (บิดา-มารดา) */}
+                <div className="md:col-span-2 border-t border-border pt-6 mt-2">
+                  <div className="flex items-center gap-2 mb-4">
+                    <h3 className="font-semibold text-foreground text-base">ข้อมูลครอบครัว (บิดา-มารดา)</h3>
+                  </div>
+                  
+                  <div className="bg-muted/20 p-4 rounded-xl border border-border space-y-4">
+                    <div className="grid md:grid-cols-2 gap-6">
+                      {/* ข้อมูลบิดา */}
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2 text-primary font-medium border-b border-border pb-1">
+                          <User className="h-4 w-4" />
+                          <span>ข้อมูลบิดา</span>
+                        </div>
+                        <InfoRow icon={<User className="h-4 w-4 text-primary" />} label="ชื่อ-นามสกุลบิดา" value={fatherFullName || null} />
+                        <InfoRow icon={<Phone className="h-4 w-4 text-primary" />} label="เบอร์โทรศัพท์บิดา" value={profileData.father_phone} />
                       </div>
-                      <InfoRow icon={<User className="h-4 w-4 text-primary" />} label="ชื่อ-นามสกุลบิดา" value={fatherFullName || null} />
-                      <InfoRow icon={<Phone className="h-4 w-4 text-primary" />} label="เบอร์โทรศัพท์บิดา" value={profileData.father_phone} />
+
+                      {/* ข้อมูลมารดา */}
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2 text-primary font-medium border-b border-border pb-1">
+                          <Heart className="h-4 w-4" />
+                          <span>ข้อมูลมารดา</span>
+                        </div>
+                        <InfoRow icon={<User className="h-4 w-4 text-primary" />} label="ชื่อ-นามสกุลมารดา" value={motherFullName || null} />
+                        <InfoRow icon={<Phone className="h-4 w-4 text-primary" />} label="เบอร์โทรศัพท์มารดา" value={profileData.mother_phone} />
+                      </div>
                     </div>
 
-                    {/* ข้อมูลมารดา */}
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-2 text-primary font-medium border-b border-border pb-1">
-                        <Heart className="h-4 w-4" />
-                        <span>ข้อมูลมารดา</span>
-                      </div>
-                      <InfoRow icon={<User className="h-4 w-4 text-primary" />} label="ชื่อ-นามสกุลมารดา" value={motherFullName || null} />
-                      <InfoRow icon={<Phone className="h-4 w-4 text-primary" />} label="เบอร์โทรศัพท์มารดา" value={profileData.mother_phone} />
+                    {/* ที่อยู่ผู้ปกครอง (รวมเป็นแถวเดียว) */}
+                    <div className="border-t border-border pt-3">
+                      <InfoRow icon={<MapPin className="h-4 w-4 text-primary" />} label="ที่อยู่ผู้ปกครอง" value={parentAddress} />
                     </div>
                   </div>
-
-                  {/* ที่อยู่ผู้ปกครอง (รวมเป็นแถวเดียว) */}
-                  <div className="border-t border-border pt-3">
-                    <InfoRow icon={<MapPin className="h-4 w-4 text-primary" />} label="ที่อยู่ผู้ปกครอง" value={parentAddress} />
-                  </div>
                 </div>
-              </div>
 
-              <PdfDocumentsSection documents={pdfDocuments} />
-            </>
-          )}
+                <PdfDocumentsSection documents={pdfDocuments} />
+              </>
+            )}
+          </div>
         </div>
-      </div>
 
       {/* 🎯 Dialog แบบฟอร์มแก้ไขข้อมูลส่วนตัว */}
       <Dialog open={editing} onOpenChange={setEditing}>
-        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="app-dialog-3xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>แก้ไขข้อมูลส่วนตัว</DialogTitle>
             <DialogDescription>

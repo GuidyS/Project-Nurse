@@ -1,12 +1,20 @@
 <?php
     // ตั้งค่า CORS (ต้องอยู่บรรทัดแรกๆ ก่อน logic อื่น)
-    header("Access-Control-Allow-Origin: http://localhost:5173");
+    $allowedOrigins = [
+        'http://localhost:5173',
+        'http://127.0.0.1:5173',
+    ];
+    $requestOrigin = $_SERVER['HTTP_ORIGIN'] ?? '';
+    if (in_array($requestOrigin, $allowedOrigins, true)) {
+        header("Access-Control-Allow-Origin: {$requestOrigin}");
+        header("Vary: Origin");
+    }
     header("Access-Control-Allow-Credentials: true");
     header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
     header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
     header("Content-Type: application/json; charset=UTF-8");
 
-    // รองรับ Preflight Request (OPTIONS)
+    // --- เพิ่มส่วนนี้เข้าไป ---
     if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
         http_response_code(200);
         exit();
@@ -35,7 +43,7 @@
                 require_once 'components/Auth/change-password.php';
                 break;
             case 'profile':
-                require_once 'components/ProfilePage/api.php';
+                require_once 'components/ProfilePage/get_profile.php';
                 break;
 
             // NotificationPage
@@ -72,19 +80,15 @@
             case 'generate-user-accounts':
                 require_once 'components/Admin/ManageUsers/generate-user-accounts.php';
                 break;
-            //
             case 'competency-items':
-                require_once 'components/Admin/competency_items/get_competency_items.php';
+                require_once 'components/Admin/CompetencyItems/get_competency_items.php';
                 break;
-            //
             case 'save-competency-item':
-                require_once 'components/Admin/competency_items/save_competency_item.php';
+                require_once 'components/Admin/CompetencyItems/save_competency_item.php';
                 break;
-            //
             case 'delete-competency-item':
-                require_once 'components/Admin/competency_items/delete_competency_item.php';
+                require_once 'components/Admin/CompetencyItems/delete_competency_item.php';
                 break;
-            
             case 'manage-role':
                 require_once 'components/Admin/ManageUsers/manage-role.php';
                 break;
@@ -93,6 +97,9 @@
                 break;
             case 'get-approval-requests':
                 require_once 'components/Admin/Approvals/get-approval-requests.php';
+                break;
+            case 'create-approval-request':
+                require_once 'components/Admin/Approvals/create-approval-request.php';
                 break;
             case 'approve-request':
                 require_once 'components/Admin/Approvals/approve-request.php';
@@ -111,6 +118,12 @@
                 break;
             case 'admin-reports':
                 require_once 'components/Admin/Reports/get-reports.php';
+                break;
+            case 'schema-audit':
+                require_once 'components/Admin/SchemaAudit/schema_audit.php';
+                break;
+            case 'approve-budget':
+                require_once 'components/Admin/Reports/approve-budget.php';
                 break;
             case 'performance':
                 require_once 'components/Performance.php';
@@ -131,6 +144,15 @@
             case 'get-advises':
                 require_once 'components/Teacher/Advises/get_advises.php';
                 break;
+            case 'get-student-plo-mapping':
+                require_once 'components/Teacher/Advises/get_student_plo_mapping.php';
+                break;
+            case 'save-student-plo-mapping':
+                require_once 'components/Teacher/Advises/save_student_plo_mapping.php';
+                break;
+            case 'send-advisor-message':
+                require_once 'components/Teacher/Advises/send_advisor_message.php';
+                break;
 
             // AdvisorNotifications (การแจ้งเตือนของอาจารย์)
             case 'get-advisor-notifications':
@@ -139,15 +161,32 @@
             case 'update-notification-read':
                 require_once 'components/Teacher/AdvisorNotifications/update_notification_read.php';
                 break;
-            //
+           // StudentCompetency (ฝั่งอาจารย์)
             case 'student-competency':
-                require_once 'components/Teacher/student_competency/get_student_competency.php';
+            case 'get-student-competency':
+            case 'advisor-competency':
+                $compPath = 'components/Teacher/StudentCompetency/get_student_competency.php';
+                if (!file_exists(__DIR__ . '/' . $compPath)) {
+                    $compPath = 'components/Teacher/student_competency/get_student_competency.php';
+                }
+                require_once $compPath;
                 break;
-            //
             case 'save-student-competency':
-                require_once 'components/Teacher/student_competency/save_student_competency.php';
+                $saveCompPath = 'components/Teacher/StudentCompetency/save_student_competency.php';
+                if (!file_exists(__DIR__ . '/' . $saveCompPath)) {
+                    $saveCompPath = 'components/Teacher/student_competency/save_student_competency.php';
+                }
+                require_once $saveCompPath;
                 break;
-            
+
+            // AssignStudents (มอบหมายนักศึกษาให้อาจารย์ — เฉพาะผู้ดูแลระบบ)
+            case 'get-assign-students':
+                require_once 'components/Admin/AssignStudents/get_assign_students.php';
+                break;
+            case 'save-assign-students':
+                require_once 'components/Admin/AssignStudents/save_assign_students.php';
+                break;
+
             // AssignInstructors
             case 'get-assign-data':
                 require_once 'components/Teacher/AssignInstructors/get_assign_data.php';
@@ -155,17 +194,20 @@
             case 'save-assign-instructor':
                 require_once 'components/Teacher/AssignInstructors/save_assign_instructor.php';
                 break;
+
             // AdvisorVaccinationView
             case 'advisor-student-list':
-                require_once 'components/Teacher/advisor_student_list/advisor_student_list.php';
+                require_once 'components/Teacher/AdvisorStudentList/advisor_student_list.php';
                 break;
             case 'view-student-vaccinations':
-                require_once 'components/Teacher/view_student_vaccinations/view_student_vaccinations.php';
+                require_once 'components/Teacher/ViewStudentVaccinations/view_student_vaccinations.php';
                 break;
+
             // ViewStudentHealthRecords
             case 'view-student-health-records':
-                require_once 'components/Teacher/view_student_health_records/view_student_health_records.php';
+                require_once 'components/Teacher/ViewStudentHealthRecords/view_student_health_records.php';
                 break;
+
             // CLOManagement
             case 'get-clo-management':
                 require_once 'components/Teacher/CLOManagement/get_clo_management.php';
@@ -245,6 +287,9 @@
             case 'delete-document':
                 require_once 'components/Teacher/Documents/delete_document.php';
                 break;
+            case 'download-document':
+                require_once 'components/Teacher/Documents/download_document.php';
+                break;
 
             // Evidence
             case 'get-evidence':
@@ -276,14 +321,44 @@
                 require_once 'components/Teacher/grading/save_grading_data.php';
                 break;
 
+            // Dashboard
+            case 'teacher-dashboard':
+                require_once 'components/Teacher/Dashboard/get_dashboard_stats.php';
+                break;
+
             // DeanDashboard
             case 'get-dean-dashboard':
                 require_once 'components/Teacher/DeanDashboard/get_dean_dashboard.php';
+                break;
+            case 'get-faculty-workload':
+                require_once 'components/Teacher/DeanDashboard/get_faculty_workload.php';
+                break;
+            case 'get-student-learning-outcomes':
+                require_once 'components/Teacher/DeanDashboard/get_student_learning_outcomes.php';
                 break;
 
             // Retention
             case 'get-retention':
                 require_once 'components/Teacher/Retention/get_retention.php';
+                break;
+
+            // ResearchSummary
+            case 'get-research-summary':
+                require_once 'components/Teacher/ResearchSummary/get_research_summary.php';
+                break;
+
+            /* -------- Research -------- */
+            case 'get-research-faculty':
+                require_once 'components/Research/get_faculty.php';
+                break;
+            case 'get-research':
+                require_once 'components/Research/get_research.php';
+                break;
+            case 'save-research':
+                require_once 'components/Research/save_research.php';
+                break;
+            case 'delete-research':
+                require_once 'components/Research/delete_research.php';
                 break;
 
             // PLOYLOReport
@@ -324,6 +399,18 @@
             case 'get-my-projects':
                 require_once 'components/Teacher/MyProjects/get_my_projects.php';
                 break;
+            case 'get-my-project-faculty-options':
+                require_once 'components/Teacher/MyProjects/get_my_project_faculty_options.php';
+                break;
+            case 'create-my-project':
+                require_once 'components/Teacher/MyProjects/create_my_project.php';
+                break;
+            case 'update-my-project':
+                require_once 'components/Teacher/MyProjects/update_my_project.php';
+                break;
+            case 'upload-my-project-file':
+                require_once 'components/Teacher/MyProjects/upload_my_project_file.php';
+                break;
 
             // ProjectPage
             case 'add-project':
@@ -355,6 +442,8 @@
                 require_once 'components/Teacher/ProjectLinks/get_project_links.php';
                 break;
             case 'create-project-links':
+                require_once 'components/Teacher/ProjectLinks/save_project_links.php';
+                break;
             case 'save-project-links':
                 require_once 'components/Teacher/ProjectLinks/save_project_links.php';
                 break;
@@ -362,6 +451,11 @@
             // ProjectReports
             case 'get-project-reports':
                 require_once 'components/Teacher/ProjectReports/get_project_reports.php';
+                break;
+
+            // ProjectAssessments
+            case 'project-assessments':
+                require_once 'components/Teacher/ProjectAssessments/project_assessments.php';
                 break;
 
             // ScheduleTasks
@@ -373,6 +467,12 @@
                 break;
             case 'update-task-status':
                 require_once 'components/Teacher/ScheduleTasks/update_task_status.php';
+                break;
+            case 'update-task-status':
+                require_once 'components/Teacher/ScheduleTasks/update_task_status.php';
+                break;
+            case 'delete-schedule-task':
+                require_once 'components/Teacher/ScheduleTasks/delete_schedule_task.php';
                 break;
 
             // Students
@@ -411,28 +511,30 @@
             case 'delete-portfolio':
                 require_once 'components/Student/Portfolio/delete_portfolio.php';
                 break;
+
+            // StudentVaccinations
+            case 'student-vaccinations':
+                require_once 'components/Student/StudentVaccinations/student_vaccinations_api.php';
+                break;
+
+            // StudentHealthRecords
+            case 'student-health-records':
+                require_once 'components/Student/StudentHealthRecords/student_health_records_api.php';
+                break;
+
+            case 'my-competency': 
+                require_once 'components/Student/StudentCompetency/get_my_competency.php';
+                break;
                 
+            /* -------- Sidebar -------- */
             case 'sidebar':
                 require_once 'components/sidebar.php';
                 break;
 
-            // Student Vaccinations API
-            case 'student-vaccinations':
-                require_once 'components/Student/student_vaccinations_api/student_vaccinations_api.php';
-                break;
-
-            // Student Health Records API
-            case 'student-health-records':
-                require_once 'components/Student/student_health_records_api/student_health_records_api.php';
-                break;
-
-            case 'my-competency': 
-                require_once 'components/Student/student_competency/get_my_competency.php';
-                break;
-
-            default:
-                http_response_code(404);
-                echo json_encode(["error" => "API endpoint is not found!"]);
-                break;
+        default:
+            http_response_code(404);
+            echo json_encode(["error" => "API endpoint is not found!"]);
+            break;
     }
+
 ?>

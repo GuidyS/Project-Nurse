@@ -5,6 +5,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
 require_once __DIR__ . '/clo_mapping_helpers.php';
 require_once __DIR__ . '/curriculum_repository.php';
+require_once __DIR__ . '/clo_access_helpers.php';
 
 $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -52,6 +53,12 @@ try {
         http_response_code(404);
         echo json_encode(["status" => "error", "message" => "ไม่พบ CLO ที่ต้องการแก้ไข"]);
         exit();
+    }
+
+    // แก้ CLO ได้เฉพาะวิชาที่ตนเองสอน (admin แก้ได้ทุกวิชา)
+    $ownerCode = (string)($existing['subject_code'] ?? $subjectCode ?? '');
+    if ($ownerCode !== '' && !cloAccessCanEditSubject($pdo, $_SESSION['user_id'], $ownerCode)) {
+        cloAccessDenySubject($ownerCode);
     }
 
     $ylo_id = $input['ylo_id'] ?? ($existing['ylo_code'] ?? null);

@@ -80,7 +80,7 @@ export function UploadDialog({ open, onOpenChange, type }: UploadDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="app-dialog-lg">
         <DialogHeader>
           <DialogTitle className="text-xl">{c.title}</DialogTitle>
           <DialogDescription className="sr-only">{c.title}</DialogDescription>

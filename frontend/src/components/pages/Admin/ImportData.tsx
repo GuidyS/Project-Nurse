@@ -121,7 +121,7 @@ export default function ImportData() {
     <>
       <div className="p-6 space-y-6 animate-fade-in">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">นำเข้าข้อมูล</h1>
+          <h1 className="text-3xl font-bold text-foreground py-1">นำเข้าข้อมูล</h1>
           <p className="text-muted-foreground">อัปโหลดไฟล์ Excel หรือ CSV เพื่อนำเข้าข้อมูลเข้าสู่ระบบ</p>
         </div>
 

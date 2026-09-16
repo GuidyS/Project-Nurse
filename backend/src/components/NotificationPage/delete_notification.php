@@ -3,7 +3,8 @@
 // ถ้าขาดบรรทัดนี้ $_SESSION['user_id'] จะว่างเปล่า และระบบจะคิดว่าไม่ได้ล็อกอิน
 session_start();
 // ตั้งค่า CORS ให้ Frontend (React) คุยกับ Backend ได้
-header("Access-Control-Allow-Origin: http://localhost:5173"); // อนุญาตให้ React Port 5173 เข้าถึงได้
+header('Access-Control-Allow-Origin: ' . (in_array($_SERVER['HTTP_ORIGIN'] ?? '', ['http://localhost:5173', 'http://127.0.0.1:5173'], true) ? ($_SERVER['HTTP_ORIGIN'] ?? '') : 'http://localhost:5173'));
+header('Vary: Origin');
 header("Access-Control-Allow-Credentials: true");             // สำคัญ! อนุญาตให้ส่ง Cookie/Session มาด้วยได้
 header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");

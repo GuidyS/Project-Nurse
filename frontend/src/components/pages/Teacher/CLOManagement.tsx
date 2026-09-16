@@ -250,23 +250,8 @@ export default function CLOManagement() {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">กำหนด CLO</h1>
+          <h1 className="text-3xl font-bold tracking-tight  leading-snug">กำหนด CLO</h1>
           <p className="text-muted-foreground">กำหนดผลลัพธ์การเรียนรู้ระดับรายวิชา (เชื่อมโยง PLO หลายรายการ)</p>
-        </div>
-        <div className="w-full sm:w-72">
-          <Select value={subjectCode} onValueChange={setSubjectCode}>
-            <SelectTrigger>
-              <BookOpen className="h-4 w-4 mr-2" />
-              <SelectValue placeholder="-- เลือกรายวิชา --" />
-            </SelectTrigger>
-            <SelectContent>
-              {courses.map((course) => (
-                <SelectItem key={course.subject_id} value={course.subject_code}>
-                  {course.subject_code} - {course.subject_name_th}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) resetForm(); }}>
           <DialogTrigger asChild>
@@ -275,7 +260,7 @@ export default function CLOManagement() {
               {editingId ? 'แก้ไข CLO' : 'เพิ่ม CLO'}
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogContent className="app-dialog-5xl">
             <DialogHeader>
               <DialogTitle>{editingId ? 'แก้ไข CLO' : 'เพิ่ม CLO ใหม่'}</DialogTitle>
               <DialogDescription>เลือก PLO ที่เกี่ยวข้องและกำหนดน้ำหนัก (%) แยกแต่ละ PLO</DialogDescription>
@@ -384,6 +369,21 @@ export default function CLOManagement() {
             แต่ละ CLO สามารถเชื่อมหลาย PLO พร้อมน้ำหนักแยกกัน — sync กับหน้า CLO รายวิชาและ CLO Map
           </CardDescription>
         </CardHeader>
+        <div className="w-full sm:w-80 p-6">
+          <Select value={subjectCode} onValueChange={setSubjectCode}>
+            <SelectTrigger>
+              <BookOpen className="h-4 w-4 mr-2" />
+              <SelectValue placeholder="-- เลือกรายวิชา --" />
+            </SelectTrigger>
+            <SelectContent>
+              {courses.map((course) => (
+                <SelectItem key={course.subject_id} value={course.subject_code}>
+                  {course.subject_code} - {course.subject_name_th}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
         <CardContent>
           {clos.length > 0 ? (
             <Table>
@@ -444,7 +444,7 @@ export default function CLOManagement() {
       </Card>
 
       <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
-        <DialogContent>
+        <DialogContent className="app-dialog-md">
           <DialogHeader>
             <DialogTitle>ยืนยันการลบ</DialogTitle>
             <DialogDescription>

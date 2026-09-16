@@ -4,6 +4,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 require_once __DIR__ . '/curriculum_repository.php';
+require_once __DIR__ . '/clo_access_helpers.php';
 
 $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -14,6 +15,9 @@ if (!isset($_SESSION['user_id'])) {
     echo json_encode(["status" => "error", "message" => "Unauthorized"]);
     exit();
 }
+
+// YLO / Sub PLO เป็นข้อมูลระดับหลักสูตร — เฉพาะ admin เท่านั้น
+cloAccessRequireAdmin($pdo, $_SESSION['user_id']);
 
 try {
     if (empty($input['ylo_plo_matrix']) || !is_array($input['ylo_plo_matrix'])) {

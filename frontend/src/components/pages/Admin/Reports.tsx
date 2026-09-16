@@ -43,6 +43,7 @@ type AnnualProjectReportRow = {
   responsiblePerson?: string;
   proposedBudget?: BudgetBySource;
   actualBudget?: BudgetBySource;
+  approvalStatus?: string;
   approvedBudgetUrl?: string;
   summaryReportUrl?: string;
   parentProjectCode?: string;
@@ -278,10 +279,11 @@ const getBudgetNotes = (row: AnnualProjectReportRow) =>
 const getDocumentStatus = (row: AnnualProjectReportRow) => {
   const notes = getBudgetNotes(row);
   if (notes.some((note) => note?.includes("ไม่ใช้งบ"))) return { label: "ไม่ใช้งบ", variant: "secondary" as const };
-  if (row.approvedBudgetUrl && row.summaryReportUrl) return { label: "เอกสารครบ", variant: "default" as const };
-  if (row.approvedBudgetUrl) return { label: "มีอนุมัติงบ", variant: "outline" as const };
+  const hasApprovedBudget = row.approvedBudgetUrl || row.approvalStatus === 'approved';
+  if (hasApprovedBudget && row.summaryReportUrl) return { label: "เอกสารครบ", variant: "default" as const };
+  if (hasApprovedBudget) return { label: "มีอนุมัติงบ", variant: "outline" as const };
   if (row.summaryReportUrl) return { label: "มีสรุปโครงการ", variant: "outline" as const };
-  return { label: "ไม่มีลิงก์เอกสาร", variant: "destructive" as const };
+  return { label: "รอดำเนินการ", variant: "destructive" as const };
 };
 
 const getDocumentVariant = (code?: string) => {
@@ -312,7 +314,7 @@ const downloadCsv = (rows: AnnualProjectReportRow[], academicYear: string) => {
     row.responsiblePerson || "",
     sumBudget(row.proposedBudget),
     sumBudget(row.actualBudget),
-    row.approvedBudgetUrl || "",
+    row.approvalStatus === 'approved' ? 'อนุมัติแล้ว' : 'รอดำเนินการ',
     row.summaryReportUrl || "",
   ]);
 
@@ -336,6 +338,24 @@ export default function Reports() {
   const [reportData, setReportData] = useState<ReportsApiData | null>(null);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+
+  const handleApproveBudget = async (projectId: string) => {
+    try {
+      const res = await api.post("/index.php?page=approve-budget", { project_id: projectId });
+      if (res.data.status === "success") {
+        toast({ title: "อนุมัติสำเร็จ", description: "อนุมัติงบโครงการเรียบร้อยแล้ว" });
+        setReportData(prev => {
+          if (!prev) return prev;
+          const updatedRows = prev.rows.map(row => 
+            row.id === projectId ? { ...row, approvalStatus: 'approved', documentStatus: { label: 'มีอนุมัติงบ', code: 'approved_only' } } : row
+          );
+          return { ...prev, rows: updatedRows };
+        });
+      }
+    } catch (error: any) {
+      toast({ title: "เกิดข้อผิดพลาด", description: error.response?.data?.message || "ไม่สามารถอนุมัติได้", variant: "destructive" });
+    }
+  };
 
   useEffect(() => {
     const controller = new AbortController();
@@ -610,26 +630,26 @@ export default function Reports() {
             <table className="w-full min-w-[1100px] text-sm">
               <thead>
                 <tr className="border-b text-left text-muted-foreground">
-                  <th className="py-3 pr-3 font-medium">รหัส</th>
+                  <th className="py-3 pr-3 font-medium whitespace-nowrap">รหัส</th>
                   <th className="py-3 pr-3 font-medium">โครงการ/กิจกรรมย่อย</th>
-                  <th className="py-3 pr-3 font-medium">ผู้รับผิดชอบ</th>
-                  <th className="py-3 pr-3 font-medium">งบเสนอ</th>
-                  <th className="py-3 pr-3 font-medium">งบใช้จริง</th>
-                  <th className="py-3 pr-3 font-medium">สถานะเอกสาร</th>
-                  <th className="py-3 pr-3 font-medium">เอกสาร</th>
+                  <th className="py-3 pr-3 font-medium whitespace-nowrap">ผู้รับผิดชอบ</th>
+                  <th className="py-3 px-3 font-medium whitespace-nowrap text-right">งบเสนอ</th>
+                  <th className="py-3 px-3 font-medium whitespace-nowrap text-right">งบใช้จริง</th>
+                  <th className="py-3 px-3 font-medium whitespace-nowrap text-center">สถานะเอกสาร</th>
+                  <th className="py-3 pl-3 font-medium whitespace-nowrap text-center">จัดการ</th>
                 </tr>
               </thead>
               <tbody>
                 {groupedRows.map((group) => (
                   <Fragment key={group.strategy}>
-                    <tr key={`${group.strategy}-header`} className="bg-muted/40">
-                      <td colSpan={7} className="px-3 py-2 font-semibold">{group.strategy}</td>
+                    <tr key={`${group.strategy}-header`} className="bg-primary/10 border-y border-primary/20">
+                      <td colSpan={7} className="px-4 py-3 text-base font-bold text-primary">{group.strategy}</td>
                     </tr>
                     {group.rows.map((row) => {
                       const docStatus = row.documentStatus ?? getDocumentStatus(row);
                       return (
                         <tr key={row.id} className="border-b align-top last:border-0">
-                          <td className="py-3 pr-3 font-medium">
+                          <td className="py-3 pr-3 font-medium whitespace-nowrap">
                             {row.projectCode || row.parentProjectCode || "-"}
                           </td>
                           <td className="py-3 pr-3">
@@ -643,25 +663,25 @@ export default function Reports() {
                               </div>
                             </div>
                           </td>
-                          <td className="py-3 pr-3">{row.responsiblePerson || "-"}</td>
-                          <td className="py-3 pr-3">{formatCurrency(sumBudget(row.proposedBudget))}</td>
-                          <td className="py-3 pr-3">{formatCurrency(sumBudget(row.actualBudget))}</td>
-                          <td className="py-3 pr-3">
+                          <td className="py-3 pr-3 whitespace-nowrap">{row.responsiblePerson || "-"}</td>
+                          <td className="py-3 px-3 text-right whitespace-nowrap">{formatCurrency(sumBudget(row.proposedBudget))}</td>
+                          <td className="py-3 px-3 text-right whitespace-nowrap">{formatCurrency(sumBudget(row.actualBudget))}</td>
+                          <td className="py-3 px-3 text-center whitespace-nowrap">
                             <Badge variant={"variant" in docStatus ? docStatus.variant : getDocumentVariant(docStatus.code)}>
                               {docStatus.label}
                             </Badge>
                           </td>
-                          <td className="py-3 pr-3">
-                            <div className="flex flex-wrap gap-2">
+                          <td className="py-3 pl-3">
+                            <div className="flex flex-wrap justify-center gap-2">
                               <Button
-                                variant="outline"
+                                variant={row.approvalStatus === 'approved' ? 'default' : 'outline'}
                                 size="sm"
                                 className="h-8 gap-1"
-                                disabled={!row.approvedBudgetUrl}
-                                onClick={() => row.approvedBudgetUrl && window.open(row.approvedBudgetUrl, "_blank", "noopener,noreferrer")}
+                                disabled={row.approvalStatus === 'approved'}
+                                onClick={() => handleApproveBudget(row.id)}
                               >
-                                <ExternalLink className="h-3 w-3" />
-                                อนุมัติงบ
+                                <CheckCircle2 className="h-3 w-3" />
+                                {row.approvalStatus === 'approved' ? 'อนุมัติแล้ว' : 'อนุมัติงบ'}
                               </Button>
                               <Button
                                 variant="outline"

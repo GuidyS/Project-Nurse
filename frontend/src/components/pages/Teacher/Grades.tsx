@@ -10,13 +10,27 @@ import { useToast } from '@/hooks/use-toast';
 
 const gradeOptions = ['A', 'B+', 'B', 'C+', 'C', 'D+', 'D', 'F', '-'];
 
+interface Course {
+  id: string | number;
+  code: string;
+  name: string;
+}
+
+interface StudentGrade {
+  id: string;
+  studentId: string;
+  name: string;
+  grade?: string | null;
+}
+
 export default function Grades() {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   
-  const [courses, setCourses] = useState<any[]>([]);
+  const [courses, setCourses] = useState<Course[]>([]);
   const [selectedCourse, setSelectedCourse] = useState<string>('');
-  const [grades, setGrades] = useState<any[]>([]);
+  const [grades, setGrades] = useState<StudentGrade[]>([]);
+  const [isEditingAll, setIsEditingAll] = useState(false);
   
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -38,7 +52,7 @@ export default function Grades() {
       }
     };
     fetchCourses();
-  }, []);
+  }, [toast]);
 
   // 2. โหลดรายชื่อนักศึกษาเมื่อเปลี่ยนวิชา
   useEffect(() => {
@@ -50,6 +64,7 @@ export default function Grades() {
         const res = await api.get(`/index.php?page=get-grading-data&subject_id=${selectedCourse}`);
         if (res.data.status === 'success') {
           setGrades(res.data.data.students || []);
+          setIsEditingAll(false);
         }
       } catch (error) {
         toast({ title: 'ข้อผิดพลาด', description: 'ไม่สามารถโหลดรายชื่อนักศึกษาได้', variant: 'destructive' });
@@ -58,7 +73,7 @@ export default function Grades() {
       }
     };
     fetchStudents();
-  }, [selectedCourse]);
+  }, [selectedCourse, toast]);
 
   const filteredGrades = grades.filter(
     (grade) =>
@@ -84,6 +99,7 @@ export default function Grades() {
       });
       
       if (res.data.status === 'success') {
+        setIsEditingAll(false);
         toast({ title: 'บันทึกสำเร็จ', description: 'บันทึกผลการเรียนทั้งหมดเรียบร้อยแล้ว' });
       } else {
         toast({ title: 'ข้อผิดพลาด', description: res.data.message, variant: 'destructive' });
@@ -98,15 +114,11 @@ export default function Grades() {
   return (
     <>
       <div className="space-y-6 animate-fade-in">
-        <div className="flex items-center justify-between">
+        <div>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">บันทึกเกรด</h1>
+            <h1 className="text-3xl font-bold tracking-tight leading-snug">บันทึกเกรด</h1>
             <p className="text-muted-foreground">บันทึกและแก้ไขผลการเรียนวิชาที่สอน</p>
           </div>
-          <Button onClick={handleSaveAll} disabled={isSaving || grades.length === 0}>
-            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-            บันทึกทั้งหมด
-          </Button>
         </div>
 
         {/* Course Selection */}
@@ -133,11 +145,15 @@ export default function Grades() {
         {/* Grades Table */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              ผลการเรียน
-            </CardTitle>
-            <CardDescription>คะแนนและเกรดของนักศึกษา</CardDescription>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  ผลการเรียน
+                </CardTitle>
+                <CardDescription>คะแนนและเกรดของนักศึกษา</CardDescription>
+              </div>
+            </div>
             <div className="flex items-center gap-2 pt-4">
               <Search className="h-4 w-4 text-muted-foreground" />
               <Input
@@ -146,6 +162,25 @@ export default function Grades() {
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="max-w-sm"
               />
+              <Button className="ml-auto"
+                  onClick={() => {
+                    if (isEditingAll) {
+                      handleSaveAll();
+                    } else {
+                      setIsEditingAll(true);
+                    }
+                  }}
+                  disabled={isSaving || grades.length === 0}
+                >
+                  {isSaving ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : isEditingAll ? (
+                    <Save className="mr-2 h-4 w-4" />
+                  ) : (
+                    <Edit className="mr-2 h-4 w-4" />
+                  )}
+                  {isEditingAll ? 'บันทึก' : 'แก้ไข'}
+                </Button>
             </div>
           </CardHeader>
           <CardContent>
@@ -154,44 +189,40 @@ export default function Grades() {
             ) : (
               <Table>
                 <TableHeader>
-                  <TableRow>
+                  <TableRow className="bg-[#8a2be2]/10 hover:bg-[#8a2be2]/10 [&_th]:font-semibold [&_th]:text-[#8a2be2]">
                     <TableHead>รหัสนักศึกษา</TableHead>
                     <TableHead>ชื่อ-นามสกุล</TableHead>
-                    <TableHead className="text-center">สอบกลางภาค (30%)</TableHead>
-                    <TableHead className="text-center">สอบปลายภาค (40%)</TableHead>
-                    <TableHead className="text-center">งานมอบหมาย (30%)</TableHead>
-                    <TableHead className="text-center">รวม</TableHead>
-                    <TableHead className="text-center">เกรด</TableHead>
+                    <TableHead className="w-[140px] text-center">เกรด</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredGrades.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">ไม่มีข้อมูลนักศึกษาในวิชานี้</TableCell>
+                      <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">ไม่มีข้อมูลนักศึกษาในวิชานี้</TableCell>
                     </TableRow>
                   ) : (
                     filteredGrades.map((grade) => (
                       <TableRow key={grade.id}>
                         <TableCell className="font-medium font-mono">{grade.studentId}</TableCell>
                         <TableCell>{grade.name}</TableCell>
-                        <TableCell className="text-center text-muted-foreground">-</TableCell>
-                        <TableCell className="text-center text-muted-foreground">-</TableCell>
-                        <TableCell className="text-center text-muted-foreground">-</TableCell>
-                        <TableCell className="text-center font-bold text-muted-foreground">-</TableCell>
                         <TableCell className="text-center">
-                          <Select
-                            value={grade.grade === null ? '-' : grade.grade}
-                            onValueChange={(value) => handleGradeChange(grade.id, value)}
-                          >
-                            <SelectTrigger className="w-[80px] mx-auto">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {gradeOptions.map((g) => (
-                                <SelectItem key={g} value={g}>{g}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          {isEditingAll ? (
+                            <Select
+                              value={grade.grade ?? '-'}
+                              onValueChange={(value) => handleGradeChange(grade.id, value)}
+                            >
+                              <SelectTrigger className="mx-auto h-10 items-center w-[90px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {gradeOptions.map((g) => (
+                                  <SelectItem key={g} value={g}>{g}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <span className="flex h-10 w-full items-center justify-center font-medium">{grade.grade || '-'}</span>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))

@@ -6,6 +6,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 if (session_status() == PHP_SESSION_NONE) { session_start(); }
 require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/../../../config/audit_helper.php';
 
 if (!isset($_SESSION['user_id'])) {
     http_response_code(401);
@@ -90,7 +91,6 @@ try {
             }
         }
 
-        // ดึงรายชื่ออาจารย์ทั้งหมดไว้เพื่อ Match ชื่อที่กรอกเข้ามากับ faculty_id
         $facultyStmt = $db->query("SELECT faculty_id, first_name_th, last_name_th, CONCAT(first_name_th, ' ', last_name_th) AS full_name FROM faculty");
         $facultyList = $facultyStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
@@ -118,7 +118,6 @@ try {
                 $receivedDate = !empty($item['received_date']) ? $item['received_date'] : null;
                 $evidencePath = $groupEvidencePaths[$groupId] ?? ($item['evidence_file_path'] ?: null);
 
-                // ตรวจสอบและค้นหา faculty_id จากชื่ออาจารย์
                 $advisorNameInput = trim($item['advisor_name'] ?? '');
                 $matchedAdvisorId = null;
                 $signedAt = null;
@@ -156,6 +155,10 @@ try {
             }
 
             $db->commit();
+
+            // บันทึก Audit Log เมื่อข้อมูลวัคซีนถูก commit สำเร็จ
+            logAudit($db, $_SESSION['user_id'] ?? null, 'update', 'student_vaccinations', "บันทึกประวัติการรับวัคซีนนักศึกษา รหัส: {$student_id}");
+
         } catch (Throwable $e) {
             $db->rollBack();
             throw $e;
