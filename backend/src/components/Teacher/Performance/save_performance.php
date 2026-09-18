@@ -5,6 +5,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
 require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../middlewares/auth_middleware.php';
+require_once __DIR__ . '/../../../config/audit_helper.php'; // นำเข้า Audit Helper
 
 header("Content-Type: application/json; charset=UTF-8");
 
@@ -26,8 +27,6 @@ $studentId = $input['selectedStudent'];
 $comment = $input['comment'] ?? "";
 
 // รองรับ 2 รูปแบบ:
-// 1) scores: { skill:[n], attitude:[n], knowledge:[n], communication:[n] } — หน้า Performance (สเกล ~0-5)
-// 2) score: number 0-100 — หน้า Practical evaluate เร็ว
 if (isset($input['score']) && $input['score'] !== '' && $input['score'] !== null) {
     $overall = max(0, min(100, (float)$input['score']));
     $fiveScale = round(($overall / 100) * 5, 2);
@@ -84,6 +83,9 @@ try {
         ':description' => $scoreDataJson,
         ':payload_json' => $scoreDataJson,
     ]);
+
+    // บันทึก Log เมื่อประเมินการปฏิบัติงานสำเร็จ
+    logAudit($db, $userId, 'create', 'performance_eval', "ประเมินการปฏิบัติงาน (Performance) ให้กับนักศึกษารหัส: {$studentId}");
 
     echo json_encode(["status" => "success", "message" => "บันทึกผลการประเมินเรียบร้อยแล้ว"]);
 } catch (Exception $e) {

@@ -5,6 +5,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
 require_once __DIR__ . '/../CLOPage/clo_mapping_helpers.php';
 require_once __DIR__ . '/../CLOPage/curriculum_repository.php';
+require_once __DIR__ . '/../../../config/audit_helper.php'; // นำเข้า Audit Helper
 
 $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -125,6 +126,9 @@ try {
     $pdo->beginTransaction();
     replaceSubjectClos($pdo, $frameworkId, (string)$subject_code, $storedClos);
     $pdo->commit();
+
+    // บันทึก Log เมื่อแก้ไขข้อมูล CLO ผ่านหน้าจัดการ CLO Management สำเร็จ
+    logAudit($pdo, $_SESSION['user_id'], 'update', 'clo_management', "บันทึก/ปรับปรุงข้อมูล CLO ในหน้าจัดการ CLO สำหรับรายวิชา: {$subject_code}");
 
     echo json_encode(["status" => "success", "message" => "บันทึกข้อมูล CLO สำเร็จ!"], JSON_UNESCAPED_UNICODE);
 } catch (PDOException $e) {

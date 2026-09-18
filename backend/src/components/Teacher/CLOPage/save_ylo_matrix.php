@@ -3,6 +3,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+require_once __DIR__ . '/../../../config/audit_helper.php';
 require_once __DIR__ . '/curriculum_repository.php';
 require_once __DIR__ . '/clo_access_helpers.php';
 
@@ -16,7 +17,6 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
-// YLO / Sub PLO เป็นข้อมูลระดับหลักสูตร — เฉพาะ admin เท่านั้น
 cloAccessRequireAdmin($pdo, $_SESSION['user_id']);
 
 try {
@@ -62,7 +62,6 @@ try {
     $pdo->beginTransaction();
     saveYloMatrixToTables($pdo, $frameworkId, $matrix);
 
-    // Optional: seed/update sub_plo_catalog rows if client sends them
     if (isset($input['sub_plo_catalog']) && is_array($input['sub_plo_catalog'])) {
         $ploIdMap = getPloIdMap($pdo, $frameworkId);
         foreach ($input['sub_plo_catalog'] as $sub) {
@@ -101,6 +100,10 @@ try {
     }
 
     $pdo->commit();
+
+    // บันทึก Log เมื่อแก้ไขเมทริกซ์ YLO-PLO
+    logAudit($pdo, $_SESSION['user_id'], 'update', 'curriculum', "ปรับปรุงตารางความสัมพันธ์ YLO-PLO ระดับหลักสูตร");
+
     echo json_encode(["status" => "success", "message" => "บันทึกข้อมูล YLO สำเร็จ"], JSON_UNESCAPED_UNICODE);
 } catch (Exception $e) {
     if ($pdo->inTransaction()) {

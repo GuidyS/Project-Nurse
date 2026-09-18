@@ -3,6 +3,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+require_once __DIR__ . '/../../../config/audit_helper.php';
 require_once __DIR__ . '/curriculum_repository.php';
 require_once __DIR__ . '/clo_access_helpers.php';
 
@@ -40,16 +41,18 @@ try {
         $subjectCode = $subjectStmt->fetchColumn() ?: null;
     }
 
-    // ลบ CLO ได้เฉพาะวิชาที่ตนเองสอน (admin ลบได้ทุกวิชา)
     $ownerCode = $subjectCode;
-    if ($ownerCode === null) {
-        foreach (listAllClosDetailed($pdo, $frameworkId) as $clo) {
-            if ((int)$clo['id'] === (int)$input['clo_id']) {
+    $cloCodeForLog = null;
+    foreach (listAllClosDetailed($pdo, $frameworkId) as $clo) {
+        if ((int)$clo['id'] === (int)$input['clo_id']) {
+            if ($ownerCode === null) {
                 $ownerCode = $clo['subject_code'] ?? null;
-                break;
             }
+            $cloCodeForLog = $clo['clo_code'] ?? null;
+            break;
         }
     }
+
     if ($ownerCode !== null && !cloAccessCanEditSubject($pdo, $_SESSION['user_id'], (string)$ownerCode)) {
         cloAccessDenySubject((string)$ownerCode);
     }
@@ -68,6 +71,10 @@ try {
         exit();
     }
     $pdo->commit();
+
+    // บันทึก Log เมื่อลบ CLO สำเร็จ
+    $cloCodeStr = $cloCodeForLog ? " รหัส {$cloCodeForLog}" : "";
+    logAudit($pdo, $_SESSION['user_id'], 'delete', 'clos', "ลบ CLO{$cloCodeStr} (ID: {$input['clo_id']}) ในรายวิชา {$ownerCode}");
 
     echo json_encode(["status" => "success", "message" => "ลบข้อมูลสำเร็จ"], JSON_UNESCAPED_UNICODE);
 } catch (Exception $e) {

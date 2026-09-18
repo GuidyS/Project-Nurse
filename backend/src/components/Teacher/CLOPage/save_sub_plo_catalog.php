@@ -3,6 +3,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+require_once __DIR__ . '/../../../config/audit_helper.php';
 require_once __DIR__ . '/curriculum_repository.php';
 require_once __DIR__ . '/clo_access_helpers.php';
 
@@ -16,12 +17,9 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
-// Sub PLO เป็นข้อมูลระดับหลักสูตร — เฉพาะ admin เท่านั้น
 cloAccessRequireAdmin($pdo, $_SESSION['user_id']);
 
 try {
-    // รับ catalog ทั้งชุด (หลักสูตรเปลี่ยนทุก 5 ปี — เพิ่ม/ลด/แก้ Sub PLO ได้)
-    // แถวที่ไม่อยู่ในชุดที่ส่งมา = ถูกลบ (FK cascade จะลบ mapping CLO↔Sub ตาม)
     if (!isset($input['sub_plo_catalog']) || !is_array($input['sub_plo_catalog'])) {
         http_response_code(400);
         echo json_encode(["status" => "error", "message" => "ข้อมูล Sub PLO ไม่ถูกต้อง"]);
@@ -40,7 +38,6 @@ try {
 
     $ploIdMap = getPloIdMap($pdo, $frameworkId);
 
-    // validate + กันโค้ดซ้ำในชุดที่ส่งมา
     $incoming = [];
     foreach ($input['sub_plo_catalog'] as $sub) {
         $code = trim((string)($sub['code'] ?? ''));
@@ -78,7 +75,6 @@ try {
     $updated = 0;
     $deleted = 0;
 
-    // เรียงตามเลขรหัสก่อนกำหนด sort_order เพื่อให้รายการใหม่แทรกตามลำดับ ไม่ไปต่อท้าย
     uksort($incoming, function ($a, $b) {
         return subPloCodeOrder((string)$a) <=> subPloCodeOrder((string)$b);
     });
@@ -122,6 +118,9 @@ try {
     }
 
     $pdo->commit();
+
+    // บันทึก Log เมื่อแก้ไขแคตตาล็อก Sub PLO หลักสูตร
+    logAudit($pdo, $_SESSION['user_id'], 'update', 'curriculum', "ปรับปรุงข้อมูลหมวด Sub PLO หลักสูตร (เพิ่ม {$inserted}, แก้ไข {$updated}, ลบ {$deleted})");
 
     echo json_encode([
         "status" => "success",

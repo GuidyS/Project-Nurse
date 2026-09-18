@@ -4,6 +4,9 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/../../../config/audit_helper.php'; // นำเข้า Audit Helper
+
 $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
 
 try {
@@ -49,6 +52,15 @@ try {
             ':ref_id' => $tqfId,
             ':title' => "อนุมัติเอกสาร TQF: $name ($courseCode)"
         ]);
+
+        // บันทึก Log เมื่ออัปโหลดเอกสาร มคอ. ใหม่
+        logAudit(
+            $pdo, 
+            $_SESSION['user_id'] ?? null, 
+            'create', 
+            'documents', 
+            "อัปโหลดเอกสาร $type (ID: $tqfId) รายวิชา: $courseCode"
+        );
 
         echo json_encode(['status' => 'success']);
     } else {

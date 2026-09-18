@@ -1,8 +1,9 @@
 <?php
 require_once __DIR__ . '/../ProjectShared/project_helpers.php';
+require_once __DIR__ . '/../../../config/audit_helper.php'; // นำเข้า Audit Helper
 
 $db = project_db();
-project_require_auth($db, ['PROJECT_DOCS_MANAGE']);
+$auth = project_require_auth($db, ['PROJECT_DOCS_MANAGE']);
 $input = project_payload();
 
 try {
@@ -36,10 +37,15 @@ try {
         ':date' => $date,
     ]);
 
+    $newDocId = (int) $db->lastInsertId();
+
+    // บันทึก Log เมื่อสร้างรายการเอกสารใหม่
+    logAudit($db, $auth['user_id'], 'create', 'project_documents', "เพิ่มรายการเอกสารโครงการใหม่ (ชื่อ: {$name}, โครงการ: {$projectName})");
+
     project_json([
         "status" => "success",
         "message" => "บันทึกเอกสารเข้าสู่ระบบสำเร็จแล้ว",
-        "doc_id" => (int) $db->lastInsertId(),
+        "doc_id" => $newDocId,
     ]);
 } catch (Exception $e) {
     project_json(["status" => "error", "message" => $e->getMessage()], 400);

@@ -1,6 +1,7 @@
 <?php
 if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/../../../config/audit_helper.php'; // นำเข้า Audit Helper
 require_once __DIR__ . '/../CLOPage/curriculum_repository.php';
 require_once __DIR__ . '/clo_score_helpers.php';
 
@@ -177,6 +178,16 @@ try {
     }
 
     $studentCount = count($result);
+
+    // บันทึก Log เมื่อแก้ไขหรือบันทึกคะแนน CLO/Sub PLO สำเร็จ
+    logAudit(
+        $db, 
+        $user_id, 
+        'update', 
+        'course_students', 
+        "บันทึก/แก้ไขคะแนน Sub PLO ในรายวิชา {$subject_code} (จำนวน {$studentCount} คน)"
+    );
+
     echo json_encode([
         "status" => "success",
         "message" => "บันทึกคะแนนของนักศึกษา $studentCount คน เรียบร้อยแล้ว",

@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../ProjectShared/project_helpers.php';
+require_once __DIR__ . '/../../../config/audit_helper.php'; // นำเข้า Audit Helper
 
 $db = project_db();
 $auth = project_require_auth($db, ['PROJECT_VIEW']);
@@ -23,6 +24,8 @@ try {
     $stmt->execute([':id' => $projectId]);
 
     $db->commit();
+
+    logAudit($db, $auth['user_id'], 'delete', 'projects', "ลบข้อมูลโครงการ (ID: {$projectId})");
 
     project_json(["status" => "success", "message" => "ลบข้อมูลสำเร็จ"]);
 } catch (Exception $e) {

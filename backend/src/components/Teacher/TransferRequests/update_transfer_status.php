@@ -5,6 +5,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
 require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../Admin/Approvals/approval-schema.php';
+require_once __DIR__ . '/../../../config/audit_helper.php'; // นำเข้า Audit Helper
 
 header('Content-Type: application/json; charset=UTF-8');
 header('Access-Control-Allow-Origin: ' . (in_array($_SERVER['HTTP_ORIGIN'] ?? '', ['http://localhost:5173', 'http://127.0.0.1:5173'], true) ? ($_SERVER['HTTP_ORIGIN'] ?? '') : 'http://localhost:5173'));
@@ -56,6 +57,10 @@ try {
             throw new Exception('Transfer request not found or already reviewed');
         }
         approvalLogAction($db, 'reject', $requestId, $reviewerId, 'advisor transfer');
+        
+        // บันทึกระบบ Audit Log
+        logAudit($db, $reviewerId, 'update', 'transfer_requests', "ปฏิเสธคำร้องขอโอนย้ายที่ปรึกษา (Request ID: {$requestId})");
+
         echo json_encode(['status' => 'success', 'message' => 'Transfer request rejected'], JSON_UNESCAPED_UNICODE);
         exit;
     }
@@ -94,6 +99,10 @@ try {
         ':id' => $requestId,
     ]);
     approvalLogAction($db, 'approve', $requestId, $reviewerId, 'advisor transfer');
+    
+    // บันทึกระบบ Audit Log
+    logAudit($db, $reviewerId, 'update', 'transfer_requests', "อนุมัติคำร้องขอโอนย้ายที่ปรึกษา (Request ID: {$requestId})");
+
     $db->commit();
 
     echo json_encode(['status' => 'success', 'message' => 'Transfer request approved'], JSON_UNESCAPED_UNICODE);
