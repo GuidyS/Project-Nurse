@@ -43,6 +43,8 @@ services:
       - SMTP_FROM_EMAIL=${SMTP_FROM_EMAIL:-}
       - SMTP_FROM_NAME=${SMTP_FROM_NAME:-}
       - APP_URL=${APP_URL:-http://localhost:5173}
+      # 📧 อีเมลคณะที่รับแจ้งเตือน "โครงการใกล้สิ้นสุด" (แจ้งแอดมินในระบบด้วย)
+      - PROJECT_REMINDER_EMAIL=${PROJECT_REMINDER_EMAIL:-nus1@siam.edu}
 
   # Database
   db:

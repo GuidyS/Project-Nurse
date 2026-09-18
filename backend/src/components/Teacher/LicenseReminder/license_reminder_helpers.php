@@ -12,6 +12,7 @@
  * แต่ละ (อาจารย์, วันหมดอายุ, ระยะ) แจ้งได้ครั้งเดียว — ต่ออายุแล้วเปลี่ยนวันหมดอายุ รอบแจ้งเตือนจะเริ่มใหม่เอง
  */
 require_once __DIR__ . '/../../../config/mailer.php';
+require_once __DIR__ . '/../../../config/scheduled_jobs.php';
 
 const LICENSE_REMINDER_STAGES = [6, 3, 1]; // เดือนก่อนหมดอายุ เรียงจากไกลไปใกล้
 const LICENSE_REMINDER_JOB = 'license_expiry_reminders';
@@ -60,15 +61,6 @@ function licenseReminderEnsureSchema(PDO $db): void
             updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
             UNIQUE KEY uq_license_reminder_stage (faculty_id, license_expiry, stage_months)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
-    ");
-
-    $db->exec("
-        CREATE TABLE IF NOT EXISTS system_job_runs (
-            job_name VARCHAR(100) NOT NULL,
-            last_run_at DATETIME NOT NULL,
-            last_result TEXT NULL,
-            PRIMARY KEY (job_name)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
     ");
 
@@ -300,43 +292,16 @@ function licenseReminderProcess(PDO $db, ?string $onlyFacultyId = null): array
 
 function licenseReminderRecordRun(PDO $db, array $summary): void
 {
-    licenseReminderEnsureSchema($db);
-    $db->prepare("
-        INSERT INTO system_job_runs (job_name, last_run_at, last_result) VALUES (?, NOW(), ?)
-        ON DUPLICATE KEY UPDATE last_run_at = NOW(), last_result = VALUES(last_result)
-    ")->execute([LICENSE_REMINDER_JOB, json_encode($summary, JSON_UNESCAPED_UNICODE)]);
+    scheduledJobRecordRun($db, LICENSE_REMINDER_JOB, $summary);
 }
 
 /** รันตามรอบ (ค่าเริ่มต้นไม่เกินชั่วโมงละครั้ง) — คืน null ถ้ายังไม่ถึงรอบ */
 function licenseReminderMaybeRunScheduled(PDO $db, int $intervalMinutes = 60): ?array
 {
-    licenseReminderEnsureSchema($db);
-
-    $dueStmt = $db->prepare("
-        SELECT COUNT(*) FROM system_job_runs
-        WHERE job_name = ? AND last_run_at > DATE_SUB(NOW(), INTERVAL ? MINUTE)
-    ");
-    $dueStmt->execute([LICENSE_REMINDER_JOB, $intervalMinutes]);
-    if ((int)$dueStmt->fetchColumn() > 0) {
-        return null;
-    }
-
-    // กันหลายคำขอรันพร้อมกัน
-    if ((int)$db->query("SELECT GET_LOCK('" . LICENSE_REMINDER_JOB . "', 0)")->fetchColumn() !== 1) {
-        return null;
-    }
-
-    try {
-        $dueStmt->execute([LICENSE_REMINDER_JOB, $intervalMinutes]);
-        if ((int)$dueStmt->fetchColumn() > 0) {
-            return null;
-        }
-        // บันทึกเวลาก่อนรัน เพื่อไม่ให้คำขอถัดไปรันซ้ำระหว่างกำลังส่งอีเมล
-        licenseReminderRecordRun($db, ['status' => 'running']);
-        $summary = licenseReminderProcess($db);
-        licenseReminderRecordRun($db, $summary);
-        return $summary;
-    } finally {
-        $db->query("SELECT RELEASE_LOCK('" . LICENSE_REMINDER_JOB . "')");
-    }
+    return scheduledJobRunIfDue(
+        $db,
+        LICENSE_REMINDER_JOB,
+        static fn(PDO $db): array => licenseReminderProcess($db),
+        $intervalMinutes
+    );
 }

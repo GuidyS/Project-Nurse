@@ -63,6 +63,11 @@ function curriculumCyclesEnsureSchema(PDO $db): void
                 FOREIGN KEY (cycle_id) REFERENCES curriculum_cycle (id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
     ");
+
+    // หลักสูตรที่ใช้งานในระบบ (ครั้งละ 1 หลักสูตร) — หน้ารายวิชาอื่นๆ แสดงเฉพาะวิชาของหลักสูตรนี้
+    if (!activeCurriculumColumnExists($db, 'curriculum_cycle', 'is_active')) {
+        $db->exec("ALTER TABLE curriculum_cycle ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 0 AFTER end_year");
+    }
 }
 
 function curriculumCyclesReadJson(): array

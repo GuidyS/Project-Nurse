@@ -18,15 +18,14 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 try {
-    if (empty($input['subject_id']) || empty($input['description'])) {
+    if ((empty($input['subject_id']) && empty($input['subject_code'])) || empty($input['description'])) {
         http_response_code(400);
         echo json_encode(["status" => "error", "message" => "ข้อมูลไม่ครบ"]);
         exit();
     }
 
-    $subjectStmt = $pdo->prepare("SELECT subject_code FROM subject WHERE subject_id = :subject_id LIMIT 1");
-    $subjectStmt->execute([':subject_id' => $input['subject_id']]);
-    $subject_code = $subjectStmt->fetchColumn();
+    // รับได้ทั้ง subject_id และ subject_code (วิชาที่มีเฉพาะในหน้า "จัดการหลักสูตร")
+    $subject_code = cloResolveSubjectCode($pdo, (array)$input);
 
     if (!$subject_code) {
         http_response_code(404);

@@ -54,6 +54,11 @@
                 require_once 'components/Teacher/LicenseReminder/run_license_reminders.php';
                 break;
 
+            // ProjectReminder (แจ้งเตือนแอดมินเมื่อโครงการใกล้สิ้นสุด)
+            case 'run-project-reminders':
+                require_once 'components/Teacher/ProjectReminder/run_project_reminders.php';
+                break;
+
             // NotificationPage
             case 'get-notifications':
                 require_once 'components/NotificationPage/get_notifications.php';
@@ -186,6 +191,7 @@
 
             // CurriculumCycles (จัดการหลักสูตรรอบ 5 ปี — เฉพาะผู้ดูแลระบบ)
             case 'get-curriculum-cycles':
+            case 'activate-curriculum-cycle':
             case 'save-curriculum-cycle':
             case 'delete-curriculum-cycle':
             case 'save-curriculum-subject':

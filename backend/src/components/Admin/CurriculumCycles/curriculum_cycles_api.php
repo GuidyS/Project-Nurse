@@ -1,6 +1,7 @@
 <?php
 if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/../../../config/active_curriculum.php';
 require_once __DIR__ . '/curriculum_cycles_helpers.php';
 
 header("Content-Type: application/json; charset=UTF-8");
@@ -19,17 +20,17 @@ try {
         // รายการหลักสูตรทั้งหมด + รายวิชาของหลักสูตรที่เลือก (ถ้าส่ง cycle_id มา)
         case 'get-curriculum-cycles':
             $cycles = $db->query("
-                SELECT c.id, c.start_year, c.end_year,
+                SELECT c.id, c.start_year, c.end_year, c.is_active,
                        COUNT(s.id) AS subject_count,
                        COALESCE(SUM(s.credit), 0) AS total_credits
                 FROM curriculum_cycle c
                 LEFT JOIN curriculum_cycle_subject s ON s.cycle_id = c.id
-                GROUP BY c.id, c.start_year, c.end_year
+                GROUP BY c.id, c.start_year, c.end_year, c.is_active
                 ORDER BY c.start_year DESC, c.end_year DESC
             ")->fetchAll(PDO::FETCH_ASSOC);
 
             foreach ($cycles as &$c) {
-                foreach (['id', 'start_year', 'end_year', 'subject_count', 'total_credits'] as $key) {
+                foreach (['id', 'start_year', 'end_year', 'is_active', 'subject_count', 'total_credits'] as $key) {
                     $c[$key] = (int)$c[$key];
                 }
             }
@@ -54,7 +55,12 @@ try {
 
             curriculumCyclesRespond(200, [
                 "status" => "success",
-                "data" => ["cycles" => $cycles, "subjects" => $subjects],
+                "data" => [
+                    "cycles" => $cycles,
+                    "subjects" => $subjects,
+                    // หลักสูตรที่หน้ารายวิชาอื่นๆ ใช้อยู่ (is_explicit = false คือยังไม่ได้กดเลือก ระบบเลือกตามปีปัจจุบันให้)
+                    "active_cycle" => activeCurriculumCycle($db),
+                ],
             ]);
             break;
 
@@ -294,6 +300,18 @@ try {
                 "status" => "success",
                 "message" => $message,
                 "data" => ["inserted" => $inserted, "updated" => $updated, "unchanged" => $unchanged, "mode" => $mode],
+            ]);
+            break;
+
+        // ตั้งหลักสูตรที่ใช้งานทั้งระบบ — หน้ารายวิชาอื่นๆ (CLO, จัดอาจารย์ผู้สอน, เชื่อมโยง LO ฯลฯ) จะแสดงเฉพาะวิชาของหลักสูตรนี้
+        case 'activate-curriculum-cycle':
+            $input = curriculumCyclesReadJson();
+            $cycle = curriculumCyclesRequireCycle($db, $input['id'] ?? 0);
+            // คำสั่งเดียว เปิดหลักสูตรที่เลือกและปิดหลักสูตรอื่นพร้อมกัน
+            $db->prepare("UPDATE curriculum_cycle SET is_active = IF(id = ?, 1, 0)")->execute([$cycle['id']]);
+            curriculumCyclesRespond(200, [
+                "status" => "success",
+                "message" => "ตั้งหลักสูตร พ.ศ. {$cycle['start_year']} – {$cycle['end_year']} เป็นหลักสูตรที่ใช้งานในระบบแล้ว",
             ]);
             break;
 

@@ -2,6 +2,7 @@
 if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../CLOPage/curriculum_repository.php';
+require_once __DIR__ . '/../../../config/active_curriculum.php';
 
 header('Access-Control-Allow-Origin: ' . (in_array($_SERVER['HTTP_ORIGIN'] ?? '', ['http://localhost:5173', 'http://127.0.0.1:5173'], true) ? ($_SERVER['HTTP_ORIGIN'] ?? '') : 'http://localhost:5173'));
 header('Vary: Origin');
@@ -40,6 +41,9 @@ try {
             }
         }
 
+        // เฉพาะวิชาในหลักสูตรที่ใช้งานในระบบ (หน้า "จัดการหลักสูตร")
+        $my_subject_codes = activeCurriculumFilterCodes($db, $my_subject_codes);
+
         if (empty($my_subject_codes)) {
             echo json_encode(["status" => "success", "data" => ["courses" => [], "students" => []]]);
             exit();
@@ -49,7 +53,7 @@ try {
         $sql_subject = "SELECT subject_id as id, subject_code as code, subject_name_th as name FROM subject WHERE subject_code IN ($inQuery) AND is_active = 1";
         $stmt_subject = $db->prepare($sql_subject);
         $stmt_subject->execute($my_subject_codes);
-        $courses = $stmt_subject->fetchAll(PDO::FETCH_ASSOC);
+        $courses = activeCurriculumApplyNames($db, $stmt_subject->fetchAll(PDO::FETCH_ASSOC), 'code', 'name');
 
         echo json_encode(["status" => "success", "data" => ["courses" => $courses, "students" => []]]);
         exit();
