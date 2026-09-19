@@ -127,14 +127,29 @@ try {
     
     $whereClause = "";
     $params = [];
-    if ($academicYear !== '') {
+    $semester = $data['semester'] ?? 'ทั้งหมด';
+
+    if ($academicYear !== '' && $academicYear !== 'ทั้งหมด') {
         if ($category === 'students') {
-            $yearPrefix = substr($academicYear, 2, 2);
-            $whereClause = " WHERE student_id LIKE :yearPrefix";
-            $params[':yearPrefix'] = $yearPrefix . '%';
-        } elseif ($category === 'projects') {
-            $whereClause = " WHERE academic_year = :year";
+            $whereClause .= ($whereClause ? " AND " : " WHERE ") . "admission_year = :year";
             $params[':year'] = $academicYear;
+        } elseif ($category === 'projects' || $category === 'courses') {
+            $whereClause .= ($whereClause ? " AND " : " WHERE ") . "academic_year = :year";
+            $params[':year'] = $academicYear;
+        }
+    }
+
+    if ($semester !== '' && $semester !== 'ทั้งหมด') {
+        if ($category === 'courses') {
+            $semNum = 0;
+            if ($semester === 'ภาคเรียนที่ 1') $semNum = 1;
+            elseif ($semester === 'ภาคเรียนที่ 2') $semNum = 2;
+            elseif ($semester === 'ภาคฤดูร้อน') $semNum = 3;
+            
+            if ($semNum > 0) {
+                $whereClause .= ($whereClause ? " AND " : " WHERE ") . "semester = :sem";
+                $params[':sem'] = $semNum;
+            }
         }
     }
 

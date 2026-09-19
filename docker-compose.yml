@@ -1,13 +1,11 @@
-version: '3.8'
 services:
-
   # Frontend
   front:
-    build: 
+    build:
       context: ./frontend
       dockerfile: DockerFile
     ports:
-      - "5173:5173"  # เข้าผ่าน Browser ด้วย http://localhost:5173
+      - "5173:5173" # เข้าผ่าน Browser ด้วย http://localhost:5173/
     volumes:
       - ./frontend:/app
       - /app/node_modules
@@ -18,11 +16,10 @@ services:
     stdin_open: true # จำเป็นสำหรับ React Docker
     tty: true
 
-
   # Backend
   backend:
     container_name: php-apache
-    build: 
+    build:
       context: ./backend
       dockerfile: DockerFile
     depends_on:
@@ -30,24 +27,14 @@ services:
     volumes:
       - ./backend/src:/var/www/html/
     ports:
-      - 8080:80
+      - "8080:80"
     environment:
       - TZ=Asia/Bangkok # 🔧 เพิ่มตรงนี้: บังคับให้ระบบ PHP ใช้เวลาประเทศไทย (ICT)
-      # 📧 อีเมลแจ้งเตือน (ใบประกอบวิชาชีพใกล้หมดอายุ) — ตั้งค่าในไฟล์ .env ข้าง docker-compose.yml (ดู .env.example)
-      #    ถ้าไม่ตั้ง SMTP_HOST ระบบยังแจ้งเตือนในระบบได้ แต่จะไม่ส่งอีเมล
-      - SMTP_HOST=${SMTP_HOST:-}
-      - SMTP_PORT=${SMTP_PORT:-587}
-      - SMTP_SECURE=${SMTP_SECURE:-tls}
-      - SMTP_USERNAME=${SMTP_USERNAME:-}
-      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
-      - SMTP_FROM_EMAIL=${SMTP_FROM_EMAIL:-}
-      - SMTP_FROM_NAME=${SMTP_FROM_NAME:-}
-      - APP_URL=${APP_URL:-http://localhost:5173}
 
   # Database
   db:
     container_name: db
-    image: mysql
+    image: mysql:8.4
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD: MYSQL_ROOT_PASSWORD
@@ -58,16 +45,16 @@ services:
     ports:
       - "9906:3306"
     volumes:
-      #- ./backend/nurseproject_test.sql:/docker-entrypoint-initdb.d/init.sql
+      # - ./backend/nurseproject_test.sql:/docker-entrypoint-initdb.d/init.sql
       - ./mysql-data:/var/lib/mysql
 
+  # phpMyAdmin
   phpmyadmin:
     image: phpmyadmin/phpmyadmin
+    restart: always
     ports:
       - "8081:80"
-    restart: always
     environment:
       PMA_HOST: db
     depends_on:
       - db
-      

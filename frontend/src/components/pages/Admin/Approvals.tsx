@@ -154,9 +154,25 @@ export default function Approvals() {
   const pendingApprovals = approvals.filter((approval) => approval.status === "pending");
   const approvedCount = approvals.filter((approval) => approval.status === "approved").length;
   const rejectedCount = approvals.filter((approval) => approval.status === "rejected").length;
-  const formatJsonDetail = (value?: Record<string, unknown> | null) => {
-    if (!value || Object.keys(value).length === 0) return null;
-    return JSON.stringify(value);
+  const getJsonDetailList = (value?: Record<string, unknown> | null) => {
+    if (!value || Object.keys(value).length === 0) return [];
+    
+    const details: string[] = [];
+    if (value.reason) details.push(`เหตุผล: ${value.reason}`);
+    if (value.student_id) details.push(`รหัสนักศึกษา: ${value.student_id}`);
+    if (value.to_advisor_id) details.push(`โอนไปยังอาจารย์รหัส: ${value.to_advisor_id}`);
+    
+    Object.entries(value).forEach(([k, v]) => {
+      if (!['reason', 'student_id', 'to_advisor_id', 'from_advisor_id', 'from_advisor_user_id', 'to_advisor_user_id'].includes(k)) {
+         if (typeof v === 'string' || typeof v === 'number') {
+           details.push(`${k}: ${v}`);
+         } else {
+           details.push(`${k}: ${JSON.stringify(v)}`);
+         }
+      }
+    });
+
+    return details;
   };
 
   const renderRows = (rows: ApprovalRequest[], showActions: boolean) => {
@@ -203,20 +219,35 @@ export default function Approvals() {
                 Open document link
               </a>
             )}
-            {formatJsonDetail(approval.payload) && (
-              <p className="truncate text-xs text-muted-foreground">
-                Payload: {formatJsonDetail(approval.payload)}
-              </p>
+            {getJsonDetailList(approval.payload).length > 0 && (
+              <div className="text-xs text-muted-foreground bg-slate-50 dark:bg-slate-900 p-2 rounded border mt-2">
+                <span className="font-semibold block mb-1">Payload:</span>
+                <ul className="list-disc list-inside space-y-1">
+                  {getJsonDetailList(approval.payload).map((item, idx) => (
+                    <li key={idx} className="break-words whitespace-normal">{item}</li>
+                  ))}
+                </ul>
+              </div>
             )}
-            {formatJsonDetail(approval.before) && (
-              <p className="truncate text-xs text-muted-foreground">
-                Before: {formatJsonDetail(approval.before)}
-              </p>
+            {getJsonDetailList(approval.before).length > 0 && (
+              <div className="text-xs text-muted-foreground bg-slate-50 dark:bg-slate-900 p-2 rounded border mt-2">
+                <span className="font-semibold block mb-1">Before:</span>
+                <ul className="list-disc list-inside space-y-1">
+                  {getJsonDetailList(approval.before).map((item, idx) => (
+                    <li key={idx} className="break-words whitespace-normal">{item}</li>
+                  ))}
+                </ul>
+              </div>
             )}
-            {formatJsonDetail(approval.after) && (
-              <p className="truncate text-xs text-muted-foreground">
-                After: {formatJsonDetail(approval.after)}
-              </p>
+            {getJsonDetailList(approval.after).length > 0 && (
+              <div className="text-xs text-muted-foreground bg-slate-50 dark:bg-slate-900 p-2 rounded border mt-2">
+                <span className="font-semibold block mb-1">After:</span>
+                <ul className="list-disc list-inside space-y-1">
+                  {getJsonDetailList(approval.after).map((item, idx) => (
+                    <li key={idx} className="break-words whitespace-normal">{item}</li>
+                  ))}
+                </ul>
+              </div>
             )}
           </div>
         </TableCell>

@@ -58,9 +58,15 @@ foreach ($menu_items as $item) {
         ];
     }
 
+    // 🔧 HOTFIX: แก้ไขปัญหาเมนู "นักศึกษาภาคปฏิบัติ" ไปซ้ำกับ "ข้อมูลนักศึกษาในที่ปรึกษา"
+    $itemUrl = $item['url'];
+    if ($item['title'] === 'นักศึกษาภาคปฏิบัติ' && $itemUrl === 'students-info') {
+        $itemUrl = 'practical-students';
+    }
+
     $sections[$sectionName]['items'][] = [
         'title' => $item['title'],
-        'url'   => $item['url'],
+        'url'   => $itemUrl,
         'icon'  => $item['icon']
     ];
 }
