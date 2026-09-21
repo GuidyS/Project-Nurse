@@ -33,7 +33,6 @@ import Students from "@/components/pages/Teacher/Students";
 import ScheduleTasks from "@/components/pages/Teacher/ScheduleTasks";
 import ProjectReports from "@/components/pages/Teacher/ProjectReports";
 import ProjectLinks from "@/components/pages/Teacher/ProjectLinks";
-import ProjectDocs from "@/components/pages/Teacher/ProjectDocs";
 import ProgramReports from "@/components/pages/Teacher/ProgramReports";
 import Approvals from "@/components/pages/Admin/Approvals";
 import AuditLog from "@/components/pages/Admin/AuditLog";
@@ -205,15 +204,12 @@ const Index = () => {
 
     // 3.2 🔒 หมวดโครงการ — แอดมินจัดการคนเดียวทั้งหมด
     // (ยกเว้น "โครงการของฉัน" ที่เปิดให้ทุก Role ไปแล้วด้านบน)
-    const projectAdminPages = ["projectspage", "project-docs", "project-links", "project-reports"];
+    const projectAdminPages = ["projectspage", "project-links", "project-reports"];
     if (projectAdminPages.includes(activeItem)) {
       switch (activeItem) {
         case "projectspage":
           if (!canViewProjectPage) return <UnauthorizedView />;
           return <ProjectsPage />;
-        case "project-docs":
-          if (roleId !== 1) return <UnauthorizedView />;
-          return <ProjectDocs />;
         case "project-links":
           if (roleId !== 1) return <UnauthorizedView />;
           return <ProjectLinks />;

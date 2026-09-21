@@ -1,7 +1,6 @@
 <?php
 if (session_status() === PHP_SESSION_NONE) session_start();
 
-// 💡 แก้ไข: ทำระบบค้นหาไฟล์ config อัตโนมัติ
 $possible_paths = [
     __DIR__ . '/config/config.php',
     __DIR__ . '/../config/config.php',
@@ -14,6 +13,7 @@ foreach ($possible_paths as $path) {
         break;
     }
 }
+require_once __DIR__ . '/../../../config/audit_helper.php'; // นำเข้า Audit Helper
 
 $origin = $_SERVER['HTTP_ORIGIN'] ?? 'http://localhost:5173';
 $allowedOrigins = ['http://localhost:5173', 'http://127.0.0.1:5173'];
@@ -121,6 +121,8 @@ try {
     ]);
 
     $db->commit();
+
+    logAudit($db, $_SESSION['user_id'], 'update', 'project_links', "บันทึกการเชื่อมโยง CLO/PLO/YLO ของโครงการ ID: {$projectId}");
 
     echo json_encode([
         "status" => "success",

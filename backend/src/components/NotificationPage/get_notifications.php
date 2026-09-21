@@ -38,6 +38,14 @@ try {
         error_log('license reminder: ' . $e->getMessage());
     }
 
+    // เช็กโครงการใกล้สิ้นสุด (ไม่เกินชั่วโมงละครั้ง) — แจ้งเฉพาะแอดมิน + อีเมลคณะ
+    try {
+        require_once __DIR__ . '/../Teacher/ProjectReminder/project_reminder_helpers.php';
+        projectReminderMaybeRunScheduled($pdo);
+    } catch (Throwable $e) {
+        error_log('project reminder: ' . $e->getMessage());
+    }
+
     $sql = "SELECT
                 n.notification_id AS id,
                 n.title,

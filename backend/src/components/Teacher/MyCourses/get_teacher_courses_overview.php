@@ -29,6 +29,13 @@ try {
         }
     }
 
+    // เฉพาะวิชาในหลักสูตรที่ใช้งานในระบบ (หน้า "จัดการหลักสูตร")
+    require_once __DIR__ . '/../../../config/active_curriculum.php';
+    $my_courses_data = array_intersect_key(
+        $my_courses_data,
+        array_flip(activeCurriculumFilterCodes($pdo, array_keys($my_courses_data)))
+    );
+
     if (empty($my_courses_data)) {
         echo json_encode(["status" => "success", "data" => []]); exit();
     }
@@ -41,7 +48,7 @@ try {
     
     $stmt = $pdo->prepare($sql);
     $stmt->execute($course_codes);
-    $courses = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $courses = activeCurriculumApplyNames($pdo, $stmt->fetchAll(PDO::FETCH_ASSOC), 'code', 'name');
 
     $results = [];
     foreach ($courses as $c) {

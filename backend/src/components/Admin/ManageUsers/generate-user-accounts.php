@@ -6,6 +6,7 @@
  * role_id stays NULL for admin to assign later.
  */
 require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/../../../config/audit_helper.php';
 require_once __DIR__ . '/../../Auth/password_helpers.php';
 
 header("Content-Type: application/json");
@@ -131,6 +132,8 @@ try {
     if ($facultyCount || $studentCount) {
         $message .= " (อาจารย์ {$facultyCount}, นักศึกษา {$studentCount})";
     }
+
+    logAudit($db, $_SESSION['user_id'] ?? null, 'create', 'users', "สร้างบัญชีผู้ใช้จำนวน {$imported} รายการ (อาจารย์ {$facultyCount}, นักศึกษา {$studentCount}, ข้ามซ้ำ {$skippedExisting}, ไม่มีวันเกิด {$skippedNoBirth}, ข้อมูลไม่ถูกต้อง {$skippedInvalid})");
 
     echo json_encode([
         "status" => "success",

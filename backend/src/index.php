@@ -54,6 +54,11 @@
                 require_once 'components/Teacher/LicenseReminder/run_license_reminders.php';
                 break;
 
+            // ProjectReminder (แจ้งเตือนแอดมินเมื่อโครงการใกล้สิ้นสุด)
+            case 'run-project-reminders':
+                require_once 'components/Teacher/ProjectReminder/run_project_reminders.php';
+                break;
+
             // NotificationPage
             case 'get-notifications':
                 require_once 'components/NotificationPage/get_notifications.php';
@@ -154,6 +159,7 @@
             case 'delete-curriculum-subject':
             case 'delete-curriculum-subjects':
             case 'import-curriculum-subjects':
+            case 'activate-curriculum-cycle':
                 require_once 'components/Admin/CurriculumCycles/curriculum_cycles_api.php';
                 break;
 
@@ -173,6 +179,17 @@
                 require_once 'components/Teacher/Advises/send_advisor_message.php';
                 break;
 
+            // AdviseNotes
+            case 'get-advise-notes':
+                require_once 'components/Teacher/AdviseNotes/get_advise_notes.php';
+                break;
+            case 'save-advise-note':
+                require_once 'components/Teacher/AdviseNotes/save_advise_note.php';
+                break;
+            case 'get-advise-students':
+                require_once 'components/Teacher/AdviseNotes/get_advise_students.php';
+                break;
+
             // AdvisorNotifications (การแจ้งเตือนของอาจารย์)
             case 'get-advisor-notifications':
                 require_once 'components/Teacher/AdvisorNotifications/get_notifications.php';
@@ -180,13 +197,6 @@
             case 'update-notification-read':
                 require_once 'components/Teacher/AdvisorNotifications/update_notification_read.php';
                 break;
-            case 'student-competency':
-                require_once 'components/Teacher/student_competency/get_student_competency.php';
-                break;
-            case 'save-student-competency':
-                require_once 'components/Teacher/student_competency/save_student_competency.php';
-                break;
-                
            // StudentCompetency (ฝั่งอาจารย์)
             case 'student-competency':
             case 'get-student-competency':
@@ -392,17 +402,6 @@
                 require_once 'components/Teacher/PLOYLOReport/get_plo_ylo_report.php';
                 break;
 
-            // AdviseNotes
-            case 'get-advise-notes':
-                require_once 'components/Teacher/AdviseNotes/get_advise_notes.php';
-                break;
-            case 'save-advise-note':
-                require_once 'components/Teacher/AdviseNotes/save_advise_note.php';
-                break;
-            case 'get-advise-students':
-                require_once 'components/Teacher/AdviseNotes/get_advise_students.php';
-                break;
-
             // MyCourses
             case 'get-teacher-courses-overview':
                 require_once 'components/Teacher/MyCourses/get_teacher_courses_overview.php';
@@ -462,6 +461,12 @@
             case 'upload-project-file':
                 require_once 'components/Teacher/ProjectDocs/upload_project_file.php';
                 break;
+            case 'update-project-doc':
+                require_once 'components/Teacher/ProjectDocs/update_project_doc.php';
+                break;
+            case 'delete-project-doc':
+                require_once 'components/Teacher/ProjectDocs/delete_project_doc.php';
+                break;
 
             // ProjectLinks
             case 'get-project-links':
@@ -494,8 +499,8 @@
             case 'update-task-status':
                 require_once 'components/Teacher/ScheduleTasks/update_task_status.php';
                 break;
-            case 'update-task-status':
-                require_once 'components/Teacher/ScheduleTasks/update_task_status.php';
+            case 'update-schedule-task':
+                require_once 'components/Teacher/ScheduleTasks/update_schedule_task.php';
                 break;
             case 'delete-schedule-task':
                 require_once 'components/Teacher/ScheduleTasks/delete_schedule_task.php';

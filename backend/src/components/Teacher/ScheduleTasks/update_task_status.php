@@ -1,6 +1,8 @@
 <?php
+if (session_status() === PHP_SESSION_NONE) session_start();
 header('Content-Type: application/json');
 require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/../../../config/audit_helper.php'; // นำเข้า Audit Helper
 
 $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -22,6 +24,8 @@ try {
 
     // ตรวจสอบว่ามีแถวถูกอัปเดตจริงไหม
     if ($stmt->rowCount() > 0) {
+        logAudit($pdo, $_SESSION['user_id'] ?? null, 'update', 'schedule_tasks', "เปลี่ยนสถานะนัดหมาย/งาน (ID: {$input['taskId']}) เป็น '{$input['status']}'");
+
         echo json_encode([
             "status" => "success",
             "message" => "อัปเดตสถานะงานเรียบร้อยแล้ว"

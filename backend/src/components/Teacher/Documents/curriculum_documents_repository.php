@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/../../../config/active_curriculum.php';
 
 function curriculum_documents_json(array $payload, int $statusCode = 200): void
 {
@@ -50,6 +51,15 @@ function curriculum_documents_active_framework_id(PDO $db): ?int
 
 function curriculum_documents_list_courses(PDO $db): array
 {
+    // ตามหลักสูตรที่ใช้งานในระบบ (ยังไม่มีหลักสูตรใช้ตาราง subject แบบเดิม)
+    $curriculumSubjects = activeCurriculumSubjects($db);
+    if ($curriculumSubjects !== null) {
+        return array_map(
+            static fn(array $subject): array => ['subject_code' => $subject['subject_code'], 'subject_name_th' => $subject['subject_name']],
+            $curriculumSubjects
+        );
+    }
+
     $stmt = $db->query("
         SELECT subject_code, subject_name_th
         FROM subject
@@ -62,6 +72,10 @@ function curriculum_documents_list_courses(PDO $db): array
 
 function curriculum_documents_subject_exists(PDO $db, string $subjectCode): bool
 {
+    if (activeCurriculumSubjectCodes($db) !== null) {
+        return activeCurriculumFilterCodes($db, [$subjectCode]) !== [];
+    }
+
     $stmt = $db->prepare("
         SELECT COUNT(*)
         FROM subject

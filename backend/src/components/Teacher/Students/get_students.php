@@ -2,6 +2,7 @@
 if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../CLOPage/curriculum_repository.php';
+require_once __DIR__ . '/../../../config/active_curriculum.php';
 
 header('Access-Control-Allow-Origin: ' . (in_array($_SERVER['HTTP_ORIGIN'] ?? '', ['http://localhost:5173', 'http://127.0.0.1:5173'], true) ? ($_SERVER['HTTP_ORIGIN'] ?? '') : 'http://localhost:5173'));
 header('Vary: Origin');
@@ -43,6 +44,9 @@ try {
             }
         }
     }
+
+    // เฉพาะวิชาในหลักสูตรที่ใช้งานในระบบ (หน้า "จัดการหลักสูตร")
+    $my_subject_codes = activeCurriculumFilterCodes($db, $my_subject_codes);
 
     if (empty($my_subject_codes)) {
         echo json_encode(["status" => "success", "data" => []]);

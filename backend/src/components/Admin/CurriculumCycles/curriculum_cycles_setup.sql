@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS `curriculum_cycle` (
   `id` int NOT NULL AUTO_INCREMENT,
   `start_year` int NOT NULL,
   `end_year` int NOT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT 0 COMMENT 'หลักสูตรที่ใช้งานในระบบ (ครั้งละ 1 หลักสูตร)',
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),

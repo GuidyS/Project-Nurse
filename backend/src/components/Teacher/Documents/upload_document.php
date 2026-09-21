@@ -4,6 +4,9 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/../../../config/audit_helper.php'; // นำเข้า Audit Helper
+
 $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
 
 try {
@@ -17,10 +20,15 @@ try {
         $semester = $input['semester'] ?? 1;
         $googleDriveLink = trim($input['google_drive_link']);
 
-        $sql = "SELECT subject_name_th FROM subject WHERE subject_code = :code";
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute([':code' => $courseCode]);
-        $subjectName = $stmt->fetchColumn() ?: '';
+        // ชื่อวิชาตามหลักสูตรที่ใช้งานก่อน แล้วค่อยถอยไปใช้ตาราง subject
+        require_once __DIR__ . '/../../../config/active_curriculum.php';
+        $subjectName = activeCurriculumSubjectName($pdo, (string)$courseCode);
+        if ($subjectName === null) {
+            $sql = "SELECT subject_name_th FROM subject WHERE subject_code = :code";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([':code' => $courseCode]);
+            $subjectName = $stmt->fetchColumn() ?: '';
+        }
         
         $insertSql = "INSERT INTO tqf_documents 
             (subject_code, subject_name, tqf_type, academic_year, semester, approval_status, responsible_teacher, file_name, file_path) 
@@ -49,6 +57,15 @@ try {
             ':ref_id' => $tqfId,
             ':title' => "อนุมัติเอกสาร TQF: $name ($courseCode)"
         ]);
+
+        // บันทึก Log เมื่ออัปโหลดเอกสาร มคอ. ใหม่
+        logAudit(
+            $pdo, 
+            $_SESSION['user_id'] ?? null, 
+            'create', 
+            'documents', 
+            "อัปโหลดเอกสาร $type (ID: $tqfId) รายวิชา: $courseCode"
+        );
 
         echo json_encode(['status' => 'success']);
     } else {

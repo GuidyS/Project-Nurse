@@ -83,14 +83,14 @@ const exportCategories: {
   },
 ];
 
-const academicYears = ["2568", "2567", "2566", "2565", "2564"];
+const academicYears = ["ทั้งหมด", "2569", "2568", "2567", "2566", "2565", "2564"];
 const semesters = ["ทั้งหมด", "ภาคเรียนที่ 1", "ภาคเรียนที่ 2", "ภาคฤดูร้อน"];
 
 export default function ExportData() {
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedFields, setSelectedFields] = useState<string[]>([]);
   const [format, setFormat] = useState("xlsx");
-  const [academicYear, setAcademicYear] = useState("2568");
+  const [academicYear, setAcademicYear] = useState("ทั้งหมด");
   const [semester, setSemester] = useState("ทั้งหมด");
   const { toast } = useToast();
 

@@ -1,6 +1,8 @@
 <?php
+if (session_status() === PHP_SESSION_NONE) session_start();
 header('Content-Type: application/json');
 require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/../../../config/audit_helper.php'; // นำเข้า Audit Helper
 
 try {
     $db = new Connect();
@@ -22,6 +24,8 @@ try {
     $stmt->bindValue(':id', $data['id']);
 
     $stmt->execute();
+
+    logAudit($db, $_SESSION['user_id'] ?? null, 'update', 'schedule_tasks', "แก้ไขรายละเอียดนัดหมาย/งาน: {$data['task']} (ID: {$data['id']})");
 
     echo json_encode(["status" => "success", "message" => "Task updated successfully"]);
 } catch (Exception $e) {

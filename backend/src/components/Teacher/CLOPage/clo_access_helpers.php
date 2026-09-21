@@ -79,6 +79,51 @@ if (!function_exists('cloAccessCanEditSubject')) {
     }
 }
 
+if (!function_exists('cloResolveSubjectCode')) {
+    /**
+     * หารหัสวิชาจากข้อมูลที่หน้าเว็บส่งมา — subject_id (ตาราง subject) หรือ subject_code
+     * รหัสวิชาต้องมีอยู่จริงในตาราง subject หรือในรายวิชาของหน้า "จัดการหลักสูตร" (curriculum_cycle_subject)
+     * คืนรหัสตามที่เก็บในฐานข้อมูล หรือ null ถ้าไม่พบ
+     */
+    function cloResolveSubjectCode(PDO $db, array $source): ?string
+    {
+        $subjectId = $source['subject_id'] ?? null;
+        if ($subjectId !== null && $subjectId !== '' && ctype_digit((string)$subjectId)) {
+            $stmt = $db->prepare("SELECT subject_code FROM subject WHERE subject_id = ? LIMIT 1");
+            $stmt->execute([(int)$subjectId]);
+            $code = $stmt->fetchColumn();
+            return $code === false || $code === null ? null : (string)$code;
+        }
+
+        $code = trim((string)($source['subject_code'] ?? ''));
+        if ($code === '' || mb_strlen($code) > 50) {
+            return null;
+        }
+
+        $stmt = $db->prepare("SELECT subject_code FROM subject WHERE subject_code = ? LIMIT 1");
+        $stmt->execute([$code]);
+        $found = $stmt->fetchColumn();
+        if ($found !== false) {
+            return (string)$found;
+        }
+
+        $hasCycleSubjects = (int)$db->query("
+            SELECT COUNT(*) FROM information_schema.TABLES
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'curriculum_cycle_subject'
+        ")->fetchColumn() > 0;
+        if ($hasCycleSubjects) {
+            $stmt = $db->prepare("SELECT subject_code FROM curriculum_cycle_subject WHERE subject_code = ? LIMIT 1");
+            $stmt->execute([$code]);
+            $found = $stmt->fetchColumn();
+            if ($found !== false) {
+                return (string)$found;
+            }
+        }
+
+        return null;
+    }
+}
+
 if (!function_exists('cloAccessDenySubject')) {
     /** ตอบ 403 แล้วจบการทำงาน เมื่อไม่มีสิทธิ์แก้วิชานั้น */
     function cloAccessDenySubject(string $subjectCode): void

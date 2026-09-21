@@ -1,12 +1,22 @@
 <?php
 
+require_once __DIR__ . '/../../../config/active_curriculum.php';
+
 $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
 
 try {
-    // 1. ดึงรายวิชาทั้งหมดมาทำ Dropdown
-    $sql_courses = "SELECT subject_code, subject_name_th FROM subject WHERE is_active = 1 ORDER BY subject_code ASC";
-    $stmt_courses = $pdo->query($sql_courses);
-    $courses = $stmt_courses->fetchAll(PDO::FETCH_ASSOC);
+    // 1. รายวิชาทำ Dropdown — ตามหลักสูตรที่ใช้งานในระบบ (ยังไม่มีหลักสูตรใช้ตาราง subject แบบเดิม)
+    $curriculumSubjects = activeCurriculumSubjects($pdo);
+    if ($curriculumSubjects !== null) {
+        $courses = array_map(
+            static fn(array $subject): array => ['subject_code' => $subject['subject_code'], 'subject_name_th' => $subject['subject_name']],
+            $curriculumSubjects
+        );
+    } else {
+        $sql_courses = "SELECT subject_code, subject_name_th FROM subject WHERE is_active = 1 ORDER BY subject_code ASC";
+        $stmt_courses = $pdo->query($sql_courses);
+        $courses = $stmt_courses->fetchAll(PDO::FETCH_ASSOC);
+    }
 
     // 2. ดึงข้อมูลเอกสารจากตาราง tqf_documents
     $sql_docs = "SELECT * FROM tqf_documents ORDER BY created_at DESC";

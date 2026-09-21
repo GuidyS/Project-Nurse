@@ -8,6 +8,9 @@ header("Content-Type: application/json; charset=UTF-8");
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit(); }
 
 require_once __DIR__ . '/../../middlewares/auth_middleware.php';
+require_once __DIR__ . '/../../../config/config.php'; // นำเข้า Connect() ถ้าต้องการ
+require_once __DIR__ . '/../../../config/audit_helper.php'; // นำเข้า Audit Helper
+
 $advisor_user_id = $_SESSION['user_id'];
 
 $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
@@ -19,7 +22,7 @@ try {
 
         // หา student_id (PK) จาก student_code ที่หน้าเว็บส่งมา
         $stmt_find_std = $pdo->prepare("SELECT student_id FROM student WHERE student_id = ? LIMIT 1");
-        $stmt_find_std->execute([$input['studentId'], $input['studentId']]);
+        $stmt_find_std->execute([$input['studentId']]);
         $student = $stmt_find_std->fetch(PDO::FETCH_ASSOC);
 
         if (!$student) {
@@ -38,6 +41,9 @@ try {
             ':summary' => $input['summary']
         ]);
 
+        // บันทึกประวัติ Log หลังเพิ่มคำปรึกษาสำเร็จ
+        logAudit($pdo, $advisor_user_id, 'create', 'advise_notes', "บันทึกการให้คำปรึกษานักศึกษารหัส {$student['student_id']} (หัวข้อ: {$input['topic']})");
+
         echo json_encode(["status" => "success", "message" => "บันทึกการให้คำปรึกษาเรียบร้อยแล้ว"]);
     } else {
         echo json_encode(["status" => "error", "message" => "กรุณากรอกข้อมูลให้ครบถ้วน"]);
@@ -46,3 +52,4 @@ try {
     http_response_code(500);
     echo json_encode(["status" => "error", "message" => $e->getMessage()]);
 }
+?>

@@ -1,5 +1,6 @@
 <?php
 session_start();
+require_once __DIR__ . '/../../config/audit_helper.php';
 
 header('Access-Control-Allow-Origin: ' . (in_array($_SERVER['HTTP_ORIGIN'] ?? '', ['http://localhost:5173', 'http://127.0.0.1:5173'], true) ? ($_SERVER['HTTP_ORIGIN'] ?? '') : 'http://localhost:5173'));
 header('Vary: Origin');
@@ -162,6 +163,7 @@ try {
     }
 
     $pdo->commit();
+    logAudit($pdo, $_SESSION['user_id'] ?? null, 'create', 'notifications', "ส่งการแจ้งเตือนหัวข้อ: {$input['title']} ถึงผู้รับ {$sentCount} รายการ (ข้าม {$skippedCount}, channel={$channel}, type={$type}, category={$category})");
     echo json_encode([
         "status" => "success",
         "message" => "Notification sent",

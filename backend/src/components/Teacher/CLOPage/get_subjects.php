@@ -5,6 +5,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
 require_once __DIR__ . '/curriculum_repository.php';
 require_once __DIR__ . '/clo_access_helpers.php';
+require_once __DIR__ . '/../../../config/active_curriculum.php';
 
 $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -18,32 +19,38 @@ try {
 
     $userId = $_SESSION['user_id'];
     $isAdmin = cloAccessIsAdmin($pdo, $userId);
+    // อาจารย์เห็นเฉพาะวิชาที่ตนเองเป็นผู้สอน
+    $myCodes = $isAdmin ? [] : cloAccessMySubjectCodes($pdo, $userId);
 
-    if ($isAdmin) {
-        // admin เห็นและแก้ไขได้ทุกวิชา
-        $sql = "SELECT subject_id, subject_code, subject_name_th FROM subject WHERE is_active = 1 ORDER BY subject_code ASC";
-        $stmt = $pdo->prepare($sql);
+    $curriculumSubjects = activeCurriculumSubjects($pdo);
+    if ($curriculumSubjects !== null) {
+        // รายวิชาตามหลักสูตรที่ใช้งานในระบบ (ตั้งค่าที่หน้า "จัดการหลักสูตร") — ชื่อวิชาตามหลักสูตร
+        // subject_id เป็น null ได้ถ้าวิชามีเฉพาะในหลักสูตร (หน้า CLO ระบุวิชาด้วย subject_code)
+        $myCodeSet = array_fill_keys(array_map('mb_strtolower', $myCodes), true);
+        $subjects = [];
+        foreach ($curriculumSubjects as $subject) {
+            if (!$isAdmin && !isset($myCodeSet[mb_strtolower($subject['subject_code'])])) {
+                continue;
+            }
+            $subjects[] = [
+                'subject_id' => $subject['subject_id'],
+                'subject_code' => $subject['subject_code'],
+                'subject_name_th' => $subject['subject_name'],
+            ];
+        }
+    } elseif ($isAdmin) {
+        // ยังไม่มีหลักสูตรในระบบ → รายวิชาทั้งหมดจากตาราง subject แบบเดิม (admin แก้ไขได้ทุกวิชา)
+        $stmt = $pdo->prepare("SELECT subject_id, subject_code, subject_name_th FROM subject WHERE is_active = 1 ORDER BY subject_code ASC");
         $stmt->execute();
         $subjects = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } elseif (empty($myCodes)) {
+        $subjects = [];
     } else {
-        // อาจารย์เห็นเฉพาะวิชาที่ตนเองเป็นผู้สอน
-        $myCodes = cloAccessMySubjectCodes($pdo, $userId);
-
-        if (empty($myCodes)) {
-            echo json_encode([
-                "status" => "success",
-                "data" => [],
-                "is_admin" => false,
-            ], JSON_UNESCAPED_UNICODE);
-            exit();
-        }
-
         $placeholders = implode(',', array_fill(0, count($myCodes), '?'));
-        $sql = "SELECT subject_id, subject_code, subject_name_th
-                FROM subject
-                WHERE is_active = 1 AND subject_code IN ($placeholders)
-                ORDER BY subject_code ASC";
-        $stmt = $pdo->prepare($sql);
+        $stmt = $pdo->prepare("SELECT subject_id, subject_code, subject_name_th
+                               FROM subject
+                               WHERE is_active = 1 AND subject_code IN ($placeholders)
+                               ORDER BY subject_code ASC");
         $stmt->execute($myCodes);
         $subjects = $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
@@ -53,6 +60,8 @@ try {
         "data" => $subjects,
         // ให้หน้าเว็บรู้ว่าควรแสดงปุ่ม "แก้ไข YLO" หรือไม่
         "is_admin" => $isAdmin,
+        // หลักสูตรที่ใช้งานในระบบ (null = ยังไม่มีหลักสูตร)
+        "curriculum" => activeCurriculumCycle($pdo),
     ], JSON_UNESCAPED_UNICODE);
 
 } catch (PDOException $e) {

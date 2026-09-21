@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../ProjectShared/project_helpers.php';
 require_once __DIR__ . '/my_project_member_helpers.php';
+require_once __DIR__ . '/../../../config/audit_helper.php';
 
 $db = project_db();
 $auth = project_require_auth($db, ['PROJECT_MY_VIEW']);
@@ -167,6 +168,8 @@ try {
     }
 
     $db->commit();
+
+    logAudit($db, $auth['user_id'], 'create', 'my_projects', "สร้างโครงการใหม่: {$nameTh} (ID: {$projectId})");
 
     project_json([
         "status" => "success",

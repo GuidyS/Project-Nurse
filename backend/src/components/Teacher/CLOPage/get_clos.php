@@ -5,6 +5,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
 require_once __DIR__ . '/clo_mapping_helpers.php';
 require_once __DIR__ . '/curriculum_repository.php';
+require_once __DIR__ . '/clo_access_helpers.php';
 
 $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -16,12 +17,12 @@ try {
         exit();
     }
 
-    $subject_id = isset($_GET['subject_id']) ? $_GET['subject_id'] : null;
+    // รับได้ทั้ง subject_id (ตาราง subject) และ subject_code (วิชาที่มีเฉพาะในหน้า "จัดการหลักสูตร")
+    $hasSubjectParam = (isset($_GET['subject_id']) && $_GET['subject_id'] !== '')
+        || (isset($_GET['subject_code']) && $_GET['subject_code'] !== '');
 
-    if ($subject_id !== null && $subject_id !== '' && ctype_digit((string)$subject_id)) {
-        $subjectStmt = $pdo->prepare("SELECT subject_code FROM subject WHERE subject_id = :subject_id LIMIT 1");
-        $subjectStmt->execute([':subject_id' => $subject_id]);
-        $subject_code = $subjectStmt->fetchColumn();
+    if ($hasSubjectParam) {
+        $subject_code = cloResolveSubjectCode($pdo, $_GET);
 
         if (!$subject_code) {
             echo json_encode(["status" => "success", "data" => ["clos" => [], "plos" => []]], JSON_UNESCAPED_UNICODE);

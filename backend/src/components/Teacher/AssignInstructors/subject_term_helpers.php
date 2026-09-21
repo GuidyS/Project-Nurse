@@ -103,6 +103,46 @@ if (!function_exists('subjectTermSave')) {
 
         $stmt = $db->prepare("UPDATE subject SET " . implode(', ', $sets) . " WHERE subject_code = :code");
         $stmt->execute($params);
+
+        // วิชาที่มีเฉพาะในหน้า "จัดการหลักสูตร" (ไม่มีในตาราง subject) → เก็บไว้ที่รายวิชาของหลักสูตรที่ใช้งาน
+        $exists = $db->prepare("SELECT COUNT(*) FROM subject WHERE subject_code = ?");
+        $exists->execute([$subjectCode]);
+        if ((int)$exists->fetchColumn() > 0) {
+            return;
+        }
+
+        require_once __DIR__ . '/../../../config/active_curriculum.php';
+        $cycle = activeCurriculumCycle($db);
+        if ($cycle === null) {
+            return;
+        }
+        subjectTermEnsureCycleColumns($db);
+        $params[':cycle_id'] = $cycle['id'];
+        $stmt = $db->prepare(
+            "UPDATE curriculum_cycle_subject SET " . implode(', ', $sets) . " WHERE subject_code = :code AND cycle_id = :cycle_id"
+        );
+        $stmt->execute($params);
+    }
+}
+
+if (!function_exists('subjectTermEnsureCycleColumns')) {
+    /** เพิ่มคอลัมน์ภาคเรียน/ปีการศึกษาให้รายวิชาของหลักสูตร (ใช้กับวิชาที่ไม่มีในตาราง subject) */
+    function subjectTermEnsureCycleColumns(PDO $db): void
+    {
+        $stmt = $db->prepare("
+            SELECT COUNT(*)
+            FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'curriculum_cycle_subject'
+              AND COLUMN_NAME = 'semester'
+        ");
+        $stmt->execute();
+
+        if ((int)$stmt->fetchColumn() === 0) {
+            $db->exec("ALTER TABLE curriculum_cycle_subject
+                       ADD COLUMN semester INT NULL DEFAULT NULL AFTER credit_desc,
+                       ADD COLUMN academic_year INT NULL DEFAULT NULL AFTER semester");
+        }
     }
 }
 
