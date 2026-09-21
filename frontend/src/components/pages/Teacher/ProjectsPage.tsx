@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { Plus, Search, Filter, Eye, Edit, MoreVertical, Upload, Link2, ClipboardCheck, Trash2, Loader2} from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { Plus, Search, Filter, Eye, Edit, MoreVertical, Upload, Link2, ClipboardCheck, Trash2, Loader2, UserCheck, Users } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -26,29 +26,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
 import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
-import { ImportDataDialog, type ImportDataTypeOption } from "@/components/shared/ImportDataDialog";
 
 type ProjectType = "academic_service" | "culture" | "other";
 type ProjectStatus = "pending" | "active" | "completed" | "cancelled";
-type ProjectDocumentType = "proposal" | "progress" | "financial" | "summary";
 
 interface ProjectMember {
   id: number;
   name: string;
   type: "faculty" | "student" | string;
   role?: string;
-}
-
-interface ProjectDocument {
-  id: number;
-  project_id?: number | null;
-  name: string;
-  type: ProjectDocumentType | string;
-  date: string;
-  file_path?: string | null;
-  file_name?: string | null;
-  mime_type?: string | null;
-  file_size?: number | null;
 }
 
 interface Project {
@@ -76,8 +62,6 @@ interface Project {
   member_details?: ProjectMember[];
   member_names?: string[];
   member_faculty_ids?: number[];
-  documents?: ProjectDocument[];
-  plos?: string[];
 }
 
 interface CurrentUser {
@@ -108,19 +92,6 @@ interface ProjectFormData {
   budget_note: string;
 }
 
-interface ProjectDocumentUploadForm {
-  name: string;
-  date: string;
-}
-
-const GoogleDriveIcon = ({ className = "h-4 w-4" }: { className?: string }) => (
-  <svg viewBox="0 0 24 24" aria-hidden="true" className={className}>
-    <path fill="#0F9D58" d="M8.3 3h7.4l7.4 12.8h-7.4L8.3 3Z" />
-    <path fill="#F4B400" d="M.9 15.8 8.3 3l3.7 6.4-3.7 6.4H.9Z" />
-    <path fill="#4285F4" d="M8.3 15.8h14.8L19.4 22H4.6l3.7-6.2Z" />
-  </svg>
-);
-
 const projectTypeLabels: Record<ProjectType, string> = {
   academic_service: "บริการวิชาการ",
   culture: "ทำนุบำรุงศิลปวัฒนธรรม",
@@ -142,22 +113,6 @@ const statusClassNames: Record<ProjectStatus, string> = {
 };
 
 const BUDGET_SOURCE_PREFIX = "แหล่งงบ: ";
-
-const projectImportTypes: ImportDataTypeOption[] = [
-  {
-    value: "projects",
-    label: "ข้อมูลโครงการ",
-    icon: Upload,
-    description: "นำเข้าข้อมูลโครงการจากไฟล์ Excel หรือ CSV",
-  },
-];
-
-const PROJECT_DOCUMENT_DEFAULT_TYPE: ProjectDocumentType = "summary";
-
-const createInitialUploadForm = (): ProjectDocumentUploadForm => ({
-  name: "",
-  date: new Date().toISOString().slice(0, 10),
-});
 
 const createInitialFormData = (): ProjectFormData => ({
   project_id: "",
@@ -191,19 +146,6 @@ const getApiErrorMessage = (error: unknown, fallback: string) => {
   return maybeError.response?.data?.message || maybeError.message || fallback;
 };
 
-const getGoogleDriveLinkError = (value: string) => {
-  try {
-    const url = new URL(value.trim());
-    const host = url.hostname.toLowerCase();
-    if (url.protocol !== "https:" || (host !== "drive.google.com" && host !== "docs.google.com")) {
-      return "กรุณาแนบลิงก์ Google Drive ที่ขึ้นต้นด้วย https://drive.google.com หรือ https://docs.google.com";
-    }
-    return null;
-  } catch {
-    return "กรุณากรอกลิงก์ Google Drive ให้ถูกต้อง";
-  }
-};
-
 const formatCurrency = (value?: string | number | null) => {
   const amount = Number(value || 0);
   return amount.toLocaleString("th-TH", {
@@ -220,18 +162,6 @@ const formatDate = (value?: string | null) => {
     day: "numeric",
   });
 };
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
-const getProjectFileUrl = (filePath?: string | null) => {
-  if (!filePath) return "";
-  if (/^https?:\/\//i.test(filePath)) return filePath;
-  return `${API_BASE_URL}/${filePath.replace(/^\/+/, "")}`;
-};
-
-const projectDocuments = (project?: Project | null) => (Array.isArray(project?.documents) ? project.documents : []);
-const projectPlos = (project?: Project | null) => (Array.isArray(project?.plos) ? project.plos : []);
-
-const getDocumentDisplayName = (document: ProjectDocument) => document.file_name || "Google Drive";
 
 const normalizeProjectType = (value?: ProjectType | null): ProjectType => value || "other";
 const normalizeStatus = (value?: ProjectStatus | null): ProjectStatus => value || "active";
@@ -302,30 +232,16 @@ const ProjectsPage = () => {
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isImportOpen, setIsImportOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [viewProject, setViewProject] = useState<Project | null>(null);
   const [isViewOpen, setIsViewOpen] = useState(false);
-  const [uploadProject, setUploadProject] = useState<Project | null>(null);
-  const [isUploadOpen, setIsUploadOpen] = useState(false);
-  const [uploadForm, setUploadForm] = useState<ProjectDocumentUploadForm>(() => createInitialUploadForm());
-  const [uploadDriveLink, setUploadDriveLink] = useState("");
-  const [isUploadingDocuments, setIsUploadingDocuments] = useState(false);
-  const [editingDocument, setEditingDocument] = useState<ProjectDocument | null>(null);
-  const [documentEditForm, setDocumentEditForm] = useState<ProjectDocumentUploadForm>(() => createInitialUploadForm());
-  const [documentEditDriveLink, setDocumentEditDriveLink] = useState("");
-  const [isDocumentEditOpen, setIsDocumentEditOpen] = useState(false);
-  const [isSavingDocument, setIsSavingDocument] = useState(false);
-  const [pendingDeleteDocument, setPendingDeleteDocument] = useState<ProjectDocument | null>(null);
-  const [isDocumentDeleteOpen, setIsDocumentDeleteOpen] = useState(false);
-  const [isDeletingDocument, setIsDeletingDocument] = useState(false);
   const [formData, setFormData] = useState<ProjectFormData>(() => createInitialFormData());
   const [facultyOptions, setFacultyOptions] = useState<FacultyOption[]>([]);
   const [memberSearch, setMemberSearch] = useState("");
   const currentUser = getCurrentUser();
   const canManageProjects = Number(currentUser?.role_id || 0) === 1;
 
-  const navigateToProjectPage = (page: "project-links" | "project-assessments", projectId: number) => {
+  const navigateToProjectPage = (page: "project-docs" | "project-links" | "project-assessments", projectId: number) => {
     if (!canManageProjects) return;
     sessionStorage.setItem("pendingProjectId", String(projectId));
     window.dispatchEvent(new CustomEvent("app:navigate", { detail: { page } }));
@@ -338,14 +254,7 @@ const ProjectsPage = () => {
         params: { search: searchQuery },
       });
       if (res.data.status === "success") {
-        const nextProjects = Array.isArray(res.data.data) ? res.data.data : [];
-        setProjects(nextProjects);
-        setViewProject((prev) => (
-          prev ? nextProjects.find((project: Project) => project.project_id === prev.project_id) || prev : prev
-        ));
-        setUploadProject((prev) => (
-          prev ? nextProjects.find((project: Project) => project.project_id === prev.project_id) || prev : prev
-        ));
+        setProjects(res.data.data || []);
       }
     } catch {
       toast({
@@ -389,185 +298,6 @@ const ProjectsPage = () => {
   const handleOpenViewModal = (project: Project) => {
     setViewProject(project);
     setIsViewOpen(true);
-  };
-
-  const resetUploadDialog = () => {
-    setUploadProject(null);
-    setUploadForm(createInitialUploadForm());
-    setUploadDriveLink("");
-  };
-
-  const handleOpenUploadDialog = (project: Project) => {
-    if (!canManageProjects) return;
-    setUploadProject(project);
-    setUploadForm(createInitialUploadForm());
-    setUploadDriveLink("");
-    setIsUploadOpen(true);
-  };
-
-  const handleUploadOpenChange = (open: boolean) => {
-    if (isUploadingDocuments && !open) return;
-    setIsUploadOpen(open);
-    if (!open && !isUploadingDocuments) {
-      resetUploadDialog();
-    }
-  };
-
-  const handleSubmitProjectDocuments = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!canManageProjects || !uploadProject) return;
-
-    const trimmedName = uploadForm.name.trim();
-    const trimmedDriveLink = uploadDriveLink.trim();
-    if (!trimmedName || !uploadForm.date || !trimmedDriveLink) {
-      toast({
-        title: "กรุณากรอกข้อมูลให้ครบ",
-        description: "ต้องระบุชื่อเอกสาร วันที่ และลิงก์ Google Drive",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const driveLinkError = getGoogleDriveLinkError(trimmedDriveLink);
-    if (driveLinkError) {
-      toast({
-        title: "ลิงก์ Google Drive ไม่ถูกต้อง",
-        description: driveLinkError,
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsUploadingDocuments(true);
-    try {
-      const documentResponse = await api.post("/index.php?page=create-project-doc", {
-        name: trimmedName,
-        project_id: uploadProject.project_id,
-        type: PROJECT_DOCUMENT_DEFAULT_TYPE,
-        date: uploadForm.date,
-        google_drive_link: trimmedDriveLink,
-      });
-
-      if (documentResponse.data.status !== "success") {
-        throw new Error(documentResponse.data.message || "ไม่สามารถบันทึกลิงก์เอกสารได้");
-      }
-
-      toast({
-        title: "บันทึกลิงก์เอกสารสำเร็จ",
-        description: documentResponse.data.message,
-      });
-      fetchProjects();
-      setIsUploadOpen(false);
-      resetUploadDialog();
-    } catch (error: unknown) {
-      toast({
-        title: "ไม่สามารถบันทึกลิงก์เอกสารได้",
-        description: getApiErrorMessage(error, "ระบบไม่สามารถบันทึกลิงก์ Google Drive ได้"),
-        variant: "destructive",
-      });
-    } finally {
-      setIsUploadingDocuments(false);
-    }
-  };
-
-  const openDocumentFile = (projectDocument: ProjectDocument) => {
-    if (!projectDocument.file_path) return;
-    window.open(getProjectFileUrl(projectDocument.file_path), "_blank", "noopener,noreferrer");
-  };
-
-  const handleOpenDocumentEdit = (document: ProjectDocument) => {
-    setEditingDocument(document);
-    setDocumentEditForm({
-      name: document.name || document.file_name || "",
-      date: document.date || new Date().toISOString().slice(0, 10),
-    });
-    setDocumentEditDriveLink(document.file_path || "");
-    setIsDocumentEditOpen(true);
-  };
-
-  const handleSaveDocumentEdit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!editingDocument) return;
-
-    const trimmedName = documentEditForm.name.trim();
-    const trimmedDriveLink = documentEditDriveLink.trim();
-    if (!trimmedName || !documentEditForm.date || !trimmedDriveLink) {
-      toast({
-        title: "กรุณากรอกข้อมูลให้ครบ",
-        description: "ต้องระบุชื่อเอกสาร วันที่เอกสาร และลิงก์ Google Drive",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const driveLinkError = getGoogleDriveLinkError(trimmedDriveLink);
-    if (driveLinkError) {
-      toast({
-        title: "ลิงก์ Google Drive ไม่ถูกต้อง",
-        description: driveLinkError,
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const payload = new FormData();
-    payload.append("document_id", String(editingDocument.id));
-    payload.append("name", trimmedName);
-    payload.append("type", PROJECT_DOCUMENT_DEFAULT_TYPE);
-    payload.append("date", documentEditForm.date);
-    payload.append("google_drive_link", trimmedDriveLink);
-
-    try {
-      setIsSavingDocument(true);
-      const res = await api.post("/index.php?page=update-project-doc", payload, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      if (res.data.status === "success") {
-        toast({ title: "บันทึกเอกสารสำเร็จ", description: res.data.message });
-        setIsDocumentEditOpen(false);
-        setEditingDocument(null);
-        setDocumentEditDriveLink("");
-        fetchProjects();
-      }
-    } catch (error: unknown) {
-      toast({
-        title: "ไม่สามารถแก้ไขเอกสารได้",
-        description: getApiErrorMessage(error, "ระบบไม่สามารถบันทึกการแก้ไขเอกสารได้"),
-        variant: "destructive",
-      });
-    } finally {
-      setIsSavingDocument(false);
-    }
-  };
-
-  const handleOpenDocumentDelete = (document: ProjectDocument) => {
-    setPendingDeleteDocument(document);
-    setIsDocumentDeleteOpen(true);
-  };
-
-  const handleDeleteDocument = async () => {
-    if (!pendingDeleteDocument) return;
-
-    try {
-      setIsDeletingDocument(true);
-      const res = await api.post("/index.php?page=delete-project-doc", {
-        document_id: pendingDeleteDocument.id,
-      });
-      if (res.data.status === "success") {
-        toast({ title: "ลบเอกสารสำเร็จ", description: res.data.message });
-        setIsDocumentDeleteOpen(false);
-        setPendingDeleteDocument(null);
-        fetchProjects();
-      }
-    } catch (error: unknown) {
-      toast({
-        title: "ไม่สามารถลบเอกสารได้",
-        description: getApiErrorMessage(error, "ระบบไม่สามารถลบเอกสารได้"),
-        variant: "destructive",
-      });
-    } finally {
-      setIsDeletingDocument(false);
-    }
   };
 
   const handleOpenCreateModal = () => {
@@ -756,29 +486,12 @@ const ProjectsPage = () => {
           <p className="text-muted-foreground mt-1">สร้าง แก้ไข และติดตามความคืบหน้าโครงการภาควิชา</p>
         </div>
         {canManageProjects && (
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" className="gap-2" onClick={() => setIsImportOpen(true)}>
-              <Upload className="h-4 w-4" />
-              Import ข้อมูล
-            </Button>
-            <Button className="gap-2" onClick={handleOpenCreateModal}>
-              <Plus className="h-4 w-4" />
-              สร้างโครงการใหม่
-            </Button>
-          </div>
+          <Button className="gap-2" onClick={handleOpenCreateModal}>
+            <Plus className="h-4 w-4" />
+            สร้างโครงการใหม่
+          </Button>
         )}
       </div>
-
-      {canManageProjects && (
-        <ImportDataDialog
-          open={isImportOpen}
-          onOpenChange={setIsImportOpen}
-          importTypes={projectImportTypes}
-          title="Import ข้อมูลโครงการ"
-          description="นำเข้าข้อมูลโครงการจากไฟล์ Excel หรือ CSV"
-          onImported={fetchProjects}
-        />
-      )}
 
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
@@ -814,12 +527,6 @@ const ProjectsPage = () => {
             const facultyMembers = projectFacultyMembers(project);
             const visibleFacultyMembers = facultyMembers.slice(0, 3);
             const hiddenFacultyCount = Math.max(0, facultyMembers.length - visibleFacultyMembers.length);
-            const documents = projectDocuments(project);
-            const visibleDocuments = documents.slice(0, 2);
-            const hiddenDocumentCount = Math.max(0, documents.length - visibleDocuments.length);
-            const plos = projectPlos(project);
-            const visiblePlos = plos.slice(0, 4);
-            const hiddenPloCount = Math.max(0, plos.length - visiblePlos.length);
 
             return (
               <div key={project.project_id} className="bg-card rounded-xl shadow-sm border p-5 hover:shadow-md transition-shadow relative">
@@ -834,18 +541,6 @@ const ProjectsPage = () => {
                     <h3 className="font-semibold text-foreground line-clamp-2">{project.project_name_th}</h3>
                     {project.project_name_en && (
                       <p className="text-xs text-muted-foreground mt-1 truncate">{project.project_name_en}</p>
-                    )}
-                    {plos.length > 0 && (
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        {visiblePlos.map((plo) => (
-                          <Badge key={`${project.project_id}-${plo}`} variant="secondary" className="text-[11px]">
-                            {plo}
-                          </Badge>
-                        ))}
-                        {hiddenPloCount > 0 && (
-                          <Badge variant="outline" className="text-[11px]">+{hiddenPloCount}</Badge>
-                        )}
-                      </div>
                     )}
                   </div>
 
@@ -866,7 +561,7 @@ const ProjectsPage = () => {
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             className="gap-2"
-                            onClick={() => handleOpenUploadDialog(project)}
+                            onClick={() => navigateToProjectPage("project-docs", project.project_id)}
                           >
                             <Upload className="h-4 w-4 text-green-500" /> อัปโหลดเอกสาร
                           </DropdownMenuItem>
@@ -895,13 +590,69 @@ const ProjectsPage = () => {
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
-                <div className="space-y-2">
+
+                <div className="space-y-3 mt-4 pt-4 border-t border-slate-100">
+                  <p className="text-sm text-slate-600 line-clamp-2 min-h-[40px]">
+                    {project.description || "ไม่มีคำอธิบายโครงการ"}
+                  </p>
+                  <div className="grid grid-cols-1 gap-3 text-xs text-muted-foreground sm:grid-cols-3">
+                    <div>
+                      <p>ปีการศึกษา</p>
+                      <p className="mt-1 font-medium text-foreground">{project.academic_year || project.fiscal_year || "-"}</p>
+                    </div>
+                    <div>
+                      <p>งบเสนอ</p>
+                      <p className="mt-1 font-medium text-foreground">{formatCurrency(projectBudgetAllocated(project))} บาท</p>
+                    </div>
+                    <div>
+                      <p>งบใช้จริง</p>
+                      <p className="mt-1 font-medium text-foreground">{formatCurrency(projectBudgetSpent(project))} บาท</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">ช่วงเวลา</span>
+                    <span className="font-medium text-foreground">{formatDate(project.start_date)} - {formatDate(project.end_date)}</span>
+                  </div>
+                  <div className="space-y-2">
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-muted-foreground">ความคืบหน้า</span>
                       <span className="font-medium text-foreground">{progress}%</span>
                     </div>
                     <Progress value={progress} className="h-2" />
                   </div>
+                  <div className="space-y-2 text-xs">
+                    <div className="flex items-start gap-2">
+                      <UserCheck className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />
+                      <div className="min-w-0">
+                        <p className="text-muted-foreground leading-relaxed">ผู้ดำเนินโครงการ</p>
+                        <Badge className="border-primary/25 bg-primary/15 text-primary">
+                          <p className="truncate font-medium">{responsibleName}</p>
+                        </Badge>
+                        
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <Users className="mt-0.5 h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-muted-foreground leading-relaxed">ผู้ร่วมโครงการ</p>
+                        {facultyMembers.length === 0 ? (
+                          <p className="font-medium text-foreground">-</p>
+                        ) : (
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {visibleFacultyMembers.map((member) => (
+                              <Badge key={`${project.project_id}-${member.id}`} variant="secondary" className="max-w-full truncate text-[11px]">
+                                {member.name}
+                              </Badge>
+                            ))}
+                            {hiddenFacultyCount > 0 && (
+                              <Badge variant="outline" className="text-[11px]">+{hiddenFacultyCount}</Badge>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             );
           })}
@@ -1129,51 +880,6 @@ const ProjectsPage = () => {
                 rows={2}
               />
             </div>
-            {editMode && editingProject && (
-              <div className="space-y-3 rounded-lg border bg-muted/20 p-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <Label>เอกสารที่อัปโหลด</Label>
-                    <p className="text-xs text-muted-foreground">แก้ไขข้อมูลเอกสาร เปลี่ยนลิงก์ Google Drive หรือลบเอกสารออกจากโครงการ</p>
-                  </div>
-                  <Badge variant="outline">{projectDocuments(editingProject).length} ลิงก์</Badge>
-                </div>
-                {projectDocuments(editingProject).length === 0 ? (
-                  <div className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
-                    ยังไม่มีลิงก์เอกสารสำหรับโครงการนี้
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {projectDocuments(editingProject).map((documentItem) => (
-                      <div key={documentItem.id} className="flex flex-col gap-3 rounded-lg border bg-background p-3 sm:flex-row sm:items-center">
-                        <GoogleDriveIcon className="h-5 w-5 shrink-0" />
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium text-foreground">{documentItem.name}</p>
-                          <p className="truncate text-xs text-muted-foreground">
-                            {formatDate(documentItem.date)}
-                          </p>
-                          <p className="truncate text-xs text-muted-foreground">{getDocumentDisplayName(documentItem)}</p>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          <Button type="button" variant="outline" size="sm" disabled={!documentItem.file_path} onClick={() => openDocumentFile(documentItem)}>
-                            <GoogleDriveIcon className="mr-1 h-4 w-4" />
-                            Google Drive
-                          </Button>
-                          <Button type="button" variant="outline" size="sm" onClick={() => handleOpenDocumentEdit(documentItem)}>
-                            <Edit className="mr-1 h-4 w-4" />
-                            แก้ไข
-                          </Button>
-                          <Button type="button" variant="outline" size="sm" className="text-red-600 hover:text-red-700" onClick={() => handleOpenDocumentDelete(documentItem)}>
-                            <Trash2 className="mr-1 h-4 w-4" />
-                            ลบ
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsModalOpen(false)} disabled={isSubmitting}>
@@ -1238,22 +944,12 @@ const ProjectsPage = () => {
                 );
               })()}
               <div className="space-y-1">
+                <p className="text-muted-foreground">รหัสโครงการ</p>
+                <p className="font-medium text-foreground">{viewProject.project_id}</p>
+              </div>
+              <div className="space-y-1">
                 <p className="text-muted-foreground">ประเภทโครงการ</p>
                 <Badge variant="outline">{projectTypeLabels[normalizeProjectType(viewProject.project_type)]}</Badge>
-              </div>
-              <div className="space-y-2">
-                <p className="text-muted-foreground">PLO ที่เชื่อมกับโครงการ</p>
-                {projectPlos(viewProject).length === 0 ? (
-                  <p className="font-medium text-foreground">-</p>
-                ) : (
-                  <div className="flex flex-wrap gap-2">
-                    {projectPlos(viewProject).map((plo) => (
-                      <Badge key={`${viewProject.project_id}-detail-${plo}`} variant="secondary">
-                        {plo}
-                      </Badge>
-                    ))}
-                  </div>
-                )}
               </div>
               <div className="space-y-1">
                 <p className="text-muted-foreground">ชื่อโครงการ (ภาษาไทย)</p>
@@ -1303,37 +999,6 @@ const ProjectsPage = () => {
                   {projectBudgetNote(viewProject) || "-"}
                 </p>
               </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-foreground text-base font-bold">เอกสารที่อัปโหลด</p>
-                  <Badge variant="outline">{projectDocuments(viewProject).length} ลิงก์</Badge>
-                </div>
-                {projectDocuments(viewProject).length === 0 ? (
-                  <div className="rounded-lg border border-dashed p-4 text-center text-muted-foreground">
-                    ยังไม่มีลิงก์เอกสารสำหรับโครงการนี้
-                  </div>
-                ) : (
-                  <div className="grid gap-3 sm:grid-cols-5">
-                    {projectDocuments(viewProject).map((documentItem) => (
-                      <button
-                        key={documentItem.id}
-                        type="button"
-                        className="flex flex-col items-center gap-2 rounded-md bg-background px-2 py-3 text-center transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
-                        disabled={!documentItem.file_path}
-                        onClick={() => openDocumentFile(documentItem)}
-                        title="เปิด Google Drive"
-                        aria-label={`เปิดเอกสาร ${documentItem.name || "Google Drive"}`}
-                      >
-                        <GoogleDriveIcon className="h-14 w-14 shrink-0" />
-                        <div className="min-w-0 w-full">
-                          <p className="max-w-[7rem] truncate text-center text-[13px] font-semibold text-foreground">{documentItem.name}</p>
-                          <p className="truncate text-xs text-muted-foreground">{formatDate(documentItem.date)}</p>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
             </div>
           )}
           <DialogFooter className="gap-2 sm:gap-0">
@@ -1345,7 +1010,7 @@ const ProjectsPage = () => {
                   className="gap-2"
                   onClick={() => {
                     setIsViewOpen(false);
-                    handleOpenUploadDialog(viewProject);
+                    navigateToProjectPage("project-docs", viewProject.project_id);
                   }}
                 >
                   <Upload className="h-4 w-4" /> เอกสาร
@@ -1365,167 +1030,6 @@ const ProjectsPage = () => {
         </DialogContent>
       </Dialog>
 
-      <Dialog
-        open={isDocumentEditOpen}
-        onOpenChange={(open) => {
-          if (isSavingDocument && !open) return;
-          setIsDocumentEditOpen(open);
-          if (!open) {
-            setEditingDocument(null);
-            setDocumentEditDriveLink("");
-          }
-        }}
-      >
-        <DialogContent className="app-dialog-3xl">
-          <DialogHeader>
-            <DialogTitle>แก้ไขเอกสารโครงการ</DialogTitle>
-            <DialogDescription>แก้ไขข้อมูลเอกสารและลิงก์ Google Drive</DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleSaveDocumentEdit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-project-document-name">ชื่อเอกสาร</Label>
-              <Input
-                id="edit-project-document-name"
-                value={documentEditForm.name}
-                onChange={(event) => setDocumentEditForm((prev) => ({ ...prev, name: event.target.value }))}
-                disabled={isSavingDocument}
-                required
-              />
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="edit-project-document-date">วันที่เอกสาร</Label>
-                <Input
-                  id="edit-project-document-date"
-                  type="date"
-                  value={documentEditForm.date}
-                  onChange={(event) => setDocumentEditForm((prev) => ({ ...prev, date: event.target.value }))}
-                  disabled={isSavingDocument}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-project-document-drive-link">ลิงก์ Google Drive</Label>
-                <div className="relative">
-                  <GoogleDriveIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
-                  <Input
-                    id="edit-project-document-drive-link"
-                    type="url"
-                    value={documentEditDriveLink}
-                    onChange={(event) => setDocumentEditDriveLink(event.target.value)}
-                    placeholder="https://drive.google.com/..."
-                    className="pl-10"
-                    disabled={isSavingDocument}
-                    required
-                  />
-                </div>
-              </div>
-            </div>
-            {editingDocument && (
-              <div className="rounded-lg border bg-muted/30 p-3 text-sm">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <GoogleDriveIcon />
-                  <p>ลิงก์ปัจจุบัน</p>
-                </div>
-                <p className="mt-1 truncate font-medium text-foreground">{editingDocument.file_path || "-"}</p>
-              </div>
-            )}
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsDocumentEditOpen(false)} disabled={isSavingDocument}>
-                ยกเลิก
-              </Button>
-              <Button type="submit" disabled={isSavingDocument || !documentEditForm.name.trim() || !documentEditForm.date || !documentEditDriveLink.trim()}>
-                {isSavingDocument ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                บันทึกเอกสาร
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={isUploadOpen} onOpenChange={handleUploadOpenChange}>
-        <DialogContent className="app-dialog-2xl">
-          <DialogHeader>
-            <DialogTitle>อัปโหลดเอกสารโครงการ</DialogTitle>
-            <DialogDescription>
-              แนบลิงก์ Google Drive เพิ่มเติมให้กับโครงการที่เลือก
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleSubmitProjectDocuments} className="space-y-5">
-            <div className="space-y-2">
-              <Label>โครงการ</Label>
-              <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm">
-                <p className="font-medium text-foreground">{uploadProject?.project_name_th || "-"}</p>
-                {uploadProject?.project_name_en && (
-                  <p className="mt-1 text-xs text-muted-foreground">{uploadProject.project_name_en}</p>
-                )}
-              </div>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="project-document-name">ชื่อเอกสาร</Label>
-                <Input
-                  id="project-document-name"
-                  value={uploadForm.name}
-                  onChange={(event) => setUploadForm((prev) => ({ ...prev, name: event.target.value }))}
-                  placeholder="เช่น รายงานความก้าวหน้าโครงการ"
-                  disabled={isUploadingDocuments}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="project-document-date">วันที่เอกสาร</Label>
-                <Input
-                  id="project-document-date"
-                  type="date"
-                  value={uploadForm.date}
-                  onChange={(event) => setUploadForm((prev) => ({ ...prev, date: event.target.value }))}
-                  disabled={isUploadingDocuments}
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="project-document-drive-link">ลิงก์ Google Drive</Label>
-              <div className="relative">
-                <GoogleDriveIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
-                <Input
-                  id="project-document-drive-link"
-                  type="url"
-                  value={uploadDriveLink}
-                  onChange={(event) => setUploadDriveLink(event.target.value)}
-                  placeholder="https://drive.google.com/..."
-                  className="pl-10"
-                  disabled={isUploadingDocuments}
-                  required
-                />
-              </div>
-            </div>
-
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => handleUploadOpenChange(false)} disabled={isUploadingDocuments}>
-                ยกเลิก
-              </Button>
-              <Button type="submit" disabled={isUploadingDocuments || !uploadForm.name.trim() || !uploadForm.date || !uploadDriveLink.trim()}>
-                {isUploadingDocuments ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    กำลังบันทึก...
-                  </>
-                ) : (
-                  <>
-                    <GoogleDriveIcon className="mr-2 h-4 w-4" />
-                    บันทึกลิงก์
-                  </>
-                )}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
       <ConfirmActionDialog
         open={isConfirmOpen}
         onOpenChange={(open) => {
@@ -1536,17 +1040,6 @@ const ProjectsPage = () => {
         description="คุณแน่ใจหรือไม่ว่าต้องการลบโครงการนี้? ข้อมูลที่เกี่ยวข้องอาจถูกลบไปด้วย"
         onConfirm={handleDeleteProject}
         isLoading={isDeleting}
-      />
-      <ConfirmActionDialog
-        open={isDocumentDeleteOpen}
-        onOpenChange={(open) => {
-          setIsDocumentDeleteOpen(open);
-          if (!open) setPendingDeleteDocument(null);
-        }}
-        title="ยืนยันการลบเอกสาร"
-        description={`คุณแน่ใจหรือไม่ว่าต้องการลบเอกสาร "${pendingDeleteDocument?.name || ""}"? ระบบจะลบข้อมูลเอกสารออกจากระบบ และลบไฟล์จริงถ้ามี`}
-        onConfirm={handleDeleteDocument}
-        isLoading={isDeletingDocument}
       />
     </div>
   );

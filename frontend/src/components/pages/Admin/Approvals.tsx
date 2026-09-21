@@ -39,7 +39,7 @@ const typeLabels: Record<string, string> = {
 
 const typeColors: Record<string, string> = {
   grade_change: "bg-blue-500",
-  student_transfer: "bg-purple-500",
+  student_transfer: "border-primary/25 bg-primary/15 text-primary",
   project_request: "bg-green-500",
   document_approve: "bg-orange-500",
 };
@@ -59,7 +59,7 @@ Object.assign(typeLabels, {
 
 Object.assign(typeColors, {
   permission_change: "bg-blue-500",
-  student_transfer: "bg-purple-500",
+  student_transfer: "border-primary/25 bg-primary/15 text-primary",
   document_link_approval: "bg-orange-500",
   sensitive_change: "bg-slate-700",
 });

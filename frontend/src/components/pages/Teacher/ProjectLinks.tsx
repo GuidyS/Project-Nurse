@@ -153,7 +153,7 @@ export default function ProjectLinks() {
                     onClick={() => setSelectedProjectId(project.id.toString())}
                     className={`w-full text-left px-4 py-3 rounded-lg text-sm transition-colors font-medium ${
                       selectedProjectId === project.id.toString()
-                        ? 'bg-primary text-primary-foreground'
+                        ? 'bg-primary/15 text-primary'
                         : 'hover:bg-muted text-foreground'
                     }`}
                   >

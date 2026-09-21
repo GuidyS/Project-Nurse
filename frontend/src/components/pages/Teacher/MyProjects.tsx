@@ -40,9 +40,7 @@ interface ProjectDocument {
 
 interface ProjectFacultyMember {
   faculty_id: number;
-  id?: number;
   name: string;
-  type?: string;
   role: string;
 }
 
@@ -65,7 +63,6 @@ interface Project {
   documents?: ProjectDocument[];
   member_faculty_ids?: number[];
   member_faculties?: ProjectFacultyMember[];
-  member_details?: ProjectFacultyMember[];
   can_edit?: boolean;
 }
 
@@ -151,7 +148,6 @@ const formatFileSize = (size: number | null) => {
 };
 
 const getDocumentDisplayName = (document: ProjectDocument) => document.file_name || document.name;
-const getProjectFacultyMembers = (project: Project) => project.member_faculties || project.member_details || [];
 
 export default function MyProjects() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -171,13 +167,7 @@ export default function MyProjects() {
       setIsLoading(true);
       const response = await api.get('/index.php?page=get-my-projects');
       if (response.data.status === 'success') {
-        const nextProjects = Array.isArray(response.data.data)
-          ? response.data.data.map((project: Project) => ({
-              ...project,
-              member_faculties: getProjectFacultyMembers(project),
-            }))
-          : [];
-        setProjects(nextProjects);
+        setProjects(response.data.data);
       } else {
         throw new Error(response.data.message);
       }

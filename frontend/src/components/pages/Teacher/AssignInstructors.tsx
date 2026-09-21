@@ -216,15 +216,17 @@ export default function AssignInstructors() {
 
   return (
     <>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">มอบหมาย Course Instructor</h1>
-          <p className="text-muted-foreground">มอบหมายอาจารย์ประจำวิชาให้กับรายวิชาในหลักสูตร</p>
+      <div className="app-page">
+        <div className="app-page-header">
+          <div>
+            <h1 className="app-page-title">มอบหมาย Course Instructor</h1>
+            <p className="app-page-description">มอบหมายอาจารย์ประจำวิชาให้กับรายวิชาในหลักสูตร</p>
+          </div>
         </div>
 
         {/* Stats */}
         <div className="grid gap-4 md:grid-cols-4">
-          <Card>
+          <Card className="app-stat-card">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">รายวิชาทั้งหมด</CardTitle>
               <BookOpen className="h-4 w-4 text-muted-foreground" />
@@ -233,7 +235,7 @@ export default function AssignInstructors() {
               <div className="text-2xl font-bold">{isLoading ? "-" : stats.totalCourses}</div>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="app-stat-card">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">มอบหมายแล้ว</CardTitle>
               <Users className="h-4 w-4 text-green-500" />
@@ -242,7 +244,7 @@ export default function AssignInstructors() {
               <div className="text-2xl font-bold text-green-600">{isLoading ? "-" : stats.assigned}</div>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="app-stat-card">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">ยังไม่มอบหมาย</CardTitle>
               <Users className="h-4 w-4 text-destructive" />
@@ -251,7 +253,7 @@ export default function AssignInstructors() {
               <div className="text-2xl font-bold text-destructive">{isLoading ? "-" : stats.unassigned}</div>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="app-stat-card">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">อาจารย์ทั้งหมด</CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
@@ -263,7 +265,7 @@ export default function AssignInstructors() {
         </div>
 
         {/* Courses Table */}
-        <Card>
+        <Card className="app-section-card">
           <CardHeader>
             <CardTitle>รายวิชาในหลักสูตร</CardTitle>
             <CardDescription>รายวิชาทั้งหมดและอาจารย์ผู้รับผิดชอบ</CardDescription>
@@ -352,7 +354,7 @@ export default function AssignInstructors() {
                       </TableCell>
                       <TableCell className="text-center">
                         {course.instructor ? (
-                          <Badge className="bg-green-500 hover:bg-green-600 px-2.5 py-0.5">{course.instructor}</Badge>
+                          <Badge className="bg-green-500 px-2.5 py-0.5">{course.instructor}</Badge>
                         ) : (
                           <Badge variant="destructive" className="px-2.5 py-0.5">ยังไม่มอบหมาย</Badge>
                         )}
@@ -387,7 +389,7 @@ export default function AssignInstructors() {
         </Card>
 
         {/* Instructors Overview */}
-        <Card>
+        <Card className="app-section-card">
           <CardHeader>
             <CardTitle>ภาระงานอาจารย์</CardTitle>
             <CardDescription>จำนวนรายวิชาที่อาจารย์แต่ละท่านรับผิดชอบ</CardDescription>
@@ -405,7 +407,7 @@ export default function AssignInstructors() {
                 {instructorsList.map((instructor) => (
                   <div
                     key={instructor.id}
-                    className="flex items-center justify-between rounded-lg border p-4 bg-card shadow-sm hover:shadow-md transition-shadow"
+                    className="app-interactive-card flex items-center justify-between p-4"
                   >
                     <div>
                       <p className="font-semibold text-foreground">{instructor.name}</p>

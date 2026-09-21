@@ -15,6 +15,22 @@ api.interceptors.response.use(
     if (error.response && error.response.status === 401) {
       console.warn("Session หมดอายุ หรือยังไม่ได้เข้าสู่ระบบ");
 
+      const storedUser = localStorage.getItem("user");
+      const isDevPreview =
+        import.meta.env.DEV &&
+        storedUser &&
+        (() => {
+          try {
+            return Boolean(JSON.parse(storedUser).__previewRole);
+          } catch {
+            return false;
+          }
+        })();
+
+      if (isDevPreview) {
+        return Promise.reject(error);
+      }
+
       const requestUrl = error.config?.url || "";
       const isOptionalSettingsRequest =
         requestUrl.includes("page=get-notification-settings") ||

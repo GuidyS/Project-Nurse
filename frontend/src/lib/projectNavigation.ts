@@ -1,5 +1,5 @@
-export type ProjectTargetPage = "projectspage" | "project-links" | "project-reports";
-export type ProjectNavigationAction = "details" | "links" | "reports";
+export type ProjectTargetPage = "projectspage" | "project-docs" | "project-links" | "project-reports";
+export type ProjectNavigationAction = "details" | "create-doc" | "view-docs" | "links" | "reports";
 
 export interface PendingProjectNavigation {
   projectId: string;

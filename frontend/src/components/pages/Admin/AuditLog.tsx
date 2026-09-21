@@ -36,7 +36,7 @@ const actionLabels: Record<AuditEntry["action"], string> = {
 
 const actionColors: Record<AuditEntry["action"], string> = {
   create: "bg-success",
-  update: "bg-primary",
+  update: "border-primary/25 bg-primary/15 text-primary",
   delete: "bg-destructive",
   role_change: "bg-warning",
 };
@@ -76,18 +76,18 @@ export default function AuditLog() {
   });
 
   return (
-    <div className="p-6 space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between">
+    <div className="app-page">
+      <div className="app-page-header">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Audit Log</h1>
-          <p className="text-muted-foreground">ประวัติการสร้าง แก้ไข และลบข้อมูลของผู้ใช้ทั้งหมด</p>
+          <h1 className="app-page-title">Audit Log</h1>
+          <p className="app-page-description">ประวัติการสร้าง แก้ไข และลบข้อมูลของผู้ใช้ทั้งหมด</p>
         </div>
         <ExportButton reportName="Audit-Log" />
       </div>
 
       {/* Summary Cards ตัด เข้า/ออกระบบ ออก เหลือ 3 การ์ด */}
       <div className="grid gap-4 md:grid-cols-3">
-        <Card>
+        <Card className="app-stat-card">
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success/10">
@@ -100,7 +100,7 @@ export default function AuditLog() {
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="app-stat-card">
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
@@ -113,7 +113,7 @@ export default function AuditLog() {
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="app-stat-card">
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-destructive/10">
@@ -128,7 +128,7 @@ export default function AuditLog() {
         </Card>
       </div>
 
-      <Card>
+      <Card className="app-section-card">
         <CardHeader>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>

@@ -199,15 +199,15 @@ export default function RolesManagement() {
 
   return (
     <>
-      <div className="p-6 space-y-6 animate-fade-in">
-        <div className="flex items-center justify-between">
+      <div className="app-page">
+        <div className="app-page-header">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">จัดการ Role</h1>
-            <p className="text-muted-foreground">มอบหมายและถอด Role ของผู้ใช้ในระบบ</p>
+            <h1 className="app-page-title">จัดการ Role</h1>
+            <p className="app-page-description">มอบหมายและถอด Role ของผู้ใช้ในระบบ</p>
           </div>
         </div>
 
-        <Card>
+        <Card className="app-section-card">
           <CardHeader className="space-y-4">
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <div>
