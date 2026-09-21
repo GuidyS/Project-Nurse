@@ -444,9 +444,9 @@ const StudentsInfo = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">ข้อมูลนักศึกษาในที่ปรึกษา</h1>
+          <h1 className="text-3xl font-bold tracking-tight">นักศึกษาภาคปฏิบัติ</h1>
           <p className="text-muted-foreground mt-1">
-            จัดการและดูแลข้อมูลนักศึกษาในที่ปรึกษาของท่าน
+            จัดการข้อมูลนักศึกษาที่อยู่ในความดูแลภาคปฏิบัติ (สัดส่วน 1:8)
           </p>
         </div>
         <Button variant="outline" className="gap-2" onClick={handleExport}>

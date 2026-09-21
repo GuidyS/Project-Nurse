@@ -27,7 +27,6 @@ import {
 } from '@/components/ui/alert-dialog';
 import {
   AlertCircle,
-  CheckCircle2,
   Download,
   FileSpreadsheet,
   Library,
@@ -48,18 +47,8 @@ interface Cycle {
   id: number;
   start_year: number;
   end_year: number;
-  is_active: number;
   subject_count: number;
   total_credits: number;
-}
-
-// หลักสูตรที่หน้ารายวิชาอื่นๆ ใช้อยู่ — is_explicit = false คือยังไม่ได้กดเลือก ระบบเลือกตามปีปัจจุบันให้
-interface ActiveCycleInfo {
-  id: number;
-  start_year: number;
-  end_year: number;
-  is_explicit: boolean;
-  label: string;
 }
 
 interface Subject {
@@ -245,10 +234,6 @@ export default function CurriculumCycles() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
-  const [activeCycle, setActiveCycle] = useState<ActiveCycleInfo | null>(null);
-  const [activateConfirmOpen, setActivateConfirmOpen] = useState(false);
-  const [isActivating, setIsActivating] = useState(false);
-
   const selectedCycle = cycles.find((c) => String(c.id) === selectedCycleId) ?? null;
 
   const fetchCycles = useCallback(async (preferId?: number) => {
@@ -256,12 +241,9 @@ export default function CurriculumCycles() {
     try {
       const res = await api.get('/index.php?page=get-curriculum-cycles');
       const list: Cycle[] = res.data?.data?.cycles ?? [];
-      const active: ActiveCycleInfo | null = res.data?.data?.active_cycle ?? null;
       setCycles(list);
-      setActiveCycle(active);
       setSelectedCycleId((current) => {
-        // เปิดหน้าครั้งแรก → แสดงหลักสูตรที่ใช้งานในระบบก่อน
-        const wanted = preferId ?? (current ? Number(current) : active?.id);
+        const wanted = preferId ?? (current ? Number(current) : undefined);
         const target = list.find((c) => c.id === wanted) ?? list[0];
         return target ? String(target.id) : '';
       });
@@ -284,9 +266,8 @@ export default function CurriculumCycles() {
       setSubjects(list);
       // วิชาที่ถูกลบไปแล้วต้องไม่ค้างอยู่ในรายการที่เลือก
       setSelectedIds((prev) => new Set(list.filter((s) => prev.has(s.id)).map((s) => s.id)));
-      // อัปเดตจำนวนวิชา/หน่วยกิตรวม และหลักสูตรที่ใช้งานไปพร้อมกัน
+      // อัปเดตจำนวนวิชา/หน่วยกิตรวมของหลักสูตรไปพร้อมกัน
       setCycles(res.data?.data?.cycles ?? []);
-      setActiveCycle(res.data?.data?.active_cycle ?? null);
     } catch (error) {
       toast({ title: 'ข้อผิดพลาด', description: apiErrorMessage(error, 'โหลดรายวิชาไม่สำเร็จ'), variant: 'destructive' });
     } finally {
@@ -394,22 +375,6 @@ export default function CurriculumCycles() {
       setCycleForm((form) => ({ ...form, error: apiErrorMessage(err, 'บันทึกหลักสูตรไม่สำเร็จ') }));
     } finally {
       setIsSavingCycle(false);
-    }
-  };
-
-  // ตั้งหลักสูตรที่เลือกเป็นหลักสูตรที่ใช้งานทั้งระบบ (หน้ารายวิชาอื่นๆ แสดงเฉพาะวิชาของหลักสูตรนี้)
-  const activateSelectedCycle = async () => {
-    if (!selectedCycle) return;
-    setIsActivating(true);
-    try {
-      const res = await api.post('/index.php?page=activate-curriculum-cycle', { id: selectedCycle.id });
-      toast({ title: 'ตั้งค่าสำเร็จ', description: res.data.message });
-      setActivateConfirmOpen(false);
-      await fetchSubjects(selectedCycleId);
-    } catch (err) {
-      toast({ title: 'ตั้งค่าไม่สำเร็จ', description: apiErrorMessage(err, 'ตั้งหลักสูตรที่ใช้งานไม่สำเร็จ'), variant: 'destructive' });
-    } finally {
-      setIsActivating(false);
     }
   };
 
@@ -564,11 +529,11 @@ export default function CurriculumCycles() {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+    <div className="app-page">
+      <div className="app-page-header">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight leading-snug">จัดการหลักสูตร</h1>
-          <p className="text-muted-foreground">
+          <h1 className="app-page-title">จัดการหลักสูตร</h1>
+          <p className="app-page-description">
             กำหนดรายวิชาของหลักสูตรแต่ละรอบ (ปรับปรุงทุก {CURRICULUM_SPAN} ปี) ด้วยไฟล์ Excel หรือเพิ่ม-ลดรายวิชาทีละวิชา
           </p>
         </div>
@@ -582,7 +547,7 @@ export default function CurriculumCycles() {
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       ) : cycles.length === 0 ? (
-        <Card>
+        <Card className="app-section-card">
           <CardContent className="space-y-3 py-14 text-center">
             <Library className="mx-auto h-10 w-10 text-muted-foreground" />
             <p className="font-medium">ยังไม่มีหลักสูตรในระบบ</p>
@@ -596,7 +561,7 @@ export default function CurriculumCycles() {
         </Card>
       ) : (
         <>
-          <Card>
+          <Card className="app-section-card">
             <CardContent className="flex flex-wrap items-end gap-4 pt-6">
               <div className="min-w-[260px] space-y-2">
                 <Label>หลักสูตร</Label>
@@ -608,7 +573,6 @@ export default function CurriculumCycles() {
                     {cycles.map((c) => (
                       <SelectItem key={c.id} value={String(c.id)}>
                         หลักสูตร {cycleLabel(c)}
-                        {activeCycle?.id === c.id ? ' • ใช้งานในระบบ' : ''}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -625,17 +589,6 @@ export default function CurriculumCycles() {
               >
                 <Trash2 className="mr-2 h-4 w-4" /> ลบหลักสูตร
               </Button>
-              {selectedCycle && activeCycle?.id === selectedCycle.id && (
-                <Badge className="h-10 gap-1.5 bg-emerald-600 px-3 text-sm text-white hover:bg-emerald-600">
-                  <CheckCircle2 className="h-4 w-4" />
-                  {activeCycle.is_explicit ? 'หลักสูตรที่ใช้งานในระบบ' : 'ใช้งานในระบบ (เลือกอัตโนมัติตามปีปัจจุบัน)'}
-                </Badge>
-              )}
-              {selectedCycle && !(activeCycle?.id === selectedCycle.id && activeCycle.is_explicit) && (
-                <Button onClick={() => setActivateConfirmOpen(true)}>
-                  <CheckCircle2 className="mr-2 h-4 w-4" /> ใช้หลักสูตรนี้ทั้งระบบ
-                </Button>
-              )}
               {selectedCycle && (
                 <div className="ml-auto flex gap-2">
                   <Badge variant="secondary" className="px-3 py-1 text-sm">
@@ -650,7 +603,7 @@ export default function CurriculumCycles() {
           </Card>
 
           {selectedCycle && (
-            <Card>
+            <Card className="app-section-card">
               <CardHeader className="space-y-4">
                 <div>
                   <CardTitle className="flex items-center gap-2">
@@ -928,9 +881,9 @@ export default function CurriculumCycles() {
 
           <div className="flex flex-wrap gap-2 text-sm">
             <Badge variant="secondary">ทั้งหมด {importRows.length} แถว</Badge>
-            <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">เพิ่มใหม่ {importNewCount}</Badge>
+            <Badge className="bg-emerald-100 text-emerald-800">เพิ่มใหม่ {importNewCount}</Badge>
             {importMode === 'merge' && (
-              <Badge className="bg-sky-100 text-sky-800 hover:bg-sky-100">อัปเดตวิชาเดิม {importUpdateCount}</Badge>
+              <Badge className="bg-sky-100 text-sky-800">อัปเดตวิชาเดิม {importUpdateCount}</Badge>
             )}
             {importErrorCount > 0 && <Badge variant="destructive">ผิดพลาด {importErrorCount}</Badge>}
           </div>
@@ -964,9 +917,9 @@ export default function CurriculumCycles() {
                       {r.error ? (
                         <span className="text-xs text-red-600">{r.error}</span>
                       ) : importMode === 'merge' && existingCodes.has(r.subject_code.toLowerCase()) ? (
-                        <Badge className="bg-sky-100 text-sky-800 hover:bg-sky-100">อัปเดต</Badge>
+                        <Badge className="bg-sky-100 text-sky-800">อัปเดต</Badge>
                       ) : (
-                        <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">ใหม่</Badge>
+                        <Badge className="bg-emerald-100 text-emerald-800">ใหม่</Badge>
                       )}
                     </TableCell>
                   </TableRow>
@@ -1017,35 +970,6 @@ export default function CurriculumCycles() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* ยืนยันการตั้งหลักสูตรที่ใช้งานทั้งระบบ */}
-      <AlertDialog open={activateConfirmOpen} onOpenChange={(open) => !isActivating && setActivateConfirmOpen(open)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              ใช้หลักสูตร {selectedCycle ? cycleLabel(selectedCycle) : ''} ทั้งระบบ?
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              หน้าที่เกี่ยวกับรายวิชาจะแสดงเฉพาะ {selectedCycle?.subject_count ?? 0} วิชาของหลักสูตรนี้ ได้แก่ กำหนด CLO รายวิชา,
-              จัดการ CLO, ตาราง CLO Map, จัดอาจารย์ผู้สอน, เชื่อมโยงระดับ LO, จัดส่งคลังเอกสาร
-              และหน้ารายวิชาของอาจารย์ (รายวิชา, วิชาที่รับผิดชอบ, ผล CLO รายบุคคล, จัดการผลการเรียน, รายชื่อนักศึกษา)
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isActivating}>ยกเลิก</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={isActivating}
-              onClick={(e) => {
-                e.preventDefault();
-                activateSelectedCycle();
-              }}
-            >
-              {isActivating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              ใช้หลักสูตรนี้
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       {/* ยืนยันการลบ */}
       <AlertDialog open={pendingDelete !== null} onOpenChange={(open) => !open && !isDeleting && setPendingDelete(null)}>

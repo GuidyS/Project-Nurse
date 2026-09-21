@@ -22,8 +22,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FileDropInput } from '@/components/ui/FileDropInput';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
 
@@ -40,11 +41,12 @@ interface ProjectDocument {
 
 interface ProjectFacultyMember {
   faculty_id: number;
-  id?: number;
   name: string;
-  type?: string;
   role: string;
 }
+
+type ProjectType = 'academic_service' | 'culture' | 'other';
+type ProjectTypeFilter = 'all' | ProjectType;
 
 interface Project {
   id: string;
@@ -52,6 +54,7 @@ interface Project {
   project_name_th?: string;
   project_name_en?: string;
   description?: string;
+  project_type?: ProjectType | null;
   type: string;
   status: string;
   progress: number;
@@ -65,7 +68,6 @@ interface Project {
   documents?: ProjectDocument[];
   member_faculty_ids?: number[];
   member_faculties?: ProjectFacultyMember[];
-  member_details?: ProjectFacultyMember[];
   can_edit?: boolean;
 }
 
@@ -76,6 +78,21 @@ interface FacultyOption {
 }
 
 type ProjectStatus = 'pending' | 'active' | 'completed' | 'cancelled';
+
+const projectTypeLabels: Record<ProjectType, string> = {
+  academic_service: 'บริการวิชาการ',
+  culture: 'ทำนุบำรุงศิลปวัฒนธรรม',
+  other: 'อื่น ๆ / ยังไม่จำแนก',
+};
+
+const projectTypeTabs: { value: ProjectTypeFilter; label: string }[] = [
+  { value: 'all', label: 'ทั้งหมด' },
+  { value: 'academic_service', label: projectTypeLabels.academic_service },
+  { value: 'culture', label: projectTypeLabels.culture },
+  { value: 'other', label: projectTypeLabels.other },
+];
+
+const normalizeProjectType = (value?: ProjectType | null): ProjectType => value || 'other';
 
 interface CreateProjectForm {
   project_name_th: string;
@@ -151,10 +168,10 @@ const formatFileSize = (size: number | null) => {
 };
 
 const getDocumentDisplayName = (document: ProjectDocument) => document.file_name || document.name;
-const getProjectFacultyMembers = (project: Project) => project.member_faculties || project.member_details || [];
 
 export default function MyProjects() {
   const [projects, setProjects] = useState<Project[]>([]);
+  const [projectTypeFilter, setProjectTypeFilter] = useState<ProjectTypeFilter>('all');
   const [isLoading, setIsLoading] = useState(true);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -171,13 +188,7 @@ export default function MyProjects() {
       setIsLoading(true);
       const response = await api.get('/index.php?page=get-my-projects');
       if (response.data.status === 'success') {
-        const nextProjects = Array.isArray(response.data.data)
-          ? response.data.data.map((project: Project) => ({
-              ...project,
-              member_faculties: getProjectFacultyMembers(project),
-            }))
-          : [];
-        setProjects(nextProjects);
+        setProjects(response.data.data);
       } else {
         throw new Error(response.data.message);
       }
@@ -449,6 +460,12 @@ export default function MyProjects() {
     }
   };
 
+  const filteredProjects = useMemo(() => {
+    return projects.filter(
+      (project) => projectTypeFilter === 'all' || normalizeProjectType(project.project_type) === projectTypeFilter
+    );
+  }, [projectTypeFilter, projects]);
+
   if (isLoading) {
     return (
       <div className="flex h-96 items-center justify-center">
@@ -457,14 +474,14 @@ export default function MyProjects() {
     );
   }
 
-  const activeProjectsCount = projects.filter(
+  const activeProjectsCount = filteredProjects.filter(
     p => p.status === 'active' || p.status === 'กำลังดำเนินการ'
   ).length;
 
-  const pendingProjectsCount = projects.filter(
+  const pendingProjectsCount = filteredProjects.filter(
     p => p.status === 'pending' || p.status === 'รอดำเนินการ'
   ).length;
-  const completedProjectsCount = projects.filter(
+  const completedProjectsCount = filteredProjects.filter(
     p => p.status === 'completed' || p.status === 'เสร็จสิ้น'
   ).length;
   const editingProject = editingProjectId
@@ -490,6 +507,16 @@ export default function MyProjects() {
           <Badge variant="outline">อ่านอย่างเดียว</Badge>
         </div>
 
+        <Tabs value={projectTypeFilter} onValueChange={(value) => setProjectTypeFilter(value as ProjectTypeFilter)}>
+          <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
+            {projectTypeTabs.map((tab) => (
+              <TabsTrigger key={tab.value} value={tab.value}>
+                {tab.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+
         {/* Stats */}
         <div className="grid gap-4 md:grid-cols-4">
           <Card>
@@ -498,7 +525,7 @@ export default function MyProjects() {
               <FolderKanban className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{projects.length}</div>
+              <div className="text-2xl font-bold">{filteredProjects.length}</div>
             </CardContent>
           </Card>
           <Card>
@@ -537,7 +564,7 @@ export default function MyProjects() {
         </div>
 
         {/* Project Cards */}
-        {projects.length === 0 ? (
+        {filteredProjects.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center h-48">
               <FolderKanban className="h-12 w-12 text-muted-foreground mb-2" />
@@ -546,7 +573,7 @@ export default function MyProjects() {
           </Card>
         ) : (
           <div className="grid gap-4">
-            {projects.map((project) => (
+            {filteredProjects.map((project) => (
               <Card key={project.id}>
                 <CardHeader>
                   <div className="flex items-center justify-between">

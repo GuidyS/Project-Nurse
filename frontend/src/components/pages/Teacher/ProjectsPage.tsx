@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { Plus, Search, Filter, Eye, Edit, MoreVertical, Upload, Link2, ClipboardCheck, Trash2, Loader2} from "lucide-react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { Plus, Search, Filter, Eye, Edit, MoreVertical, Upload, Link2, ClipboardCheck, Trash2, Loader2, UserCheck, Users } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -23,13 +23,16 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
 import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
-import { ImportDataDialog, type ImportDataTypeOption } from "@/components/shared/ImportDataDialog";
 
 type ProjectType = "academic_service" | "culture" | "other";
+type ProjectTypeFilter = "all" | ProjectType;
 type ProjectStatus = "pending" | "active" | "completed" | "cancelled";
+type ProjectStatusFilter = "all" | ProjectStatus;
 type ProjectDocumentType = "proposal" | "progress" | "financial" | "summary";
 
 interface ProjectMember {
@@ -77,7 +80,6 @@ interface Project {
   member_names?: string[];
   member_faculty_ids?: number[];
   documents?: ProjectDocument[];
-  plos?: string[];
 }
 
 interface CurrentUser {
@@ -134,6 +136,21 @@ const statusLabels: Record<ProjectStatus, string> = {
   cancelled: "ไม่อนุมัติ/ยกเลิก",
 };
 
+const projectTypeTabs: { value: ProjectTypeFilter; label: string }[] = [
+  { value: "all", label: "ทั้งหมด" },
+  { value: "academic_service", label: projectTypeLabels.academic_service },
+  { value: "culture", label: projectTypeLabels.culture },
+  { value: "other", label: projectTypeLabels.other },
+];
+
+const statusFilterOptions: { value: ProjectStatusFilter; label: string }[] = [
+  { value: "all", label: "ทุกสถานะ" },
+  { value: "pending", label: statusLabels.pending },
+  { value: "active", label: statusLabels.active },
+  { value: "completed", label: statusLabels.completed },
+  { value: "cancelled", label: statusLabels.cancelled },
+];
+
 const statusClassNames: Record<ProjectStatus, string> = {
   pending: "border-yellow-500/60 bg-yellow-500/10 text-yellow-700 dark:text-yellow-300",
   active: "border-green-500/60 bg-green-500/10 text-green-700 dark:text-green-300",
@@ -142,21 +159,16 @@ const statusClassNames: Record<ProjectStatus, string> = {
 };
 
 const BUDGET_SOURCE_PREFIX = "แหล่งงบ: ";
-
-const projectImportTypes: ImportDataTypeOption[] = [
-  {
-    value: "projects",
-    label: "ข้อมูลโครงการ",
-    icon: Upload,
-    description: "นำเข้าข้อมูลโครงการจากไฟล์ Excel หรือ CSV",
-  },
-];
-
 const PROJECT_DOCUMENT_DEFAULT_TYPE: ProjectDocumentType = "summary";
 
 const createInitialUploadForm = (): ProjectDocumentUploadForm => ({
   name: "",
   date: new Date().toISOString().slice(0, 10),
+});
+
+const createInitialCreateDocumentForm = (): ProjectDocumentUploadForm => ({
+  name: "",
+  date: "",
 });
 
 const createInitialFormData = (): ProjectFormData => ({
@@ -229,12 +241,11 @@ const getProjectFileUrl = (filePath?: string | null) => {
 };
 
 const projectDocuments = (project?: Project | null) => (Array.isArray(project?.documents) ? project.documents : []);
-const projectPlos = (project?: Project | null) => (Array.isArray(project?.plos) ? project.plos : []);
-
 const getDocumentDisplayName = (document: ProjectDocument) => document.file_name || "Google Drive";
 
 const normalizeProjectType = (value?: ProjectType | null): ProjectType => value || "other";
 const normalizeStatus = (value?: ProjectStatus | null): ProjectStatus => value || "active";
+const projectAcademicYear = (project: Project) => project.academic_year ?? project.fiscal_year ?? null;
 
 const projectBudgetAllocated = (project: Project) => project.budget_allocated ?? project.budget ?? 0;
 const projectBudgetSpent = (project: Project) => project.budget_spent ?? project.spent ?? 0;
@@ -296,13 +307,15 @@ const ProjectsPage = () => {
   const { toast } = useToast();
   const [projects, setProjects] = useState<Project[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [projectTypeFilter, setProjectTypeFilter] = useState<ProjectTypeFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<ProjectStatusFilter>("all");
+  const [academicYearFilter, setAcademicYearFilter] = useState("all");
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isImportOpen, setIsImportOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [viewProject, setViewProject] = useState<Project | null>(null);
   const [isViewOpen, setIsViewOpen] = useState(false);
@@ -310,6 +323,8 @@ const ProjectsPage = () => {
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [uploadForm, setUploadForm] = useState<ProjectDocumentUploadForm>(() => createInitialUploadForm());
   const [uploadDriveLink, setUploadDriveLink] = useState("");
+  const [createDocumentForm, setCreateDocumentForm] = useState<ProjectDocumentUploadForm>(() => createInitialCreateDocumentForm());
+  const [createDocumentDriveLink, setCreateDocumentDriveLink] = useState("");
   const [isUploadingDocuments, setIsUploadingDocuments] = useState(false);
   const [editingDocument, setEditingDocument] = useState<ProjectDocument | null>(null);
   const [documentEditForm, setDocumentEditForm] = useState<ProjectDocumentUploadForm>(() => createInitialUploadForm());
@@ -389,6 +404,18 @@ const ProjectsPage = () => {
   const handleOpenViewModal = (project: Project) => {
     setViewProject(project);
     setIsViewOpen(true);
+  };
+
+  const resetCreateDocumentFields = () => {
+    setCreateDocumentForm(createInitialCreateDocumentForm());
+    setCreateDocumentDriveLink("");
+  };
+
+  const handleProjectModalOpenChange = (open: boolean) => {
+    setIsModalOpen(open);
+    if (!open) {
+      resetCreateDocumentFields();
+    }
   };
 
   const resetUploadDialog = () => {
@@ -476,6 +503,7 @@ const ProjectsPage = () => {
   };
 
   const handleOpenDocumentEdit = (document: ProjectDocument) => {
+    if (!canManageProjects) return;
     setEditingDocument(document);
     setDocumentEditForm({
       name: document.name || document.file_name || "",
@@ -487,7 +515,7 @@ const ProjectsPage = () => {
 
   const handleSaveDocumentEdit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!editingDocument) return;
+    if (!canManageProjects || !editingDocument) return;
 
     const trimmedName = documentEditForm.name.trim();
     const trimmedDriveLink = documentEditDriveLink.trim();
@@ -541,12 +569,13 @@ const ProjectsPage = () => {
   };
 
   const handleOpenDocumentDelete = (document: ProjectDocument) => {
+    if (!canManageProjects) return;
     setPendingDeleteDocument(document);
     setIsDocumentDeleteOpen(true);
   };
 
   const handleDeleteDocument = async () => {
-    if (!pendingDeleteDocument) return;
+    if (!canManageProjects || !pendingDeleteDocument) return;
 
     try {
       setIsDeletingDocument(true);
@@ -574,6 +603,7 @@ const ProjectsPage = () => {
     if (!canManageProjects) return;
     setEditMode(false);
     setFormData(createInitialFormData());
+    resetCreateDocumentFields();
     setMemberSearch("");
     setIsModalOpen(true);
   };
@@ -599,6 +629,7 @@ const ProjectsPage = () => {
       budget_source: budget.source,
       budget_note: budget.note,
     });
+    resetCreateDocumentFields();
     setMemberSearch("");
     setIsModalOpen(true);
   };
@@ -647,6 +678,22 @@ const ProjectsPage = () => {
       return "วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่มต้น";
     }
 
+    if (!editMode) {
+      const documentName = createDocumentForm.name.trim();
+      const documentDate = createDocumentForm.date.trim();
+      const documentDriveLink = createDocumentDriveLink.trim();
+      const hasDocumentInput = Boolean(documentName || documentDate || documentDriveLink);
+
+      if (hasDocumentInput && (!documentName || !documentDate || !documentDriveLink)) {
+        return "กรุณากรอกชื่อเอกสาร วันที่เอกสาร และลิงก์ Google Drive ให้ครบ";
+      }
+
+      if (documentDriveLink) {
+        const driveLinkError = getGoogleDriveLinkError(documentDriveLink);
+        if (driveLinkError) return driveLinkError;
+      }
+    }
+
     const currentProject = projects.find((project) => project.project_id.toString() === formData.project_id);
     const currentProgress = Number(currentProject?.progress || 0);
     if (editMode && formData.status === "completed" && currentProgress < 100) {
@@ -689,7 +736,45 @@ const ProjectsPage = () => {
 
       const res = await api.post(endpoint, payload);
       if (res.data.status === "success") {
-        toast({ title: "สำเร็จ", description: res.data.message });
+        const documentName = createDocumentForm.name.trim();
+        const documentDriveLink = createDocumentDriveLink.trim();
+        const shouldCreateDocument = !editMode && Boolean(documentName || createDocumentForm.date || documentDriveLink);
+
+        if (shouldCreateDocument) {
+          const projectId = Number(res.data.project_id ?? res.data.data?.project_id ?? res.data.data?.id ?? 0);
+          try {
+            if (!Number.isInteger(projectId) || projectId <= 0) {
+              throw new Error("ไม่พบรหัสโครงการสำหรับบันทึกลิงก์เอกสาร");
+            }
+
+            const documentResponse = await api.post("/index.php?page=create-project-doc", {
+              name: documentName,
+              project_id: projectId,
+              type: PROJECT_DOCUMENT_DEFAULT_TYPE,
+              date: createDocumentForm.date,
+              google_drive_link: documentDriveLink,
+            });
+
+            if (documentResponse.data.status !== "success") {
+              throw new Error(documentResponse.data.message || "ไม่สามารถบันทึกลิงก์เอกสารได้");
+            }
+
+            toast({
+              title: "สำเร็จ",
+              description: "สร้างโครงการและบันทึกลิงก์เอกสารสำเร็จ",
+            });
+          } catch (documentError: unknown) {
+            toast({
+              title: "สร้างโครงการสำเร็จ แต่บันทึกลิงก์เอกสารไม่สำเร็จ",
+              description: getApiErrorMessage(documentError, "ระบบไม่สามารถบันทึกลิงก์ Google Drive ได้"),
+              variant: "destructive",
+            });
+          }
+        } else {
+          toast({ title: "สำเร็จ", description: res.data.message });
+        }
+
+        resetCreateDocumentFields();
         setIsModalOpen(false);
         fetchProjects();
       }
@@ -747,6 +832,26 @@ const ProjectsPage = () => {
     ? projects.find((project) => project.project_id.toString() === formData.project_id) || null
     : null;
   const editingProgress = editingProject ? projectProgress(editingProject) : 0;
+  const academicYearOptions = useMemo(() => {
+    const years = projects
+      .map(projectAcademicYear)
+      .filter((year): year is number => year !== null && Number.isFinite(Number(year)))
+      .map(Number);
+
+    return Array.from(new Set(years)).sort((a, b) => b - a);
+  }, [projects]);
+  const filteredProjects = useMemo(() => {
+    return projects.filter((project) => {
+      const matchesType =
+        projectTypeFilter === "all" || normalizeProjectType(project.project_type) === projectTypeFilter;
+      const matchesStatus = statusFilter === "all" || normalizeStatus(project.status) === statusFilter;
+      const year = projectAcademicYear(project);
+      const matchesYear = academicYearFilter === "all" || String(year ?? "") === academicYearFilter;
+
+      return matchesType && matchesStatus && matchesYear;
+    });
+  }, [academicYearFilter, projectTypeFilter, projects, statusFilter]);
+  const activeFilterCount = Number(statusFilter !== "all") + Number(academicYearFilter !== "all");
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -756,29 +861,12 @@ const ProjectsPage = () => {
           <p className="text-muted-foreground mt-1">สร้าง แก้ไข และติดตามความคืบหน้าโครงการภาควิชา</p>
         </div>
         {canManageProjects && (
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" className="gap-2" onClick={() => setIsImportOpen(true)}>
-              <Upload className="h-4 w-4" />
-              Import ข้อมูล
-            </Button>
-            <Button className="gap-2" onClick={handleOpenCreateModal}>
-              <Plus className="h-4 w-4" />
-              สร้างโครงการใหม่
-            </Button>
-          </div>
+          <Button className="gap-2" onClick={handleOpenCreateModal}>
+            <Plus className="h-4 w-4" />
+            สร้างโครงการใหม่
+          </Button>
         )}
       </div>
-
-      {canManageProjects && (
-        <ImportDataDialog
-          open={isImportOpen}
-          onOpenChange={setIsImportOpen}
-          importTypes={projectImportTypes}
-          title="Import ข้อมูลโครงการ"
-          description="นำเข้าข้อมูลโครงการจากไฟล์ Excel หรือ CSV"
-          onImported={fetchProjects}
-        />
-      )}
 
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
@@ -790,23 +878,91 @@ const ProjectsPage = () => {
             className="pl-10"
           />
         </div>
-        <Button variant="outline" className="gap-2">
-          <Filter className="h-4 w-4" />
-          กรอง
-        </Button>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" className="gap-2">
+              <Filter className="h-4 w-4" />
+              กรอง
+              {activeFilterCount > 0 && (
+                <Badge variant="secondary" className="ml-1 rounded-sm px-1.5 py-0 text-[11px]">
+                  {activeFilterCount}
+                </Badge>
+              )}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-80 space-y-4">
+            <div className="space-y-1">
+              <p className="text-sm font-medium">ตัวกรองโครงการ</p>
+              <p className="text-xs text-muted-foreground">เลือกสถานะและปีการศึกษา</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="project-status-filter">สถานะ</Label>
+              <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as ProjectStatusFilter)}>
+                <SelectTrigger id="project-status-filter">
+                  <SelectValue placeholder="เลือกสถานะ" />
+                </SelectTrigger>
+                <SelectContent>
+                  {statusFilterOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="project-year-filter">ปีการศึกษา</Label>
+              <Select value={academicYearFilter} onValueChange={setAcademicYearFilter}>
+                <SelectTrigger id="project-year-filter">
+                  <SelectValue placeholder="เลือกปีการศึกษา" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">ทุกปีการศึกษา</SelectItem>
+                  {academicYearOptions.map((year) => (
+                    <SelectItem key={year} value={String(year)}>
+                      {year}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              disabled={activeFilterCount === 0}
+              onClick={() => {
+                setStatusFilter("all");
+                setAcademicYearFilter("all");
+              }}
+            >
+              ล้างตัวกรอง
+            </Button>
+          </PopoverContent>
+        </Popover>
       </div>
+
+      <Tabs value={projectTypeFilter} onValueChange={(value) => setProjectTypeFilter(value as ProjectTypeFilter)}>
+        <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
+          {projectTypeTabs.map((tab) => (
+            <TabsTrigger key={tab.value} value={tab.value}>
+              {tab.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
 
       {isLoading ? (
         <div className="flex justify-center items-center py-20">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
-      ) : projects.length === 0 ? (
+      ) : filteredProjects.length === 0 ? (
         <div className="text-center py-20 text-muted-foreground border-2 border-dashed rounded-xl">
           ไม่พบข้อมูลโครงการในระบบ
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {projects.map((project) => {
+          {filteredProjects.map((project) => {
             const projectType = normalizeProjectType(project.project_type);
             const status = normalizeStatus(project.status);
             const progress = projectProgress(project);
@@ -814,12 +970,6 @@ const ProjectsPage = () => {
             const facultyMembers = projectFacultyMembers(project);
             const visibleFacultyMembers = facultyMembers.slice(0, 3);
             const hiddenFacultyCount = Math.max(0, facultyMembers.length - visibleFacultyMembers.length);
-            const documents = projectDocuments(project);
-            const visibleDocuments = documents.slice(0, 2);
-            const hiddenDocumentCount = Math.max(0, documents.length - visibleDocuments.length);
-            const plos = projectPlos(project);
-            const visiblePlos = plos.slice(0, 4);
-            const hiddenPloCount = Math.max(0, plos.length - visiblePlos.length);
 
             return (
               <div key={project.project_id} className="bg-card rounded-xl shadow-sm border p-5 hover:shadow-md transition-shadow relative">
@@ -834,18 +984,6 @@ const ProjectsPage = () => {
                     <h3 className="font-semibold text-foreground line-clamp-2">{project.project_name_th}</h3>
                     {project.project_name_en && (
                       <p className="text-xs text-muted-foreground mt-1 truncate">{project.project_name_en}</p>
-                    )}
-                    {plos.length > 0 && (
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        {visiblePlos.map((plo) => (
-                          <Badge key={`${project.project_id}-${plo}`} variant="secondary" className="text-[11px]">
-                            {plo}
-                          </Badge>
-                        ))}
-                        {hiddenPloCount > 0 && (
-                          <Badge variant="outline" className="text-[11px]">+{hiddenPloCount}</Badge>
-                        )}
-                      </div>
                     )}
                   </div>
 
@@ -895,20 +1033,76 @@ const ProjectsPage = () => {
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
-                <div className="space-y-2">
+
+                <div className="space-y-3 mt-4 pt-4 border-t border-slate-100">
+                  <p className="text-sm text-slate-600 line-clamp-2 min-h-[40px]">
+                    {project.description || "ไม่มีคำอธิบายโครงการ"}
+                  </p>
+                  <div className="grid grid-cols-1 gap-3 text-xs text-muted-foreground sm:grid-cols-3">
+                    <div>
+                      <p>ปีการศึกษา</p>
+                      <p className="mt-1 font-medium text-foreground">{project.academic_year || project.fiscal_year || "-"}</p>
+                    </div>
+                    <div>
+                      <p>งบเสนอ</p>
+                      <p className="mt-1 font-medium text-foreground">{formatCurrency(projectBudgetAllocated(project))} บาท</p>
+                    </div>
+                    <div>
+                      <p>งบใช้จริง</p>
+                      <p className="mt-1 font-medium text-foreground">{formatCurrency(projectBudgetSpent(project))} บาท</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">ช่วงเวลา</span>
+                    <span className="font-medium text-foreground">{formatDate(project.start_date)} - {formatDate(project.end_date)}</span>
+                  </div>
+                  <div className="space-y-2">
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-muted-foreground">ความคืบหน้า</span>
                       <span className="font-medium text-foreground">{progress}%</span>
                     </div>
                     <Progress value={progress} className="h-2" />
                   </div>
+                  <div className="space-y-2 text-xs">
+                    <div className="flex items-start gap-2">
+                      <UserCheck className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />
+                      <div className="min-w-0">
+                        <p className="text-muted-foreground leading-relaxed">ผู้ดำเนินโครงการ</p>
+                        <Badge className="border-primary/25 bg-primary/15 text-primary">
+                          <p className="truncate font-medium">{responsibleName}</p>
+                        </Badge>
+                        
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <Users className="mt-0.5 h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-muted-foreground leading-relaxed">ผู้ร่วมโครงการ</p>
+                        {facultyMembers.length === 0 ? (
+                          <p className="font-medium text-foreground">-</p>
+                        ) : (
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {visibleFacultyMembers.map((member) => (
+                              <Badge key={`${project.project_id}-${member.id}`} variant="secondary" className="max-w-full truncate text-[11px]">
+                                {member.name}
+                              </Badge>
+                            ))}
+                            {hiddenFacultyCount > 0 && (
+                              <Badge variant="outline" className="text-[11px]">+{hiddenFacultyCount}</Badge>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             );
           })}
         </div>
       )}
 
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+      <Dialog open={isModalOpen} onOpenChange={handleProjectModalOpenChange}>
         <DialogContent className="app-dialog-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editMode ? "แก้ไขข้อมูลโครงการ" : "สร้างโครงการใหม่"}</DialogTitle>
@@ -1129,6 +1323,51 @@ const ProjectsPage = () => {
                 rows={2}
               />
             </div>
+            {!editMode && (
+              <div className="space-y-3 rounded-lg border bg-muted/20 p-4">
+                <div>
+                  <Label>เอกสาร Google Drive</Label>
+                  <p className="text-xs text-muted-foreground">แนบลิงก์เอกสารตั้งต้นให้โครงการใหม่ หากกรอกต้องระบุชื่อ วันที่ และลิงก์ให้ครบ</p>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="grid gap-2">
+                    <Label htmlFor="create-project-document-name">ชื่อเอกสาร</Label>
+                    <Input
+                      id="create-project-document-name"
+                      value={createDocumentForm.name}
+                      onChange={(event) => setCreateDocumentForm((prev) => ({ ...prev, name: event.target.value }))}
+                      placeholder="เช่น รายงานข้อเสนอโครงการ"
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="create-project-document-date">วันที่เอกสาร</Label>
+                    <Input
+                      id="create-project-document-date"
+                      type="date"
+                      value={createDocumentForm.date}
+                      onChange={(event) => setCreateDocumentForm((prev) => ({ ...prev, date: event.target.value }))}
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="create-project-document-drive-link">ลิงก์ Google Drive</Label>
+                  <div className="relative">
+                    <GoogleDriveIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
+                    <Input
+                      id="create-project-document-drive-link"
+                      type="url"
+                      value={createDocumentDriveLink}
+                      onChange={(event) => setCreateDocumentDriveLink(event.target.value)}
+                      placeholder="https://drive.google.com/..."
+                      className="pl-10"
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
             {editMode && editingProject && (
               <div className="space-y-3 rounded-lg border bg-muted/20 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1176,7 +1415,7 @@ const ProjectsPage = () => {
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsModalOpen(false)} disabled={isSubmitting}>
+            <Button variant="outline" onClick={() => handleProjectModalOpenChange(false)} disabled={isSubmitting}>
               ยกเลิก
             </Button>
             <Button onClick={handleSaveProject} disabled={isSubmitting}>
@@ -1240,20 +1479,6 @@ const ProjectsPage = () => {
               <div className="space-y-1">
                 <p className="text-muted-foreground">ประเภทโครงการ</p>
                 <Badge variant="outline">{projectTypeLabels[normalizeProjectType(viewProject.project_type)]}</Badge>
-              </div>
-              <div className="space-y-2">
-                <p className="text-muted-foreground">PLO ที่เชื่อมกับโครงการ</p>
-                {projectPlos(viewProject).length === 0 ? (
-                  <p className="font-medium text-foreground">-</p>
-                ) : (
-                  <div className="flex flex-wrap gap-2">
-                    {projectPlos(viewProject).map((plo) => (
-                      <Badge key={`${viewProject.project_id}-detail-${plo}`} variant="secondary">
-                        {plo}
-                      </Badge>
-                    ))}
-                  </div>
-                )}
               </div>
               <div className="space-y-1">
                 <p className="text-muted-foreground">ชื่อโครงการ (ภาษาไทย)</p>
@@ -1516,7 +1741,6 @@ const ProjectsPage = () => {
                   </>
                 ) : (
                   <>
-                    <GoogleDriveIcon className="mr-2 h-4 w-4" />
                     บันทึกลิงก์
                   </>
                 )}

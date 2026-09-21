@@ -146,10 +146,10 @@ function OutcomeItemList({ items }: { items?: OutcomeItem[] }) {
 
 function StatusBadge({ status }: { status: StudentOutcome["outcome_status"] }) {
   if (status === "passed") {
-    return <Badge className="rounded-md bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/10">ผ่านเกณฑ์</Badge>;
+    return <Badge className="rounded-md bg-emerald-500/10 text-emerald-600">ผ่านเกณฑ์</Badge>;
   }
   if (status === "at_risk") {
-    return <Badge className="rounded-md bg-red-500/10 text-red-600 hover:bg-red-500/10">ต้องติดตาม</Badge>;
+    return <Badge className="rounded-md bg-red-500/10 text-red-600">ต้องติดตาม</Badge>;
   }
   return <Badge variant="outline" className="rounded-md text-muted-foreground">ยังไม่มีผลประเมิน</Badge>;
 }

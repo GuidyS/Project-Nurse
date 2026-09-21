@@ -377,7 +377,7 @@ export default function CLOManagement() {
             </SelectTrigger>
             <SelectContent>
               {courses.map((course) => (
-                <SelectItem key={course.subject_code} value={course.subject_code}>
+                <SelectItem key={course.subject_id} value={course.subject_code}>
                   {course.subject_code} - {course.subject_name_th}
                 </SelectItem>
               ))}

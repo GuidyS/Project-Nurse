@@ -123,7 +123,7 @@ export default function CourseDetailPage({ courseCode, onBack, onManageCLO }: Co
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">
             <span>{course.name}</span>
-            <Badge className="bg-primary text-primary-foreground">{course.code}</Badge>
+            <Badge className="border-primary/25 bg-primary/15 text-primary">{course.code}</Badge>
           </DialogTitle>
           <p className="text-muted-foreground text-sm">{course.type} · ภาคเรียน {course.semester}</p>
         </DialogHeader>
