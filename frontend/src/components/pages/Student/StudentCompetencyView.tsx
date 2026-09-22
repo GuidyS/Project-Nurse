@@ -170,11 +170,11 @@ export default function StudentCompetencyView() {
                                     <div
                                       className={`h-4 w-4 rounded-full border flex items-center justify-center transition-all ${
                                         isSelected
-                                          ? "border-primary bg-primary text-primary-foreground shadow-sm scale-110"
+                                          ? "border-primary/40 bg-primary/15 text-primary shadow-sm scale-110"
                                           : "border-muted-foreground/30 bg-transparent"
                                       }`}
                                     >
-                                      {isSelected && <div className="h-1.5 w-1.5 rounded-full bg-background" />}
+                                      {isSelected && <div className="h-1.5 w-1.5 rounded-full bg-primary" />}
                                     </div>
                                   </div>
                                 </td>

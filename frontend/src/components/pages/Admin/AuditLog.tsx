@@ -1,11 +1,10 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar, Search, Filter, Download, User, FileEdit, Trash2, Plus, LogIn, LogOut, Shield } from "lucide-react";
+import { Calendar, Search, User, FileEdit, Trash2, Plus, Shield } from "lucide-react";
 import ExportButton from "@/components/dashboard/ExportButton";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
@@ -15,7 +14,7 @@ interface AuditEntry {
   timestamp: string;
   user: string;
   userRole: string;
-  action: "create" | "update" | "delete" | "login" | "logout" | "role_change";
+  action: "create" | "update" | "delete" | "role_change";
   resource: string;
   details: string;
   ipAddress: string;
@@ -25,8 +24,6 @@ const actionIcons: Record<AuditEntry["action"], React.ReactNode> = {
   create: <Plus className="h-4 w-4" />,
   update: <FileEdit className="h-4 w-4" />,
   delete: <Trash2 className="h-4 w-4" />,
-  login: <LogIn className="h-4 w-4" />,
-  logout: <LogOut className="h-4 w-4" />,
   role_change: <Shield className="h-4 w-4" />,
 };
 
@@ -34,28 +31,23 @@ const actionLabels: Record<AuditEntry["action"], string> = {
   create: "สร้าง",
   update: "แก้ไข",
   delete: "ลบ",
-  login: "เข้าสู่ระบบ",
-  logout: "ออกจากระบบ",
   role_change: "เปลี่ยน Role",
 };
 
 const actionColors: Record<AuditEntry["action"], string> = {
   create: "bg-success",
-  update: "bg-primary",
+  update: "border-primary/25 bg-primary/15 text-primary",
   delete: "bg-destructive",
-  login: "bg-success",
-  logout: "bg-muted-foreground",
   role_change: "bg-warning",
 };
 
 export default function AuditLog() {
-  const [logs, setLogs] = useState<AuditEntry[]>([]); // 👈 เก็บข้อมูลจริง
+  const [logs, setLogs] = useState<AuditEntry[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [actionFilter, setActionFilter] = useState("all");
   const [roleFilter, setRoleFilter] = useState("all");
   const { toast } = useToast();
 
-  // ดึงข้อมูลจาก API
   useEffect(() => {
     const fetchLogs = async () => {
       try {
@@ -71,10 +63,10 @@ export default function AuditLog() {
       }
     };
     fetchLogs();
-  }, []);
+  }, [toast]);
 
   const filteredLogs = logs.filter((entry) => {
-    const matchesSearch = 
+    const matchesSearch =
       entry.user.toLowerCase().includes(searchQuery.toLowerCase()) ||
       entry.details.toLowerCase().includes(searchQuery.toLowerCase()) ||
       entry.resource.toLowerCase().includes(searchQuery.toLowerCase());
@@ -84,130 +76,121 @@ export default function AuditLog() {
   });
 
   return (
-    <>
-      <div className="p-6 space-y-6 animate-fade-in">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">Audit Log</h1>
-            <p className="text-muted-foreground">ประวัติการใช้งานระบบของผู้ใช้ทั้งหมด</p>
-          </div>
-          <ExportButton reportName="Audit-Log" />
+    <div className="app-page">
+      <div className="app-page-header">
+        <div>
+          <h1 className="app-page-title">Audit Log</h1>
+          <p className="app-page-description">ประวัติการสร้าง แก้ไข และลบข้อมูลของผู้ใช้ทั้งหมด</p>
         </div>
+        <ExportButton reportName="Audit-Log" />
+      </div>
 
-        {/* Summary Cards */}
-        <div className="grid gap-4 md:grid-cols-4">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success/10">
-                  <Plus className="h-5 w-5 text-success" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{logs.filter((e) => e.action === "create").length}</p>
-                  <p className="text-xs text-muted-foreground">สร้างใหม่</p>
-                </div>
+      {/* Summary Cards ตัด เข้า/ออกระบบ ออก เหลือ 3 การ์ด */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card className="app-stat-card">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success/10">
+                <Plus className="h-5 w-5 text-success" />
               </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                  <FileEdit className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{logs.filter((e) => e.action === "update").length}</p>
-                  <p className="text-xs text-muted-foreground">แก้ไข</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-destructive/10">
-                  <Trash2 className="h-5 w-5 text-destructive" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{logs.filter((e) => e.action === "delete").length}</p>
-                  <p className="text-xs text-muted-foreground">ลบ</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-warning/10">
-                  <LogIn className="h-5 w-5 text-warning" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{logs.filter((e) => e.action === "login" || e.action === "logout").length}</p>
-                  <p className="text-xs text-muted-foreground">เข้า/ออกระบบ</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <CardTitle>รายการ Audit Log</CardTitle>
-                <CardDescription>แสดง {filteredLogs.length} รายการ</CardDescription>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    placeholder="ค้นหา..."
-                    className="pl-9 w-48"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                </div>
-                <Select value={actionFilter} onValueChange={setActionFilter}>
-                  <SelectTrigger className="w-32">
-                    <SelectValue placeholder="การกระทำ" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">ทั้งหมด</SelectItem>
-                    <SelectItem value="create">สร้าง</SelectItem>
-                    <SelectItem value="update">แก้ไข</SelectItem>
-                    <SelectItem value="delete">ลบ</SelectItem>
-                    <SelectItem value="login">เข้าสู่ระบบ</SelectItem>
-                    <SelectItem value="logout">ออกจากระบบ</SelectItem>
-                    <SelectItem value="role_change">เปลี่ยน Role</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={roleFilter} onValueChange={setRoleFilter}>
-                  <SelectTrigger className="w-32">
-                    <SelectValue placeholder="Role" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">ทั้งหมด</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="teacher">อาจารย์</SelectItem>
-                    <SelectItem value="student">นักศึกษา</SelectItem>
-                  </SelectContent>
-                </Select>
+                <p className="text-2xl font-bold">{logs.filter((e) => e.action === "create").length}</p>
+                <p className="text-xs text-muted-foreground">สร้างใหม่</p>
               </div>
             </div>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
+          </CardContent>
+        </Card>
+        <Card className="app-stat-card">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                <FileEdit className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{logs.filter((e) => e.action === "update").length}</p>
+                <p className="text-xs text-muted-foreground">แก้ไข</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="app-stat-card">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-destructive/10">
+                <Trash2 className="h-5 w-5 text-destructive" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{logs.filter((e) => e.action === "delete").length}</p>
+                <p className="text-xs text-muted-foreground">ลบ</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card className="app-section-card">
+        <CardHeader>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle>รายการ Audit Log</CardTitle>
+              <CardDescription>แสดง {filteredLogs.length} รายการ</CardDescription>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="ค้นหา..."
+                  className="pl-9 w-48"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+              <Select value={actionFilter} onValueChange={setActionFilter}>
+                <SelectTrigger className="w-32">
+                  <SelectValue placeholder="การกระทำ" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">ทั้งหมด</SelectItem>
+                  <SelectItem value="create">สร้าง</SelectItem>
+                  <SelectItem value="update">แก้ไข</SelectItem>
+                  <SelectItem value="delete">ลบ</SelectItem>
+                  <SelectItem value="role_change">เปลี่ยน Role</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={roleFilter} onValueChange={setRoleFilter}>
+                <SelectTrigger className="w-32">
+                  <SelectValue placeholder="Role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">ทั้งหมด</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="teacher">อาจารย์</SelectItem>
+                  <SelectItem value="student">นักศึกษา</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>เวลา</TableHead>
+                <TableHead>ผู้ใช้</TableHead>
+                <TableHead>การกระทำ</TableHead>
+                <TableHead>รายละเอียด</TableHead>
+                <TableHead>IP Address</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredLogs.length === 0 ? (
                 <TableRow>
-                  <TableHead>เวลา</TableHead>
-                  <TableHead>ผู้ใช้</TableHead>
-                  <TableHead>การกระทำ</TableHead>
-                  <TableHead>รายละเอียด</TableHead>
-                  <TableHead>IP Address</TableHead>
+                  <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">
+                    ไม่มีประวัติการใช้งาน
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredLogs.map((entry) => (
+              ) : (
+                filteredLogs.map((entry) => (
                   <TableRow key={entry.id}>
                     <TableCell className="text-muted-foreground whitespace-nowrap">
                       <div className="flex items-center gap-2">
@@ -235,12 +218,12 @@ export default function AuditLog() {
                     </TableCell>
                     <TableCell className="text-muted-foreground font-mono text-sm">{entry.ipAddress}</TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      </div>
-    </>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

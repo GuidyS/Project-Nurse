@@ -3,6 +3,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+require_once __DIR__ . '/../../../config/audit_helper.php';
 require_once __DIR__ . '/curriculum_repository.php';
 
 $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
@@ -35,6 +36,9 @@ try {
     $pdo->beginTransaction();
     replaceSubjectClos($pdo, $frameworkId, (string)$input['subject_code'], is_array($input['clos']) ? $input['clos'] : []);
     $pdo->commit();
+
+    // บันทึก Log เมื่อบันทึกผัง CLO สำเร็จ
+    logAudit($pdo, $_SESSION['user_id'], 'update', 'clos', "ปรับปรุง/บันทึกข้อมูล CLO ทั้งชุดของรายวิชา {$input['subject_code']}");
 
     echo json_encode(["status" => "success", "message" => "บันทึกข้อมูล CLO เรียบร้อยแล้ว!"], JSON_UNESCAPED_UNICODE);
 } catch (PDOException $e) {

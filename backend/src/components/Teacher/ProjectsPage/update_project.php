@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../ProjectShared/project_helpers.php';
 require_once __DIR__ . '/../MyProjects/my_project_member_helpers.php';
 require_once __DIR__ . '/../ProjectReminder/project_reminder_helpers.php';
+require_once __DIR__ . '/../../../config/audit_helper.php'; // นำเข้า Audit Helper
 
 $db = project_db();
 $auth = project_require_auth($db, ['PROJECT_VIEW']);
@@ -203,6 +204,8 @@ try {
     }
 
     $db->commit();
+
+    logAudit($db, $auth['user_id'], 'update', 'projects', "แก้ไขข้อมูลโครงการ: {$nameTh} (ID: {$projectId})");
 
     // วันสิ้นสุดอาจถูกเลื่อนเข้ามาในช่วงแจ้งเตือน → เช็กโครงการนี้ทันที (พังก็ไม่กระทบการบันทึก)
     try {

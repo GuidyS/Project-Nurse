@@ -6,6 +6,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
  
 if (session_status() == PHP_SESSION_NONE) { session_start(); }
 require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/../../Admin/AssignStudents/assign_students_helpers.php';
  
 header("Content-Type: application/json; charset=UTF-8");
  
@@ -32,27 +33,53 @@ try {
     if ((int)$user['role_id'] === 1) {
         // Admin: เห็นนักศึกษาทุกคน
         $stmt2 = $db->prepare("
-            SELECT student_id, CONCAT(first_name_th, ' ', last_name_th) AS full_name, status
+            SELECT student_id, CONCAT(first_name_th, ' ', last_name_th) AS full_name, status,
+                   year_level, admission_year
             FROM student
             ORDER BY student_id
         ");
         $stmt2->execute();
     } else {
         // อาจารย์ที่ปรึกษา: เห็นเฉพาะนักศึกษาในความดูแลของตัวเอง
+        $advisorType = assignStudentsResolveType('advisor');
+        [$typeSql, $typeParams] = assignStudentsTypeCondition($advisorType, 'sam');
         $stmt2 = $db->prepare("
-            SELECT s.student_id, CONCAT(s.first_name_th, ' ', s.last_name_th) AS full_name, s.status
+            SELECT DISTINCT s.student_id, CONCAT(s.first_name_th, ' ', s.last_name_th) AS full_name, s.status,
+                   s.year_level, s.admission_year
             FROM student_advisor_mapping sam
             JOIN student s ON s.student_id = sam.student_id
             WHERE sam.faculty_id = :fid
+              AND $typeSql
             ORDER BY s.student_id
         ");
-        $stmt2->execute([':fid' => $user['username']]);
+        $stmt2->execute($typeParams + [':fid' => $user['username']]);
     }
  
-    $students = $stmt2->fetchAll(PDO::FETCH_ASSOC);
+    $students = $stmt2->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+    // คำนวณชั้นปีจริง Real-time ตัดรอบ 10 สิงหาคม
+    $now = new DateTime();
+    $currentYearBE = (int)$now->format('Y') + 543;
+    $cutOffDate = new DateTime($now->format('Y') . '-08-10 00:00:00');
+    $academicYear = ($now >= $cutOffDate) ? $currentYearBE : ($currentYearBE - 1);
+
+    foreach ($students as &$s) {
+        $cleanId = trim((string)$s['student_id']);
+        if (strlen($cleanId) >= 2 && is_numeric(substr($cleanId, 0, 2))) {
+            $entryYear = 2500 + (int)substr($cleanId, 0, 2);
+            $calculatedYl = $academicYear - $entryYear + 1;
+            if ($calculatedYl < 1) $calculatedYl = 1;
+            if ($calculatedYl > 8) $calculatedYl = 8;
+            $s['year_level'] = $calculatedYl;
+        } else {
+            $s['year_level'] = (int)($s['year_level'] ?? 1);
+        }
+        $s['academic_year'] = $academicYear;
+    }
+    unset($s);
+
     echo json_encode(["status" => "success", "data" => $students], JSON_UNESCAPED_UNICODE);
 } catch (Exception $e) {
     http_response_code(500);
     echo json_encode(["status" => "error", "message" => $e->getMessage()], JSON_UNESCAPED_UNICODE);
 }
- 

@@ -8,7 +8,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 if (session_status() == PHP_SESSION_NONE) { session_start(); }
 require_once __DIR__ . '/../../../config/config.php';
-require_once __DIR__ . '/../../../config/academic_helper.php';
 
 ob_end_clean();
 header("Content-Type: application/json; charset=UTF-8");
@@ -24,12 +23,15 @@ if (!$userId) {
 try {
     $db = new Connect;
 
+    // ดึงข้อมูลนักศึกษา
     $stmt = $db->prepare("
         SELECT u.user_id, u.username, 
-               s.student_id, s.first_name_th, s.last_name_th
+               s.student_id, s.first_name_th, s.last_name_th,
+               s.admission_year, s.year_level
         FROM users u
-        LEFT JOIN student s ON s.user_id = u.user_id
+        LEFT JOIN student s ON s.student_id = u.username
         WHERE u.user_id = :id
+        LIMIT 1
     ");
     $stmt->execute([':id' => $userId]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -46,12 +48,24 @@ try {
         $fullName = $studentId;
     }
 
-    if ($studentId === '') {
-        http_response_code(404);
-        echo json_encode(["status" => "error", "message" => "บัญชีนี้ไม่ได้ผูกกับข้อมูลนักศึกษา"], JSON_UNESCAPED_UNICODE);
-        exit;
+    // คำนวณปีการศึกษาและชั้นปีโดยตรงจากรหัสนักศึกษา (รหัส 66 -> ปี 4)
+    $now = new DateTime();
+    $currentYearBE = (int)$now->format('Y') + 543;
+    $cutOffDate = new DateTime($now->format('Y') . '-08-10 00:00:00');
+    $academicYear = ($now >= $cutOffDate) ? $currentYearBE : ($currentYearBE - 1);
+
+    $entryYear = 0;
+    if (strlen($studentId) >= 2 && is_numeric(substr($studentId, 0, 2))) {
+        $entryYear = 2500 + (int)substr($studentId, 0, 2);
+    } else {
+        $entryYear = $academicYear;
     }
 
+    $yearLevel = $academicYear - $entryYear + 1;
+    if ($yearLevel < 1) $yearLevel = 1;
+    if ($yearLevel > 8) $yearLevel = 8;
+
+    // ค้นหาหลักสูตร
     $fwStmt = $db->prepare("
         SELECT id, curriculum_year, program_name 
         FROM curriculum_framework 
@@ -62,15 +76,26 @@ try {
     $framework = $fwStmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$framework) {
-        http_response_code(500);
-        echo json_encode(["status" => "error", "message" => "ไม่พบหลักสูตรที่เปิดใช้งานอยู่ในระบบ"], JSON_UNESCAPED_UNICODE);
+        $fwFallback = $db->query("SELECT id, curriculum_year, program_name FROM curriculum_framework ORDER BY id DESC LIMIT 1");
+        $framework = $fwFallback ? $fwFallback->fetch(PDO::FETCH_ASSOC) : null;
+    }
+
+    if (!$framework) {
+        echo json_encode([
+            "status" => "success",
+            "data" => [
+                "student_id"    => $studentId,
+                "full_name"     => $fullName,
+                "year_level"    => $yearLevel,
+                "academic_year" => $academicYear,
+                "framework"     => null,
+                "items"         => []
+            ]
+        ], JSON_UNESCAPED_UNICODE);
         exit;
     }
 
-    $info = calculateRealtimeAcademicInfo($studentId);
-    $academicYear = $info['academic_year'];
-    $yearLevel = $info['year_level'];
-
+    // ดึงเกณฑ์ประเมินสมรรถนะตามชั้นปีจริง (ปี 4)
     $itemStmt = $db->prepare("
         SELECT 
             ci.id, 
@@ -102,12 +127,12 @@ try {
     echo json_encode([
         "status" => "success",
         "data" => [
-            "student_id" => $studentId,
-            "full_name" => $fullName,
-            "year_level" => $yearLevel,
+            "student_id"    => $studentId,
+            "full_name"     => $fullName,
+            "year_level"    => $yearLevel,
             "academic_year" => $academicYear,
-            "framework" => $framework,
-            "items" => $items
+            "framework"     => $framework,
+            "items"         => $items
         ]
     ], JSON_UNESCAPED_UNICODE);
 

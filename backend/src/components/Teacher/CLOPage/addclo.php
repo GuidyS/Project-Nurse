@@ -3,6 +3,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+require_once __DIR__ . '/../../../config/audit_helper.php';
 require_once __DIR__ . '/clo_mapping_helpers.php';
 require_once __DIR__ . '/curriculum_repository.php';
 require_once __DIR__ . '/clo_access_helpers.php';
@@ -33,7 +34,6 @@ try {
         exit();
     }
 
-    // แก้ CLO ได้เฉพาะวิชาที่ตนเองสอน (admin แก้ได้ทุกวิชา)
     if (!cloAccessCanEditSubject($pdo, $_SESSION['user_id'], (string)$subject_code)) {
         cloAccessDenySubject((string)$subject_code);
     }
@@ -59,7 +59,7 @@ try {
     }
 
     $pdo->beginTransaction();
-    addCurriculumClo(
+    $cloId = addCurriculumClo(
         $pdo,
         $frameworkId,
         (string)$subject_code,
@@ -72,6 +72,10 @@ try {
         $sub_plos
     );
     $pdo->commit();
+    
+    // บันทึก Log เมื่อเพิ่ม CLO สำเร็จ
+    $cloCodeStr = !empty($input['clo_code']) ? " รหัส {$input['clo_code']}" : "";
+    logAudit($pdo, $_SESSION['user_id'], 'create', 'clos', "เพิ่ม CLO{$cloCodeStr} (ID: {$cloId}) ในรายวิชา {$subject_code}");
 
     echo json_encode(["status" => "success", "message" => "เพิ่ม CLO สำเร็จ"], JSON_UNESCAPED_UNICODE);
 } catch (Exception $e) {

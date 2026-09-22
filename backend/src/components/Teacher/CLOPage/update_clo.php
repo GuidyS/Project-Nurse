@@ -3,6 +3,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+require_once __DIR__ . '/../../../config/audit_helper.php';
 require_once __DIR__ . '/clo_mapping_helpers.php';
 require_once __DIR__ . '/curriculum_repository.php';
 require_once __DIR__ . '/clo_access_helpers.php';
@@ -89,6 +90,10 @@ try {
         exit();
     }
     $pdo->commit();
+
+    // บันทึก Log เมื่อแก้ไขข้อมูล CLO สำเร็จ
+    $cloCodeStr = !empty($input['clo_code']) ? " รหัส {$input['clo_code']}" : "";
+    logAudit($pdo, $_SESSION['user_id'], 'update', 'clos', "แก้ไข CLO{$cloCodeStr} (ID: {$input['clo_id']}) ในรายวิชา {$ownerCode}");
 
     echo json_encode(["status" => "success", "message" => "อัปเดตข้อมูลสำเร็จ"], JSON_UNESCAPED_UNICODE);
 } catch (Exception $e) {

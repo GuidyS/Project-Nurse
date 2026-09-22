@@ -564,11 +564,11 @@ export default function CurriculumCycles() {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+    <div className="app-page">
+      <div className="app-page-header">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight leading-snug">จัดการหลักสูตร</h1>
-          <p className="text-muted-foreground">
+          <h1 className="app-page-title">จัดการหลักสูตร</h1>
+          <p className="app-page-description">
             กำหนดรายวิชาของหลักสูตรแต่ละรอบ (ปรับปรุงทุก {CURRICULUM_SPAN} ปี) ด้วยไฟล์ Excel หรือเพิ่ม-ลดรายวิชาทีละวิชา
           </p>
         </div>
@@ -582,7 +582,7 @@ export default function CurriculumCycles() {
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       ) : cycles.length === 0 ? (
-        <Card>
+        <Card className="app-section-card">
           <CardContent className="space-y-3 py-14 text-center">
             <Library className="mx-auto h-10 w-10 text-muted-foreground" />
             <p className="font-medium">ยังไม่มีหลักสูตรในระบบ</p>
@@ -596,7 +596,7 @@ export default function CurriculumCycles() {
         </Card>
       ) : (
         <>
-          <Card>
+          <Card className="app-section-card">
             <CardContent className="flex flex-wrap items-end gap-4 pt-6">
               <div className="min-w-[260px] space-y-2">
                 <Label>หลักสูตร</Label>
@@ -626,7 +626,7 @@ export default function CurriculumCycles() {
                 <Trash2 className="mr-2 h-4 w-4" /> ลบหลักสูตร
               </Button>
               {selectedCycle && activeCycle?.id === selectedCycle.id && (
-                <Badge className="h-10 gap-1.5 bg-emerald-600 px-3 text-sm text-white hover:bg-emerald-600">
+                <Badge className="h-10 gap-1.5 bg-emerald-600 px-3 text-sm text-white">
                   <CheckCircle2 className="h-4 w-4" />
                   {activeCycle.is_explicit ? 'หลักสูตรที่ใช้งานในระบบ' : 'ใช้งานในระบบ (เลือกอัตโนมัติตามปีปัจจุบัน)'}
                 </Badge>
@@ -650,7 +650,7 @@ export default function CurriculumCycles() {
           </Card>
 
           {selectedCycle && (
-            <Card>
+            <Card className="app-section-card">
               <CardHeader className="space-y-4">
                 <div>
                   <CardTitle className="flex items-center gap-2">
@@ -928,9 +928,9 @@ export default function CurriculumCycles() {
 
           <div className="flex flex-wrap gap-2 text-sm">
             <Badge variant="secondary">ทั้งหมด {importRows.length} แถว</Badge>
-            <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">เพิ่มใหม่ {importNewCount}</Badge>
+            <Badge className="bg-emerald-100 text-emerald-800">เพิ่มใหม่ {importNewCount}</Badge>
             {importMode === 'merge' && (
-              <Badge className="bg-sky-100 text-sky-800 hover:bg-sky-100">อัปเดตวิชาเดิม {importUpdateCount}</Badge>
+              <Badge className="bg-sky-100 text-sky-800">อัปเดตวิชาเดิม {importUpdateCount}</Badge>
             )}
             {importErrorCount > 0 && <Badge variant="destructive">ผิดพลาด {importErrorCount}</Badge>}
           </div>
@@ -964,9 +964,9 @@ export default function CurriculumCycles() {
                       {r.error ? (
                         <span className="text-xs text-red-600">{r.error}</span>
                       ) : importMode === 'merge' && existingCodes.has(r.subject_code.toLowerCase()) ? (
-                        <Badge className="bg-sky-100 text-sky-800 hover:bg-sky-100">อัปเดต</Badge>
+                        <Badge className="bg-sky-100 text-sky-800">อัปเดต</Badge>
                       ) : (
-                        <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">ใหม่</Badge>
+                        <Badge className="bg-emerald-100 text-emerald-800">ใหม่</Badge>
                       )}
                     </TableCell>
                   </TableRow>

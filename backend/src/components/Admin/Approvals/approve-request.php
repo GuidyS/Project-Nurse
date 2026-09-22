@@ -46,8 +46,10 @@ try {
         throw new RuntimeException('Approval request has already been reviewed');
     }
 
+    // เรียกประมวลผลคำขอ (ถ้ามี)
     approvalApplyRequest($db, $request);
 
+    // อัปเดตสถานะเป็น approved
     $update = $db->prepare("
         UPDATE approval_requests
         SET status = 'approved',
@@ -65,11 +67,13 @@ try {
         ':id' => $id,
     ]);
 
-    if ($update->rowCount() === 0) {
-        throw new RuntimeException('Approval request could not be updated');
+    // บันทึกลง Audit Log
+    $detailText = (string)($request['title'] ?? '');
+    if ($reviewNote) {
+        $detailText .= " (หมายเหตุ: {$reviewNote})";
     }
+    approvalLogAction($db, 'approve', $id, $reviewerId, $detailText);
 
-    approvalLogAction($db, 'approve', $id, $reviewerId);
     $db->commit();
 
     echo json_encode(['status' => 'success', 'message' => 'Approval request approved'], JSON_UNESCAPED_UNICODE);
@@ -86,5 +90,4 @@ try {
     http_response_code(500);
     echo json_encode(['status' => 'error', 'message' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
 }
-
 ?>

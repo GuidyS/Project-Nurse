@@ -1,6 +1,7 @@
 <?php
 if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/../../../config/audit_helper.php'; // นำเข้า Audit Helper
 
 header('Access-Control-Allow-Origin: ' . (in_array($_SERVER['HTTP_ORIGIN'] ?? '', ['http://localhost:5173', 'http://127.0.0.1:5173'], true) ? ($_SERVER['HTTP_ORIGIN'] ?? '') : 'http://localhost:5173'));
 header('Vary: Origin');
@@ -18,6 +19,17 @@ try {
         throw new Exception("Invalid input data: Missing ID");
     }
 
+    // ดึงข้อมูลก่อนอัปเดตเพื่อใช้สำหรับลงบันทึก Log
+    $infoStmt = $db->prepare("
+        SELECT e.subject_id, s.subject_code, std.student_id 
+        FROM enrollment e 
+        JOIN subject s ON e.subject_id = s.subject_id 
+        JOIN student std ON e.student_id = std.student_id 
+        WHERE e.enrollment_id = :id LIMIT 1
+    ");
+    $infoStmt->execute([':id' => $input['id']]);
+    $enrollmentInfo = $infoStmt->fetch(PDO::FETCH_ASSOC);
+
     // อัปเดตเกรดโดยอ้างอิงจาก enrollment_id ที่เราดึงมาจาก get_course_students.php
     $sql = "UPDATE enrollment SET grade = :grade WHERE enrollment_id = :id";
     $stmt = $db->prepare($sql);
@@ -28,6 +40,15 @@ try {
     
     // ตรวจสอบว่าอัปเดตสำเร็จไหม
     if ($stmt->rowCount() > 0 || $input['grade']) {
+        
+        // บันทึก Log เมื่อมีการแก้ไขเกรดสำเร็จ
+        if ($enrollmentInfo) {
+            $studentId = $enrollmentInfo['student_id'];
+            $subjectCode = $enrollmentInfo['subject_code'];
+            $gradeAssigned = $input['grade'] ?: 'ลบเกรด';
+            logAudit($db, $_SESSION['user_id'] ?? null, 'update', 'grades', "บันทึก/แก้ไขเกรดรายวิชา {$subjectCode} (นักศึกษา: {$studentId} เกรด: {$gradeAssigned})");
+        }
+
         echo json_encode(["status" => "success", "message" => "Grade updated successfully"]);
     } else {
         throw new Exception("ไม่พบข้อมูลการลงทะเบียนนี้ในระบบ");

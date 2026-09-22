@@ -4,6 +4,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 require_once __DIR__ . '/../CLOPage/curriculum_repository.php';
+require_once __DIR__ . '/../../../config/audit_helper.php'; // นำเข้า Audit Helper
 
 $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -45,6 +46,10 @@ try {
         saveSubjectCoursePlos($pdo, $frameworkId, $courseCode, $normalizedPlos);
     }
     $pdo->commit();
+
+    // บันทึก Log เมื่อมีการบันทึกตาราง CLO Map
+    $courseCount = count($inputCloMap);
+    logAudit($pdo, $_SESSION['user_id'], 'update', 'clo_map', "บันทึกผังการกระจายความรับผิดชอบ (CLO Map) จำนวน {$courseCount} รายวิชา");
 
     echo json_encode(["status" => "success", "message" => "บันทึกข้อมูล CLO Map สำเร็จ!"], JSON_UNESCAPED_UNICODE);
 } catch (PDOException $e) {

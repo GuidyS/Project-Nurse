@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../ProjectShared/project_helpers.php';
+require_once __DIR__ . '/../../../config/audit_helper.php';
 
 $db = project_db();
 $auth = project_require_auth($db, ['PROJECT_MY_VIEW']);
@@ -140,6 +141,8 @@ try {
         ':file_size' => (int) $file['size'],
         ':uploaded_by' => $auth['user_id'],
     ]);
+
+    logAudit($db, $auth['user_id'], 'create', 'project_docs', "อัปโหลดไฟล์โครงการ {$projectName} (ไฟล์: {$originalName})");
 
     project_json([
         "status" => "success",

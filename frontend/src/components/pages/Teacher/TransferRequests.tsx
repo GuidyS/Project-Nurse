@@ -216,13 +216,13 @@ export default function TransferRequests() {
             <TabsTrigger value="incoming">
               คำขอเข้า
               {pendingIncomingCount > 0 && (
-                <Badge className="ml-2 bg-primary">{pendingIncomingCount}</Badge>
+                <Badge className="ml-2 border-primary/25 bg-primary/15 text-primary">{pendingIncomingCount}</Badge>
               )}
             </TabsTrigger>
             <TabsTrigger value="outgoing">
               คำขอออก
               {pendingOutgoingCount > 0 && (
-                <Badge className="ml-2 bg-primary">{pendingOutgoingCount}</Badge>
+                <Badge className="ml-2 border-primary/25 bg-primary/15 text-primary">{pendingOutgoingCount}</Badge>
               )}
             </TabsTrigger>
             <TabsTrigger value="history">ประวัติ</TabsTrigger>

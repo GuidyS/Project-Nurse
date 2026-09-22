@@ -2,6 +2,7 @@
 // อาจารย์อัปโหลดรูปใบประกอบวิชาชีพการพยาบาลของตัวเอง (หน้าข้อมูลส่วนตัว)
 if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/../../../config/audit_helper.php';
 require_once __DIR__ . '/license_reminder_helpers.php';
 
 header("Content-Type: application/json; charset=UTF-8");
@@ -82,6 +83,8 @@ try {
             @unlink($oldAbsolute);
         }
     }
+
+    logAudit($db, $_SESSION['user_id'] ?? null, 'update', 'license_images', "อัปโหลด/เปลี่ยนรูปใบประกอบวิชาชีพ (faculty_id: {$user['faculty_id']})");
 
     licenseImageRespond(200, [
         "status" => "success",

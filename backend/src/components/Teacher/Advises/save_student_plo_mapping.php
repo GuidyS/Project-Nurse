@@ -1,6 +1,7 @@
 <?php
 if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/../../../config/audit_helper.php';
 
 header('Access-Control-Allow-Origin: ' . (in_array($_SERVER['HTTP_ORIGIN'] ?? '', ['http://localhost:5173', 'http://127.0.0.1:5173'], true) ? ($_SERVER['HTTP_ORIGIN'] ?? '') : 'http://localhost:5173'));
 header('Vary: Origin');
@@ -16,7 +17,7 @@ $input = json_decode(file_get_contents("php://input"), true);
 
 if (!$advisorUserId) {
     http_response_code(401);
-    echo json_encode(["status" => "error", "message" => "Unauthorized"]);
+    echo json_encode(["status" => "error", "message" => "Unauthorized"], JSON_UNESCAPED_UNICODE);
     exit();
 }
 
@@ -26,7 +27,7 @@ $mapping = $input['mapping'] ?? null;
 
 if ($studentId === '' || $yearLevel < 1 || !is_array($mapping)) {
     http_response_code(400);
-    echo json_encode(["status" => "error", "message" => "Missing student_id, year_level, or mapping"]);
+    echo json_encode(["status" => "error", "message" => "Missing student_id, year_level, or mapping"], JSON_UNESCAPED_UNICODE);
     exit();
 }
 
@@ -72,14 +73,14 @@ try {
 
     if (!advisorCanAccessStudent($db, (int)$advisorUserId, $studentId)) {
         http_response_code(403);
-        echo json_encode(["status" => "error", "message" => "Forbidden"]);
+        echo json_encode(["status" => "error", "message" => "Forbidden"], JSON_UNESCAPED_UNICODE);
         exit();
     }
 
     $mappingJson = json_encode($mapping, JSON_UNESCAPED_UNICODE);
     if ($mappingJson === false) {
         http_response_code(400);
-        echo json_encode(["status" => "error", "message" => "Invalid mapping JSON"]);
+        echo json_encode(["status" => "error", "message" => "Invalid mapping JSON"], JSON_UNESCAPED_UNICODE);
         exit();
     }
 
@@ -111,6 +112,14 @@ try {
             ':id' => $existingId,
         ]);
         $recordId = (int)$existingId;
+
+        logAudit(
+            $db,
+            $advisorUserId,
+            'update',
+            'advises',
+            "แก้ไขการประเมิน PLO นักศึกษา รหัส {$studentId} ชั้นปีที่ {$yearLevel}"
+        );
     } else {
         $stmt = $db->prepare("
             INSERT INTO student_plo_mapping_records
@@ -125,6 +134,14 @@ try {
             ':mapping_json' => $mappingJson,
         ]);
         $recordId = (int)$db->lastInsertId();
+
+        logAudit(
+            $db,
+            $advisorUserId,
+            'create',
+            'advises',
+            "บันทึกการประเมิน PLO นักศึกษา รหัส {$studentId} ชั้นปีที่ {$yearLevel}"
+        );
     }
 
     echo json_encode([
@@ -134,9 +151,9 @@ try {
             "student_id" => $studentId,
             "year_level" => $yearLevel,
         ],
-    ]);
+    ], JSON_UNESCAPED_UNICODE);
 } catch (Exception $e) {
     http_response_code(500);
-    echo json_encode(["status" => "error", "message" => $e->getMessage()]);
+    echo json_encode(["status" => "error", "message" => $e->getMessage()], JSON_UNESCAPED_UNICODE);
 }
 ?>

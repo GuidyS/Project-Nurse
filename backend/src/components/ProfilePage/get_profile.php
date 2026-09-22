@@ -2,6 +2,7 @@
 if (session_status() == PHP_SESSION_NONE) { session_start(); }
 require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../Teacher/LicenseReminder/license_reminder_helpers.php';
+require_once __DIR__ . '/../../config/audit_helper.php';
 
 if (!isset($_SESSION['user_id'])) {
     http_response_code(401);
@@ -651,6 +652,9 @@ try {
                 $licenseExpiry,
                 $u_info['username']
             ]);
+
+            // บันทึก Audit Log เมื่ออาจารย์อัปเดตข้อมูล
+            logAudit($db, $id, 'update', 'profile', 'อาจารย์/บุคลากรแก้ไขข้อมูลส่วนตัว (รหัส: ' . $u_info['username'] . ')');
 
             // เพิ่งแก้วันหมดอายุ/อีเมล → เช็กแจ้งเตือนของคนนี้ทันที (พังก็ไม่กระทบการบันทึก)
             try {

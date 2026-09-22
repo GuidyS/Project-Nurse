@@ -29,6 +29,7 @@ try {
 
     $where = empty($whereParts) ? '' : 'WHERE ' . implode(' AND ', $whereParts);
 
+    // แก้ไขจุดเชื่อมโยง faculty ให้ผูกกับ username ตามโครงสร้างจริงของระบบ
     $stmt = $db->prepare("
         SELECT
             ar.approval_request_id,
@@ -51,7 +52,7 @@ try {
         FROM approval_requests ar
         LEFT JOIN users requester ON ar.requester_user_id = requester.user_id
         LEFT JOIN users reviewer ON ar.reviewed_by = reviewer.user_id
-        LEFT JOIN faculty f ON requester.user_id = f.user_id OR requester.username = CAST(f.faculty_id AS CHAR)
+        LEFT JOIN faculty f ON requester.username = CAST(f.faculty_id AS CHAR)
         $where
         ORDER BY
             CASE ar.status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END,
@@ -59,7 +60,7 @@ try {
             ar.approval_request_id DESC
     ");
     $stmt->execute($params);
-    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
     $requests = array_map(function ($row) {
         $requesterName = trim((string)($row['requester_full_name'] ?? ''));
@@ -105,5 +106,3 @@ try {
     http_response_code(500);
     echo json_encode(['status' => 'error', 'message' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
 }
-
-?>

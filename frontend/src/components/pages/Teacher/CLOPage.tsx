@@ -800,7 +800,7 @@ export default function CLOPage() {
                       <div className="flex justify-between items-start gap-4">
                         <div className="space-y-2 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
-                            <Badge className="bg-primary/10 text-primary hover:bg-primary/20">
+                            <Badge className="bg-primary/10 text-primary">
                               {clo.clo_code || `CLO ${index + 1}`}
                             </Badge>
                             {clo.ylo_id && <Badge variant="secondary">{clo.ylo_id}</Badge>}

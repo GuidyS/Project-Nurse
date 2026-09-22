@@ -408,11 +408,11 @@ export default function UsersManagement() {
 
   return (
     <>
-      <div className="p-6 space-y-6 animate-fade-in">
-        <div className="flex items-center justify-between">
+      <div className="app-page">
+        <div className="app-page-header">
           <div>
-            <h1 className="text-3xl font-bold text-foreground py-1">จัดการผู้ใช้</h1>
-            <p className="text-muted-foreground">สร้างบัญชีจากข้อมูลอาจารย์/นักศึกษา แก้ไข ลบ และมอบบทบาท</p>
+            <h1 className="app-page-title">จัดการผู้ใช้</h1>
+            <p className="app-page-description">สร้างบัญชีจากข้อมูลอาจารย์/นักศึกษา แก้ไข ลบ และมอบบทบาท</p>
           </div>
           <Button className="gap-2" onClick={() => setIsGenerateOpen(true)} disabled={isGenerating}>
             {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
@@ -420,11 +420,11 @@ export default function UsersManagement() {
           </Button>
         </div>
 
-        <Card>
+        <Card className="app-section-card">
           <CardHeader className="space-y-4">
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <div>
-                <CardTitle className="py-2">รายชื่อผู้ใช้</CardTitle>
+                <CardTitle>รายชื่อผู้ใช้</CardTitle>
                 <CardDescription>
                   {roleLabels[roleTab]} {tabCount(roleTab)} คน · ทั้งหมด {users.length} คน
                 </CardDescription>
@@ -507,7 +507,11 @@ export default function UsersManagement() {
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-muted-foreground hover:bg-muted hover:text-foreground"
+                            >
                               <MoreHorizontal className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>

@@ -4,6 +4,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/../../../config/audit_helper.php'; // นำเข้า Audit Helper
 
 header('Content-Type: application/json; charset=UTF-8');
 header('Access-Control-Allow-Credentials: true');
@@ -179,6 +180,8 @@ try {
             ':participant_status' => $participantStatus,
         ]);
 
+        logAudit($db, $_SESSION['user_id'], 'update', 'project_assessments', "เพิ่มผู้เข้าร่วม (นักศึกษา: {$studentId}) ในโครงการ ID: {$projectId}");
+
         projectAssessmentResponse(['status' => 'success', 'message' => 'เพิ่มผู้เข้าร่วมโครงการแล้ว']);
     }
 
@@ -200,6 +203,8 @@ try {
         ");
         $stmt->execute([':project_id' => $projectId, ':student_id' => $studentId]);
         $db->commit();
+
+        logAudit($db, $_SESSION['user_id'], 'delete', 'project_assessments', "นำผู้เข้าร่วม (นักศึกษา: {$studentId}) ออกจากโครงการ ID: {$projectId}");
 
         projectAssessmentResponse(['status' => 'success', 'message' => 'นำผู้เข้าร่วมออกจากโครงการแล้ว']);
     }
@@ -231,6 +236,8 @@ try {
             ':is_satisfied' => (int)(bool)$input['is_satisfied'],
             ':comment' => trim((string)($input['comment'] ?? '')) ?: null,
         ]);
+
+        logAudit($db, $_SESSION['user_id'], 'update', 'project_assessments', "บันทึกผลประเมินความพึงพอใจ นักศึกษา: {$studentId} โครงการ ID: {$projectId}");
 
         projectAssessmentResponse(['status' => 'success', 'message' => 'บันทึกความพึงพอใจแล้ว']);
     }
@@ -319,6 +326,8 @@ try {
             ]);
         }
         $db->commit();
+
+        logAudit($db, $_SESSION['user_id'], 'update', 'project_assessments', "บันทึกผลประเมิน CLO/PLO/YLO ของนักศึกษา {$studentId} โครงการ ID: {$projectId}");
 
         projectAssessmentResponse(['status' => 'success', 'message' => 'บันทึกผล CLO/PLO/YLO แล้ว']);
     }

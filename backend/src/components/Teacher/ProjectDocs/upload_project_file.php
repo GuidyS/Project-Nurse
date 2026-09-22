@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../ProjectShared/project_helpers.php';
+require_once __DIR__ . '/../../../config/audit_helper.php'; // นำเข้า Audit Helper
 
 $db = project_db();
 $auth = project_require_auth($db, ['PROJECT_DOCS_MANAGE']);
@@ -80,7 +81,7 @@ try {
     $facultyDirName = (string) $facultyId;
     $uploadDir = $baseProjectDocsDir . $facultyDirName . DIRECTORY_SEPARATOR;
     if (!is_dir($uploadDir) && !mkdir($uploadDir, 0755, true)) {
-        project_json(["status" => "error", "message" => "เนเธกเนเธชเธฒเธกเธฒเธฃเธ–เธชเธฃเนเธฒเธเนเธเธฅเน€เธ”เธญเธฃเนเธญเธฑเธเนเธซเธฅเธ”เนเธ”เน"], 500);
+        project_json(["status" => "error", "message" => "เน„เธกเนˆเธชเธฒเธกเธฒเธฃเธ–เธชเธฃเน‰เธฒเธ‡เน‚เธŸเธฅเน€เธ”เธญเธฃเนŒเธญเธฑเธ›เน‚เธซเธฅเธ”เน„เธ”เน‰"], 500);
         exit;
     }
 
@@ -122,6 +123,9 @@ try {
         ':uploaded_by' => $auth['user_id'],
         ':id' => $documentId,
     ]);
+
+    // บันทึก Log เมื่ออัปโหลดไฟล์เอกสารเสร็จสมบูรณ์
+    logAudit($db, $auth['user_id'], 'update', 'project_documents', "อัปโหลด/แก้ไขไฟล์เอกสารโครงการ (ID: {$documentId}, ชื่อไฟล์: {$originalName})");
 
     project_json([
         "status" => "success",

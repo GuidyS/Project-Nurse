@@ -5,6 +5,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
 require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../Admin/Approvals/approval-schema.php';
+require_once __DIR__ . '/../../../config/audit_helper.php'; // นำเข้า Audit Helper
 
 header('Content-Type: application/json; charset=UTF-8');
 header('Access-Control-Allow-Origin: ' . (in_array($_SERVER['HTTP_ORIGIN'] ?? '', ['http://localhost:5173', 'http://127.0.0.1:5173'], true) ? ($_SERVER['HTTP_ORIGIN'] ?? '') : 'http://localhost:5173'));
@@ -96,6 +97,9 @@ try {
         'payload_json' => $payload,
     ]);
 
+    // บันทึกระบบ Audit Log
+    logAudit($db, $fromAdvisor['user_id'], 'create', 'transfer_requests', "สร้างคำร้องขอโอนย้ายนักศึกษา {$studentId} ไปยังอาจารย์ {$toAdvisor['faculty_id']}");
+
     echo json_encode([
         'status' => 'success',
         'message' => 'Transfer request created and sent to Admin',
@@ -105,5 +109,4 @@ try {
     http_response_code(500);
     echo json_encode(['status' => 'error', 'message' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
 }
-
 ?>

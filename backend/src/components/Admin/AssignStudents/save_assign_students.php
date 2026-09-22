@@ -1,6 +1,7 @@
 <?php
 if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/../../../config/audit_helper.php';
 require_once __DIR__ . '/assign_students_helpers.php';
 
 header('Access-Control-Allow-Origin: ' . (in_array($_SERVER['HTTP_ORIGIN'] ?? '', ['http://localhost:5173', 'http://127.0.0.1:5173'], true) ? ($_SERVER['HTTP_ORIGIN'] ?? '') : 'http://localhost:5173'));
@@ -40,7 +41,6 @@ try {
         exit();
     }
 
-    // ตัดค่าซ้ำและค่าว่างออกก่อนตรวจโควตา
     $studentIds = array_values(array_unique(array_filter(array_map('strval', $studentIds), static fn($v) => $v !== '')));
 
     if (count($studentIds) > $type['limit']) {
@@ -52,13 +52,15 @@ try {
         exit();
     }
 
-    $facStmt = $db->prepare("SELECT COUNT(*) FROM faculty WHERE faculty_id = ?");
+    $facStmt = $db->prepare("SELECT first_name_th, last_name_th FROM faculty WHERE faculty_id = ?");
     $facStmt->execute([$facultyId]);
-    if ((int)$facStmt->fetchColumn() === 0) {
+    $facultyRow = $facStmt->fetch(PDO::FETCH_ASSOC);
+    if (!$facultyRow) {
         http_response_code(400);
         echo json_encode(["status" => "error", "message" => "ไม่พบอาจารย์ท่านนี้ในระบบ"], JSON_UNESCAPED_UNICODE);
         exit();
     }
+    $facultyName = trim(($facultyRow['first_name_th'] ?? '') . ' ' . ($facultyRow['last_name_th'] ?? ''));
 
     if (!empty($studentIds)) {
         $ph = implode(',', array_fill(0, count($studentIds), '?'));
@@ -75,8 +77,6 @@ try {
 
     $db->beginTransaction();
 
-    // นับว่ามีนักศึกษาคนไหนถูกย้ายมาจากอาจารย์ท่านอื่นบ้าง เพื่อรายงานให้ผู้ดูแลทราบ
-    // ใช้ named parameter ทั้งหมด (ผสมกับ ? ในคำสั่งเดียวไม่ได้)
     $movedCount = 0;
     if (!empty($studentIds)) {
         $studentParams = [];
@@ -90,13 +90,11 @@ try {
         $stmt->execute($studentParams + $typeParams + [':fid' => $facultyId]);
         $movedCount = (int)$stmt->fetchColumn();
 
-        // ถอดนักศึกษาที่เลือกออกจากอาจารย์ท่านอื่นในประเภทเดียวกันก่อน (1 คน มีได้ 1 ท่าน)
         $del = $db->prepare("DELETE sam FROM student_advisor_mapping sam
                              WHERE sam.student_id IN ($ph) AND $typeSql");
         $del->execute($studentParams + $typeParams);
     }
 
-    // ล้างรายการเดิมของอาจารย์ท่านนี้ในประเภทนี้ แล้วใส่ชุดใหม่ทั้งชุด
     $clear = $db->prepare("DELETE sam FROM student_advisor_mapping sam WHERE sam.faculty_id = :fid AND $typeSql");
     $clear->execute($typeParams + [':fid' => $facultyId]);
 
@@ -107,13 +105,22 @@ try {
         $insert->execute([$sid, $facultyId, $type['key'], $academicYear]);
     }
 
-    // มอบตำแหน่งให้อาจารย์อัตโนมัติถ้ายังไม่มี
     $positionGranted = false;
     if (!empty($studentIds)) {
         $positionGranted = assignStudentsGrantPosition($db, $facultyId, $type['position_id']);
     }
 
     $db->commit();
+
+    // บันทึก Audit Log สำหรับการมอบหมายนักศึกษา
+    $logMsg = "จัด{$type['label']}ให้อาจารย์ {$facultyName} (รหัส: {$facultyId}) จำนวน " . count($studentIds) . " คน";
+    if ($movedCount > 0) {
+        $logMsg .= " (ย้ายมา {$movedCount} คน)";
+    }
+    if ($positionGranted) {
+        $logMsg .= " [เพิ่มสิทธิ์ตำแหน่ง{$type['label']}]";
+    }
+    logAudit($db, $_SESSION['user_id'] ?? null, 'update', 'assign_students', $logMsg);
 
     $message = "บันทึกสำเร็จ — มอบหมายนักศึกษา " . count($studentIds) . " คนให้{$type['label']}";
     if ($movedCount > 0) {
@@ -142,3 +149,4 @@ try {
     http_response_code(500);
     echo json_encode(["status" => "error", "message" => $e->getMessage()], JSON_UNESCAPED_UNICODE);
 }
+?>

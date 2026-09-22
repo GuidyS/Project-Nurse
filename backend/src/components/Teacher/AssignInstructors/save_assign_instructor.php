@@ -1,6 +1,7 @@
 <?php
 if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/../../../config/audit_helper.php'; // นำเข้า Audit Helper
 require_once __DIR__ . '/../CLOPage/curriculum_repository.php';
 require_once __DIR__ . '/subject_term_helpers.php';
 
@@ -17,7 +18,7 @@ try {
     $db = new Connect();
 
     if (empty($input['subject_code']) || !isset($input['faculty_id'])) {
-        echo json_encode(["status" => "error", "message" => "ข้อมูลไม่ครบถ้วน"]);
+        echo json_encode(["status" => "error", "message" => "ข้อมูลไม่ครบถ้วน"], JSON_UNESCAPED_UNICODE);
         exit();
     }
 
@@ -26,7 +27,7 @@ try {
 
     $frameworkId = getActiveFrameworkId($db);
     if (!$frameworkId) {
-        echo json_encode(["status" => "error", "message" => "ไม่พบหลักสูตรที่เปิดใช้งาน"]);
+        echo json_encode(["status" => "error", "message" => "ไม่พบหลักสูตรที่เปิดใช้งาน"], JSON_UNESCAPED_UNICODE);
         exit();
     }
 
@@ -53,6 +54,23 @@ try {
         $msg .= ' (ภาคเรียน ' . subjectTermLabel($semester, $academicYear) . ')';
     }
 
+    // บันทึก Audit Log เมื่อมอบหมายอาจารย์หรืออัปเดตภาคเรียนสำเร็จ
+    $actionDesc = empty($faculty_id) 
+        ? "ยกเลิกมอบหมายอาจารย์ผู้สอน รายวิชา: {$subject_code}" 
+        : "มอบหมายอาจารย์ผู้สอน (ID: {$faculty_id}) รายวิชา: {$subject_code}";
+    
+    if (array_key_exists('semester', $input) || array_key_exists('academic_year', $input)) {
+        $actionDesc .= " (ภาคเรียน " . subjectTermLabel($semester, $academicYear) . ")";
+    }
+
+    logAudit(
+        $db,
+        $_SESSION['user_id'] ?? null,
+        'update',
+        'assign_instructors',
+        $actionDesc
+    );
+
     echo json_encode([
         "status" => "success",
         "message" => $msg,
@@ -67,6 +85,6 @@ try {
     echo json_encode(["status" => "error", "message" => $e->getMessage()], JSON_UNESCAPED_UNICODE);
 } catch (Exception $e) {
     http_response_code(500);
-    echo json_encode(["status" => "error", "message" => $e->getMessage()]);
+    echo json_encode(["status" => "error", "message" => $e->getMessage()], JSON_UNESCAPED_UNICODE);
 }
 ?>

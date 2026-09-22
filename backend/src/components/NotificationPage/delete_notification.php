@@ -2,6 +2,7 @@
 //  เริ่มต้น Session (ต้องอยู่บรรทัดแรกสุดเสมอ!)
 // ถ้าขาดบรรทัดนี้ $_SESSION['user_id'] จะว่างเปล่า และระบบจะคิดว่าไม่ได้ล็อกอิน
 session_start();
+require_once __DIR__ . '/../../config/audit_helper.php';
 // ตั้งค่า CORS ให้ Frontend (React) คุยกับ Backend ได้
 header('Access-Control-Allow-Origin: ' . (in_array($_SERVER['HTTP_ORIGIN'] ?? '', ['http://localhost:5173', 'http://127.0.0.1:5173'], true) ? ($_SERVER['HTTP_ORIGIN'] ?? '') : 'http://localhost:5173'));
 header('Vary: Origin');
@@ -53,6 +54,7 @@ if (isset($input['id'])) {
         // ถ้าทั้งผู้รับและผู้ส่งซ่อนแล้ว (หรือไม่มีผู้ส่ง) ค่อยลบแถวจริงเพื่อไม่ให้ข้อมูลค้าง
         $receiverId = (int)$row['user_id'];
         $senderId = $row['sender_user_id'] !== null ? (int)$row['sender_user_id'] : null;
+        $physicallyDeleted = false;
 
         $countStmt = $pdo->prepare("SELECT COUNT(*) FROM notification_hidden WHERE notification_id = :id");
         $countStmt->execute([':id' => $notifId]);
@@ -62,7 +64,11 @@ if (isset($input['id'])) {
         if ($hiddenCount >= $sidesNeeded) {
             $pdo->prepare("DELETE FROM notifications WHERE notification_id = :id")->execute([':id' => $notifId]);
             $pdo->prepare("DELETE FROM notification_hidden WHERE notification_id = :id")->execute([':id' => $notifId]);
+            $physicallyDeleted = true;
         }
+
+        $deleteMode = $physicallyDeleted ? 'ลบออกจากระบบ' : 'ซ่อนจากรายการของผู้ใช้';
+        logAudit($pdo, $userId, 'delete', 'notifications', "{$deleteMode} notification_id={$notifId}");
 
         echo json_encode(["status" => "success"]);
     } catch (Exception $e) {

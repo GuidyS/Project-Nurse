@@ -5,6 +5,7 @@ header('Vary: Origin');
 header("Access-Control-Allow-Credentials: true");
 header("Access-Control-Allow-Methods: POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
+header("Content-Type: application/json; charset=UTF-8");
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
@@ -12,10 +13,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/../../../config/audit_helper.php';
 
 if (!isset($_SESSION['user_id'])) {
     http_response_code(401);
-    echo json_encode(["status" => "error", "message" => "Unauthorized"]);
+    echo json_encode(["status" => "error", "message" => "Unauthorized"], JSON_UNESCAPED_UNICODE);
     exit();
 }
 
@@ -24,25 +26,23 @@ $projectId = $input['project_id'] ?? null;
 
 if (!$projectId) {
     http_response_code(400);
-    echo json_encode(["status" => "error", "message" => "Missing project_id"]);
+    echo json_encode(["status" => "error", "message" => "Missing project_id"], JSON_UNESCAPED_UNICODE);
     exit();
 }
 
 try {
     $db = new Connect();
     
-    // Check if an approval request already exists
     $checkStmt = $db->prepare("SELECT approval_request_id, status FROM approval_requests WHERE target_ref_type = 'report_item' AND target_ref_id = :project_id AND request_type = 'budget_approval'");
     $checkStmt->execute([':project_id' => $projectId]);
     $existing = $checkStmt->fetch(PDO::FETCH_ASSOC);
 
     if ($existing) {
         if ($existing['status'] === 'approved') {
-            echo json_encode(["status" => "success", "message" => "Budget already approved"]);
+            echo json_encode(["status" => "success", "message" => "Budget already approved"], JSON_UNESCAPED_UNICODE);
             exit();
         }
         
-        // Update existing to approved
         $updateStmt = $db->prepare("UPDATE approval_requests SET status = 'approved', reviewed_by = :user_id, reviewed_at = CURRENT_TIMESTAMP WHERE approval_request_id = :id");
         $updateStmt->execute([
             ':user_id' => $_SESSION['user_id'],
@@ -60,10 +60,17 @@ try {
         ]);
     }
 
-    echo json_encode(["status" => "success", "message" => "Budget approved successfully"]);
+    logAudit(
+        $db,
+        $_SESSION['user_id'] ?? null,
+        'update',
+        'reports',
+        "อนุมัติงบประมาณโครงการ ID: {$projectId}"
+    );
+
+    echo json_encode(["status" => "success", "message" => "Budget approved successfully"], JSON_UNESCAPED_UNICODE);
 
 } catch (Throwable $e) {
     http_response_code(500);
-    echo json_encode(["status" => "error", "message" => $e->getMessage()]);
+    echo json_encode(["status" => "error", "message" => $e->getMessage()], JSON_UNESCAPED_UNICODE);
 }
-?>

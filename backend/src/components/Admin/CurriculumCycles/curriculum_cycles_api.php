@@ -2,6 +2,7 @@
 if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../config/active_curriculum.php';
+require_once __DIR__ . '/../../../config/audit_helper.php';
 require_once __DIR__ . '/curriculum_cycles_helpers.php';
 
 header("Content-Type: application/json; charset=UTF-8");
@@ -86,11 +87,13 @@ try {
                 $stmt->execute([$startYear, $endYear]);
                 $id = (int)$db->lastInsertId();
                 $message = "สร้างหลักสูตรปี {$startYear} - {$endYear} แล้ว";
+                logAudit($db, $_SESSION['user_id'] ?? null, 'create', 'curriculum_cycles', "เพิ่มหลักสูตร พ.ศ. {$startYear} - {$endYear} (ID: {$id})");
             } else {
                 curriculumCyclesRequireCycle($db, $id);
                 $stmt = $db->prepare("UPDATE curriculum_cycle SET start_year = ?, end_year = ? WHERE id = ?");
                 $stmt->execute([$startYear, $endYear, $id]);
                 $message = "แก้ไขปีหลักสูตรเป็น {$startYear} - {$endYear} แล้ว";
+                logAudit($db, $_SESSION['user_id'] ?? null, 'update', 'curriculum_cycles', "แก้ไขหลักสูตรเป็น พ.ศ. {$startYear} - {$endYear} (ID: {$id})");
             }
 
             curriculumCyclesRespond(200, ["status" => "success", "message" => $message, "data" => ["id" => $id]]);
@@ -102,6 +105,7 @@ try {
             $cycle = curriculumCyclesRequireCycle($db, $input['id'] ?? 0);
             $stmt = $db->prepare("DELETE FROM curriculum_cycle WHERE id = ?");
             $stmt->execute([$cycle['id']]);
+            logAudit($db, $_SESSION['user_id'] ?? null, 'delete', 'curriculum_cycles', "ลบหลักสูตร พ.ศ. {$cycle['start_year']} - {$cycle['end_year']} (ID: {$cycle['id']})");
             curriculumCyclesRespond(200, [
                 "status" => "success",
                 "message" => "ลบหลักสูตรปี {$cycle['start_year']} - {$cycle['end_year']} แล้ว",
@@ -135,7 +139,9 @@ try {
                     $cycle['id'], $subject['subject_code'], $subject['subject_name'],
                     $subject['credit'], $subject['credit_desc'], (int)$next->fetchColumn(),
                 ]);
+                $subjectId = (int)$db->lastInsertId();
                 $message = "เพิ่มวิชา {$subject['subject_code']} แล้ว";
+                logAudit($db, $_SESSION['user_id'] ?? null, 'create', 'curriculum_subjects', "เพิ่มรายวิชา {$subject['subject_code']} ในหลักสูตร พ.ศ. {$cycle['start_year']} - {$cycle['end_year']} (ID: {$subjectId})");
             } else {
                 $stmt = $db->prepare("
                     UPDATE curriculum_cycle_subject
@@ -154,6 +160,7 @@ try {
                     }
                 }
                 $message = "แก้ไขวิชา {$subject['subject_code']} แล้ว";
+                logAudit($db, $_SESSION['user_id'] ?? null, 'update', 'curriculum_subjects', "แก้ไขรายวิชา {$subject['subject_code']} ในหลักสูตร พ.ศ. {$cycle['start_year']} - {$cycle['end_year']} (ID: {$id})");
             }
 
             curriculumCyclesRespond(200, ["status" => "success", "message" => $message]);
@@ -168,6 +175,7 @@ try {
                 curriculumCyclesRespond(404, ["status" => "error", "message" => "ไม่พบรายวิชาที่ต้องการลบ"]);
             }
             $db->prepare("DELETE FROM curriculum_cycle_subject WHERE id = ?")->execute([(int)$input['id']]);
+            logAudit($db, $_SESSION['user_id'] ?? null, 'delete', 'curriculum_subjects', "ลบรายวิชา {$code} (ID: " . (int)$input['id'] . ")");
             curriculumCyclesRespond(200, ["status" => "success", "message" => "ลบวิชา {$code} แล้ว"]);
             break;
 
@@ -194,6 +202,7 @@ try {
                 curriculumCyclesRespond(404, ["status" => "error", "message" => "ไม่พบรายวิชาที่เลือก (อาจถูกลบไปแล้ว)"]);
             }
 
+            logAudit($db, $_SESSION['user_id'] ?? null, 'delete', 'curriculum_subjects', "ลบรายวิชาหลายรายการ {$deleted} วิชา ในหลักสูตร พ.ศ. {$cycle['start_year']} - {$cycle['end_year']}");
             curriculumCyclesRespond(200, [
                 "status" => "success",
                 "message" => "ลบรายวิชาแล้ว {$deleted} วิชา",
@@ -296,6 +305,7 @@ try {
                 ? "แทนที่รายวิชาทั้งหมดด้วย " . count($clean) . " วิชาจากไฟล์แล้ว"
                 : "นำเข้าสำเร็จ: เพิ่มใหม่ {$inserted} วิชา, อัปเดต {$updated} วิชา" . ($unchanged > 0 ? ", ไม่เปลี่ยนแปลง {$unchanged} วิชา" : "");
 
+            logAudit($db, $_SESSION['user_id'] ?? null, 'update', 'curriculum_subjects', "นำเข้ารายวิชาหลักสูตร พ.ศ. {$cycle['start_year']} - {$cycle['end_year']} โหมด {$mode}: เพิ่ม {$inserted}, แก้ไข {$updated}, ไม่เปลี่ยนแปลง {$unchanged}");
             curriculumCyclesRespond(200, [
                 "status" => "success",
                 "message" => $message,
@@ -309,6 +319,7 @@ try {
             $cycle = curriculumCyclesRequireCycle($db, $input['id'] ?? 0);
             // คำสั่งเดียว เปิดหลักสูตรที่เลือกและปิดหลักสูตรอื่นพร้อมกัน
             $db->prepare("UPDATE curriculum_cycle SET is_active = IF(id = ?, 1, 0)")->execute([$cycle['id']]);
+            logAudit($db, $_SESSION['user_id'] ?? null, 'update', 'curriculum_cycles', "ตั้งหลักสูตร พ.ศ. {$cycle['start_year']} - {$cycle['end_year']} เป็นหลักสูตรที่ใช้งานในระบบ (ID: {$cycle['id']})");
             curriculumCyclesRespond(200, [
                 "status" => "success",
                 "message" => "ตั้งหลักสูตร พ.ศ. {$cycle['start_year']} – {$cycle['end_year']} เป็นหลักสูตรที่ใช้งานในระบบแล้ว",

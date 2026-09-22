@@ -46,13 +46,13 @@ try {
     }
 
     $studentStmt = $db->prepare(
-        "SELECT s.student_id, s.student_code, s.title, s.first_name_th, s.last_name_th,
+        "SELECT s.student_id, s.title, s.first_name_th, s.last_name_th,
                 s.year_level, s.status, COUNT(DISTINCT e.subject_id) AS enrolled_courses
          FROM enrollment e
          INNER JOIN student s ON s.student_id = e.student_id
          WHERE e.academic_year = :academic_year
            AND e.status = 'Active'
-         GROUP BY s.student_id, s.student_code, s.title, s.first_name_th, s.last_name_th,
+         GROUP BY s.student_id, s.title, s.first_name_th, s.last_name_th,
                   s.year_level, s.status
          ORDER BY s.student_id ASC"
     );
@@ -64,7 +64,6 @@ try {
         $studentId = (string)$row['student_id'];
         $students[$studentId] = [
             'student_id' => $studentId,
-            'student_code' => (string)($row['student_code'] ?? $studentId),
             'name' => trim(implode(' ', array_filter([
                 $row['title'] ?? '',
                 $row['first_name_th'] ?? '',

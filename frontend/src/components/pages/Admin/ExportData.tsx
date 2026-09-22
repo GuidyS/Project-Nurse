@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -164,16 +163,18 @@ export default function ExportData() {
 
   return (
     <>
-      <div className="p-6 space-y-6 animate-fade-in">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground py-1">ส่งออกข้อมูล</h1>
-          <p className="text-muted-foreground">เลือกข้อมูลที่ต้องการส่งออกเป็นไฟล์ Excel หรือ CSV</p>
+      <div className="app-page">
+        <div className="app-page-header">
+          <div>
+            <h1 className="app-page-title">ส่งออกข้อมูล</h1>
+            <p className="app-page-description">เลือกข้อมูลที่ต้องการส่งออกเป็นไฟล์ Excel หรือ CSV</p>
+          </div>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-3">
           {/* Category Selection */}
           <div className="lg:col-span-1 space-y-4">
-            <Card>
+            <Card className="app-section-card">
               <CardHeader>
                 <CardTitle className="text-base">เลือกประเภทข้อมูล</CardTitle>
               </CardHeader>
@@ -181,10 +182,10 @@ export default function ExportData() {
                 {exportCategories.map((category) => (
                   <div
                     key={category.value}
-                    className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all ${
+                    className={`app-interactive-card flex cursor-pointer items-center gap-3 p-3 ${
                       selectedCategory === category.value
                         ? "bg-primary/10 border border-primary"
-                        : "bg-muted/30 hover:bg-muted/50"
+                        : "bg-muted/30"
                     }`}
                     onClick={() => {
                       setSelectedCategory(category.value);
@@ -199,7 +200,7 @@ export default function ExportData() {
             </Card>
 
             {/* Filters */}
-            <Card>
+            <Card className="app-section-card">
               <CardHeader>
                 <CardTitle className="text-base">ตัวกรอง</CardTitle>
               </CardHeader>
@@ -238,7 +239,7 @@ export default function ExportData() {
 
           {/* Field Selection & Format */}
           <div className="lg:col-span-2 space-y-4">
-            <Card>
+            <Card className="app-section-card">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
@@ -274,7 +275,7 @@ export default function ExportData() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="app-section-card">
               <CardHeader>
                 <CardTitle className="text-base">รูปแบบไฟล์</CardTitle>
               </CardHeader>

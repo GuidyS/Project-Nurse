@@ -468,7 +468,7 @@ const CoursesPage = () => {
                 </TableCell>
                 <TableCell>
                   {course.instructor ? (
-                    <Badge className="bg-green-500 hover:bg-green-600 px-2 py-0.5 text-white">
+                    <Badge className="bg-green-500 px-2 py-0.5 text-white">
                       {course.instructor}
                     </Badge>
                   ) : (
@@ -665,7 +665,7 @@ const CoursesPage = () => {
               {/* รายละเอียด CLO ที่กำลังให้คะแนน */}
               <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge className="bg-primary text-primary-foreground">{activeClo.clo_code}</Badge>
+                  <Badge className="border-primary/25 bg-primary/15 text-primary">{activeClo.clo_code}</Badge>
                   {activeClo.ylo && <Badge variant="secondary">{activeClo.ylo}</Badge>}
                   {activeClo.plos.map((plo) => (
                     <Badge key={plo.code} variant="outline">{plo.code}</Badge>

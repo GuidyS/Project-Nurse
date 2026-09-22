@@ -4,6 +4,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/../../../config/audit_helper.php';
 
 header("Content-Type: application/json; charset=UTF-8");
 
@@ -60,6 +61,8 @@ try {
         ':message' => $message,
         ':payload_json' => $payload_json,
     ]);
+
+    logAudit($db, $advisor_user_id, 'create', 'advisor_messages', "ส่งข้อความถึงนักศึกษารหัส {$student_id} (หัวข้อ: {$title})");
 
     echo json_encode([
         "status" => "success",

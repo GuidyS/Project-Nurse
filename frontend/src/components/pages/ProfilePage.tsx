@@ -292,7 +292,7 @@ export default function ProfilePage() {
               รหัสประจำตัว: {userRole === "student" ? studentId : profileData.faculty_id}
             </p>
             <div className="mt-3 flex flex-wrap items-center justify-center gap-2 md:justify-start">
-              <Badge className="bg-primary hover:bg-primary/90 text-white font-normal">
+              <Badge className="border-primary/25 bg-primary/15 text-primary font-normal">
                 {userRole === "student" ? "นักศึกษาพยาบาลศาสตร์" : "อาจารย์ / บุคลากร"}
               </Badge>
               {userRole === "teacher" && getWorkStatusBadge(profileData.status)}
@@ -872,8 +872,8 @@ const LicenseStatusBadge = ({ expiry, showRemaining = false }: { expiry: unknown
       <Badge
         className={
           days <= 30
-            ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            : "bg-warning text-warning-foreground hover:bg-warning/90"
+            ? "bg-destructive text-destructive-foreground"
+            : "bg-warning text-warning-foreground"
         }
       >
         ใกล้หมดอายุ · เหลือ {days} วัน
@@ -923,11 +923,11 @@ const formatThaiDate = (value: unknown): string | null => {
 const getWorkStatusBadge = (status?: string | null) => {
   const normalized = String(status ?? "").trim().toLowerCase();
   if (normalized === "active") {
-    return <Badge className="bg-success text-success-foreground hover:bg-success/90">Active</Badge>;
+    return <Badge className="bg-success text-success-foreground">Active</Badge>;
   }
   if (normalized === "retired") {
     return (
-      <Badge className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+      <Badge className="bg-destructive text-destructive-foreground">
         Retired
       </Badge>
     );

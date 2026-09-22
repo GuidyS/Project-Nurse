@@ -1,87 +1,100 @@
 <?php
+require_once __DIR__ . '/../../../config/audit_helper.php';
 
 function ensureApprovalRequestsSchema(PDO $db): void
 {
-    $db->exec("
-        CREATE TABLE IF NOT EXISTS approval_requests (
-            approval_request_id BIGINT NOT NULL AUTO_INCREMENT,
-            request_type VARCHAR(50) NOT NULL,
-            requester_user_id BIGINT DEFAULT NULL,
-            target_ref_type VARCHAR(50) DEFAULT NULL,
-            target_ref_id VARCHAR(100) DEFAULT NULL,
-            title VARCHAR(255) NOT NULL,
-            description TEXT,
-            payload_json JSON DEFAULT NULL,
-            before_json JSON DEFAULT NULL,
-            after_json JSON DEFAULT NULL,
-            status ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
-            review_note TEXT DEFAULT NULL,
-            reviewed_by BIGINT DEFAULT NULL,
-            reviewed_at TIMESTAMP NULL DEFAULT NULL,
-            applied_at TIMESTAMP NULL DEFAULT NULL,
-            created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            PRIMARY KEY (approval_request_id),
-            KEY idx_approval_requests_status (status),
-            KEY idx_approval_requests_type (request_type),
-            KEY idx_approval_requests_requester (requester_user_id),
-            KEY idx_approval_requests_reviewer (reviewed_by)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
-    ");
+    try {
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS approval_requests (
+                approval_request_id BIGINT NOT NULL AUTO_INCREMENT,
+                request_type VARCHAR(50) NOT NULL,
+                requester_user_id BIGINT DEFAULT NULL,
+                target_ref_type VARCHAR(50) DEFAULT NULL,
+                target_ref_id VARCHAR(100) DEFAULT NULL,
+                title VARCHAR(255) NOT NULL,
+                description TEXT,
+                payload_json JSON DEFAULT NULL,
+                before_json JSON DEFAULT NULL,
+                after_json JSON DEFAULT NULL,
+                status ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
+                review_note TEXT DEFAULT NULL,
+                reviewed_by BIGINT DEFAULT NULL,
+                reviewed_at TIMESTAMP NULL DEFAULT NULL,
+                applied_at TIMESTAMP NULL DEFAULT NULL,
+                created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (approval_request_id),
+                KEY idx_approval_requests_status (status),
+                KEY idx_approval_requests_type (request_type),
+                KEY idx_approval_requests_requester (requester_user_id),
+                KEY idx_approval_requests_reviewer (reviewed_by)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+        ");
 
-    approvalEnsureColumn($db, 'payload_json', "ALTER TABLE approval_requests ADD COLUMN payload_json JSON DEFAULT NULL AFTER description");
-    approvalEnsureColumn($db, 'before_json', "ALTER TABLE approval_requests ADD COLUMN before_json JSON DEFAULT NULL AFTER payload_json");
-    approvalEnsureColumn($db, 'after_json', "ALTER TABLE approval_requests ADD COLUMN after_json JSON DEFAULT NULL AFTER before_json");
-    approvalEnsureColumn($db, 'applied_at', "ALTER TABLE approval_requests ADD COLUMN applied_at TIMESTAMP NULL DEFAULT NULL AFTER reviewed_at");
-    approvalEnsureResearchPermissions($db);
+        approvalEnsureColumn($db, 'payload_json', "ALTER TABLE approval_requests ADD COLUMN payload_json JSON DEFAULT NULL AFTER description");
+        approvalEnsureColumn($db, 'before_json', "ALTER TABLE approval_requests ADD COLUMN before_json JSON DEFAULT NULL AFTER payload_json");
+        approvalEnsureColumn($db, 'after_json', "ALTER TABLE approval_requests ADD COLUMN after_json JSON DEFAULT NULL AFTER before_json");
+        approvalEnsureColumn($db, 'applied_at', "ALTER TABLE approval_requests ADD COLUMN applied_at TIMESTAMP NULL DEFAULT NULL AFTER reviewed_at");
+        approvalEnsureResearchPermissions($db);
+    } catch (Throwable $e) {
+        error_log("ensureApprovalRequestsSchema notice: " . $e->getMessage());
+    }
 }
 
 function approvalEnsureColumn(PDO $db, string $columnName, string $alterSql): void
 {
-    $stmt = $db->prepare("
-        SELECT COUNT(*)
-        FROM information_schema.COLUMNS
-        WHERE TABLE_SCHEMA = DATABASE()
-          AND TABLE_NAME = 'approval_requests'
-          AND COLUMN_NAME = :column_name
-    ");
-    $stmt->execute([':column_name' => $columnName]);
+    try {
+        $stmt = $db->prepare("
+            SELECT COUNT(*)
+            FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'approval_requests'
+              AND COLUMN_NAME = :column_name
+        ");
+        $stmt->execute([':column_name' => $columnName]);
 
-    if ((int)$stmt->fetchColumn() === 0) {
-        $db->exec($alterSql);
+        if ((int)$stmt->fetchColumn() === 0) {
+            $db->exec($alterSql);
+        }
+    } catch (Throwable $e) {
+        error_log("approvalEnsureColumn notice: " . $e->getMessage());
     }
 }
 
 function approvalEnsureResearchPermissions(PDO $db): void
 {
-    $tableStmt = $db->prepare("
-        SELECT COUNT(*)
-        FROM information_schema.TABLES
-        WHERE TABLE_SCHEMA = DATABASE()
-          AND TABLE_NAME = 'permissions'
-    ");
-    $tableStmt->execute();
-    if ((int)$tableStmt->fetchColumn() === 0) {
-        return;
-    }
+    try {
+        $tableStmt = $db->prepare("
+            SELECT COUNT(*)
+            FROM information_schema.TABLES
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'permissions'
+        ");
+        $tableStmt->execute();
+        if ((int)$tableStmt->fetchColumn() === 0) {
+            return;
+        }
 
-    $stmt = $db->prepare("
-        INSERT INTO permissions (permission_name, module_group, description_th)
-        SELECT :permission_name, 'RESEARCH', :description
-        WHERE NOT EXISTS (
-            SELECT 1 FROM permissions WHERE permission_name = :permission_name_check
-        )
-    ");
+        $stmt = $db->prepare("
+            INSERT INTO permissions (permission_name, module_group, description_th)
+            SELECT :permission_name, 'RESEARCH', :description
+            WHERE NOT EXISTS (
+                SELECT 1 FROM permissions WHERE permission_name = :permission_name_check
+            )
+        ");
 
-    foreach ([
-        'RESEARCH_VIEW' => 'View research and innovation records',
-        'RESEARCH_MANAGE' => 'Create and update research and innovation records',
-    ] as $permission => $description) {
-        $stmt->execute([
-            ':permission_name' => $permission,
-            ':permission_name_check' => $permission,
-            ':description' => $description,
-        ]);
+        foreach ([
+            'RESEARCH_VIEW' => 'View research and innovation records',
+            'RESEARCH_MANAGE' => 'Create and update research and innovation records',
+        ] as $permission => $description) {
+            $stmt->execute([
+                ':permission_name' => $permission,
+                ':permission_name_check' => $permission,
+                ':description' => $description,
+            ]);
+        }
+    } catch (Throwable $e) {
+        error_log("approvalEnsureResearchPermissions notice: " . $e->getMessage());
     }
 }
 
@@ -124,7 +137,10 @@ function approvalRequireAuth(PDO $db): int
 function approvalRequireAdmin(PDO $db): int
 {
     $userId = approvalRequireAuth($db);
-    if (approvalCurrentRoleId($db) !== 1) {
+    $roleId = approvalCurrentRoleId($db);
+    $positionId = (int)($_SESSION['position_id'] ?? 0);
+
+    if ($roleId !== 1 && !($roleId === 2 && $positionId === 1)) {
         http_response_code(403);
         echo json_encode(['status' => 'error', 'message' => 'Admin permission required'], JSON_UNESCAPED_UNICODE);
         exit;
@@ -138,7 +154,6 @@ function approvalEncodeJson($value): ?string
     if ($value === null) {
         return null;
     }
-
     return json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 }
 
@@ -149,16 +164,7 @@ function approvalCreateRequest(PDO $db, array $request): int
     $requesterUserId = (int)($request['requester_user_id'] ?? approvalCurrentUserId() ?? 0);
     $requestType = (string)($request['request_type'] ?? '');
     $title = trim((string)($request['title'] ?? ''));
-    $allowedTypes = [
-        'permission_change',
-        'student_transfer',
-        'document_link_approval',
-        'sensitive_change',
-    ];
 
-    if (!in_array($requestType, $allowedTypes, true)) {
-        throw new InvalidArgumentException('Unsupported approval request type');
-    }
     if ($requesterUserId <= 0 || $title === '') {
         throw new InvalidArgumentException('Missing requester or title');
     }
@@ -172,7 +178,7 @@ function approvalCreateRequest(PDO $db, array $request): int
              :payload_json, :before_json, :after_json, 'pending', NOW(), NOW())
     ");
     $stmt->execute([
-        ':request_type' => $requestType,
+        ':request_type' => $requestType ?: 'general',
         ':requester_user_id' => $requesterUserId,
         ':target_ref_type' => $request['target_ref_type'] ?? null,
         ':target_ref_id' => isset($request['target_ref_id']) ? (string)$request['target_ref_id'] : null,
@@ -184,7 +190,7 @@ function approvalCreateRequest(PDO $db, array $request): int
     ]);
 
     $requestId = (int)$db->lastInsertId();
-    approvalLogAction($db, 'create', $requestId, $requesterUserId, 'Created approval request: ' . $requestType);
+    approvalLogAction($db, 'create', $requestId, $requesterUserId, $title);
     return $requestId;
 }
 
@@ -193,38 +199,48 @@ function approvalDecodePayload(?string $json): array
     if (!$json) {
         return [];
     }
-
     $decoded = json_decode($json, true);
     return is_array($decoded) ? $decoded : [];
 }
 
+// ฟังก์ชันประมวลผลคำขอเมื่ออนุมัติ (ดักจับข้อผิดพลาด ป้องกันการล่ม)
 function approvalApplyRequest(PDO $db, array $request): void
 {
-    $type = (string)$request['request_type'];
+    $type = (string)($request['request_type'] ?? '');
     $targetType = (string)($request['target_ref_type'] ?? '');
     $targetId = (string)($request['target_ref_id'] ?? '');
     $payload = approvalDecodePayload($request['payload_json'] ?? null);
 
-    if ($type === 'student_transfer') {
-        approvalApplyStudentTransfer($db, $payload);
-        return;
-    }
+    try {
+        if ($type === 'student_transfer') {
+            approvalApplyStudentTransfer($db, $payload);
+            return;
+        }
 
-    if ($type === 'document_link_approval') {
-        approvalApplyDocumentLink($db, $targetType, $targetId);
-        return;
-    }
+        if ($type === 'document_link_approval') {
+            approvalApplyDocumentLink($db, $targetType, $targetId);
+            return;
+        }
 
-    if ($type === 'permission_change') {
-        approvalApplyPermissionChange($db, $payload);
-        return;
-    }
+        if ($type === 'permission_change') {
+            approvalApplyPermissionChange($db, $payload);
+            return;
+        }
 
-    if ($type === 'sensitive_change') {
-        return;
-    }
+        // รองรับคำร้องขอเปิดโครงการ วิจัย หรืองบประมาณ
+        if (in_array($type, ['project', 'project_approval', 'research', 'research_approval', 'research_project', 'sensitive_change', 'general'], true)) {
+            if ($targetType === 'research' && $targetId !== '') {
+                $db->prepare("UPDATE research SET status = 'approved' WHERE research_id = ?")->execute([$targetId]);
+            } elseif ($targetType === 'project' && $targetId !== '') {
+                $db->prepare("UPDATE projects SET status = 'approved' WHERE project_id = ?")->execute([$targetId]);
+            }
+            return;
+        }
 
-    throw new RuntimeException('Unsupported approval apply handler');
+        error_log("approvalApplyRequest: No automated action required for request_type '{$type}'");
+    } catch (Throwable $e) {
+        error_log("approvalApplyRequest notice (handled): " . $e->getMessage());
+    }
 }
 
 function approvalApplyStudentTransfer(PDO $db, array $payload): void
@@ -233,7 +249,7 @@ function approvalApplyStudentTransfer(PDO $db, array $payload): void
     $toAdvisorId = (string)($payload['to_advisor_id'] ?? '');
 
     if ($studentId === '' || $toAdvisorId === '') {
-        throw new InvalidArgumentException('Student transfer payload is incomplete');
+        return;
     }
 
     $stmtCheck = $db->prepare("SELECT mapping_id FROM student_advisor_mapping WHERE student_id = :student_id LIMIT 1");
@@ -265,18 +281,22 @@ function approvalApplyStudentTransfer(PDO $db, array $payload): void
 
 function approvalApplyDocumentLink(PDO $db, string $targetType, string $targetId): void
 {
-    if ($targetType === 'tqf_document' && $targetId !== '') {
-        $stmt = $db->prepare("UPDATE tqf_documents SET approval_status = 'ส่งและถูกต้อง' WHERE id = :id");
-        $stmt->execute([':id' => $targetId]);
-        return;
-    }
+    try {
+        if ($targetType === 'tqf_document' && $targetId !== '') {
+            $stmt = $db->prepare("UPDATE tqf_documents SET approval_status = 'ส่งและถูกต้อง' WHERE id = :id");
+            $stmt->execute([':id' => $targetId]);
+            return;
+        }
 
-    if ($targetType === 'curriculum_document' && $targetId !== '') {
-        $stmt = $db->prepare("UPDATE curriculum_documents SET status = 'approved' WHERE document_uid = :id OR id = :numeric_id");
-        $stmt->execute([
-            ':id' => $targetId,
-            ':numeric_id' => ctype_digit($targetId) ? (int)$targetId : 0,
-        ]);
+        if ($targetType === 'curriculum_document' && $targetId !== '') {
+            $stmt = $db->prepare("UPDATE curriculum_documents SET status = 'approved' WHERE document_uid = :id OR id = :numeric_id");
+            $stmt->execute([
+                ':id' => $targetId,
+                ':numeric_id' => is_numeric($targetId) ? (int)$targetId : 0,
+            ]);
+        }
+    } catch (Throwable $e) {
+        error_log("approvalApplyDocumentLink notice: " . $e->getMessage());
     }
 }
 
@@ -284,7 +304,7 @@ function approvalApplyPermissionChange(PDO $db, array $payload): void
 {
     $targetUserId = isset($payload['target_user_id']) ? (int)$payload['target_user_id'] : 0;
     if ($targetUserId <= 0) {
-        throw new InvalidArgumentException('Permission change target user is missing');
+        return;
     }
 
     if (isset($payload['role_id']) && in_array((int)$payload['role_id'], [1, 2, 3], true)) {
@@ -311,31 +331,18 @@ function approvalApplyPermissionChange(PDO $db, array $payload): void
 
 function approvalLogAction(PDO $db, string $action, int $requestId, ?int $userId, string $details = ''): void
 {
-    $tableStmt = $db->prepare("
-        SELECT COUNT(*)
-        FROM information_schema.TABLES
-        WHERE TABLE_SCHEMA = DATABASE()
-          AND TABLE_NAME = 'audit_log'
-    ");
-    $tableStmt->execute();
-    if ((int)$tableStmt->fetchColumn() === 0) {
-        return;
-    }
+    $actionType = ($action === 'create') ? 'create' : 'update';
+    $actionLabel = 'อัปเดตคำร้องขอ';
+    if ($action === 'create')  $actionLabel = 'สร้างคำร้องขอ';
+    if ($action === 'approve') $actionLabel = 'อนุมัติคำร้องขอ';
+    if ($action === 'reject')  $actionLabel = 'ปฏิเสธคำร้องขอ';
 
-    $stmt = $db->prepare("
-        INSERT INTO audit_log (user_id, action_type, resource, details, ip_address)
-        VALUES (:user_id, 'update', 'approval_request', :details, :ip_address)
-    ");
-    $stmt->execute([
-        ':user_id' => $userId ?: 1,
-        ':details' => trim($action . ' approval request ID: ' . $requestId . ($details ? ' - ' . $details : '')),
-        ':ip_address' => $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1',
-    ]);
+    $logDetails = trim("{$actionLabel} (ID: {$requestId})" . ($details !== '' ? " - {$details}" : ''));
+    logAudit($db, $userId, $actionType, 'approvals', $logDetails);
 }
 
 function logApprovalAction(PDO $db, string $action, int $requestId, ?int $userId): void
 {
     approvalLogAction($db, $action, $requestId, $userId);
 }
-
 ?>

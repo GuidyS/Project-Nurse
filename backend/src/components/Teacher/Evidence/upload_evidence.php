@@ -9,6 +9,8 @@ header("Content-Type: application/json; charset=UTF-8");
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit(); }
 
+require_once __DIR__ . '/../../../config/audit_helper.php'; // นำเข้า Audit Helper
+
 $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
 
 try {
@@ -82,6 +84,17 @@ try {
             ':mime_type' => $mime_type ?: null,
             ':file_category' => $file_category
         ]);
+
+        $portfolioId = $pdo->lastInsertId();
+
+        // บันทึก Log การอัปโหลดหลักฐาน
+        logAudit(
+            $pdo, 
+            $_SESSION['user_id'] ?? null, 
+            'create', 
+            'evidence', 
+            "อัปโหลดหลักฐาน/พอร์ตโฟลิโอ: {$title} (ID: {$portfolioId}) ให้กับนักศึกษารหัส: {$studentId}"
+        );
 
         echo json_encode(["status" => "success", "message" => "อัปโหลดหลักฐานสำเร็จ"]);
     } else {

@@ -151,6 +151,18 @@
                 require_once 'components/Teacher/CoursesPage/api.php';
                 break;
 
+            // CurriculumCycles (จัดการหลักสูตรรอบ 5 ปี — เฉพาะผู้ดูแลระบบ)
+            case 'get-curriculum-cycles':
+            case 'save-curriculum-cycle':
+            case 'delete-curriculum-cycle':
+            case 'save-curriculum-subject':
+            case 'delete-curriculum-subject':
+            case 'delete-curriculum-subjects':
+            case 'import-curriculum-subjects':
+            case 'activate-curriculum-cycle':
+                require_once 'components/Admin/CurriculumCycles/curriculum_cycles_api.php';
+                break;
+
             /* -------- Teacher -------- */
 
             // Advises
@@ -167,6 +179,17 @@
                 require_once 'components/Teacher/Advises/send_advisor_message.php';
                 break;
 
+            // AdviseNotes
+            case 'get-advise-notes':
+                require_once 'components/Teacher/AdviseNotes/get_advise_notes.php';
+                break;
+            case 'save-advise-note':
+                require_once 'components/Teacher/AdviseNotes/save_advise_note.php';
+                break;
+            case 'get-advise-students':
+                require_once 'components/Teacher/AdviseNotes/get_advise_students.php';
+                break;
+
             // AdvisorNotifications (การแจ้งเตือนของอาจารย์)
             case 'get-advisor-notifications':
                 require_once 'components/Teacher/AdvisorNotifications/get_notifications.php';
@@ -174,11 +197,22 @@
             case 'update-notification-read':
                 require_once 'components/Teacher/AdvisorNotifications/update_notification_read.php';
                 break;
+           // StudentCompetency (ฝั่งอาจารย์)
             case 'student-competency':
-                require_once 'components/Teacher/student_competency/get_student_competency.php';
+            case 'get-student-competency':
+            case 'advisor-competency':
+                $compPath = 'components/Teacher/StudentCompetency/get_student_competency.php';
+                if (!file_exists(__DIR__ . '/' . $compPath)) {
+                    $compPath = 'components/Teacher/student_competency/get_student_competency.php';
+                }
+                require_once $compPath;
                 break;
             case 'save-student-competency':
-                require_once 'components/Teacher/student_competency/save_student_competency.php';
+                $saveCompPath = 'components/Teacher/StudentCompetency/save_student_competency.php';
+                if (!file_exists(__DIR__ . '/' . $saveCompPath)) {
+                    $saveCompPath = 'components/Teacher/student_competency/save_student_competency.php';
+                }
+                require_once $saveCompPath;
                 break;
 
             // AssignStudents (มอบหมายนักศึกษาให้อาจารย์ — เฉพาะผู้ดูแลระบบ)
@@ -187,18 +221,6 @@
                 break;
             case 'save-assign-students':
                 require_once 'components/Admin/AssignStudents/save_assign_students.php';
-                break;
-
-            // CurriculumCycles (จัดการหลักสูตรรอบ 5 ปี — เฉพาะผู้ดูแลระบบ)
-            case 'get-curriculum-cycles':
-            case 'activate-curriculum-cycle':
-            case 'save-curriculum-cycle':
-            case 'delete-curriculum-cycle':
-            case 'save-curriculum-subject':
-            case 'delete-curriculum-subject':
-            case 'delete-curriculum-subjects':
-            case 'import-curriculum-subjects':
-                require_once 'components/Admin/CurriculumCycles/curriculum_cycles_api.php';
                 break;
 
             // AssignInstructors
@@ -361,7 +383,7 @@
                 require_once 'components/Teacher/ResearchSummary/get_research_summary.php';
                 break;
 
-            /* -------- Research -------- */
+            // Research
             case 'get-research-faculty':
                 require_once 'components/Research/get_faculty.php';
                 break;
@@ -378,17 +400,6 @@
             // PLOYLOReport
             case 'get-plo-ylo-report':
                 require_once 'components/Teacher/PLOYLOReport/get_plo_ylo_report.php';
-                break;
-
-            // AdviseNotes
-            case 'get-advise-notes':
-                require_once 'components/Teacher/AdviseNotes/get_advise_notes.php';
-                break;
-            case 'save-advise-note':
-                require_once 'components/Teacher/AdviseNotes/save_advise_note.php';
-                break;
-            case 'get-advise-students':
-                require_once 'components/Teacher/AdviseNotes/get_advise_students.php';
                 break;
 
             // MyCourses
@@ -450,6 +461,12 @@
             case 'upload-project-file':
                 require_once 'components/Teacher/ProjectDocs/upload_project_file.php';
                 break;
+            case 'update-project-doc':
+                require_once 'components/Teacher/ProjectDocs/update_project_doc.php';
+                break;
+            case 'delete-project-doc':
+                require_once 'components/Teacher/ProjectDocs/delete_project_doc.php';
+                break;
 
             // ProjectLinks
             case 'get-project-links':
@@ -482,8 +499,8 @@
             case 'update-task-status':
                 require_once 'components/Teacher/ScheduleTasks/update_task_status.php';
                 break;
-            case 'update-task-status':
-                require_once 'components/Teacher/ScheduleTasks/update_task_status.php';
+            case 'update-schedule-task':
+                require_once 'components/Teacher/ScheduleTasks/update_schedule_task.php';
                 break;
             case 'delete-schedule-task':
                 require_once 'components/Teacher/ScheduleTasks/delete_schedule_task.php';
