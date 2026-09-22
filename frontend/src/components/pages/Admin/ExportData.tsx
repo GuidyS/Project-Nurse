@@ -24,7 +24,6 @@ const exportCategories: {
     fields: [
       { key: "student_id", label: "รหัสนักศึกษา" },
       { key: "full_name_th", label: "ชื่อ-นามสกุล" },
-      { key: "nickname", label: "ชื่อเล่น" },
       { key: "gender", label: "เพศ" },
       { key: "year_level", label: "ชั้นปี" },
       { key: "gpa", label: "GPA" },
@@ -32,7 +31,6 @@ const exportCategories: {
       { key: "email", label: "อีเมล" },
       { key: "phone", label: "เบอร์โทร" },
       { key: "admission_year", label: "ปีที่เข้าศึกษา" },
-      { key: "hometown_province", label: "ภูมิลำเนา" },
     ],
   },
   {
@@ -82,14 +80,20 @@ const exportCategories: {
   },
 ];
 
-const academicYears = ["2568", "2567", "2566", "2565", "2564"];
+// ปีการศึกษาปัจจุบัน (พ.ศ.) — ปีการศึกษาเริ่มเดือนมิถุนายน ช่วง ม.ค.–พ.ค. ยังนับเป็นปีการศึกษาก่อนหน้า
+const getCurrentAcademicYear = (now = new Date()) =>
+  now.getFullYear() + 543 - (now.getMonth() < 5 ? 1 : 0);
+
+// ปีการศึกษาปัจจุบันย้อนหลังรวม 5 ปี (เช่น 2569 → 2569–2565) เลื่อนตามปีจริงโดยไม่ต้องแก้โค้ด
+const currentAcademicYear = getCurrentAcademicYear();
+const academicYears = Array.from({ length: 5 }, (_, i) => String(currentAcademicYear - i));
 const semesters = ["ทั้งหมด", "ภาคเรียนที่ 1", "ภาคเรียนที่ 2", "ภาคฤดูร้อน"];
 
 export default function ExportData() {
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedFields, setSelectedFields] = useState<string[]>([]);
   const [format, setFormat] = useState("xlsx");
-  const [academicYear, setAcademicYear] = useState("2568");
+  const [academicYear, setAcademicYear] = useState(academicYears[0]);
   const [semester, setSemester] = useState("ทั้งหมด");
   const { toast } = useToast();
 
