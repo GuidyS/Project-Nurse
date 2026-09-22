@@ -28,6 +28,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
 import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
+import { ImportDataDialog, type ImportDataTypeOption } from "@/components/shared/ImportDataDialog";
 
 type ProjectType = "academic_service" | "culture" | "other";
 type ProjectTypeFilter = "all" | ProjectType;
@@ -80,6 +81,7 @@ interface Project {
   member_names?: string[];
   member_faculty_ids?: number[];
   documents?: ProjectDocument[];
+  plos?: string[];
 }
 
 interface CurrentUser {
@@ -159,6 +161,16 @@ const statusClassNames: Record<ProjectStatus, string> = {
 };
 
 const BUDGET_SOURCE_PREFIX = "แหล่งงบ: ";
+
+const projectImportTypes: ImportDataTypeOption[] = [
+  {
+    value: "projects",
+    label: "ข้อมูลโครงการ",
+    icon: Upload,
+    description: "นำเข้าข้อมูลโครงการจากไฟล์ Excel หรือ CSV",
+  },
+];
+
 const PROJECT_DOCUMENT_DEFAULT_TYPE: ProjectDocumentType = "summary";
 
 const createInitialUploadForm = (): ProjectDocumentUploadForm => ({
@@ -241,6 +253,8 @@ const getProjectFileUrl = (filePath?: string | null) => {
 };
 
 const projectDocuments = (project?: Project | null) => (Array.isArray(project?.documents) ? project.documents : []);
+const projectPlos = (project?: Project | null) => (Array.isArray(project?.plos) ? project.plos : []);
+
 const getDocumentDisplayName = (document: ProjectDocument) => document.file_name || "Google Drive";
 
 const normalizeProjectType = (value?: ProjectType | null): ProjectType => value || "other";
@@ -316,6 +330,7 @@ const ProjectsPage = () => {
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [viewProject, setViewProject] = useState<Project | null>(null);
   const [isViewOpen, setIsViewOpen] = useState(false);
@@ -861,12 +876,29 @@ const ProjectsPage = () => {
           <p className="text-muted-foreground mt-1">สร้าง แก้ไข และติดตามความคืบหน้าโครงการภาควิชา</p>
         </div>
         {canManageProjects && (
-          <Button className="gap-2" onClick={handleOpenCreateModal}>
-            <Plus className="h-4 w-4" />
-            สร้างโครงการใหม่
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" className="gap-2" onClick={() => setIsImportOpen(true)}>
+              <Upload className="h-4 w-4" />
+              Import ข้อมูล
+            </Button>
+            <Button className="gap-2" onClick={handleOpenCreateModal}>
+              <Plus className="h-4 w-4" />
+              สร้างโครงการใหม่
+            </Button>
+          </div>
         )}
       </div>
+
+      {canManageProjects && (
+        <ImportDataDialog
+          open={isImportOpen}
+          onOpenChange={setIsImportOpen}
+          importTypes={projectImportTypes}
+          title="Import ข้อมูลโครงการ"
+          description="นำเข้าข้อมูลโครงการจากไฟล์ Excel หรือ CSV"
+          onImported={fetchProjects}
+        />
+      )}
 
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
