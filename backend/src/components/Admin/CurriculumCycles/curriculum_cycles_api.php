@@ -41,7 +41,7 @@ try {
             if (isset($_GET['cycle_id']) && $_GET['cycle_id'] !== '') {
                 $cycle = curriculumCyclesRequireCycle($db, $_GET['cycle_id']);
                 $stmt = $db->prepare("
-                    SELECT id, subject_code, subject_name, credit, credit_desc
+                    SELECT id, subject_code, subject_name, subject_name_en, credit, credit_desc, subject_type
                     FROM curriculum_cycle_subject
                     WHERE cycle_id = ?
                     ORDER BY subject_code ASC, id ASC
@@ -132,12 +132,13 @@ try {
                 $next = $db->prepare("SELECT COALESCE(MAX(sort_order), 0) + 1 FROM curriculum_cycle_subject WHERE cycle_id = ?");
                 $next->execute([$cycle['id']]);
                 $stmt = $db->prepare("
-                    INSERT INTO curriculum_cycle_subject (cycle_id, subject_code, subject_name, credit, credit_desc, sort_order)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    INSERT INTO curriculum_cycle_subject
+                        (cycle_id, subject_code, subject_name, subject_name_en, credit, credit_desc, subject_type, sort_order)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 ");
                 $stmt->execute([
-                    $cycle['id'], $subject['subject_code'], $subject['subject_name'],
-                    $subject['credit'], $subject['credit_desc'], (int)$next->fetchColumn(),
+                    $cycle['id'], $subject['subject_code'], $subject['subject_name'], $subject['subject_name_en'],
+                    $subject['credit'], $subject['credit_desc'], $subject['subject_type'], (int)$next->fetchColumn(),
                 ]);
                 $subjectId = (int)$db->lastInsertId();
                 $message = "เพิ่มวิชา {$subject['subject_code']} แล้ว";
@@ -145,12 +146,12 @@ try {
             } else {
                 $stmt = $db->prepare("
                     UPDATE curriculum_cycle_subject
-                    SET subject_code = ?, subject_name = ?, credit = ?, credit_desc = ?
+                    SET subject_code = ?, subject_name = ?, subject_name_en = ?, credit = ?, credit_desc = ?, subject_type = ?
                     WHERE id = ? AND cycle_id = ?
                 ");
                 $stmt->execute([
-                    $subject['subject_code'], $subject['subject_name'], $subject['credit'],
-                    $subject['credit_desc'], $id, $cycle['id'],
+                    $subject['subject_code'], $subject['subject_name'], $subject['subject_name_en'], $subject['credit'],
+                    $subject['credit_desc'], $subject['subject_type'], $id, $cycle['id'],
                 ]);
                 if ($stmt->rowCount() === 0) {
                     $exists = $db->prepare("SELECT 1 FROM curriculum_cycle_subject WHERE id = ? AND cycle_id = ?");
@@ -265,13 +266,17 @@ try {
                 }
 
                 // วิชาที่รหัสซ้ำจะอัปเดตชื่อ/หน่วยกิต แต่คงลำดับเดิมไว้
+                // ไฟล์ที่ไม่มีคอลัมน์ชื่ออังกฤษ/ประเภทวิชา (แพทเทิร์นเดิม) จะไม่ลบค่าเดิมที่กรอกไว้
                 $stmt = $db->prepare("
-                    INSERT INTO curriculum_cycle_subject (cycle_id, subject_code, subject_name, credit, credit_desc, sort_order)
-                    VALUES (:cycle_id, :code, :name, :credit, :credit_desc, :sort_order)
+                    INSERT INTO curriculum_cycle_subject
+                        (cycle_id, subject_code, subject_name, subject_name_en, credit, credit_desc, subject_type, sort_order)
+                    VALUES (:cycle_id, :code, :name, :name_en, :credit, :credit_desc, :subject_type, :sort_order)
                     ON DUPLICATE KEY UPDATE
                         subject_name = VALUES(subject_name),
+                        subject_name_en = COALESCE(VALUES(subject_name_en), subject_name_en),
                         credit = VALUES(credit),
-                        credit_desc = VALUES(credit_desc)
+                        credit_desc = VALUES(credit_desc),
+                        subject_type = COALESCE(VALUES(subject_type), subject_type)
                 ");
 
                 $inserted = 0;
@@ -281,8 +286,10 @@ try {
                         ':cycle_id' => $cycle['id'],
                         ':code' => $subject['subject_code'],
                         ':name' => $subject['subject_name'],
+                        ':name_en' => $subject['subject_name_en'],
                         ':credit' => $subject['credit'],
                         ':credit_desc' => $subject['credit_desc'],
+                        ':subject_type' => $subject['subject_type'],
                         ':sort_order' => $startOrder + $i,
                     ]);
                     // MySQL: 1 = เพิ่มใหม่, 2 = อัปเดต, 0 = ข้อมูลเหมือนเดิม

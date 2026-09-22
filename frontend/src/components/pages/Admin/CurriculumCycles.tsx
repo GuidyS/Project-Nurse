@@ -66,20 +66,26 @@ interface Subject {
   id: number;
   subject_code: string;
   subject_name: string;
+  subject_name_en: string | null;
   credit: number;
   credit_desc: string | null;
+  subject_type: string | null;
 }
 
 interface ImportRow {
   row: number;
   subject_code: string;
   subject_name: string;
+  subject_name_en: string;
   credit: string;
+  subject_type: string;
   error: string | null;
 }
 
+// ฟิลด์บังคับ (ต้องมีในไฟล์ Excel) / ฟิลด์เสริม (ไม่มีคอลัมน์ก็นำเข้าได้)
 type SubjectField = 'subject_code' | 'subject_name' | 'credit';
-type SubjectErrors = Partial<Record<SubjectField, string>>;
+type OptionalSubjectField = 'subject_name_en' | 'subject_type';
+type SubjectErrors = Partial<Record<SubjectField | OptionalSubjectField, string>>;
 type ImportMode = 'merge' | 'replace';
 
 // หลักสูตรปรับปรุงทุก 5 ปี — ใช้เติมปีสิ้นสุดให้อัตโนมัติ
@@ -92,9 +98,17 @@ const CREDIT_PATTERN = /^(\d{1,2})(?:\.0+)?\s*(\(\s*[\d\s\-–]+\s*\))?$/;
 // หัวคอลัมน์ที่ยอมรับในไฟล์ Excel (เทียบแบบไม่สนช่องว่าง/ตัวพิมพ์)
 const HEADER_ALIASES: Record<SubjectField, string[]> = {
   subject_code: ['รหัสวิชา', 'รหัส', 'subject_code', 'subjectcode', 'code', 'coursecode'],
-  subject_name: ['ชื่อวิชา', 'ชื่อรายวิชา', 'ชื่อ', 'subject_name', 'subjectname', 'name', 'coursename'],
+  subject_name: ['ชื่อวิชา', 'ชื่อวิชา (ไทย)', 'ชื่อวิชาภาษาไทย', 'ชื่อรายวิชา', 'ชื่อ', 'subject_name', 'subject_name_th', 'subjectname', 'name', 'coursename'],
   credit: ['จำนวนหน่วยกิต', 'หน่วยกิต', 'credit', 'credits'],
 };
+
+const OPTIONAL_HEADER_ALIASES: Record<OptionalSubjectField, string[]> = {
+  subject_name_en: ['ชื่อวิชา (อังกฤษ)', 'ชื่อวิชาภาษาอังกฤษ', 'ชื่อภาษาอังกฤษ', 'subject_name_en', 'englishname', 'name_en'],
+  subject_type: ['ประเภทวิชา', 'หมวดวิชา', 'subject_type', 'type', 'category'],
+};
+
+// ตัวเลือกประเภทวิชา (พิมพ์ค่าอื่นเองได้)
+const SUBJECT_TYPE_SUGGESTIONS = ['หมวดวิชาศึกษาทั่วไป', 'หมวดวิชาเฉพาะ', 'หมวดวิชาเฉพาะเลือก', 'หมวดวิชาเลือกเสรี'];
 
 const normalizeHeader = (value: unknown) =>
   String(value ?? '').replace(/\s+/g, '').toLowerCase();
@@ -115,8 +129,10 @@ const apiErrorMessage = (error: unknown, fallback: string) => {
 const compareSubjectCode = (a: Subject, b: Subject) =>
   a.subject_code.localeCompare(b.subject_code, 'th', { numeric: true, sensitivity: 'base' });
 
-function validateSubject(code: string, name: string, credit: string): SubjectErrors {
+function validateSubject(code: string, name: string, credit: string, nameEn = '', type = ''): SubjectErrors {
   const errors: SubjectErrors = {};
+  if (nameEn.trim().length > 255) errors.subject_name_en = 'ชื่อวิชาภาษาอังกฤษยาวเกิน 255 ตัวอักษร';
+  if (type.trim().length > 100) errors.subject_type = 'ประเภทวิชายาวเกิน 100 ตัวอักษร';
   const trimmedCredit = credit.trim();
   const creditMatch = trimmedCredit.match(CREDIT_PATTERN);
 
@@ -151,6 +167,9 @@ async function parseCurriculumFile(file: File): Promise<ImportRow[]> {
 
   let headerIndex = -1;
   const columns: Record<SubjectField, number> = { subject_code: -1, subject_name: -1, credit: -1 };
+  const optionalColumns: Record<OptionalSubjectField, number> = { subject_name_en: -1, subject_type: -1 };
+  const optionalCell = (cells: unknown[], field: OptionalSubjectField) =>
+    optionalColumns[field] >= 0 ? String(cells[optionalColumns[field]] ?? '').trim() : '';
 
   // หัวตารางอาจไม่ได้อยู่แถวแรก (เช่นมีชื่อหลักสูตรอยู่ด้านบน) จึงหาใน 10 แถวแรก
   for (let i = 0; i < Math.min(grid.length, 10); i++) {
@@ -162,6 +181,10 @@ async function parseCurriculumFile(file: File): Promise<ImportRow[]> {
     if (found.every(([, index]) => index >= 0)) {
       headerIndex = i;
       found.forEach(([field, index]) => { columns[field] = index; });
+      (Object.keys(OPTIONAL_HEADER_ALIASES) as OptionalSubjectField[]).forEach((field) => {
+        const aliases = OPTIONAL_HEADER_ALIASES[field].map(normalizeHeader);
+        optionalColumns[field] = cells.findIndex((cell) => aliases.includes(cell));
+      });
       break;
     }
   }
@@ -178,16 +201,18 @@ async function parseCurriculumFile(file: File): Promise<ImportRow[]> {
     const code = String(cells[columns.subject_code] ?? '').trim();
     const name = String(cells[columns.subject_name] ?? '').trim();
     const credit = String(cells[columns.credit] ?? '').trim();
+    const nameEn = optionalCell(cells, 'subject_name_en');
+    const type = optionalCell(cells, 'subject_type');
     if (!code && !name && !credit) continue;
 
     const rowNo = firstRow + i + 1;
-    let error = Object.values(validateSubject(code, name, credit))[0] ?? null;
+    let error = Object.values(validateSubject(code, name, credit, nameEn, type))[0] ?? null;
     if (!error) {
       const key = code.toLowerCase();
       if (seen.has(key)) error = `รหัสวิชาซ้ำกับแถวที่ ${seen.get(key)}`;
       else seen.set(key, rowNo);
     }
-    rows.push({ row: rowNo, subject_code: code, subject_name: name, credit, error });
+    rows.push({ row: rowNo, subject_code: code, subject_name: name, subject_name_en: nameEn, credit, subject_type: type, error });
   }
 
   if (rows.length === 0) throw new Error('ไม่พบรายวิชาในไฟล์ (มีแต่หัวตาราง)');
@@ -196,18 +221,25 @@ async function parseCurriculumFile(file: File): Promise<ImportRow[]> {
 
 function downloadTemplate() {
   const sheet = XLSX.utils.aoa_to_sheet([
-    ['รหัสวิชา', 'ชื่อวิชา', 'จำนวนหน่วยกิต'],
-    ['103-111', 'ภาษาอังกฤษพื้นฐาน', 3],
-    ['103-112', 'การสื่อสารภาษาอังกฤษในชีวิตประจำวัน', '3(2-2-5)'],
+    ['รหัสวิชา', 'ชื่อวิชา', 'ชื่อวิชา (อังกฤษ)', 'จำนวนหน่วยกิต', 'ประเภทวิชา'],
+    ['103-111', 'ภาษาอังกฤษพื้นฐาน', 'English Fundamentals', 3, 'หมวดวิชาศึกษาทั่วไป'],
+    ['103-112', 'การสื่อสารภาษาอังกฤษในชีวิตประจำวัน', 'English Communication in Everyday Life', '3(2-2-5)', 'หมวดวิชาศึกษาทั่วไป'],
   ]);
-  sheet['!cols'] = [{ wch: 14 }, { wch: 45 }, { wch: 16 }];
+  sheet['!cols'] = [{ wch: 14 }, { wch: 45 }, { wch: 45 }, { wch: 16 }, { wch: 24 }];
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, sheet, 'รายวิชา');
   XLSX.writeFile(workbook, 'แพทเทิร์นหลักสูตร.xlsx');
 }
 
 const emptyCycleForm = { id: null as number | null, start: '', end: '', endTouched: false, error: '' };
-const emptySubjectForm = { id: null as number | null, subject_code: '', subject_name: '', credit: '' };
+const emptySubjectForm = {
+  id: null as number | null,
+  subject_code: '',
+  subject_name: '',
+  subject_name_en: '',
+  credit: '',
+  subject_type: '',
+};
 
 export default function CurriculumCycles() {
   const { toast } = useToast();
@@ -308,7 +340,10 @@ export default function CurriculumCycles() {
     const keyword = search.trim().toLowerCase();
     if (!keyword) return subjects;
     return subjects.filter(
-      (s) => s.subject_code.toLowerCase().includes(keyword) || s.subject_name.toLowerCase().includes(keyword),
+      (s) =>
+        s.subject_code.toLowerCase().includes(keyword) ||
+        s.subject_name.toLowerCase().includes(keyword) ||
+        (s.subject_name_en ?? '').toLowerCase().includes(keyword),
     );
   }, [subjects, search]);
 
@@ -425,19 +460,27 @@ export default function CurriculumCycles() {
       id: subject.id,
       subject_code: subject.subject_code,
       subject_name: subject.subject_name,
+      subject_name_en: subject.subject_name_en ?? '',
       credit: subject.credit_desc ?? String(subject.credit),
+      subject_type: subject.subject_type ?? '',
     });
     setSubjectErrors({});
     setSubjectDialogOpen(true);
   };
 
-  const updateSubjectField = (field: SubjectField, value: string) => {
+  const updateSubjectField = (field: SubjectField | OptionalSubjectField, value: string) => {
     setSubjectForm((form) => ({ ...form, [field]: value }));
     setSubjectErrors((errors) => ({ ...errors, [field]: undefined }));
   };
 
   const saveSubject = async () => {
-    const errors = validateSubject(subjectForm.subject_code, subjectForm.subject_name, subjectForm.credit);
+    const errors = validateSubject(
+      subjectForm.subject_code,
+      subjectForm.subject_name,
+      subjectForm.credit,
+      subjectForm.subject_name_en,
+      subjectForm.subject_type,
+    );
     if (Object.keys(errors).length > 0) {
       setSubjectErrors(errors);
       return;
@@ -450,7 +493,9 @@ export default function CurriculumCycles() {
         id: subjectForm.id,
         subject_code: subjectForm.subject_code.trim(),
         subject_name: subjectForm.subject_name.trim(),
+        subject_name_en: subjectForm.subject_name_en.trim(),
         credit: subjectForm.credit.trim(),
+        subject_type: subjectForm.subject_type.trim(),
       });
       toast({ title: 'บันทึกสำเร็จ', description: res.data.message });
       setSubjectDialogOpen(false);
@@ -540,11 +585,13 @@ export default function CurriculumCycles() {
       const res = await api.post('/index.php?page=import-curriculum-subjects', {
         cycle_id: Number(selectedCycleId),
         mode: importMode,
-        subjects: importRows.map(({ row, subject_code, subject_name, credit }) => ({
+        subjects: importRows.map(({ row, subject_code, subject_name, subject_name_en, credit, subject_type }) => ({
           row,
           subject_code,
           subject_name,
+          subject_name_en,
           credit,
+          subject_type,
         })),
       });
       toast({ title: 'นำเข้าสำเร็จ', description: res.data.message });
@@ -657,7 +704,7 @@ export default function CurriculumCycles() {
                     <Library className="h-5 w-5 text-primary" /> รายวิชาในหลักสูตร {cycleLabel(selectedCycle)}
                   </CardTitle>
                   <CardDescription>
-                    ไฟล์ Excel ต้องมีคอลัมน์ รหัสวิชา, ชื่อวิชา และ จำนวนหน่วยกิต
+                    ไฟล์ Excel ต้องมีคอลัมน์ รหัสวิชา, ชื่อวิชา และ จำนวนหน่วยกิต (ชื่อวิชาภาษาอังกฤษ และ ประเภทวิชา ใส่เพิ่มได้)
                   </CardDescription>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -727,10 +774,12 @@ export default function CurriculumCycles() {
                             />
                           </TableHead>
                           <TableHead className="w-[70px] text-center">ลำดับ</TableHead>
-                          <TableHead className="w-[140px]">รหัสวิชา</TableHead>
-                          <TableHead>ชื่อวิชา</TableHead>
-                          <TableHead className="w-[140px] text-center">หน่วยกิต</TableHead>
-                          <TableHead className="w-[110px] text-right">จัดการ</TableHead>
+                          <TableHead className="w-[120px] whitespace-nowrap">รหัสวิชา</TableHead>
+                          <TableHead className="min-w-[220px]">ชื่อวิชา (ไทย)</TableHead>
+                          <TableHead className="min-w-[200px]">ชื่อวิชา (อังกฤษ)</TableHead>
+                          <TableHead className="w-[110px] whitespace-nowrap text-center">หน่วยกิต</TableHead>
+                          <TableHead className="min-w-[160px]">ประเภทวิชา</TableHead>
+                          <TableHead className="w-[110px] whitespace-nowrap text-right">จัดการ</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -745,10 +794,12 @@ export default function CurriculumCycles() {
                               />
                             </TableCell>
                             <TableCell className="text-center text-muted-foreground">{index + 1}</TableCell>
-                            <TableCell className="font-medium">{subject.subject_code}</TableCell>
+                            <TableCell className="whitespace-nowrap font-medium">{subject.subject_code}</TableCell>
                             <TableCell>{subject.subject_name}</TableCell>
-                            <TableCell className="text-center">{subject.credit_desc ?? subject.credit}</TableCell>
-                            <TableCell className="text-right">
+                            <TableCell className="text-muted-foreground">{subject.subject_name_en || '-'}</TableCell>
+                            <TableCell className="whitespace-nowrap text-center">{subject.credit_desc ?? subject.credit}</TableCell>
+                            <TableCell className="text-muted-foreground">{subject.subject_type || '-'}</TableCell>
+                            <TableCell className="whitespace-nowrap text-right">
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -880,7 +931,7 @@ export default function CurriculumCycles() {
               {subjectErrors.subject_code && <p className="text-sm text-red-600">{subjectErrors.subject_code}</p>}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="subject-name" className={cn(subjectErrors.subject_name && 'text-red-600')}>ชื่อวิชา</Label>
+              <Label htmlFor="subject-name" className={cn(subjectErrors.subject_name && 'text-red-600')}>ชื่อวิชา (ไทย)</Label>
               <Input
                 id="subject-name"
                 placeholder="เช่น ภาษาอังกฤษพื้นฐาน"
@@ -889,6 +940,19 @@ export default function CurriculumCycles() {
                 error={Boolean(subjectErrors.subject_name)}
               />
               {subjectErrors.subject_name && <p className="text-sm text-red-600">{subjectErrors.subject_name}</p>}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="subject-name-en" className={cn(subjectErrors.subject_name_en && 'text-red-600')}>
+                ชื่อวิชา (อังกฤษ) <span className="font-normal text-muted-foreground">(ไม่บังคับ)</span>
+              </Label>
+              <Input
+                id="subject-name-en"
+                placeholder="เช่น English Fundamentals"
+                value={subjectForm.subject_name_en}
+                onChange={(e) => updateSubjectField('subject_name_en', e.target.value)}
+                error={Boolean(subjectErrors.subject_name_en)}
+              />
+              {subjectErrors.subject_name_en && <p className="text-sm text-red-600">{subjectErrors.subject_name_en}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="subject-credit" className={cn(subjectErrors.credit && 'text-red-600')}>จำนวนหน่วยกิต</Label>
@@ -900,6 +964,25 @@ export default function CurriculumCycles() {
                 error={Boolean(subjectErrors.credit)}
               />
               {subjectErrors.credit && <p className="text-sm text-red-600">{subjectErrors.credit}</p>}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="subject-type" className={cn(subjectErrors.subject_type && 'text-red-600')}>
+                ประเภทวิชา <span className="font-normal text-muted-foreground">(ไม่บังคับ)</span>
+              </Label>
+              <Input
+                id="subject-type"
+                list="subject-type-options"
+                placeholder="เลือกหรือพิมพ์ เช่น หมวดวิชาศึกษาทั่วไป"
+                value={subjectForm.subject_type}
+                onChange={(e) => updateSubjectField('subject_type', e.target.value)}
+                error={Boolean(subjectErrors.subject_type)}
+              />
+              <datalist id="subject-type-options">
+                {SUBJECT_TYPE_SUGGESTIONS.map((type) => (
+                  <option key={type} value={type} />
+                ))}
+              </datalist>
+              {subjectErrors.subject_type && <p className="text-sm text-red-600">{subjectErrors.subject_type}</p>}
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setSubjectDialogOpen(false)} disabled={isSavingSubject}>
@@ -916,7 +999,7 @@ export default function CurriculumCycles() {
 
       {/* Pop-up ตรวจสอบไฟล์ก่อนนำเข้า */}
       <Dialog open={importDialogOpen} onOpenChange={(open) => !isImporting && setImportDialogOpen(open)}>
-        <DialogContent className="sm:max-w-3xl">
+        <DialogContent className="sm:max-w-5xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileSpreadsheet className="h-5 w-5 text-primary" /> ตรวจสอบข้อมูลก่อนนำเข้า
@@ -949,7 +1032,9 @@ export default function CurriculumCycles() {
                   <TableHead className="w-[70px] text-center">แถว</TableHead>
                   <TableHead className="w-[120px]">รหัสวิชา</TableHead>
                   <TableHead>ชื่อวิชา</TableHead>
+                  <TableHead>ชื่อวิชา (อังกฤษ)</TableHead>
                   <TableHead className="w-[100px] text-center">หน่วยกิต</TableHead>
+                  <TableHead className="w-[150px]">ประเภทวิชา</TableHead>
                   <TableHead className="w-[170px]">สถานะ</TableHead>
                 </TableRow>
               </TableHeader>
@@ -959,7 +1044,9 @@ export default function CurriculumCycles() {
                     <TableCell className="text-center text-muted-foreground">{r.row}</TableCell>
                     <TableCell className="font-medium">{r.subject_code || '-'}</TableCell>
                     <TableCell>{r.subject_name || '-'}</TableCell>
+                    <TableCell className="text-muted-foreground">{r.subject_name_en || '-'}</TableCell>
                     <TableCell className="text-center">{r.credit || '-'}</TableCell>
+                    <TableCell className="text-muted-foreground">{r.subject_type || '-'}</TableCell>
                     <TableCell>
                       {r.error ? (
                         <span className="text-xs text-red-600">{r.error}</span>

@@ -68,6 +68,14 @@ function curriculumCyclesEnsureSchema(PDO $db): void
     if (!activeCurriculumColumnExists($db, 'curriculum_cycle', 'is_active')) {
         $db->exec("ALTER TABLE curriculum_cycle ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 0 AFTER end_year");
     }
+
+    // ชื่อวิชาภาษาอังกฤษ + ประเภทวิชา (ให้ฟิลด์ตรงกับหน้าส่งออกข้อมูลรายวิชา)
+    if (!activeCurriculumColumnExists($db, 'curriculum_cycle_subject', 'subject_name_en')) {
+        $db->exec("ALTER TABLE curriculum_cycle_subject ADD COLUMN subject_name_en VARCHAR(255) DEFAULT NULL AFTER subject_name");
+    }
+    if (!activeCurriculumColumnExists($db, 'curriculum_cycle_subject', 'subject_type')) {
+        $db->exec("ALTER TABLE curriculum_cycle_subject ADD COLUMN subject_type VARCHAR(100) DEFAULT NULL AFTER credit_desc");
+    }
 }
 
 function curriculumCyclesReadJson(): array
@@ -130,11 +138,23 @@ function curriculumCyclesNormalizeSubject(array $row): array
 
     [$credit, $creditDesc] = curriculumCyclesParseCredit($row['credit'] ?? '');
 
+    // ไม่บังคับกรอก — ค่าว่างเก็บเป็น NULL
+    $nameEn = trim((string)($row['subject_name_en'] ?? ''));
+    if (mb_strlen($nameEn) > 255) {
+        throw new InvalidArgumentException("ชื่อวิชาภาษาอังกฤษยาวเกิน 255 ตัวอักษร");
+    }
+    $type = trim((string)($row['subject_type'] ?? ''));
+    if (mb_strlen($type) > 100) {
+        throw new InvalidArgumentException("ประเภทวิชายาวเกิน 100 ตัวอักษร");
+    }
+
     return [
         'subject_code' => $code,
         'subject_name' => $name,
+        'subject_name_en' => $nameEn !== '' ? $nameEn : null,
         'credit' => $credit,
         'credit_desc' => $creditDesc,
+        'subject_type' => $type !== '' ? $type : null,
     ];
 }
 
