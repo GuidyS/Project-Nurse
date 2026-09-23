@@ -22,7 +22,7 @@
 
 ## รายการไฟล์ที่แก้ไข
 
-รวมทั้งหมด **40 ไฟล์** ที่มีอยู่ใน `earn-new-branch`
+รวมทั้งหมด **49 ไฟล์**
 
 ### Layout
 
@@ -32,6 +32,8 @@
 ### Admin
 
 - `frontend/src/components/pages/Admin/Approvals.tsx`
+- `frontend/src/components/pages/Admin/AssignStudents.tsx`
+- `frontend/src/components/pages/Admin/CompetencyItemsManagement.tsx`
 - `frontend/src/components/pages/Admin/RolesManagement.tsx`
 - `frontend/src/components/pages/Admin/UsersManagement.tsx`
 
@@ -42,13 +44,19 @@
 ### Student
 
 - `frontend/src/components/pages/Student/Portfolio.tsx`
+- `frontend/src/components/pages/Student/StudentCompetencyView.tsx`
+- `frontend/src/components/pages/Student/StudentHealthRecordsPage.tsx`
+- `frontend/src/components/pages/Student/StudentVaccinationPage.tsx`
 - `frontend/src/components/pages/Student/Transcript.tsx`
 
 ### Teacher
 
 - `frontend/src/components/pages/Teacher/AdviseNotes.tsx`
 - `frontend/src/components/pages/Teacher/Advises.tsx`
+- `frontend/src/components/pages/Teacher/AdvisorCompetencyView.tsx`
+- `frontend/src/components/pages/Teacher/AdvisorHealthRecordsView.tsx`
 - `frontend/src/components/pages/Teacher/AdvisorNotifications.tsx`
+- `frontend/src/components/pages/Teacher/AdvisorVaccinationView.tsx`
 - `frontend/src/components/pages/Teacher/CLOManagement.tsx`
 - `frontend/src/components/pages/Teacher/CLOMap.tsx`
 - `frontend/src/components/pages/Teacher/CLOPage.tsx`
@@ -70,6 +78,7 @@
 - `frontend/src/components/pages/Teacher/ProjectLinks.tsx`
 - `frontend/src/components/pages/Teacher/ProjectReports.tsx`
 - `frontend/src/components/pages/Teacher/ProjectsPage.tsx`
+- `frontend/src/components/pages/Teacher/ResearchSummary.tsx`
 - `frontend/src/components/pages/Teacher/Retention.tsx`
 - `frontend/src/components/pages/Teacher/ScheduleTasks.tsx`
 - `frontend/src/components/pages/Teacher/StudentLearningOutcomesPage.tsx`
@@ -92,6 +101,6 @@
 
 ## ข้อสังเกต
 
-- Branch `earn-new-branch` ไม่มีไฟล์ `AssignStudents.tsx`, `CompetencyItemsManagement.tsx`, `StudentCompetencyView.tsx`, `StudentHealthRecordsPage.tsx`, `StudentVaccinationPage.tsx`, `AdvisorCompetencyView.tsx`, `AdvisorHealthRecordsView.tsx`, `AdvisorVaccinationView.tsx` และ `ResearchSummary.tsx` จึงไม่ได้เพิ่มไฟล์เหล่านี้กลับเข้ามาระหว่างย้ายงานจาก `main`
+- ไฟล์หน้า UI จำนวน 9 ไฟล์ที่ยังไม่มีใน `earn-new-branch` ถูกนำกลับมาจากงานเดิมแล้ว แต่ branch นี้ยังไม่มี routing และรายการเมนูสำหรับเรียกหน้าเหล่านี้โดยตรง
 - เอกสารโครงการอ้างถึงไฟล์ `MYSQL_DATABASE (19-8-2569).sql` และ `MYSQL_DATABASE (3-8-2569).sql` แต่ไม่พบไฟล์ดังกล่าวใน Workspace
 - พบโค้ดและตารางเดิมที่เกี่ยวข้องกับเกรดหรือคะแนน แต่ไม่ได้แก้ไขหรือทดสอบส่วนนั้นตามขอบเขตล่าสุดของโครงการ
