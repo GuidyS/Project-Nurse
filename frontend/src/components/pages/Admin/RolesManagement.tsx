@@ -4,7 +4,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -274,20 +273,24 @@ export default function RolesManagement() {
                 {roleTabs.map((tab) => (
                   <TabsTrigger key={tab.value} value={tab.value} className="gap-1.5">
                     {tab.label}
-                    <Badge variant="secondary" className="h-5 min-w-5 px-1.5 text-[10px]">
-                      {tabCount(tab.value)}
-                    </Badge>
+                    <span className="tabular-nums text-current">({tabCount(tab.value)})</span>
                   </TabsTrigger>
                 ))}
               </TabsList>
             </Tabs>
           </CardHeader>
           <CardContent>
-            <Table>
+            <Table className="min-w-[760px] table-fixed">
+              <colgroup>
+                <col className="w-[32%]" />
+                <col className="w-[18%]" />
+                <col className="w-[30%]" />
+                <col className="w-[20%]" />
+              </colgroup>
               <TableHeader>
                 <TableRow>
                   <TableHead>ผู้ใช้</TableHead>
-                  <TableHead>อีเมล</TableHead>
+                  <TableHead>รหัสประจำตัว</TableHead>
                   <TableHead>Role ปัจจุบัน</TableHead>
                   <TableHead className="text-right">จัดการ</TableHead>
                 </TableRow>
@@ -302,17 +305,10 @@ export default function RolesManagement() {
                 ) : (
                   filteredUsers.map((user) => (
                     <TableRow key={user.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <Avatar className="h-8 w-8">
-                            <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                              {user.fullName.charAt(0)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <span className="font-medium">{user.fullName}</span>
-                        </div>
+                      <TableCell className="break-words font-medium">
+                        {user.fullName}
                       </TableCell>
-                      <TableCell className="text-muted-foreground">{user.email}</TableCell>
+                      <TableCell className="break-words text-muted-foreground">{user.email}</TableCell>
                       <TableCell>
                         <div className="flex flex-col gap-1">
                           <Badge

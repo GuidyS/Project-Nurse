@@ -63,8 +63,8 @@ export default function Advises() {
   return (
     <>
       <div className="space-y-6 animate-fade-in">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">นักศึกษาในที่ปรึกษา</h1>
+        <div className="app-page-header-surface">
+          <h1 className="text-3xl font-bold tracking-tight leading-snug">นักศึกษาในที่ปรึกษา</h1>
           <p className="text-muted-foreground">จัดการนักศึกษาที่อยู่ในความดูแล (สัดส่วน 1:12)</p>
         </div>
 

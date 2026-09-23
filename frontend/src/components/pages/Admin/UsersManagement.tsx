@@ -4,7 +4,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -526,16 +525,22 @@ export default function UsersManagement() {
                 {roleTabs.map((tab) => (
                   <TabsTrigger key={tab.value} value={tab.value} className="gap-1.5">
                     {tab.label}
-                    <Badge variant="secondary" className="h-5 min-w-5 px-1.5 text-[10px]">
-                      {tabCount(tab.value)}
-                    </Badge>
+                    <span className="tabular-nums text-current">({tabCount(tab.value)})</span>
                   </TabsTrigger>
                 ))}
               </TabsList>
             </Tabs>
           </CardHeader>
           <CardContent>
-            <Table>
+            <Table className="min-w-[900px] table-fixed">
+              <colgroup>
+                <col className="w-[27%]" />
+                <col className="w-[15%]" />
+                <col className="w-[25%]" />
+                <col className="w-[11%]" />
+                <col className="w-[14%]" />
+                <col className="w-[8%]" />
+              </colgroup>
               <TableHeader>
                 <TableRow>
                   <TableHead>ผู้ใช้</TableHead>
@@ -556,17 +561,10 @@ export default function UsersManagement() {
                 ) : (
                   filteredUsers.map((user) => (
                     <TableRow key={user.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <Avatar className="h-8 w-8">
-                            <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                              {user.fullName.charAt(0)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <span className="font-medium">{user.fullName}</span>
-                        </div>
+                      <TableCell className="break-words font-medium">
+                        {user.fullName}
                       </TableCell>
-                      <TableCell className="text-muted-foreground">{user.email}</TableCell>
+                      <TableCell className="break-words text-muted-foreground">{user.email}</TableCell>
                       <TableCell>
                         <div className="flex flex-col gap-1">
                           <Badge
@@ -581,7 +579,7 @@ export default function UsersManagement() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={user.status === "active" ? "default" : "secondary"} className={user.status === "active" ? "bg-success" : ""}>
+                        <Badge variant={user.status === "active" ? "default" : "destructive"} className={user.status === "active" ? "bg-success" : "border-red-200 bg-red-100 text-red-800 hover:bg-red-100"}>
                           {user.status === "active" ? "ใช้งาน" : "ระงับ"}
                         </Badge>
                       </TableCell>

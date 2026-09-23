@@ -88,9 +88,9 @@ export default function ProgramReports() {
   return (
     <>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="app-page-header-surface flex items-center justify-between flex-wrap gap-4">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">รายงาน PLO/YLO/CLO</h1>
+            <h1 className="text-3xl font-bold tracking-tight leading-snug">รายงาน PLO/YLO/CLO</h1>
             <p className="text-muted-foreground">รายงานผลลัพธ์การเรียนรู้ของหลักสูตรทุกชั้นปี</p>
           </div>
           <Button variant="outline" onClick={handleExport}>

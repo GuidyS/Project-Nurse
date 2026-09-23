@@ -247,7 +247,9 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
 
               <SidebarMenu>
                 {filteredItems.map((item: any) => {
-                  const Icon = getIcon(item.icon);
+                  const Icon = item.url === "competency-items-management"
+                    ? Icons.ListChecks
+                    : getIcon(item.icon);
                   const isActive = activeItem === item.url;
                   return (
                     <SidebarMenuItem key={item.url}>

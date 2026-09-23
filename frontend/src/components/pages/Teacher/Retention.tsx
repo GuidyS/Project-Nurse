@@ -74,7 +74,7 @@ export default function Retention() {
 
   return (
     <div className="p-6 space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between">
+      <div className="app-page-header-surface flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">อัตราการคงอยู่ของนักศึกษา</h1>
           <p className="text-muted-foreground">วิเคราะห์สัดส่วนนักศึกษาคงอยู่และสาเหตุการออกกลางคัน</p>

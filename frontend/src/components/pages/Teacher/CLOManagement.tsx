@@ -248,7 +248,7 @@ export default function CLOManagement() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
+      <div className="app-page-header-surface flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">กำหนด CLO</h1>
           <p className="text-muted-foreground">กำหนดผลลัพธ์การเรียนรู้ระดับรายวิชา (เชื่อมโยง PLO หลายรายการ)</p>

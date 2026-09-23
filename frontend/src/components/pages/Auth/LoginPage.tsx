@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,6 +32,7 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [showResetPassword, setShowResetPassword] = useState(false);
   const [roleUnassignedOpen, setRoleUnassignedOpen] = useState(false);
+  const [accountSuspended, setAccountSuspended] = useState(false);
 
   const handleBackToLogin = () => {
     setShowResetPassword(false);
@@ -51,8 +53,17 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
     return false;
   };
 
+  const showLoginFailure = (payload?: { code?: string; message?: string }) => {
+    if (payload?.message?.includes("บัญชีถูกระงับ")) {
+      setAccountSuspended(true);
+    } else if (!showRoleUnassignedPopup(payload)) {
+      toast.error(payload?.message || "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง");
+    }
+  };
+
     const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setAccountSuspended(false);
 
     const nextErrors: { username?: string; password?: string } = {};
     if (!username.trim()) {
@@ -82,19 +93,12 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
       
       toast.success("เข้าสู่ระบบสำเร็จ");
       onLoginSuccess(response.data.user);
-    } else if (showRoleUnassignedPopup(response.data)) {
-      // card popup
     } else {
-      toast.error(response.data.message || "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง");
+      showLoginFailure(response.data);
     }
   } catch (error: any) {
     const data = error.response?.data;
-    if (showRoleUnassignedPopup(data)) {
-      // card popup
-    } else {
-      const message = data?.message || "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง";
-      toast.error(message);
-    }
+    showLoginFailure(data);
     console.error("Login Error:", error);
   } finally {
     setIsLoading(false);
@@ -153,6 +157,16 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
         </div>
         <form onSubmit={handleLogin} className="space-y-6">
 
+          {accountSuspended && (
+            <Alert variant="destructive" className="border-red-300 bg-red-50 text-red-900 [&>svg]:text-red-700">
+              <ShieldAlert className="h-5 w-5" />
+              <AlertTitle className="text-lg font-semibold leading-7">บัญชีถูกระงับการใช้งาน</AlertTitle>
+              <AlertDescription className="text-base leading-7">
+                กรุณาติดต่อผู้ดูแลระบบเพื่อตรวจสอบและเปิดใช้งานบัญชี
+              </AlertDescription>
+            </Alert>
+          )}
+
           <div className="space-y-4">
             <div className="space-y-2">
               <Label
@@ -170,6 +184,7 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
                 aria-invalid={Boolean(loginErrors.username)}
                 onChange={(e) => {
                   setUsername(e.target.value);
+                  setAccountSuspended(false);
                   if (loginErrors.username) {
                     setLoginErrors((current) => ({ ...current, username: undefined }));
                   }

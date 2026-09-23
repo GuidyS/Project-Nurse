@@ -249,6 +249,19 @@
 }
 
 @layer components {
+  .app-page-header,
+  .app-page-header-surface {
+    @apply rounded-md border border-primary/10 bg-card px-5 py-5 shadow-sm sm:px-6;
+  }
+
+  .app-page-header {
+    @apply flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between;
+  }
+
+  .app-page-header-surface > div {
+    min-width: 0;
+  }
+
   /* --- User Profile & Logout UI --- */
   .sidebar-profile-avatar {
     @apply h-full w-full border border-[#8a2be2]/20;

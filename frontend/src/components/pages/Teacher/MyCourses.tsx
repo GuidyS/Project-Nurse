@@ -64,7 +64,7 @@ export default function MyCourses() {
   return (
     <>
       <div className="space-y-6">
-        <div>
+        <div className="app-page-header-surface">
           <h1 className="text-3xl font-bold tracking-tight">รายวิชาที่รับผิดชอบ</h1>
           <p className="text-muted-foreground">รายวิชาทั้งหมดที่คุณเป็นผู้สอนหรือรับผิดชอบหลักสูตร</p>
         </div>

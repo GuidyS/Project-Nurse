@@ -128,7 +128,13 @@ export default function ProjectLinks() {
   };
 
   return (
-    <>
+    <div className="space-y-6">
+      <div className="app-page-header">
+        <div>
+          <h1 className="app-page-title">เชื่อมโยงระดับ LO</h1>
+          <p className="app-page-description">เชื่อมโยงโครงการกับผลลัพธ์การเรียนรู้ PLO, YLO และ CLO</p>
+        </div>
+      </div>
       <div className="grid gap-6 md:grid-cols-3">
         {/* เมนูเลือกโครงการฝั่งซ้าย */}
         <div className="md:col-span-1 space-y-4">
@@ -305,6 +311,6 @@ export default function ProjectLinks() {
           </Card>
         </div>
       </div>
-    </>
+    </div>
   );
 }

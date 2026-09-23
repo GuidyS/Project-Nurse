@@ -209,8 +209,8 @@ export default function Approvals() {
   return (
     <>
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">อนุมัติคำขอ</h1>
+      <div className="app-page-header-surface">
+        <h1 className="text-3xl font-bold tracking-tight leading-snug">อนุมัติคำขอ</h1>
         <p className="text-muted-foreground">ดำเนินการตามคำขอจากอาจารย์และผู้ใช้งานในระบบ</p>
       </div>
 

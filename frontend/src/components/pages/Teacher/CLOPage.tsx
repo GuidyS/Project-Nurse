@@ -648,7 +648,7 @@ export default function CLOPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
+      <div className="app-page-header-surface flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">การจัดการ CLO รายวิชา</h1>
           <p className="text-muted-foreground">Course Learning Outcomes Management</p>
