@@ -67,6 +67,15 @@
             case 'generate-user-accounts':
                 require_once 'components/Admin/ManageUsers/generate-user-accounts.php';
                 break;
+            case 'competency-items':
+                require_once 'components/Admin/CompetencyItems/get_competency_items.php';
+                break;
+            case 'save-competency-item':
+                require_once 'components/Admin/CompetencyItems/save_competency_item.php';
+                break;
+            case 'delete-competency-item':
+                require_once 'components/Admin/CompetencyItems/delete_competency_item.php';
+                break;
             case 'manage-role':
                 require_once 'components/Admin/ManageUsers/manage-role.php';
                 break;
