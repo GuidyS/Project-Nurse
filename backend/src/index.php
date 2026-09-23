@@ -417,6 +417,84 @@
             case 'delete-portfolio':
                 require_once 'components/Student/Portfolio/delete_portfolio.php';
                 break;
+
+            /* -------- Frontend compatibility routes -------- */
+
+            case 'upload-license-image':
+                require_once 'components/Teacher/LicenseReminder/upload_license_image.php';
+                break;
+
+            case 'approve-budget':
+                require_once 'components/Admin/Reports/approve-budget.php';
+                break;
+
+            case 'get-curriculum-cycles':
+            case 'save-curriculum-cycle':
+            case 'delete-curriculum-cycle':
+            case 'save-curriculum-subject':
+            case 'delete-curriculum-subject':
+            case 'delete-curriculum-subjects':
+            case 'import-curriculum-subjects':
+            case 'activate-curriculum-cycle':
+                require_once 'components/Admin/CurriculumCycles/curriculum_cycles_api.php';
+                break;
+
+            case 'get-assign-students':
+                require_once 'components/Admin/AssignStudents/get_assign_students.php';
+                break;
+            case 'save-assign-students':
+                require_once 'components/Admin/AssignStudents/save_assign_students.php';
+                break;
+
+            case 'advisor-student-list':
+                require_once 'components/Teacher/AdvisorStudentList/advisor_student_list.php';
+                break;
+            case 'view-student-vaccinations':
+                require_once 'components/Teacher/ViewStudentVaccinations/view_student_vaccinations.php';
+                break;
+            case 'view-student-health-records':
+                require_once 'components/Teacher/ViewStudentHealthRecords/view_student_health_records.php';
+                break;
+            case 'get-research-summary':
+                require_once 'components/Teacher/ResearchSummary/get_research_summary.php';
+                break;
+
+            case 'get-my-project-faculty-options':
+                require_once 'components/Teacher/MyProjects/get_my_project_faculty_options.php';
+                break;
+            case 'create-my-project':
+                require_once 'components/Teacher/MyProjects/create_my_project.php';
+                break;
+            case 'update-my-project':
+                require_once 'components/Teacher/MyProjects/update_my_project.php';
+                break;
+            case 'upload-my-project-file':
+                require_once 'components/Teacher/MyProjects/upload_my_project_file.php';
+                break;
+            case 'update-project-doc':
+                require_once 'components/Teacher/ProjectDocs/update_project_doc.php';
+                break;
+            case 'delete-project-doc':
+                require_once 'components/Teacher/ProjectDocs/delete_project_doc.php';
+                break;
+
+            case 'student-vaccinations':
+                require_once 'components/Student/StudentVaccinations/student_vaccinations_api.php';
+                break;
+            case 'student-health-records':
+                require_once 'components/Student/StudentHealthRecords/student_health_records_api.php';
+                break;
+            case 'my-competency':
+                require_once 'components/Student/StudentCompetency/get_my_competency.php';
+                break;
+            case 'student-competency':
+            case 'get-student-competency':
+            case 'advisor-competency':
+                require_once 'components/Teacher/StudentCompetency/get_student_competency.php';
+                break;
+            case 'save-student-competency':
+                require_once 'components/Teacher/StudentCompetency/save_student_competency.php';
+                break;
                 
             case 'sidebar':
                 require_once 'components/sidebar.php';

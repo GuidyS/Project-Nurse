@@ -1,0 +1,135 @@
+<?php
+/**
+ * ตัวช่วยของหน้า "จัดการหลักสูตร" (หลักสูตรรอบละ 5 ปี เช่น 2566 - 2571)
+ * ตารางแยกออกจาก subject เดิม เพื่อไม่ให้กระทบหน้า CLO / รายวิชา ที่ใช้ตาราง subject อยู่
+ */
+
+const CURRICULUM_YEAR_MIN = 2500;
+const CURRICULUM_YEAR_MAX = 2700;
+const CURRICULUM_CREDIT_MAX = 30;
+const CURRICULUM_IMPORT_MAX_ROWS = 1000;
+
+function curriculumCyclesRespond(int $code, array $payload): void
+{
+    http_response_code($code);
+    echo json_encode($payload, JSON_UNESCAPED_UNICODE);
+    exit();
+}
+
+function curriculumCyclesRequireAdmin(PDO $db): int
+{
+    if (!isset($_SESSION['user_id'])) {
+        curriculumCyclesRespond(401, ["status" => "error", "message" => "Unauthorized"]);
+    }
+
+    $stmt = $db->prepare("SELECT role_id FROM users WHERE user_id = ? LIMIT 1");
+    $stmt->execute([$_SESSION['user_id']]);
+    if ((int)$stmt->fetchColumn() !== 1) {
+        curriculumCyclesRespond(403, ["status" => "error", "message" => "เฉพาะผู้ดูแลระบบเท่านั้นที่จัดการหลักสูตรได้"]);
+    }
+
+    return (int)$_SESSION['user_id'];
+}
+
+// ตรวจ schema แบบอ่านอย่างเดียว ห้าม endpoint สร้างหรือแก้ตารางอัตโนมัติ
+function curriculumCyclesEnsureSchema(PDO $db): void
+{
+    $stmt = $db->query("
+        SELECT COUNT(*)
+        FROM information_schema.TABLES
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME IN ('curriculum_cycle', 'curriculum_cycle_subject')
+    ");
+    if ((int)$stmt->fetchColumn() !== 2) {
+        throw new RuntimeException('ไม่พบตารางหลักสูตรที่จำเป็น กรุณาติดตั้ง schema ที่รองรับก่อนจัดการหลักสูตร');
+    }
+
+    if (!activeCurriculumColumnExists($db, 'curriculum_cycle', 'is_active')) {
+        throw new RuntimeException('ไม่พบคอลัมน์ curriculum_cycle.is_active กรุณาติดตั้ง schema ที่รองรับก่อนจัดการหลักสูตร');
+    }
+}
+
+function curriculumCyclesReadJson(): array
+{
+    $input = json_decode(file_get_contents('php://input'), true);
+    return is_array($input) ? $input : [];
+}
+
+function curriculumCyclesNormalizeYear($value, string $label): int
+{
+    $text = trim((string)$value);
+    if ($text === '' || !preg_match('/^\d{4}$/', $text)) {
+        throw new InvalidArgumentException("{$label}ต้องเป็นปี พ.ศ. 4 หลัก");
+    }
+    $year = (int)$text;
+    if ($year < CURRICULUM_YEAR_MIN || $year > CURRICULUM_YEAR_MAX) {
+        throw new InvalidArgumentException("{$label}ต้องอยู่ระหว่าง " . CURRICULUM_YEAR_MIN . " - " . CURRICULUM_YEAR_MAX);
+    }
+    return $year;
+}
+
+/**
+ * รับหน่วยกิตได้ทั้ง "3" และ "3(2-2-5)"
+ * คืนค่า [จำนวนหน่วยกิต, รูปแบบเต็มถ้ามีวงเล็บ]
+ */
+function curriculumCyclesParseCredit($value): array
+{
+    $text = trim((string)$value);
+    if ($text === '') {
+        throw new InvalidArgumentException("กรุณาระบุจำนวนหน่วยกิต");
+    }
+    if (!preg_match('/^(\d{1,2})(?:\.0+)?\s*(\(\s*[\d\s\-–]+\s*\))?$/u', $text, $m)) {
+        throw new InvalidArgumentException("จำนวนหน่วยกิตต้องเป็นตัวเลข เช่น 3 หรือ 3(2-2-5)");
+    }
+    $credit = (int)$m[1];
+    if ($credit > CURRICULUM_CREDIT_MAX) {
+        throw new InvalidArgumentException("จำนวนหน่วยกิตต้องไม่เกิน " . CURRICULUM_CREDIT_MAX);
+    }
+    $desc = !empty($m[2]) ? $credit . preg_replace('/\s+/', '', $m[2]) : null;
+    return [$credit, $desc];
+}
+
+function curriculumCyclesNormalizeSubject(array $row): array
+{
+    $code = trim((string)($row['subject_code'] ?? ''));
+    $name = trim((string)($row['subject_name'] ?? ''));
+
+    if ($code === '') {
+        throw new InvalidArgumentException("กรุณาระบุรหัสวิชา");
+    }
+    if (mb_strlen($code) > 50) {
+        throw new InvalidArgumentException("รหัสวิชายาวเกิน 50 ตัวอักษร");
+    }
+    if ($name === '') {
+        throw new InvalidArgumentException("กรุณาระบุชื่อวิชา");
+    }
+    if (mb_strlen($name) > 255) {
+        throw new InvalidArgumentException("ชื่อวิชายาวเกิน 255 ตัวอักษร");
+    }
+
+    [$credit, $creditDesc] = curriculumCyclesParseCredit($row['credit'] ?? '');
+
+    return [
+        'subject_code' => $code,
+        'subject_name' => $name,
+        'credit' => $credit,
+        'credit_desc' => $creditDesc,
+    ];
+}
+
+function curriculumCyclesFindCycle(PDO $db, int $cycleId): ?array
+{
+    $stmt = $db->prepare("SELECT id, start_year, end_year FROM curriculum_cycle WHERE id = ? LIMIT 1");
+    $stmt->execute([$cycleId]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    return $row ?: null;
+}
+
+function curriculumCyclesRequireCycle(PDO $db, $cycleId): array
+{
+    $cycle = curriculumCyclesFindCycle($db, (int)$cycleId);
+    if ($cycle === null) {
+        curriculumCyclesRespond(404, ["status" => "error", "message" => "ไม่พบหลักสูตรที่เลือก"]);
+    }
+    return $cycle;
+}
