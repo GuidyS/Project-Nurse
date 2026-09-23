@@ -314,10 +314,11 @@ try {
                 $update = $db->prepare("UPDATE import_history SET status = 'success', record_count = :count WHERE id = :id");
                 $update->execute([':count' => $finalCount, ':id' => $importId]);
 
+                // 🌟 เปลี่ยน 'create' เป็น 'import'
                 logAudit(
                     $db,
                     $adminUserId,
-                    'create',
+                    'import',
                     'import_data',
                     "นำเข้าข้อมูล {$importType} สำเร็จ: {$finalCount} รายการ (ไฟล์: {$file['name']})"
                 );
@@ -341,3 +342,4 @@ try {
     http_response_code(400);
     echo json_encode(["status" => "error", "message" => $e->getMessage()], JSON_UNESCAPED_UNICODE);
 }
+?>

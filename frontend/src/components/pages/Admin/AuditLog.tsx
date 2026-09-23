@@ -4,7 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar, Search, User, FileEdit, Trash2, Plus, Shield } from "lucide-react";
+import { Calendar, Search, User, FileEdit, Trash2, Plus, Shield, FileUp, FileDown } from "lucide-react";
 import ExportButton from "@/components/dashboard/ExportButton";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
@@ -14,7 +14,7 @@ interface AuditEntry {
   timestamp: string;
   user: string;
   userRole: string;
-  action: "create" | "update" | "delete" | "role_change";
+  action: "create" | "update" | "delete" | "role_change" | "export" | "import";
   resource: string;
   details: string;
   ipAddress: string;
@@ -25,6 +25,8 @@ const actionIcons: Record<AuditEntry["action"], React.ReactNode> = {
   update: <FileEdit className="h-4 w-4" />,
   delete: <Trash2 className="h-4 w-4" />,
   role_change: <Shield className="h-4 w-4" />,
+  import: <FileDown className="h-4 w-4" />,
+  export: <FileUp className="h-4 w-4" />,
 };
 
 const actionLabels: Record<AuditEntry["action"], string> = {
@@ -32,6 +34,8 @@ const actionLabels: Record<AuditEntry["action"], string> = {
   update: "แก้ไข",
   delete: "ลบ",
   role_change: "เปลี่ยน Role",
+  import: "นำเข้าข้อมูล",
+  export: "ส่งออกข้อมูล",
 };
 
 const actionColors: Record<AuditEntry["action"], string> = {
@@ -39,6 +43,8 @@ const actionColors: Record<AuditEntry["action"], string> = {
   update: "bg-primary",
   delete: "bg-destructive",
   role_change: "bg-warning",
+  import: "border-primary/25 bg-primary/15 text-primary",
+  export: "bg-warning",
 };
 
 export default function AuditLog() {
@@ -76,18 +82,18 @@ export default function AuditLog() {
   });
 
   return (
-    <div className="p-6 space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between">
+    <div className="app-page">
+      <div className="app-page-header">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Audit Log</h1>
-          <p className="text-muted-foreground">ประวัติการสร้าง แก้ไข และลบข้อมูลของผู้ใช้ทั้งหมด</p>
+          <h1 className="app-page-title">Audit Log</h1>
+          <p className="app-page-description">ประวัติการสร้าง แก้ไข และลบข้อมูลของผู้ใช้ทั้งหมด</p>
         </div>
         <ExportButton reportName="Audit-Log" />
       </div>
 
       {/* Summary Cards ตัด เข้า/ออกระบบ ออก เหลือ 3 การ์ด */}
       <div className="grid gap-4 md:grid-cols-3">
-        <Card>
+        <Card className="app-stat-card">
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success/10">
@@ -100,7 +106,7 @@ export default function AuditLog() {
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="app-stat-card">
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
@@ -113,7 +119,7 @@ export default function AuditLog() {
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="app-stat-card">
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-destructive/10">
@@ -128,7 +134,7 @@ export default function AuditLog() {
         </Card>
       </div>
 
-      <Card>
+      <Card className="app-section-card">
         <CardHeader>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
