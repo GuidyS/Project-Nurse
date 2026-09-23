@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -62,9 +61,8 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
     return false;
   };
 
-    const handleLogin = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setAccountSuspended(false);
 
     const nextErrors: { username?: string; password?: string } = {};
     if (!username.trim()) {
@@ -99,7 +97,7 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
     } else if (showRoleUnassignedPopup(response.data)) {
       // card popup
     } else {
-      showLoginFailure(response.data);
+      toast.error(response.data?.message || "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง");
     }
   } catch (error: any) {
     const data = error.response?.data;
@@ -169,16 +167,6 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
         </div>
         <form onSubmit={handleLogin} className="space-y-6">
 
-          {accountSuspended && (
-            <Alert variant="destructive" className="border-red-300 bg-red-50 text-red-900 [&>svg]:text-red-700">
-              <ShieldAlert className="h-5 w-5" />
-              <AlertTitle className="text-lg font-semibold leading-7">บัญชีถูกระงับการใช้งาน</AlertTitle>
-              <AlertDescription className="text-base leading-7">
-                กรุณาติดต่อผู้ดูแลระบบเพื่อตรวจสอบและเปิดใช้งานบัญชี
-              </AlertDescription>
-            </Alert>
-          )}
-
           <div className="space-y-4">
             <div className="space-y-2">
               <Label
@@ -196,7 +184,6 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
                 aria-invalid={Boolean(loginErrors.username)}
                 onChange={(e) => {
                   setUsername(e.target.value);
-                  setAccountSuspended(false);
                   if (loginErrors.username) {
                     setLoginErrors((current) => ({ ...current, username: undefined }));
                   }
