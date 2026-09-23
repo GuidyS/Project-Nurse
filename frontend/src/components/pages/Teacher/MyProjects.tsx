@@ -85,11 +85,11 @@ export default function MyProjects({ onItemClick }: MyProjectsProps) {
 
   return (
     <>
-      <div className="space-y-6">
-        <div className="app-page-header-surface flex items-center justify-between flex-wrap gap-4">
+      <div className="app-page">
+        <div className="app-page-header">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">โครงการของฉัน</h1>
-            <p className="text-muted-foreground">โครงการที่คุณเป็นผู้รับผิดชอบทั้งหมดในฐานข้อมูล</p>
+            <h1 className="app-page-title">โครงการของฉัน</h1>
+            <p className="app-page-description">โครงการที่คุณเป็นผู้รับผิดชอบหรือเป็นสมาชิก</p>
           </div>
         </div>
 

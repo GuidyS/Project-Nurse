@@ -271,9 +271,11 @@ export default function RolesManagement() {
             <Tabs value={roleTab} onValueChange={(value) => setRoleTab(value as RoleTab)}>
               <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
                 {roleTabs.map((tab) => (
-                  <TabsTrigger key={tab.value} value={tab.value} className="gap-1.5">
+                  <TabsTrigger key={tab.value} value={tab.value} className="group gap-2">
                     {tab.label}
-                    <span className="tabular-nums text-current">({tabCount(tab.value)})</span>
+                    <span className="text-xs font-semibold tabular-nums text-muted-foreground group-data-[state=active]:text-primary">
+                      {tabCount(tab.value)}
+                    </span>
                   </TabsTrigger>
                 ))}
               </TabsList>
@@ -281,18 +283,12 @@ export default function RolesManagement() {
           </CardHeader>
           <CardContent>
             <Table className="min-w-[760px] table-fixed">
-              <colgroup>
-                <col className="w-[32%]" />
-                <col className="w-[18%]" />
-                <col className="w-[30%]" />
-                <col className="w-[20%]" />
-              </colgroup>
               <TableHeader>
                 <TableRow>
-                  <TableHead>ผู้ใช้</TableHead>
-                  <TableHead>รหัสประจำตัว</TableHead>
-                  <TableHead>Role ปัจจุบัน</TableHead>
-                  <TableHead className="text-right">จัดการ</TableHead>
+                  <TableHead className="w-[34%]">ผู้ใช้</TableHead>
+                  <TableHead className="w-[20%]">รหัสประจำตัว</TableHead>
+                  <TableHead className="w-[30%]">Role ปัจจุบัน</TableHead>
+                  <TableHead className="w-[16%] text-right">จัดการ</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -305,8 +301,8 @@ export default function RolesManagement() {
                 ) : (
                   filteredUsers.map((user) => (
                     <TableRow key={user.id}>
-                      <TableCell className="break-words font-medium">
-                        {user.fullName}
+                      <TableCell>
+                        <span className="font-medium">{user.fullName}</span>
                       </TableCell>
                       <TableCell className="break-words text-muted-foreground">{user.email}</TableCell>
                       <TableCell>

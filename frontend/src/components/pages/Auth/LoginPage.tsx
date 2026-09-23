@@ -32,7 +32,7 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [showResetPassword, setShowResetPassword] = useState(false);
   const [roleUnassignedOpen, setRoleUnassignedOpen] = useState(false);
-  const [accountSuspended, setAccountSuspended] = useState(false);
+  const [accountSuspendedOpen, setAccountSuspendedOpen] = useState(false);
 
   const handleBackToLogin = () => {
     setShowResetPassword(false);
@@ -53,12 +53,13 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
     return false;
   };
 
-  const showLoginFailure = (payload?: { code?: string; message?: string }) => {
-    if (payload?.message?.includes("บัญชีถูกระงับ")) {
-      setAccountSuspended(true);
-    } else if (!showRoleUnassignedPopup(payload)) {
-      toast.error(payload?.message || "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง");
+  const showAccountSuspendedPopup = (payload?: { message?: string }) => {
+    const message = payload?.message || "";
+    if (message.includes("บัญชีถูกระงับ")) {
+      setAccountSuspendedOpen(true);
+      return true;
     }
+    return false;
   };
 
     const handleLogin = async (e: React.FormEvent) => {
@@ -93,12 +94,23 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
       
       toast.success("เข้าสู่ระบบสำเร็จ");
       onLoginSuccess(response.data.user);
+    } else if (showAccountSuspendedPopup(response.data)) {
+      // แสดงข้อความสถานะบัญชีแบบเด่นชัด
+    } else if (showRoleUnassignedPopup(response.data)) {
+      // card popup
     } else {
       showLoginFailure(response.data);
     }
   } catch (error: any) {
     const data = error.response?.data;
-    showLoginFailure(data);
+    if (showAccountSuspendedPopup(data)) {
+      // แสดงข้อความสถานะบัญชีแบบเด่นชัด
+    } else if (showRoleUnassignedPopup(data)) {
+      // card popup
+    } else {
+      const message = data?.message || "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง";
+      toast.error(message);
+    }
     console.error("Login Error:", error);
   } finally {
     setIsLoading(false);
@@ -303,6 +315,23 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
           </AlertDialogHeader>
           <AlertDialogFooter className="sm:justify-center">
             <AlertDialogAction className="min-w-28">รับทราบ</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={accountSuspendedOpen} onOpenChange={setAccountSuspendedOpen}>
+        <AlertDialogContent className="app-dialog-md">
+          <AlertDialogHeader>
+            <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+              <ShieldAlert className="h-7 w-7" />
+            </div>
+            <AlertDialogTitle className="text-center text-xl">บัญชีถูกระงับการใช้งาน</AlertDialogTitle>
+            <AlertDialogDescription className="text-center text-base leading-7">
+              ไม่สามารถเข้าสู่ระบบด้วยบัญชีนี้ได้ กรุณาติดต่อผู้ดูแลระบบเพื่อขอเปิดใช้งานบัญชี
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="sm:justify-center">
+            <AlertDialogAction className="min-w-32">รับทราบ</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
