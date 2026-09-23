@@ -11,7 +11,7 @@ interface Props {
 export function StudentDetailsDialog({ isOpen, onOpenChange, student }: Props) {
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="app-dialog-lg">
         <DialogHeader>
           <DialogTitle>รายละเอียดนักศึกษา</DialogTitle>
           <DialogDescription>

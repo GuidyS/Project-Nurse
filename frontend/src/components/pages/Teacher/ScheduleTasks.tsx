@@ -231,7 +231,7 @@ export default function ScheduleTasks() {
   return (
     <>
       <div className="space-y-6">
-        <div className="app-page-header-surface flex items-center justify-between flex-wrap gap-4">
+        <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Schedule Task</h1>
             <p className="text-muted-foreground">มอบหมายงานให้นักศึกษาฝึกปฏิบัติ</p>
@@ -251,7 +251,7 @@ export default function ScheduleTasks() {
                 <Plus className="mr-2 h-4 w-4" /> สร้างงานใหม่
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px]">
+            <DialogContent className="app-dialog-lg">
               <DialogHeader>
                 <DialogTitle>{editingTaskId ? "แก้ไขงาน" : "สร้างงานใหม่"}</DialogTitle>
                 <DialogDescription>{editingTaskId ? "แก้ไขรายละเอียดงานที่มอบหมายแล้ว" : "มอบหมายงานให้นักศึกษาฝึกปฏิบัติ"}</DialogDescription>

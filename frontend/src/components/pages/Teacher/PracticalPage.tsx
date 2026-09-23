@@ -51,6 +51,12 @@ export interface PracticalStudent extends Student {
   totalTasks: number;
 }
 
+type PracticalStudentApiRow = Student &
+  Partial<Omit<PracticalStudent, "performance" | "performanceComment">> & {
+    performance?: number | string | null;
+    performanceComment?: string | null;
+  };
+
 const PracticalPage = () => {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
@@ -83,13 +89,16 @@ const PracticalPage = () => {
       setError(null);
       const response = await api.get("/index.php?page=get-practical-students");
       if (response.data.status === "success") {
-        const rows = (response.data.data || []).map((s: Student & Partial<PracticalStudent>) => {
+        const data = Array.isArray(response.data.data)
+          ? (response.data.data as PracticalStudentApiRow[])
+          : [];
+        const rows = data.map((s) => {
           const tasksCompleted = Number(s.tasksCompleted ?? 0);
           const tasksPending = Number(s.tasksPending ?? 0);
           const totalTasks = Number(s.totalTasks ?? tasksCompleted + tasksPending);
           const progress = Number(s.progress ?? 0);
           const hospital = s.hospital || s.workplace || "โรงพยาบาลเครือข่ายฝึกปฏิบัติ";
-          const rawPerformance = (s as Record<string, unknown>).performance;
+          const rawPerformance = s.performance;
           const performance =
             rawPerformance === null || rawPerformance === undefined || rawPerformance === ""
               ? null
@@ -103,8 +112,8 @@ const PracticalPage = () => {
             workplace: s.workplace || hospital,
             ward: s.ward || "—",
             performance: Number.isFinite(performance) ? performance : null,
-            hasPerformanceEval: Boolean((s as Partial<PracticalStudent>).hasPerformanceEval),
-            performanceComment: String((s as Record<string, unknown>).performanceComment ?? ""),
+            hasPerformanceEval: Boolean(s.hasPerformanceEval),
+            performanceComment: String(s.performanceComment ?? ""),
             totalTasks,
             tasksCompleted,
             tasksPending,
@@ -280,7 +289,7 @@ const PracticalPage = () => {
 
   const getPerformanceBadge = (score: number) => {
     if (score >= 90) return <Badge className="bg-success text-success-foreground">ดีเยี่ยม</Badge>;
-    if (score >= 80) return <Badge className="bg-primary text-primary-foreground">ดี</Badge>;
+    if (score >= 80) return <Badge className="border-primary/25 bg-primary/15 text-primary">ดี</Badge>;
     if (score >= 70) return <Badge variant="secondary">พอใช้</Badge>;
     return <Badge variant="destructive">ต้องปรับปรุง</Badge>;
   };
@@ -296,7 +305,7 @@ const PracticalPage = () => {
 
   return (
     <div className="space-y-6">
-      <div className="app-page-header-surface flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-foreground">นักศึกษาฝึกปฏิบัติ</h1>
           <p className="text-muted-foreground mt-1">จัดการและติดตามนักศึกษาที่ดูแล (1:8)</p>
@@ -477,7 +486,7 @@ const PracticalPage = () => {
       />
 
       <Dialog open={isAssignOpen} onOpenChange={setIsAssignOpen}>
-        <DialogContent>
+        <DialogContent className="app-dialog-lg">
           <DialogHeader>
             <DialogTitle>มอบหมายงาน</DialogTitle>
             <DialogDescription>
@@ -521,7 +530,7 @@ const PracticalPage = () => {
       </Dialog>
 
       <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
-        <DialogContent>
+        <DialogContent className="app-dialog-lg">
           <DialogHeader>
             <DialogTitle>อัปโหลดหลักฐาน</DialogTitle>
             <DialogDescription>

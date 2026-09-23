@@ -15,7 +15,7 @@ export function MainLayout({ children, onItemClick, activeItem }: MainLayoutProp
         onItemClick={onItemClick}
         activeItem={activeItem}
         />
-        <main className="min-w-0 flex-1 relative overflow-y-auto bg-background text-foreground p-4 sm:p-6">
+        <main className="flex-1 relative overflow-y-auto bg-background text-foreground p-6">
           <div className="max-w-7xl mx-auto">
             {children}
           </div>

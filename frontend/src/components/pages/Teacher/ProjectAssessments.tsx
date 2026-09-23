@@ -264,7 +264,7 @@ export default function ProjectAssessments() {
 
   return (
     <div className="space-y-6">
-      <div className="app-page-header-surface flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <Button variant="ghost" className="mb-2 -ml-3 gap-2" onClick={() => navigate("projectspage")}>
             <ArrowLeft className="h-4 w-4" /> กลับไปหน้าจัดการโครงการ

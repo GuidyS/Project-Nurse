@@ -6,10 +6,16 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { TrendingUp, Save, Link } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import api from '@/lib/axios'; 
+import { consumePendingProjectNavigation } from '@/lib/projectNavigation';
 
 interface TargetOption {
   code: string;
   description: string;
+}
+
+interface ProjectOption {
+  id: number;
+  name: string;
 }
 
 interface LinkMatrix {
@@ -21,7 +27,7 @@ interface LinkMatrix {
 }
 
 export default function ProjectLinks() {
-  const [projects, setProjects] = useState<any[]>([]);
+  const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [plos, setPlos] = useState<TargetOption[]>([]);
   const [ylos, setYlos] = useState<TargetOption[]>([]);
   const [clos, setClos] = useState<TargetOption[]>([]);
@@ -45,10 +51,9 @@ export default function ProjectLinks() {
           setClos(data.clos || []);
           setLinks(data.links || {});
           
-          const pending = sessionStorage.getItem("pendingProjectId");
-          if (pending && (data.projects || []).some((p: any) => String(p.id) === pending)) {
-            setSelectedProjectId(pending);
-            sessionStorage.removeItem("pendingProjectId");
+          const pending = consumePendingProjectNavigation();
+          if (pending?.projectId && (data.projects || []).some((p: ProjectOption) => String(p.id) === pending.projectId)) {
+            setSelectedProjectId(pending.projectId);
           } else if (data.projects && data.projects.length > 0) {
             setSelectedProjectId(data.projects[0].id.toString());
           }
@@ -128,13 +133,7 @@ export default function ProjectLinks() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="app-page-header">
-        <div>
-          <h1 className="app-page-title">เชื่อมโยงระดับ LO</h1>
-          <p className="app-page-description">เชื่อมโยงโครงการกับผลลัพธ์การเรียนรู้ PLO, YLO และ CLO</p>
-        </div>
-      </div>
+    <>
       <div className="grid gap-6 md:grid-cols-3">
         {/* เมนูเลือกโครงการฝั่งซ้าย */}
         <div className="md:col-span-1 space-y-4">
@@ -154,7 +153,7 @@ export default function ProjectLinks() {
                     onClick={() => setSelectedProjectId(project.id.toString())}
                     className={`w-full text-left px-4 py-3 rounded-lg text-sm transition-colors font-medium ${
                       selectedProjectId === project.id.toString()
-                        ? 'bg-primary text-primary-foreground'
+                        ? 'bg-primary/15 text-primary'
                         : 'hover:bg-muted text-foreground'
                     }`}
                   >
@@ -311,6 +310,6 @@ export default function ProjectLinks() {
           </Card>
         </div>
       </div>
-    </div>
+    </>
   );
 }

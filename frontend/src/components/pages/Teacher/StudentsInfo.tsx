@@ -155,7 +155,9 @@ const StudentsInfo = () => {
   const fetchStudents = async () => {
     try {
       setLoading(true);
-      const res = await api.get('/components/Teacher/Advises/get_advises.php');
+      // หน้านี้แสดงเฉพาะนักศึกษาฝั่ง "ภาคปฏิบัติ" (สัดส่วน 1:8)
+      // ส่วนนักศึกษาในที่ปรึกษา (1:12) อยู่ที่หน้า "นักศึกษาในความดูแล"
+      const res = await api.get('/index.php?page=get-advises&advisor_type=practical');
       if (res.data.status === 'success') {
         const formattedData = res.data.data.map((item: any) => ({
           ...item,
@@ -440,10 +442,12 @@ const StudentsInfo = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="app-page-header-surface flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">นักศึกษาในที่ปรึกษา</h1>
-          <p className="text-muted-foreground mt-1">จัดการข้อมูลนักศึกษาและติดตาม PLO/YLO/CLO</p>
+          <h1 className="text-3xl font-bold tracking-tight">นักศึกษาภาคปฏิบัติ</h1>
+          <p className="text-muted-foreground mt-1">
+            จัดการข้อมูลนักศึกษาที่อยู่ในความดูแลภาคปฏิบัติ (สัดส่วน 1:8)
+          </p>
         </div>
         <Button variant="outline" className="gap-2" onClick={handleExport}>
           <Download className="h-4 w-4" />
@@ -474,8 +478,6 @@ const StudentsInfo = () => {
               <TableHead>ชั้นปี</TableHead>
               <TableHead>เกรดเฉลี่ย</TableHead>
               <TableHead>สถานะ</TableHead>
-              <TableHead>PLO Mapping</TableHead>
-              <TableHead className="text-right">การดำเนินการ</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -502,29 +504,6 @@ const StudentsInfo = () => {
                   </span>
                 </TableCell>
                 <TableCell>{getStatusBadge(student.status)}</TableCell>
-                <TableCell>
-                  <Button variant="outline" size="sm" className="gap-2" onClick={(e) => { e.stopPropagation(); openMappingDialog(student); }}>
-                    <Target className="h-4 w-4" />
-                    ติ้ก PLO/CLO
-                  </Button>
-                </TableCell>
-                <TableCell className="text-right">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem className="gap-2" onClick={() => openStudentDetail(student)}>
-                        <Eye className="h-4 w-4" /> ดูข้อมูล
-                      </DropdownMenuItem>
-                      <DropdownMenuItem className="gap-2" onClick={() => openMessageDialog(student)}>
-                        <Mail className="h-4 w-4" /> ส่งข้อความ
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -538,7 +517,7 @@ const StudentsInfo = () => {
 
       {/* Student Detail Dialog */}
       <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
-        <DialogContent className="sm:max-w-[680px]">
+        <DialogContent className="app-dialog-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3">
               <Avatar className="h-12 w-12">
@@ -604,10 +583,6 @@ const StudentsInfo = () => {
                   <Mail className="h-4 w-4" />
                   ส่งข้อความ
                 </Button>
-                <Button className="gap-2" onClick={() => openMappingDialog()}>
-                  <Target className="h-4 w-4" />
-                  ติ๊ก PLO/CLO
-                </Button>
               </div>
             </div>
           )}
@@ -616,7 +591,7 @@ const StudentsInfo = () => {
 
       {/* Send Message Dialog */}
       <Dialog open={messageDialogOpen} onOpenChange={setMessageDialogOpen}>
-        <DialogContent className="sm:max-w-[520px]">
+        <DialogContent className="app-dialog-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Mail className="h-5 w-5 text-primary" />
@@ -668,7 +643,7 @@ const StudentsInfo = () => {
 
       {/* Course-PLO Mapping Matrix Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-[95vw] max-h-[90vh] overflow-hidden">
+        <DialogContent className="app-dialog-screen overflow-hidden">
           <DialogHeader>
             <DialogTitle className="flex items-center justify-between">
               <div className="flex items-center gap-3">

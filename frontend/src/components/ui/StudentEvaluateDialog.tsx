@@ -30,7 +30,7 @@ export function StudentEvaluateDialog({
 }: Props) {
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="app-dialog-lg">
         <DialogHeader>
           <DialogTitle>ประเมินนักศึกษา</DialogTitle>
           <DialogDescription>

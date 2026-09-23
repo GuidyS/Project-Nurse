@@ -104,7 +104,7 @@ export default function DeanDashboard() {
     <>
       <div className="space-y-6 animate-fade-in">
         {/* Header */}
-        <div className="app-page-header-surface flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-foreground">แดชบอร์ดคณบดี</h1>
             <p className="text-muted-foreground">ภาพรวมผลการดำเนินงานและภาระงานอาจารย์ระดับคณะ</p>

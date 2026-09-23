@@ -144,7 +144,7 @@ export default function AdvisorCompetencyView() {
   if (view === "list") {
     return (
       <div className="p-6 space-y-6 animate-fade-in max-w-7xl mx-auto">
-        <div className="app-page-header-surface">
+        <div>
           <div className="flex items-center gap-2">
             <Users className="h-6 w-6 text-primary" />
             <h1 className="text-2xl font-bold text-foreground">ประเมินสมรรถนะหลักนักศึกษา</h1>
@@ -197,7 +197,7 @@ export default function AdvisorCompetencyView() {
 
   return (
     <div className="p-6 space-y-6 animate-fade-in max-w-6xl mx-auto">
-      <div className="app-page-header-surface flex items-center justify-between gap-3 flex-wrap">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={handleBack}>
             <ChevronLeft className="h-5 w-5" />

@@ -61,7 +61,7 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
     return false;
   };
 
-  const handleLogin = async (e: React.FormEvent) => {
+    const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const nextErrors: { username?: string; password?: string } = {};
@@ -97,7 +97,7 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
     } else if (showRoleUnassignedPopup(response.data)) {
       // card popup
     } else {
-      toast.error(response.data?.message || "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง");
+      toast.error(response.data.message || "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง");
     }
   } catch (error: any) {
     const data = error.response?.data;
@@ -285,7 +285,7 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
       </div>
 
       <AlertDialog open={roleUnassignedOpen} onOpenChange={setRoleUnassignedOpen}>
-        <AlertDialogContent className="max-w-md">
+        <AlertDialogContent className="app-dialog-md">
           <AlertDialogHeader>
             <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 text-amber-800">
               <ShieldAlert className="h-6 w-6" />

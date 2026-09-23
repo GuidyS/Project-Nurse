@@ -68,7 +68,7 @@ export default function StudentCompetencyView() {
   return (
     <div className="p-6 space-y-6 animate-fade-in max-w-6xl mx-auto">
       {/* Header Info */}
-      <div className="app-page-header-surface flex items-center justify-between gap-4 flex-wrap">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <div className="flex items-center gap-2">
             <ClipboardCheck className="h-6 w-6 text-primary" />

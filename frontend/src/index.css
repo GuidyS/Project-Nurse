@@ -6,112 +6,67 @@
 
 @layer base {
   :root {
-    /* Clean White/Blue Theme */
-    --background: 220 20% 97%;
-    --foreground: 220 25% 15%;
+    /* Light purple MIS theme */
+    --background: 260 33% 98%;
+    --foreground: 224 32% 15%;
 
     --card: 0 0% 100%;
-    --card-foreground: 220 25% 15%;
+    --card-foreground: 224 32% 15%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 220 25% 15%;
+    --popover-foreground: 224 32% 15%;
 
-    /* Blue Primary */
-    --primary: 217 91% 50%;
+    /* Accessible purple primary */
+    --primary: 262 73% 51%;
     --primary-foreground: 0 0% 100%;
 
-    /* Light Gray Secondary */
-    --secondary: 220 14% 96%;
-    --secondary-foreground: 220 25% 25%;
+    --secondary: 260 24% 96%;
+    --secondary-foreground: 224 32% 20%;
 
-    --muted: 220 14% 96%;
-    --muted-foreground: 220 10% 46%;
+    --muted: 260 24% 96%;
+    --muted-foreground: 224 12% 44%;
 
-    /* Orange Accent */
-    --accent: 25 95% 53%;
-    --accent-foreground: 0 0% 100%;
+    /* Soft purple accent for hover and selected surfaces */
+    --accent: 260 80% 96%;
+    --accent-foreground: 262 73% 43%;
 
     /* Success Green */
     --success: 142 76% 36%;
     --success-foreground: 0 0% 100%;
 
     /* Warning Yellow */
-    --warning: 45 93% 47%;
-    --warning-foreground: 0 0% 0%;
+    --warning: 35 92% 45%;
+    --warning-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 217 91% 50%;
+    --border: 252 20% 88%;
+    --input: 252 20% 88%;
+    --ring: 262 73% 51%;
 
-    --radius: 0.75rem;
+    --radius: 0.5rem;
 
     /* Sidebar */
     --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 220 10% 40%;
-    --sidebar-primary: 217 91% 50%;
+    --sidebar-foreground: 224 12% 38%;
+    --sidebar-primary: 262 73% 51%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 217 91% 97%;
-    --sidebar-accent-foreground: 217 91% 50%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217 91% 50%;
+    --sidebar-accent: 260 80% 97%;
+    --sidebar-accent-foreground: 262 73% 43%;
+    --sidebar-border: 252 20% 88%;
+    --sidebar-ring: 262 73% 51%;
+    --sidebar-brand: 262 73% 51%;
+    --sidebar-brand-soft: 262 73% 51%;
+    --sidebar-brand-soft-strong: 262 70% 62%;
+    --sidebar-brand-foreground: 0 0% 100%;
 
     /* Custom shadows */
-    --shadow-sm: 0 1px 2px 0 hsl(220 25% 15% / 0.05);
-    --shadow-card: 0 1px 3px 0 hsl(220 25% 15% / 0.1), 0 1px 2px -1px hsl(220 25% 15% / 0.1);
-    --scrollbar-track: 220 20% 96%;
-    --scrollbar-thumb: 220 12% 72%;
-    --scrollbar-thumb-hover: 217 91% 58%;
-  }
-
-  .dark {
-    --background: 222 47% 5%;
-    --foreground: 210 40% 98%;
-
-    --card: 222 38% 8%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222 38% 8%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 217 91% 60%;
-    --primary-foreground: 0 0% 100%;
-
-    --secondary: 222 30% 13%;
-    --secondary-foreground: 210 40% 96%;
-
-    --muted: 222 30% 13%;
-    --muted-foreground: 215 20% 72%;
-
-    --accent: 25 95% 55%;
-    --accent-foreground: 0 0% 100%;
-
-    --success: 142 70% 45%;
-    --success-foreground: 0 0% 100%;
-
-    --warning: 45 93% 50%;
-    --warning-foreground: 0 0% 0%;
-
-    --destructive: 0 62% 50%;
-    --destructive-foreground: 0 0% 100%;
-
-    --border: 222 26% 18%;
-    --input: 222 26% 18%;
-    --ring: 217 91% 60%;
-
-    --sidebar-background: 222 42% 6%;
-    --sidebar-foreground: 210 28% 88%;
-    --sidebar-primary: 217 91% 60%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 222 32% 13%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 222 26% 16%;
-    --sidebar-ring: 217 91% 60%;
-    --scrollbar-track: 222 34% 8%;
-    --scrollbar-thumb: 217 15% 34%;
-    --scrollbar-thumb-hover: 217 91% 64%;
+    --shadow-sm: 0 1px 2px 0 hsl(224 32% 15% / 0.05);
+    --shadow-card: 0 1px 3px 0 hsl(224 32% 15% / 0.1), 0 1px 2px -1px hsl(224 32% 15% / 0.1);
+    --scrollbar-track: 260 24% 96%;
+    --scrollbar-thumb: 252 14% 70%;
+    --scrollbar-thumb-hover: 262 73% 59%;
   }
 }
 
@@ -145,14 +100,6 @@
     color-scheme: light;
     position: relative;
     padding-inline-end: 2.5rem;
-  }
-
-  .dark input[type="date"],
-  .dark input[type="datetime-local"],
-  .dark input[type="month"],
-  .dark input[type="time"],
-  .dark input[type="week"] {
-    color-scheme: dark;
   }
 
   input[type="date"]::-webkit-calendar-picker-indicator,
@@ -249,35 +196,159 @@
 }
 
 @layer components {
-  .app-page-header,
-  .app-page-header-surface {
-    @apply rounded-md border border-primary/10 bg-card px-5 py-5 shadow-sm sm:px-6;
+  .app-page {
+    @apply mx-auto w-full max-w-7xl space-y-5;
   }
 
   .app-page-header {
-    @apply flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between;
+    @apply flex flex-col gap-4 rounded-md border border-primary/10 bg-card px-5 py-5 shadow-sm sm:px-6 lg:flex-row lg:items-center lg:justify-between;
   }
 
-  .app-page-header-surface > div {
-    min-width: 0;
+  .app-page-title {
+    @apply text-2xl font-bold leading-tight tracking-normal text-foreground sm:text-[1.7rem];
+  }
+
+  .app-page-description {
+    @apply mt-1 max-w-3xl text-sm leading-6 text-muted-foreground;
+  }
+
+  .app-section-card {
+    @apply rounded-md border-border/80 shadow-sm;
+  }
+
+  .app-stat-card {
+    @apply rounded-md border-border/80 bg-card shadow-sm transition-colors hover:border-primary/40 hover:bg-primary/5;
+  }
+
+  .app-interactive-card {
+    @apply rounded-md border border-border/80 bg-card transition-colors hover:border-primary/60 hover:bg-primary/5;
+  }
+
+  .app-dialog-content,
+  .app-dialog-shell {
+    --app-dialog-width: 32rem;
+    --app-dialog-gutter: 1rem;
+    width: min(calc(100vw - (var(--app-dialog-gutter) * 2)), var(--app-dialog-width));
+    max-width: var(--app-dialog-width);
+    max-height: calc(100dvh - (var(--app-dialog-gutter) * 2));
+  }
+
+  .app-dialog-content {
+    overflow-y: auto;
+  }
+
+  .app-dialog-shell {
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  @media (min-width: 640px) {
+    .app-dialog-content,
+    .app-dialog-shell {
+      --app-dialog-gutter: 2rem;
+    }
+  }
+
+  .app-dialog-sm {
+    --app-dialog-width: 24rem;
+  }
+
+  .app-dialog-md {
+    --app-dialog-width: 28rem;
+  }
+
+  .app-dialog-lg {
+    --app-dialog-width: 32rem;
+  }
+
+  .app-dialog-xl {
+    --app-dialog-width: 36rem;
+  }
+
+  .app-dialog-2xl {
+    --app-dialog-width: 42rem;
+  }
+
+  .app-dialog-3xl {
+    --app-dialog-width: 48rem;
+  }
+
+  .app-dialog-4xl {
+    --app-dialog-width: 56rem;
+  }
+
+  .app-dialog-5xl {
+    --app-dialog-width: 64rem;
+  }
+
+  .app-dialog-6xl {
+    --app-dialog-width: 72rem;
+  }
+
+  .app-dialog-screen {
+    --app-dialog-width: 95vw;
+  }
+
+  .app-dialog-fixed {
+    flex-shrink: 0;
+  }
+
+  .app-dialog-body {
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow-y: auto;
+  }
+
+  .role-position-option {
+    border-color: hsl(var(--border) / 0.8) !important;
+    background-color: hsl(var(--background) / 0.6) !important;
+    color: hsl(var(--foreground)) !important;
+  }
+
+  .role-position-option:hover {
+    border-color: hsl(var(--primary) / 0.6) !important;
+    background-color: hsl(var(--primary) / 0.05) !important;
+    color: hsl(var(--primary)) !important;
+  }
+
+  .role-position-option-selected {
+    border-color: hsl(var(--primary) / 0.7) !important;
+    background-color: hsl(var(--primary) / 0.1) !important;
+    color: hsl(var(--primary)) !important;
+  }
+
+  .role-position-option-selected:hover {
+    background-color: hsl(var(--primary) / 0.15) !important;
+  }
+
+  .role-position-option-primary {
+    cursor: not-allowed;
+    border-color: hsl(var(--primary) / 0.45) !important;
+    background-color: hsl(var(--primary) / 0.08) !important;
+    color: hsl(var(--primary)) !important;
+  }
+
+  .role-position-option-primary:hover {
+    border-color: hsl(var(--primary) / 0.45) !important;
+    background-color: hsl(var(--primary) / 0.08) !important;
+    color: hsl(var(--primary)) !important;
+  }
+
+  .role-position-option-note {
+    color: hsl(var(--primary) / 0.75);
   }
 
   /* --- User Profile & Logout UI --- */
   .sidebar-profile-avatar {
-    @apply h-full w-full border border-[#8a2be2]/20;
+    border-color: hsl(var(--sidebar-brand) / 0.2);
+    @apply h-full w-full border;
   }
   
   .sidebar-profile-fallback {
-    background-color: #ad71e6 !important;
-    color: white !important;
+    background-color: hsl(var(--sidebar-brand-soft-strong)) !important;
+    color: hsl(var(--sidebar-brand-foreground)) !important;
     @apply text-sm font-semibold;
-  }
-
-  .dark .sidebar-profile-fallback {
-    /* ใช้สีพื้นหลังม่วงความทึบ 10% (rgba ของ #8a2be2) ให้ตรงกับปุ่ม active */
-    background-color: rgba(138, 43, 226, 0.1) !important; 
-    /* สีตัวอักษรเป็นสีม่วง */
-    color: #8a2be2 !important; 
   }
 
   .sidebar-logout-overlay {
@@ -296,6 +367,41 @@
     @apply p-1 hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors;
   }
 
+  .sidebar-brand-bg {
+    background-color: hsl(var(--sidebar-brand));
+  }
+
+  .sidebar-logo-trigger {
+    background-color: hsl(var(--sidebar-brand) / 0.8);
+    color: hsl(var(--sidebar-brand-foreground));
+    @apply absolute inset-0 h-full w-full opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-lg flex items-center justify-center border-none;
+  }
+
+  .sidebar-logo-trigger:hover {
+    background-color: hsl(var(--sidebar-brand));
+  }
+
+  .sidebar-toggle-button {
+    color: hsl(var(--sidebar-foreground) / 0.7);
+  }
+
+  .sidebar-toggle-button:hover {
+    background-color: hsl(var(--sidebar-brand-soft) / 0.1);
+    color: hsl(var(--sidebar-brand));
+  }
+
+  .sidebar-menu-action:hover,
+  .sidebar-menu-action:active,
+  .sidebar-menu-action:focus,
+  .sidebar-menu-action.active {
+    background-color: hsl(var(--sidebar-brand-soft) / 0.1) !important;
+    color: hsl(var(--sidebar-brand)) !important;
+  }
+
+  .sidebar-menu-action:focus-visible {
+    --tw-ring-color: hsl(var(--sidebar-brand) / 0.5);
+  }
+
   /* --- Main Menu Icons --- */
   .sidebar-main-icon {
     /* ตั้งค่าเริ่มต้นให้สีไอคอนรองรับ Dark/Light Mode */
@@ -304,12 +410,12 @@
 
   /* ดักจับ Hover เฉพาะปุ่มใครปุ่มมัน */
   [data-sidebar="menu-button"]:hover .sidebar-main-icon {
-    @apply text-[#8a2be2];
+    color: hsl(var(--sidebar-brand));
   }
 
   /* สีตอนที่เมนูนั้นกำลัง Active อยู่ */
   .sidebar-main-icon.active {
-    @apply text-[#8a2be2];
+    color: hsl(var(--sidebar-brand));
   }
   
   /* --- Bottom Menu Icons --- */
@@ -320,11 +426,11 @@
 
   /* 2. ดักจับว่าถ้าเมาส์ชี้ที่ "ปุ่มเมนู" ตัวไหน ค่อยให้ไอคอนข้างในปุ่มนั้นเปลี่ยนสี */
   [data-sidebar="menu-button"]:hover .sidebar-bottom-icon {
-    @apply text-[#8a2be2];
+    color: hsl(var(--sidebar-brand));
   }
 
   /* 3. สีตอนที่เมนูนั้นกำลัง Active อยู่ */
   .sidebar-bottom-icon.active {
-    @apply text-[#8a2be2];
+    color: hsl(var(--sidebar-brand));
   }
 }

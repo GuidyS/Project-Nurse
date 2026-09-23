@@ -13,6 +13,27 @@ import { useState, useEffect } from 'react';
 import api from '@/lib/axios';
 import { ConfirmActionDialog } from '@/components/ui/ConfirmActionDialog';
 
+interface TransferRequestItem {
+  id: string;
+  studentId: string;
+  studentName: string;
+  otherAdvisor: string;
+  reason: string;
+  date: string;
+  status: string;
+  type?: string;
+}
+
+interface TransferDropdownOption {
+  id: string | number;
+  name: string;
+}
+
+interface TransferDropdowns {
+  students: TransferDropdownOption[];
+  advisors: TransferDropdownOption[];
+}
+
 const getStatusBadge = (status: string) => {
   switch (status) {
     case 'pending':
@@ -27,10 +48,10 @@ const getStatusBadge = (status: string) => {
 };
 
 export default function TransferRequests() {
-  const [incomingRequests, setIncomingRequests] = useState<any[]>([]);
-  const [outgoingRequests, setOutgoingRequests] = useState<any[]>([]);
-  const [historyRequests, setHistoryRequests] = useState<any[]>([]);
-  const [dropdowns, setDropdowns] = useState<{students: any[], advisors: any[]}>({students: [], advisors: []});
+  const [incomingRequests, setIncomingRequests] = useState<TransferRequestItem[]>([]);
+  const [outgoingRequests, setOutgoingRequests] = useState<TransferRequestItem[]>([]);
+  const [historyRequests, setHistoryRequests] = useState<TransferRequestItem[]>([]);
+  const [dropdowns, setDropdowns] = useState<TransferDropdowns>({students: [], advisors: []});
 
   const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
@@ -133,7 +154,7 @@ export default function TransferRequests() {
   return (
     <>
       <div className="space-y-6">
-        <div className="app-page-header-surface flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">ร้องขอรับมอบนักศึกษา</h1>
             <p className="text-muted-foreground">จัดการคำขอรับมอบนักศึกษาระหว่างอาจารย์ที่ปรึกษา</p>
@@ -195,13 +216,13 @@ export default function TransferRequests() {
             <TabsTrigger value="incoming">
               คำขอเข้า
               {pendingIncomingCount > 0 && (
-                <Badge className="ml-2 bg-primary">{pendingIncomingCount}</Badge>
+                <Badge className="ml-2 border-primary/25 bg-primary/15 text-primary">{pendingIncomingCount}</Badge>
               )}
             </TabsTrigger>
             <TabsTrigger value="outgoing">
               คำขอออก
               {pendingOutgoingCount > 0 && (
-                <Badge className="ml-2 bg-primary">{pendingOutgoingCount}</Badge>
+                <Badge className="ml-2 border-primary/25 bg-primary/15 text-primary">{pendingOutgoingCount}</Badge>
               )}
             </TabsTrigger>
             <TabsTrigger value="history">ประวัติ</TabsTrigger>
@@ -242,16 +263,7 @@ export default function TransferRequests() {
                         <TableCell>{request.date}</TableCell>
                         <TableCell>{getStatusBadge(request.status)}</TableCell>
                         <TableCell>
-                          <div className="flex gap-2">
-                            <Button size="sm" onClick={() => openApproveConfirm(request.id)}>
-                              <CheckCircle className="mr-1 h-3 w-3" />
-                              รับ
-                            </Button>
-                            <Button variant="outline" size="sm" onClick={() => openRejectDialog(request.id)}>
-                              <XCircle className="mr-1 h-3 w-3" />
-                              ปฏิเสธ
-                            </Button>
-                          </div>
+                          <Badge variant="outline">Admin review</Badge>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -350,7 +362,7 @@ export default function TransferRequests() {
 
         {/* Reject Dialog */}
         <Dialog open={isRejectDialogOpen} onOpenChange={setIsRejectDialogOpen}>
-          <DialogContent>
+          <DialogContent className="app-dialog-md">
             <DialogHeader>
               <DialogTitle>ปฏิเสธคำขอรับมอบ</DialogTitle>
               <DialogDescription>
@@ -380,7 +392,7 @@ export default function TransferRequests() {
 
         {/* Create Request Dialog */}
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogContent>
+          <DialogContent className="app-dialog-lg">
             <DialogHeader>
               <DialogTitle>สร้างคำขอมอบนักศึกษา (ส่งออก)</DialogTitle>
               <DialogDescription>

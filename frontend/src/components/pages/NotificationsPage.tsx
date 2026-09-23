@@ -206,7 +206,7 @@ const NotificationsPage = () => {
   const getTypeBadge = (type: Notification["type"]) => {
     switch (type) {
       case "request":
-        return <Badge className="bg-primary text-primary-foreground">คำขอ</Badge>;
+        return <Badge className="border-primary/25 bg-primary/15 text-primary">คำขอ</Badge>;
       case "warning":
         return <Badge className="bg-warning text-warning-foreground">เตือน</Badge>;
       case "success":
@@ -376,16 +376,16 @@ const NotificationsPage = () => {
   };
 
   const getRoleBadge = (roleId: number) => {
-    if (roleId === 1) return <Badge className="bg-destructive hover:bg-destructive text-[10px] h-4">Admin</Badge>;
-    if (roleId === 2) return <Badge className="bg-blue-500 hover:bg-blue-600 text-[10px] h-4">อาจารย์</Badge>;
-    return <Badge className="bg-emerald-500 hover:bg-emerald-600 text-[10px] h-4">นักศึกษา</Badge>;
+    if (roleId === 1) return <Badge className="bg-destructive text-[10px] h-4">Admin</Badge>;
+    if (roleId === 2) return <Badge className="bg-blue-500 text-[10px] h-4">อาจารย์</Badge>;
+    return <Badge className="bg-emerald-500 text-[10px] h-4">นักศึกษา</Badge>;
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="app-page">
+      <div className="app-page-header">
         <div>
-          <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
+          <h1 className="app-page-title flex items-center gap-2">
             การแจ้งเตือน
             {unreadCount > 0 && (
               <Badge className="bg-destructive text-destructive-foreground">
@@ -393,12 +393,12 @@ const NotificationsPage = () => {
               </Badge>
             )}
           </h1>
-          <p className="text-muted-foreground mt-1">
+          <p className="app-page-description">
             จัดการและส่งการแจ้งเตือนให้นักศึกษา
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={markAllAsRead} className="gap-2">
+          <Button onClick={markAllAsRead} className="gap-2">
             <CheckCheck className="h-4 w-4" />
             อ่านทั้งหมด
           </Button>
@@ -559,20 +559,20 @@ const NotificationsPage = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-card rounded-xl shadow-card p-4 text-center">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        <div className="app-stat-card p-4 text-center">
           <p className="text-2xl font-bold text-foreground">{notifications.length}</p>
           <p className="text-xs text-muted-foreground">ทั้งหมด</p>
         </div>
-        <div className="bg-card rounded-xl shadow-card p-4 text-center">
+        <div className="app-stat-card p-4 text-center">
           <p className="text-2xl font-bold text-primary">{unreadCount}</p>
           <p className="text-xs text-muted-foreground">ยังไม่อ่าน</p>
         </div>
-        <div className="bg-card rounded-xl shadow-card p-4 text-center">
+        <div className="app-stat-card p-4 text-center">
           <p className="text-2xl font-bold text-warning">{requestCount}</p>
           <p className="text-xs text-muted-foreground">คำขอนัดพบ</p>
         </div>
-        <div className="bg-card rounded-xl shadow-card p-4 text-center">
+        <div className="app-stat-card p-4 text-center">
           <p className="text-2xl font-bold text-success">{sentCount}</p>
           <p className="text-xs text-muted-foreground">ส่งสำเร็จ</p>
         </div>
@@ -607,14 +607,13 @@ const NotificationsPage = () => {
                 <div
                   key={notification.id}
                   onClick={() => handleCardClick(notification)} 
-                  // 🎯 เพิ่ม border border-transparent และ hover:border-primary/60 เพื่อทำกรอบสีเมื่อเอาเมาส์วาง
-                  className={`bg-card rounded-xl shadow-card p-4 flex items-start gap-4 transition-all cursor-pointer hover:bg-muted/50 hover:shadow-md border border-transparent hover:border-primary/60 ${
+                  className={`group flex cursor-pointer items-start gap-4 rounded-md border bg-card p-4 shadow-sm transition-colors hover:border-primary/70 hover:bg-primary/5 ${
                     !notification.isRead 
-                      ? "border-l-4 border-l-primary" // ขอบซ้ายหนา 4px กรณีที่ยังไม่อ่าน
-                      : "opacity-90 border-border/40" // ขอบจางๆ กรณีที่อ่านแล้ว
+                      ? "border-l-4 border-l-primary"
+                      : "opacity-90 border-border/60"
                   }`}
                 >
-                  <div className="p-2 bg-muted rounded-lg flex-shrink-0">
+                  <div className="flex-shrink-0 rounded-md bg-muted p-2 transition-colors group-hover:bg-primary/10">
                     {getTypeIcon(notification.type)}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -646,7 +645,7 @@ const NotificationsPage = () => {
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 hover:bg-primary/20 hover:text-primary z-10"
+                        className="z-10 h-8 w-8 hover:bg-primary/15 hover:text-primary"
                         onClick={(e) => {
                           e.stopPropagation(); // 🎯 5. ดักจับ Event ไม่ให้การกดปุ่ม "ติ๊กอ่านแล้ว" ทะลุไปเปิดหน้าต่างรายละเอียด
                           markAsRead(notification.id);
@@ -658,7 +657,7 @@ const NotificationsPage = () => {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive z-10"
+                      className="z-10 h-8 w-8 text-destructive hover:bg-primary/15 hover:text-primary"
                       onClick={(e) => {
                         e.stopPropagation(); // 🎯 ดักจับ Event ไม่ให้การกดปุ่ม "ลบ" ทะลุไปเปิดหน้าต่างรายละเอียด
                         openDeleteConfirm(notification.id);
@@ -670,7 +669,7 @@ const NotificationsPage = () => {
                 </div>
               ))
             ) : (
-              <div className="bg-card rounded-xl shadow-card p-12 text-center">
+              <div className="app-section-card bg-card p-12 text-center">
                 <Bell className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                 <h3 className="font-semibold text-foreground mb-2">
                   ไม่มีการแจ้งเตือน
@@ -704,7 +703,7 @@ const NotificationsPage = () => {
                 {selectedNotification.title}
               </h3>
               
-              <div className="bg-muted/50 p-4 rounded-xl border border-border">
+              <div className="rounded-md border border-border bg-muted/50 p-4">
                 <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
                   {selectedNotification.message}
                 </p>

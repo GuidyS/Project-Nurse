@@ -33,6 +33,7 @@ const teacherSubRoles = [
   { value: "dean", label: "คณบดี" },
   { value: "instructor", label: "อาจารย์ประจำ" },
   { value: "project_manager", label: "อาจารย์รับผิดชอบโครงการ" },
+  { value: "research", label: "อาจารย์งานวิจัย" },
   { value: "program_manager", label: "อาจารย์รับผิดชอบหลักสูตร" },
   { value: "advisor", label: "อาจารย์ที่ปรึกษา" },
   { value: "practical_instructor", label: "อาจารย์ภาคปฏิบัติ" },
@@ -56,6 +57,7 @@ const subRoleLabels: Record<string, string> = {
   dean: "คณบดี",
   instructor: "อาจารย์ประจำ",
   project_manager: "อาจารย์รับผิดชอบโครงการ",
+  research: "อาจารย์งานวิจัย",
   program_manager: "อาจารย์รับผิดชอบหลักสูตร",
   advisor: "อาจารย์ที่ปรึกษา",
   practical_instructor: "อาจารย์ภาคปฏิบัติ",
@@ -64,7 +66,7 @@ const subRoleLabels: Record<string, string> = {
 export default function RolesManagement() {
   const [users, setUsers] = useState<UserWithRole[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [roleTab, setRoleTab] = useState<RoleTab>("unassigned");
+  const [roleTab, setRoleTab] = useState<RoleTab>("teacher");
   const [selectedUser, setSelectedUser] = useState<UserWithRole | null>(null);
   const [newRole, setNewRole] = useState("");
   const [primaryPosition, setPrimaryPosition] = useState("");
@@ -196,60 +198,15 @@ export default function RolesManagement() {
 
   return (
     <>
-      <div className="p-6 space-y-6 animate-fade-in">
-        <div className="flex items-center justify-between">
+      <div className="app-page">
+        <div className="app-page-header">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">จัดการ Role</h1>
-            <p className="text-muted-foreground">มอบหมายและถอด Role ของผู้ใช้ในระบบ</p>
+            <h1 className="app-page-title">จัดการ Role</h1>
+            <p className="app-page-description">มอบหมายและถอด Role ของผู้ใช้ในระบบ</p>
           </div>
         </div>
 
-        {/* Role Summary Cards */}
-        <div className="grid gap-4 md:grid-cols-4">
-          {roles.map((role) => (
-            <Card
-              key={role.value}
-              className={cn(
-                "cursor-pointer transition-colors hover:border-primary/40",
-                roleTab === role.value && "border-primary"
-              )}
-              onClick={() => setRoleTab(role.value as RoleTab)}
-            >
-              <CardHeader className="pb-2">
-                <div className="flex items-center gap-2">
-                  <Shield className="h-5 w-5 text-primary" />
-                  <CardTitle className="text-base">{role.label}</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">{role.description}</p>
-                <p className="mt-2 text-2xl font-bold">
-                  {tabCount(role.value as RoleTab)}
-                </p>
-              </CardContent>
-            </Card>
-          ))}
-          <Card
-            className={cn(
-              "cursor-pointer transition-colors hover:border-primary/40",
-              roleTab === "unassigned" && "border-primary"
-            )}
-            onClick={() => setRoleTab("unassigned")}
-          >
-            <CardHeader className="pb-2">
-              <div className="flex items-center gap-2">
-                <Shield className="h-5 w-5 text-amber-600" />
-                <CardTitle className="text-base">รอจัดบทบาท</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">บัญชียังไม่มี role — มอบสิทธิ์ก่อนเข้าใช้ระบบ</p>
-              <p className="mt-2 text-2xl font-bold">{tabCount("unassigned")}</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        <Card>
+        <Card className="app-section-card">
           <CardHeader className="space-y-4">
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <div>
@@ -304,7 +261,7 @@ export default function RolesManagement() {
                       <TableCell>
                         <span className="font-medium">{user.fullName}</span>
                       </TableCell>
-                      <TableCell className="break-words text-muted-foreground">{user.email}</TableCell>
+                      <TableCell className="text-muted-foreground">{user.email}</TableCell>
                       <TableCell>
                         <div className="flex flex-col gap-1">
                           <Badge

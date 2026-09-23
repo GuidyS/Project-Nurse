@@ -399,7 +399,7 @@ export default function ResearchSummary() {
 
   return (
     <div className="space-y-6">
-      <div className="app-page-header-surface flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">สรุปผลงานวิจัย 5 ปี</h1>
           <p className="text-muted-foreground">บันทึกและตรวจสอบผลงานวิจัยสำหรับอาจารย์งานวิจัย</p>

@@ -9,11 +9,12 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Search, Edit, Trash2, MoreHorizontal, UserPlus, Upload } from "lucide-react";
+import { Loader2, Search, Edit, Trash2, MoreHorizontal, UserPlus, Upload, Users as UsersIcon } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import api from "@/lib/axios";
 import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ImportDataDialog, type ImportDataTypeOption } from "@/components/shared/ImportDataDialog";
 
 interface User {
   id: string;
@@ -65,18 +66,24 @@ const studentPdfOptions = [
   { value: "student_certificate_file", label: "ไฟล์ประกาศนียบัตร/ใบรับรอง" },
 ];
 
+const userImportTypes: ImportDataTypeOption[] = [
+  { value: "students", label: "ข้อมูลนักศึกษา", icon: UsersIcon, description: "นำเข้ารายชื่อนักศึกษาใหม่" },
+  { value: "teachers", label: "ข้อมูลอาจารย์", icon: UsersIcon, description: "นำเข้ารายชื่ออาจารย์" },
+];
+
 export default function UsersManagement() {
   const [users, setUsers] = useState<User[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [roleTab, setRoleTab] = useState<RoleTab>("teacher");
   const [isGenerateOpen, setIsGenerateOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
   // 🎯 States สำหรับ Dialog แก้ไขข้อมูลเชิงลึก
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [editingUserRole, setEditingUserRole] = useState<number | null>(null);
   const [detailForm, setDetailForm] = useState<any>({});
-  const [pdfFiles, setPdfFiles] = useState<Record<string, File[]>>({});
+  const [pdfLinks, setPdfLinks] = useState<Record<string, string>>({});
   const [selectedPdfField, setSelectedPdfField] = useState("nursing_council_file");
   const [savedDocuments, setSavedDocuments] = useState<Array<{
     field: string;
@@ -101,7 +108,6 @@ export default function UsersManagement() {
     portfolio_id?: number | null;
   } | null>(null);
   const [isDeleteDocOpen, setIsDeleteDocOpen] = useState(false);
-  const pdfInputRef = useRef<HTMLInputElement | null>(null);
   const { toast } = useToast();
 
   // ดึงข้อมูลผู้ใช้จาก API
@@ -161,11 +167,8 @@ export default function UsersManagement() {
     try {
       setEditingUserId(userId);
       setDetailForm({});
-      setPdfFiles({});
+      setPdfLinks({});
       setSavedDocuments([]);
-      if (pdfInputRef.current) {
-        pdfInputRef.current.value = "";
-      }
       const res = await api.get(`/index.php?page=manage-user&id=${userId}`);
       if (res.data.status === "success") {
         setEditingUserRole(res.data.data.role_id);
@@ -183,58 +186,18 @@ export default function UsersManagement() {
   const handleSaveEdit = async () => {
     try {
       setIsSaving(true);
-      const pdfFieldNames = [...teacherPdfOptions, ...studentPdfOptions].map((option) => option.value);
-      const formFiles: Record<string, File[]> = {};
-      const sanitizedDetails = { ...detailForm };
 
-      Object.entries(pdfFiles).forEach(([field, files]) => {
-        if (files.length > 0) {
-          formFiles[field] = files;
-        }
-      });
+      const payload = {
+        user_id: editingUserId,
+        details: detailForm,
+        pdfLinks: pdfLinks
+      };
 
-      const inputFiles = Array.from(pdfInputRef.current?.files || []);
-      if (inputFiles.length > 0 && !(formFiles[selectedPdfField]?.length > 0)) {
-        formFiles[selectedPdfField] = [...(formFiles[selectedPdfField] || []), ...inputFiles];
-      }
-
-      pdfFieldNames.forEach((field) => {
-        const value = detailForm[field];
-
-        if (value instanceof File) {
-          formFiles[field] = [...(formFiles[field] || []), value];
-          delete sanitizedDetails[field];
-          return;
-        }
-
-        if (typeof FileList !== "undefined" && value instanceof FileList) {
-          const files = Array.from(value);
-          if (files.length > 0) {
-            formFiles[field] = [...(formFiles[field] || []), ...files];
-          }
-          delete sanitizedDetails[field];
-        }
-      });
-
-      const hasPdfFiles = Object.values(formFiles).some((files) => files.length > 0);
-
-      if (hasPdfFiles) {
-        const formData = new FormData();
-        formData.append("user_id", editingUserId || "");
-        formData.append("details", JSON.stringify(sanitizedDetails));
-
-        Object.entries(formFiles).forEach(([field, files]) => {
-          files.forEach((file) => formData.append(`${field}[]`, file));
-        });
-
-        await api.post("/index.php?page=manage-user", formData);
-      } else {
-        await api.post("/index.php?page=manage-user", { user_id: editingUserId, details: detailForm });
-      }
+      await api.post("/index.php?page=manage-user", payload);
 
       toast({ title: "อัปเดตข้อมูลสำเร็จ" });
       setIsEditDialogOpen(false);
-      setPdfFiles({});
+      setPdfLinks({});
       setSavedDocuments([]);
       fetchUsers();
     } catch (error: any) {
@@ -368,38 +331,26 @@ export default function UsersManagement() {
     }
   };
 
-  const handlePdfFileChange = (field: string, fileList?: FileList | null) => {
-    const files = Array.from(fileList || []);
-    if (files.length === 0) {
-      setPdfFiles((prev) => ({ ...prev, [field]: [] }));
-      return;
-    }
-
-    const invalidFile = files.find((file) => file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf"));
-    if (invalidFile) {
-      toast({ title: "ไฟล์ไม่ถูกต้อง", description: "กรุณาเลือกไฟล์ PDF เท่านั้น", variant: "destructive" });
-      return;
-    }
-
-    setPdfFiles((prev) => ({ ...prev, [field]: files }));
+  const handlePdfLinkChange = (field: string, link: string) => {
+    setPdfLinks((prev) => ({ ...prev, [field]: link }));
   };
 
   const pdfOptions = editingUserRole === 3 ? studentPdfOptions : teacherPdfOptions;
-  const selectedPdfFiles = pdfFiles[selectedPdfField] || [];
-  const selectedPdfLabel = pdfOptions.find((option) => option.value === selectedPdfField)?.label || "เอกสาร PDF";
+  const selectedPdfLink = pdfLinks[selectedPdfField] || "";
+  const selectedPdfLabel = pdfOptions.find((option) => option.value === selectedPdfField)?.label || "เอกสาร";
 
   const PdfUploadSection = ({ description }: { description: string }) => (
     <div className="col-span-2 rounded-lg border p-4 space-y-4">
       <div className="flex items-center gap-2">
         <Upload className="h-4 w-4 text-primary" />
-        <Label className="text-base font-semibold">อัปโหลดเอกสาร PDF</Label>
+        <Label className="text-base font-semibold">บันทึกลิงก์เอกสาร Google Drive</Label>
       </div>
 
       <div className="space-y-2">
-        <Label>ประเภทไฟล์ที่จะอัปโหลด</Label>
+        <Label>ประเภทเอกสารที่ต้องการบันทึกลิงก์</Label>
         <Select value={selectedPdfField} onValueChange={setSelectedPdfField}>
           <SelectTrigger>
-            <SelectValue placeholder="เลือกประเภทไฟล์" />
+            <SelectValue placeholder="เลือกประเภทเอกสาร" />
           </SelectTrigger>
           <SelectContent>
             {pdfOptions.map((option) => (
@@ -411,41 +362,15 @@ export default function UsersManagement() {
         </Select>
       </div>
 
-      <label
-        htmlFor="pdf-upload-dropzone"
-        onDragOver={(event) => event.preventDefault()}
-        onDrop={(event) => {
-          event.preventDefault();
-          handlePdfFileChange(selectedPdfField, event.dataTransfer.files);
-        }}
-        className="flex min-h-[160px] cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-muted-foreground/30 bg-muted/20 px-6 py-8 text-center transition-colors hover:border-primary/60 hover:bg-primary/5"
-      >
-        <Upload className="mb-3 h-10 w-10 text-primary" />
-        <p className="font-medium text-foreground">Choose a file or Drag it here</p>
-        <p className="mt-2 text-xs text-muted-foreground">รองรับหลายไฟล์พร้อมกัน เฉพาะ PDF ขนาดไม่เกิน 50MB ต่อไฟล์</p>
-        <Input
-          ref={pdfInputRef}
-          id="pdf-upload-dropzone"
-          type="file"
-          multiple
-          accept="application/pdf,.pdf"
-          className="hidden"
-          onChange={(event) => handlePdfFileChange(selectedPdfField, event.currentTarget.files)}
+      <div className="space-y-2">
+        <Label>ลิงก์ Google Drive (ต้องตั้งค่าเป็น Anyone with the link)</Label>
+        <Input 
+          type="url" 
+          placeholder="https://drive.google.com/file/d/..."
+          value={pdfLinks[selectedPdfField] || ""}
+          onChange={(e) => handlePdfLinkChange(selectedPdfField, e.target.value)}
         />
-      </label>
-
-      {selectedPdfFiles.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-xs font-medium text-muted-foreground">ไฟล์ที่เลือก ({selectedPdfFiles.length})</p>
-          <div className="space-y-1">
-            {selectedPdfFiles.map((file) => (
-              <div key={`${selectedPdfField}-${file.name}-${file.size}`} className="rounded-md bg-muted px-3 py-2 text-xs text-foreground">
-                {file.name}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      </div>
 
       {savedDocuments.length > 0 && (
         <div className="space-y-2">
@@ -489,19 +414,25 @@ export default function UsersManagement() {
 
   return (
     <>
-      <div className="p-6 space-y-6 animate-fade-in">
-        <div className="flex items-center justify-between">
+      <div className="app-page">
+        <div className="app-page-header">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">จัดการผู้ใช้</h1>
-            <p className="text-muted-foreground">สร้างบัญชีจากข้อมูลอาจารย์/นักศึกษา แก้ไข ลบ และมอบบทบาท</p>
+            <h1 className="app-page-title">จัดการผู้ใช้</h1>
+            <p className="app-page-description">สร้างบัญชีจากข้อมูลอาจารย์/นักศึกษา แก้ไข ลบ และมอบบทบาท</p>
           </div>
-          <Button className="gap-2" onClick={() => setIsGenerateOpen(true)} disabled={isGenerating}>
-            {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
-            สร้างบัญชีจากข้อมูลในระบบ
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" className="gap-2" onClick={() => setIsImportOpen(true)}>
+              <Upload className="h-4 w-4" />
+              Import ข้อมูล
+            </Button>
+            <Button className="gap-2" onClick={() => setIsGenerateOpen(true)} disabled={isGenerating}>
+              {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
+              สร้างบัญชีจากข้อมูลในระบบ
+            </Button>
+          </div>
         </div>
 
-        <Card>
+        <Card className="app-section-card">
           <CardHeader className="space-y-4">
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <div>
@@ -558,7 +489,7 @@ export default function UsersManagement() {
                       <TableCell>
                         <span className="font-medium">{user.fullName}</span>
                       </TableCell>
-                      <TableCell className="break-words text-muted-foreground">{user.email}</TableCell>
+                      <TableCell className="text-muted-foreground">{user.email}</TableCell>
                       <TableCell>
                         <div className="flex flex-col gap-1">
                           <Badge
@@ -584,7 +515,11 @@ export default function UsersManagement() {
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-muted-foreground hover:bg-muted hover:text-foreground"
+                            >
                               <MoreHorizontal className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
@@ -608,7 +543,7 @@ export default function UsersManagement() {
 
       {/* 🎯 Dialog แก้ไขข้อมูลแบบฟอร์มยาว */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="app-dialog-3xl">
           <DialogHeader>
             <DialogTitle>แก้ไขข้อมูลผู้ใช้ (ID: {detailForm.student_id || detailForm.faculty_id})</DialogTitle>
           </DialogHeader>
@@ -683,6 +618,15 @@ export default function UsersManagement() {
         variant="default"
         onConfirm={handleGenerateAccounts}
         isLoading={isGenerating}
+      />
+
+      <ImportDataDialog
+        open={isImportOpen}
+        onOpenChange={setIsImportOpen}
+        importTypes={userImportTypes}
+        title="Import ข้อมูลผู้ใช้"
+        description="นำเข้าข้อมูลนักศึกษาและอาจารย์จากไฟล์ Excel หรือ CSV"
+        onImported={fetchUsers}
       />
 
       <ConfirmActionDialog

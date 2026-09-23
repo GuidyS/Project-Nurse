@@ -151,7 +151,7 @@ export default function AdvisorVaccinationView() {
   if (view === "list") {
     return (
       <div className="p-6 space-y-6 animate-fade-in max-w-7xl mx-auto">
-        <div className="app-page-header-surface">
+        <div>
           <div className="flex items-center gap-2">
             <Users className="h-6 w-6 text-primary" />
             <h1 className="text-2xl font-bold text-foreground">นักศึกษาในความดูแล</h1>
@@ -222,7 +222,7 @@ export default function AdvisorVaccinationView() {
   // ==========================================
   return (
     <div className="space-y-6 max-w-7xl mx-auto p-6 animate-fade-in">
-      <div className="app-page-header-surface flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <Button variant="outline" size="icon" onClick={handleBack} className="shrink-0">
             <ChevronLeft className="h-5 w-5" />

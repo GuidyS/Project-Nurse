@@ -42,7 +42,6 @@ import {
 interface OutcomeItem {
   code: string;
   subject_code?: string;
-  description?: string;
   score: number | null;
   passed: boolean;
 }
@@ -56,13 +55,6 @@ interface OutcomeResult {
   items?: OutcomeItem[];
 }
 
-interface CloSubjectOutcome extends OutcomeResult {
-  subject_id: string;
-  subject_code: string;
-  subject_name: string;
-  defined: number;
-}
-
 interface StudentOutcome {
   student_id: string;
   student_code: string;
@@ -72,7 +64,7 @@ interface StudentOutcome {
   enrolled_courses: number;
   ylo: OutcomeResult;
   plo: OutcomeResult;
-  clo: OutcomeResult & { defined: number; subjects?: CloSubjectOutcome[] };
+  clo: OutcomeResult & { defined: number };
   outcome_status: "pending" | "passed" | "at_risk";
 }
 
@@ -130,81 +122,34 @@ function OutcomeItemList({ items }: { items?: OutcomeItem[] }) {
   if (!items?.length) return null;
 
   return (
-    <div className="mt-3 space-y-2 border-t pt-3">
+    <div className="mt-3 flex flex-wrap gap-2 border-t pt-3">
       {items.map((item) => {
         const ItemIcon = item.passed ? CheckCircle2 : XCircle;
         return (
-          <div
+          <Badge
             key={`${item.subject_code ?? "outcome"}-${item.code}`}
-            className="rounded-md border bg-muted/20 p-3"
+            variant="outline"
+            className={item.passed
+              ? "gap-1.5 rounded-md border-emerald-500/30 bg-emerald-500/10 text-emerald-600"
+              : "gap-1.5 rounded-md border-red-500/30 bg-red-500/10 text-red-600"}
           >
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2 font-medium">
-                <ItemIcon className={`h-4 w-4 ${item.passed ? "text-emerald-600" : "text-red-600"}`} />
-                <span>{item.subject_code ? `${item.subject_code} · ` : ""}{item.code}</span>
-              </div>
-              <Badge
-                variant="outline"
-                className={item.passed
-                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600"
-                  : "border-red-500/30 bg-red-500/10 text-red-600"}
-              >
-                {item.score !== null ? `${item.score}% · ` : ""}{item.passed ? "ผ่าน" : "ไม่ผ่าน"}
-              </Badge>
-            </div>
-            {item.description && (
-              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{item.description}</p>
-            )}
-          </div>
+            <ItemIcon className="h-3.5 w-3.5" />
+            {item.subject_code ? `${item.subject_code} · ` : ""}{item.code}
+            {item.score !== null ? ` · ${item.score}%` : ""}
+            · {item.passed ? "ผ่าน" : "ไม่ผ่าน"}
+          </Badge>
         );
       })}
     </div>
   );
 }
 
-function CloOutcomeCard({ clo }: { clo: StudentOutcome["clo"] }) {
-  const [selectedSubjectId, setSelectedSubjectId] = useState("all");
-  const selectedSubject = clo.subjects?.find((subject) => subject.subject_id === selectedSubjectId);
-  const result = selectedSubject ?? clo;
-
-  return (
-    <div className="rounded-lg border p-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2">
-          <Target className="h-4 w-4 text-blue-500" />
-          <h3 className="text-sm font-semibold">ผลประเมิน CLO</h3>
-        </div>
-        <Select value={selectedSubjectId} onValueChange={setSelectedSubjectId}>
-          <SelectTrigger className="w-full sm:w-[260px]" aria-label="เลือกรายวิชาสำหรับดูผล CLO">
-            <SelectValue placeholder="เลือกรายวิชา" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">ทุกรายวิชา</SelectItem>
-            {(clo.subjects ?? []).map((subject) => (
-              <SelectItem key={subject.subject_id} value={subject.subject_id}>
-                {subject.subject_code} - {subject.subject_name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <p className="mt-3 text-lg font-semibold">ผ่าน {result.passed} จาก {result.assessed} รายการ</p>
-      <p className="mt-1 text-xs text-muted-foreground">
-        {result.assessed > 0
-          ? `คิดเป็น ${result.rate}% จาก CLO ที่กำหนดไว้ ${result.defined} รายการ`
-          : `ยังไม่มีผลประเมิน จาก CLO ที่กำหนดไว้ ${result.defined} รายการ`}
-      </p>
-      <OutcomeItemList items={result.items} />
-    </div>
-  );
-}
-
 function StatusBadge({ status }: { status: StudentOutcome["outcome_status"] }) {
   if (status === "passed") {
-    return <Badge className="rounded-md bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/10">ผ่านเกณฑ์</Badge>;
+    return <Badge className="rounded-md bg-emerald-500/10 text-emerald-600">ผ่านเกณฑ์</Badge>;
   }
   if (status === "at_risk") {
-    return <Badge className="rounded-md bg-red-500/10 text-red-600 hover:bg-red-500/10">ต้องติดตาม</Badge>;
+    return <Badge className="rounded-md bg-red-500/10 text-red-600">ต้องติดตาม</Badge>;
   }
   return <Badge variant="outline" className="rounded-md text-muted-foreground">ยังไม่มีผลประเมิน</Badge>;
 }
@@ -276,7 +221,7 @@ export default function StudentLearningOutcomesPage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="app-page-header-surface flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="flex items-start gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-blue-500/10 text-blue-500"><GraduationCap className="h-5 w-5" /></div>
           <div>
@@ -339,7 +284,7 @@ export default function StudentLearningOutcomesPage() {
           {selectedStudent && <><SheetHeader className="text-left"><SheetTitle>{selectedStudent.name}</SheetTitle><SheetDescription>รหัสนักศึกษา {selectedStudent.student_id} · ชั้นปี {selectedStudent.year_level || "-"}</SheetDescription></SheetHeader><div className="mt-6 space-y-4">
             <div className="rounded-lg border p-4"><div className="flex items-center gap-2"><BookOpen className="h-4 w-4 text-blue-500" /><h3 className="text-sm font-semibold">การลงทะเบียนเรียน</h3></div><p className="mt-3 text-2xl font-bold">{selectedStudent.enrolled_courses} รายวิชา</p><p className="mt-1 text-xs text-muted-foreground">ปีการศึกษา {data.academic_year}</p></div>
             {[["YLO", selectedStudent.ylo, Target], ["PLO", selectedStudent.plo, Layers3]].map(([label, outcome, OutcomeIcon]) => { const result = outcome as OutcomeResult; const Icon = OutcomeIcon as typeof Target; return <div key={label as string} className="rounded-lg border p-4"><div className="flex items-center gap-2"><Icon className="h-4 w-4 text-blue-500" /><h3 className="text-sm font-semibold">ผลประเมิน {label as string}</h3></div><p className="mt-3 text-lg font-semibold">ผ่าน {result.passed} จาก {result.assessed} รายการ</p><p className="mt-1 text-xs text-muted-foreground">{result.assessed > 0 ? `คิดเป็น ${result.rate}%` : "ยังไม่มีผลประเมินที่บันทึกในระบบ"}</p><OutcomeItemList items={result.items} /></div>; })}
-            <CloOutcomeCard key={selectedStudent.student_id} clo={selectedStudent.clo} />
+            <div className="rounded-lg border p-4"><div className="flex items-center gap-2"><Target className="h-4 w-4 text-blue-500" /><h3 className="text-sm font-semibold">ผลประเมิน CLO</h3></div><p className="mt-3 text-lg font-semibold">ผ่าน {selectedStudent.clo.passed} จาก {selectedStudent.clo.assessed} รายการ</p><p className="mt-1 text-xs text-muted-foreground">{selectedStudent.clo.assessed > 0 ? `คิดเป็น ${selectedStudent.clo.rate}% จาก CLO ที่กำหนดไว้ ${selectedStudent.clo.defined} รายการ` : `ยังไม่มีผลประเมิน จาก CLO ที่กำหนดไว้ ${selectedStudent.clo.defined} รายการ`}</p><OutcomeItemList items={selectedStudent.clo.items} /></div>
           </div></>}
         </SheetContent>
       </Sheet>

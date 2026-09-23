@@ -122,7 +122,12 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
       setMenuSections(sections);
     } catch (error) {
       console.error('Failed to fetch menus:', error);
-      toast.error('โหลดเมนูไม่สำเร็จ');
+      const previewSections = import.meta.env.DEV ? getPreviewMenuSections(readStoredUser()) : [];
+      if (previewSections.length > 0) {
+        setMenuSections(previewSections);
+      } else {
+        toast.error('โหลดเมนูไม่สำเร็จ');
+      }
     } finally {
       setIsLoading(false);
     }

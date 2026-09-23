@@ -64,7 +64,7 @@ export default function MyCourses() {
   return (
     <>
       <div className="space-y-6">
-        <div className="app-page-header-surface">
+        <div>
           <h1 className="text-3xl font-bold tracking-tight">รายวิชาที่รับผิดชอบ</h1>
           <p className="text-muted-foreground">รายวิชาทั้งหมดที่คุณเป็นผู้สอนหรือรับผิดชอบหลักสูตร</p>
         </div>
@@ -140,9 +140,8 @@ export default function MyCourses() {
                     <Progress value={course.cloProgress} />
                   </div>
                   <div className="flex gap-2 pt-2">
-                    {/* ปุ่มสามารถปรับ URL ให้ลิงก์ไปหน้าตัดเกรด หรือกำหนด CLO ได้ภายหลัง */}
-                    <Button variant="outline" className="flex-1">จัดการ CLO</Button>
-                    <Button className="flex-1">ให้คะแนน</Button>
+                    <Button variant="outline" className="flex-1" onClick={() => window.location.href = `/?page=clos&course_id=${course.id}`}>จัดการ CLO</Button>
+                    <Button className="flex-1" onClick={() => window.location.href = `/?page=courses&action=grade&course_id=${course.id}`}>ให้คะแนน</Button>
                   </div>
                 </CardContent>
               </Card>

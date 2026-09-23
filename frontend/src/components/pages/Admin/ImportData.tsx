@@ -119,10 +119,12 @@ export default function ImportData() {
 
   return (
     <>
-      <div className="p-6 space-y-6 animate-fade-in">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">นำเข้าข้อมูล</h1>
-          <p className="text-muted-foreground">อัปโหลดไฟล์ Excel หรือ CSV เพื่อนำเข้าข้อมูลเข้าสู่ระบบ</p>
+      <div className="app-page">
+        <div className="app-page-header">
+          <div>
+            <h1 className="app-page-title">นำเข้าข้อมูล</h1>
+            <p className="app-page-description">อัปโหลดไฟล์ Excel หรือ CSV เพื่อนำเข้าข้อมูลเข้าสู่ระบบ</p>
+          </div>
         </div>
 
         {/* Import Types */}
@@ -130,7 +132,7 @@ export default function ImportData() {
           {importTypes.map((type) => (
             <Card
               key={type.value}
-              className={`cursor-pointer transition-all hover:border-primary ${selectedType === type.value ? "border-primary bg-primary/5" : ""}`}
+              className={`app-interactive-card cursor-pointer ${selectedType === type.value ? "border-primary bg-primary/5 hover:border-primary hover:bg-primary/5" : ""}`}
               onClick={() => setSelectedType(type.value)}
             >
               <CardContent className="pt-6">
@@ -149,7 +151,7 @@ export default function ImportData() {
         </div>
 
         {/* Upload Area */}
-        <Card>
+        <Card className="app-section-card">
           <CardHeader>
             <CardTitle>อัปโหลดไฟล์</CardTitle>
             <CardDescription>รองรับไฟล์ .xlsx, .xls, .csv (ขนาดไม่เกิน 10MB)</CardDescription>
@@ -162,7 +164,7 @@ export default function ImportData() {
                 event.preventDefault();
                 handleFileSelect(event.dataTransfer.files?.[0]);
               }}
-              className="flex min-h-[220px] cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-muted-foreground/30 bg-muted/20 px-6 py-10 text-center transition-colors hover:border-primary/60 hover:bg-primary/5"
+              className="flex min-h-[220px] cursor-pointer flex-col items-center justify-center rounded-md border-2 border-dashed border-muted-foreground/30 bg-muted/20 px-6 py-10 text-center transition-colors hover:border-primary/60 hover:bg-primary/5"
             >
 
                 <Upload className="mb-3 h-10 w-10 text-primary" />
@@ -200,7 +202,7 @@ export default function ImportData() {
         </Card>
 
         {/* Import History */}
-        <Card>
+        <Card className="app-section-card">
           <CardHeader>
             <CardTitle>ประวัติการนำเข้า</CardTitle>
             <CardDescription>รายการนำเข้าข้อมูลล่าสุด</CardDescription>
@@ -210,7 +212,7 @@ export default function ImportData() {
               {/* แก้ไขจาก ImportHistory เป็น importHistory */}
               {importHistory.length > 0 ? (
                 importHistory.map((item) => (
-                  <div key={item.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                  <div key={item.id} className="flex items-center justify-between rounded-md bg-muted/30 p-3">
                     <div className="flex items-center gap-3">
                       <FileSpreadsheet className="h-8 w-8 text-primary" />
                       <div>

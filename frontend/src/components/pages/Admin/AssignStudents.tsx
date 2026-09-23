@@ -189,7 +189,7 @@ export default function AssignStudents() {
       {/* เลือกประเภทอาจารย์ + ตัวอาจารย์ */}
       <div className="grid gap-4 md:grid-cols-2">
         <div className="grid gap-2">
-          <Label htmlFor="advisor-type" className="font-semibold">ประเภทอาจารย์</Label>
+          <Label className="font-semibold">ประเภทอาจารย์</Label>
           <Select value={advisorType} onValueChange={setAdvisorType}>
             <SelectTrigger className="border-border bg-card shadow-sm hover:border-primary/50">
               <SelectValue />
@@ -205,7 +205,7 @@ export default function AssignStudents() {
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="advisor-picker" className="font-semibold">รายชื่ออาจารย์</Label>
+          <Label className="font-semibold">รายชื่ออาจารย์</Label>
           <Popover open={teacherPickerOpen} onOpenChange={setTeacherPickerOpen} modal>
             <PopoverTrigger asChild>
               <Button

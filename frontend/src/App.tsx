@@ -10,11 +10,49 @@ import api from "@/lib/axios";
 
 const queryClient = new QueryClient();
 
-const applySavedTheme = () => {
-  const theme = localStorage.getItem("theme") || "dark";
-  const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-  const shouldUseDark = theme === "dark" || (theme === "system" && prefersDark);
-  document.documentElement.classList.toggle("dark", shouldUseDark);
+const applyLightTheme = () => {
+  document.documentElement.classList.remove("dark");
+  localStorage.setItem("theme", "light");
+};
+
+const devPreviewUsers: Record<string, Record<string, unknown>> = {
+  admin: {
+    __previewRole: "admin",
+    role_id: 1,
+    position_id: 1,
+    username: "preview-admin",
+    name: "Admin Preview",
+    permissions: [
+      "NOTIFICATION_VIEW",
+      "PROFILE_VIEW_SELF",
+      "SYSTEM_SETTINGS",
+      "PROJECT_VIEW",
+      "PROJECT_REPORTS_VIEW",
+      "RESEARCH_SUMMARY_VIEW",
+    ],
+  },
+  teacher: {
+    __previewRole: "teacher",
+    role_id: 2,
+    position_id: 2,
+    username: "preview-teacher",
+    name: "Teacher Preview",
+    permissions: [
+      "NOTIFICATION_VIEW",
+      "PROFILE_VIEW_SELF",
+      "PROJECT_VIEW",
+      "PROJECT_REPORTS_VIEW",
+      "RESEARCH_SUMMARY_VIEW",
+    ],
+  },
+  student: {
+    __previewRole: "student",
+    role_id: 3,
+    position_id: 0,
+    username: "preview-student",
+    name: "Student Preview",
+    permissions: ["NOTIFICATION_VIEW", "PROFILE_VIEW_SELF"],
+  },
 };
 
 // 🔧 ปรับปรุงกงจักร SessionGateway ใหม่ให้ฉลาดขึ้น
@@ -23,6 +61,16 @@ const SessionGateway = ({ children }: { children: React.ReactNode }) => {
   const [hasSession, setHasSession] = useState(false);
 
   useEffect(() => {
+    const previewRole = new URLSearchParams(window.location.search).get("previewRole") || "";
+    const previewUser = import.meta.env.DEV ? devPreviewUsers[previewRole] : null;
+    if (previewUser) {
+      localStorage.setItem("user", JSON.stringify(previewUser));
+      localStorage.setItem("permissions", JSON.stringify(previewUser.permissions || []));
+      setHasSession(true);
+      setIsValidating(false);
+      return;
+    }
+
     // 💡 เช็คก้าวแรก: ถ้าในคอมพิวเตอร์ไม่มีข้อมูล 'user' อยู่เลย แปลว่ายังไม่ได้ล็อกอินแน่ๆ 
     // ไม่ต้องยิง API ไปกวนเซิร์ฟเวอร์ ให้ผ่านไปหน้าล็อกอินได้เลย ป้องกันลูปนรก!
     const savedUser = localStorage.getItem("user");
@@ -36,6 +84,19 @@ const SessionGateway = ({ children }: { children: React.ReactNode }) => {
     api.get("/index.php?page=profile")
       .then((res) => {
         if (res.data.status === "success") {
+          const currentUser = JSON.parse(savedUser);
+          const profileData = res.data.data || {};
+          const mergedUser = {
+            ...currentUser,
+            ...profileData,
+            role_id: profileData.role_id ?? currentUser.role_id,
+            position_id: profileData.position_id ?? currentUser.position_id,
+            permissions: Array.isArray(profileData.permissions)
+              ? profileData.permissions
+              : currentUser.permissions,
+          };
+
+          localStorage.setItem("user", JSON.stringify(mergedUser));
           setHasSession(true);
         }
       })
@@ -52,10 +113,10 @@ const SessionGateway = ({ children }: { children: React.ReactNode }) => {
 
   if (isValidating) {
     return (
-      <div className="flex h-screen w-screen items-center justify-center bg-slate-950">
+      <div className="flex h-screen w-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
-          <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#8a2be2] border-t-transparent" />
-          <p className="text-sm font-medium text-slate-400">กำลังตรวจสอบสถานะระบบพยาบาล...</p>
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          <p className="text-sm font-medium text-muted-foreground">กำลังตรวจสอบสถานะระบบพยาบาล...</p>
         </div>
       </div>
     );
@@ -66,7 +127,7 @@ const SessionGateway = ({ children }: { children: React.ReactNode }) => {
 
 const App = () => {
   useEffect(() => {
-    applySavedTheme();
+    applyLightTheme();
   }, []);
 
   return (
