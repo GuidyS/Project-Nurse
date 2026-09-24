@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { 
   Sidebar, 
   SidebarContent, 
@@ -208,6 +208,11 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
   };
 
   const userName = getDisplayName(sidebarUser);
+  const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8080").replace(/\/$/, "");
+  const profilePictureRaw = typeof sidebarUser.profile_picture_url === 'string' ? sidebarUser.profile_picture_url.trim() : '';
+  const profilePictureUrl = profilePictureRaw
+    ? (/^https?:\/\//i.test(profilePictureRaw) ? profilePictureRaw : `${apiBaseUrl}/${profilePictureRaw.replace(/^\//, "")}`)
+    : "";
 
   // ดึงตัวอักษรตัวแรกจากชื่อ (เช่น 'สมชาย' จะได้ 'ส') 
   // หากไม่มีชื่อจะใช้ 'U' เป็นค่าเริ่มต้น
@@ -402,6 +407,9 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
           <div className="relative h-10 w-10 shrink-0">
             {/* เรียกใช้ Class จาก index.css */}
             <Avatar className="sidebar-profile-avatar">
+              {profilePictureUrl ? (
+                <AvatarImage src={profilePictureUrl} alt={userName} className="object-cover" />
+              ) : null}
               <AvatarFallback className="sidebar-profile-fallback">
                 {userInitial}
               </AvatarFallback>

@@ -43,7 +43,7 @@ const actionColors: Record<AuditEntry["action"], string> = {
   update: "bg-blue",
   delete: "bg-destructive",
   role_change: "bg-yellow",
-  import: "bg-lightorange",
+  import: "bg-lightpurple",
   export: "bg-orange",
 };
 
@@ -88,50 +88,6 @@ export default function AuditLog() {
           <h1 className="app-page-title">Audit Log</h1>
           <p className="app-page-description">ประวัติการสร้าง แก้ไข และลบข้อมูลของผู้ใช้ทั้งหมด</p>
         </div>
-        <ExportButton reportName="Audit-Log" />
-      </div>
-
-      {/* Summary Cards ตัด เข้า/ออกระบบ ออก เหลือ 3 การ์ด */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card className="app-stat-card">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success/10">
-                <Plus className="h-5 w-5 text-success" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{logs.filter((e) => e.action === "create").length}</p>
-                <p className="text-xs text-muted-foreground">สร้างใหม่</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="app-stat-card">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                <FileEdit className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{logs.filter((e) => e.action === "update").length}</p>
-                <p className="text-xs text-muted-foreground">แก้ไข</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="app-stat-card">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-destructive/10">
-                <Trash2 className="h-5 w-5 text-destructive" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{logs.filter((e) => e.action === "delete").length}</p>
-                <p className="text-xs text-muted-foreground">ลบ</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       <Card className="app-section-card">
@@ -184,7 +140,7 @@ export default function AuditLog() {
             <TableHeader>
               <TableRow>
                 <TableHead>เวลา</TableHead>
-                <TableHead>ผู้ใช้</TableHead>
+                <TableHead className="w-40 min-w-40">ผู้ใช้</TableHead>
                 <TableHead>การกระทำ</TableHead>
                 <TableHead>รายละเอียด</TableHead>
                 <TableHead>IP Address</TableHead>

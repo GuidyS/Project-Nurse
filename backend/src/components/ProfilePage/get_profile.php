@@ -117,6 +117,215 @@ function extractGoogleDriveId(string $value): ?string
     return null;
 }
 
+const FACULTY_PROFILE_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+const FACULTY_PROFILE_IMAGE_MIME_EXTENSIONS = [
+    'image/jpeg' => 'jpg',
+    'image/png' => 'png',
+    'image/webp' => 'webp',
+];
+
+function facultyProfilePictureCachePaths(string $facultyId, string $driveId): array
+{
+    $safeOwner = preg_replace('/[^A-Za-z0-9_-]/', '_', $facultyId);
+    $relativeDir = 'uploads/user-documents/' . $safeOwner;
+    $absoluteDir = __DIR__ . '/../../' . $relativeDir;
+    $hash = substr(hash('sha256', $driveId), 0, 16);
+
+    return [
+        'relative_dir' => $relativeDir,
+        'absolute_dir' => $absoluteDir,
+        'file_prefix' => 'profile_picture_' . $hash,
+    ];
+}
+
+function findCachedFacultyProfilePicture(string $facultyId, string $driveId): ?string
+{
+    $paths = facultyProfilePictureCachePaths($facultyId, $driveId);
+    foreach (array_values(FACULTY_PROFILE_IMAGE_MIME_EXTENSIONS) as $ext) {
+        $fileName = $paths['file_prefix'] . '.' . $ext;
+        $absolutePath = $paths['absolute_dir'] . DIRECTORY_SEPARATOR . $fileName;
+        if (is_file($absolutePath) && filesize($absolutePath) > 0) {
+            return $paths['relative_dir'] . '/' . $fileName;
+        }
+    }
+
+    return null;
+}
+
+function fetchRemoteBytesLimited(string $url, int $maxBytes): ?array
+{
+    if (function_exists('curl_init')) {
+        $bytes = '';
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_MAXREDIRS => 5,
+            CURLOPT_CONNECTTIMEOUT => 5,
+            CURLOPT_TIMEOUT => 12,
+            CURLOPT_USERAGENT => 'Nurse-MIS/1.0',
+            CURLOPT_HTTPHEADER => ['Accept: image/avif,image/webp,image/apng,image/*,*/*;q=0.8'],
+            CURLOPT_WRITEFUNCTION => static function ($ch, string $chunk) use (&$bytes, $maxBytes): int {
+                if (strlen($bytes) + strlen($chunk) > $maxBytes) {
+                    return 0;
+                }
+                $bytes .= $chunk;
+                return strlen($chunk);
+            },
+        ]);
+
+        $ok = curl_exec($ch);
+        $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $contentType = (string)curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+        $errorNo = curl_errno($ch);
+        curl_close($ch);
+
+        if ($ok === false || $errorNo !== 0 || $httpCode < 200 || $httpCode >= 300 || $bytes === '') {
+            return null;
+        }
+
+        return ['bytes' => $bytes, 'content_type' => $contentType];
+    }
+
+    $context = stream_context_create([
+        'http' => [
+            'method' => 'GET',
+            'follow_location' => 1,
+            'max_redirects' => 5,
+            'timeout' => 12,
+            'ignore_errors' => true,
+            'header' => "User-Agent: Nurse-MIS/1.0\r\nAccept: image/avif,image/webp,image/apng,image/*,*/*;q=0.8\r\n",
+        ],
+    ]);
+    $handle = @fopen($url, 'rb', false, $context);
+    if (!$handle) {
+        return null;
+    }
+
+    $bytes = stream_get_contents($handle, $maxBytes + 1);
+    fclose($handle);
+    if (!is_string($bytes) || $bytes === '' || strlen($bytes) > $maxBytes) {
+        return null;
+    }
+
+    $headers = $http_response_header ?? [];
+    $httpCode = 0;
+    $contentType = '';
+    foreach ($headers as $header) {
+        if (preg_match('~^HTTP/\S+\s+(\d{3})~i', $header, $m)) {
+            $httpCode = (int)$m[1];
+        } elseif (stripos($header, 'Content-Type:') === 0) {
+            $contentType = trim(substr($header, 13));
+        }
+    }
+
+    if ($httpCode < 200 || $httpCode >= 300) {
+        return null;
+    }
+
+    return ['bytes' => $bytes, 'content_type' => $contentType];
+}
+
+function detectProfileImageMime(string $bytes, string $reportedContentType = ''): ?string
+{
+    $mime = null;
+    if (function_exists('finfo_open')) {
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        if ($finfo) {
+            $detected = finfo_buffer($finfo, $bytes);
+            finfo_close($finfo);
+            $mime = is_string($detected) ? strtolower($detected) : null;
+        }
+    }
+
+    if (!$mime && function_exists('getimagesizefromstring')) {
+        $imageInfo = @getimagesizefromstring($bytes);
+        $mime = is_array($imageInfo) && isset($imageInfo['mime']) ? strtolower((string)$imageInfo['mime']) : null;
+    }
+
+    if ($mime && array_key_exists($mime, FACULTY_PROFILE_IMAGE_MIME_EXTENSIONS)) {
+        return $mime;
+    }
+
+    $reportedMime = strtolower(trim(explode(';', $reportedContentType)[0]));
+    return array_key_exists($reportedMime, FACULTY_PROFILE_IMAGE_MIME_EXTENSIONS) ? $reportedMime : null;
+}
+
+function cacheGoogleDriveProfilePicture(string $facultyId, string $driveId): ?string
+{
+    if ($facultyId === '') {
+        return null;
+    }
+
+    $cached = findCachedFacultyProfilePicture($facultyId, $driveId);
+    if ($cached !== null) {
+        return $cached;
+    }
+
+    $paths = facultyProfilePictureCachePaths($facultyId, $driveId);
+    if (!is_dir($paths['absolute_dir']) && !mkdir($paths['absolute_dir'], 0775, true)) {
+        return null;
+    }
+
+    $urls = [
+        'https://drive.google.com/thumbnail?id=' . rawurlencode($driveId) . '&sz=w256',
+        'https://drive.google.com/uc?export=download&id=' . rawurlencode($driveId),
+    ];
+
+    foreach ($urls as $url) {
+        $response = fetchRemoteBytesLimited($url, FACULTY_PROFILE_IMAGE_MAX_BYTES);
+        if (!$response) {
+            continue;
+        }
+
+        $mime = detectProfileImageMime($response['bytes'], (string)($response['content_type'] ?? ''));
+        if ($mime === null) {
+            continue;
+        }
+
+        $extension = FACULTY_PROFILE_IMAGE_MIME_EXTENSIONS[$mime];
+        $fileName = $paths['file_prefix'] . '.' . $extension;
+        $absolutePath = $paths['absolute_dir'] . DIRECTORY_SEPARATOR . $fileName;
+        $tempPath = $absolutePath . '.tmp';
+
+        if (file_put_contents($tempPath, $response['bytes'], LOCK_EX) === false) {
+            @unlink($tempPath);
+            continue;
+        }
+        if (!rename($tempPath, $absolutePath)) {
+            @unlink($tempPath);
+            continue;
+        }
+        @chmod($absolutePath, 0664);
+
+        $currentBaseName = basename($absolutePath);
+        foreach (glob($paths['absolute_dir'] . DIRECTORY_SEPARATOR . 'profile_picture_*') ?: [] as $oldPath) {
+            if (basename($oldPath) !== $currentBaseName && is_file($oldPath)) {
+                @unlink($oldPath);
+            }
+        }
+
+        return $paths['relative_dir'] . '/' . $fileName;
+    }
+
+    return null;
+}
+
+function resolveFacultyProfilePictureUrl(string $rawPath, string $facultyId): ?string
+{
+    $path = trim($rawPath);
+    if ($path === '' || isLegacyExcelImagePath($path)) {
+        return null;
+    }
+
+    $driveId = extractGoogleDriveId($path);
+    if ($driveId) {
+        return cacheGoogleDriveProfilePicture($facultyId, $driveId);
+    }
+
+    $picture = resolveFacultyFileUrl($path, true);
+    return $picture['available'] ? $picture['file_url'] : null;
+}
+
 /**
  * Build a browser-openable URL from DB-stored faculty document paths.
  */
@@ -127,10 +336,10 @@ function resolveFacultyFileUrl(string $rawPath, bool $preferDirectImage = false)
 
     if ($driveId) {
         $viewUrl = 'https://drive.google.com/file/d/' . $driveId . '/view';
-        $directUrl = 'https://drive.google.com/uc?export=view&id=' . $driveId;
+        $thumbnailUrl = 'https://drive.google.com/thumbnail?id=' . $driveId . '&sz=w256';
         return [
             'file_path' => $path,
-            'file_url' => $preferDirectImage ? $directUrl : $viewUrl,
+            'file_url' => $preferDirectImage ? $thumbnailUrl : $viewUrl,
             'source' => 'google_drive',
             'available' => true,
         ];
@@ -511,9 +720,11 @@ try {
             $profile = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
             $profile['pdf_documents'] = buildFacultyDocuments($db, $profile);
 
-            if (!empty($profile['profile_picture']) && !isLegacyExcelImagePath((string)$profile['profile_picture'])) {
-                $picture = resolveFacultyFileUrl((string)$profile['profile_picture'], true);
-                $profile['profile_picture_url'] = $picture['available'] ? $picture['file_url'] : null;
+            if (!empty($profile['profile_picture'])) {
+                $profile['profile_picture_url'] = resolveFacultyProfilePictureUrl(
+                    (string)$profile['profile_picture'],
+                    (string)($profile['faculty_id'] ?? $u_info['username'] ?? '')
+                );
             } else {
                 $profile['profile_picture_url'] = null;
             }
@@ -574,7 +785,6 @@ try {
                         birth_date = :birth_date, 
                         email = :email, 
                         phone = :phone, 
-                        id_card_number = :id_card_number,
                         gpa = :gpa,
                         height = :height,
                         weight = :weight,
@@ -598,7 +808,6 @@ try {
                 ':birth_date'       => !empty($input['birth_date']) ? trim((string)$input['birth_date']) : null,
                 ':email'            => !empty($input['email']) ? trim((string)$input['email']) : null,
                 ':phone'            => $phone,
-                ':id_card_number'   => $idCardNumber,
                 ':gpa'              => $gpa,
                 ':height'           => $height,
                 ':weight'           => $weight,

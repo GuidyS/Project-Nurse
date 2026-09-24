@@ -13,21 +13,69 @@ if (!$student_id || $_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit();
 }
 
+function portfolio_validate_google_drive_link(string $url): void
+{
+    $trimmedUrl = trim($url);
+    if ($trimmedUrl === '') {
+        return;
+    }
+
+    if (!filter_var($trimmedUrl, FILTER_VALIDATE_URL)) {
+        throw new InvalidArgumentException("ลิงก์ Google Drive ไม่ถูกต้อง");
+    }
+
+    $parts = parse_url($trimmedUrl);
+    $scheme = strtolower((string)($parts['scheme'] ?? ''));
+    $host = strtolower((string)($parts['host'] ?? ''));
+    if ($scheme !== 'https' || !in_array($host, ['drive.google.com', 'docs.google.com'], true)) {
+        throw new InvalidArgumentException("กรุณาแนบลิงก์ Google Drive ที่ถูกต้อง");
+    }
+}
+
 try {
-    $title = $_POST['title'] ?? '';
-    $type = $_POST['type'] ?? 'certificate';
-    $description = $_POST['description'] ?? '';
+    $rawInput = file_get_contents('php://input');
+    $jsonInput = json_decode($rawInput, true);
+    if (!is_array($jsonInput)) {
+        $jsonInput = [];
+    }
+
+    $input = array_merge($_POST, $jsonInput);
+
+    $title = trim((string)($input['title'] ?? ''));
+    $type = trim((string)($input['type'] ?? 'certificate'));
+    $description = trim((string)($input['description'] ?? ''));
+    $googleDriveLink = trim((string)($input['google_drive_link'] ?? ''));
     
     $fileName = null;
     $filePath = null;
     $mimeType = null;
     $fileCategory = 'document';
+    $hasUploadedFile = isset($_FILES['file']) && $_FILES['file']['error'] === UPLOAD_ERR_OK;
+
+    if ($title === '') {
+        http_response_code(400);
+        echo json_encode(["status" => "error", "message" => "กรุณาระบุชื่อผลงาน"], JSON_UNESCAPED_UNICODE);
+        exit();
+    }
+
+    if ($googleDriveLink === '' && !$hasUploadedFile) {
+        http_response_code(400);
+        echo json_encode(["status" => "error", "message" => "กรุณาแนบลิงก์ Google Drive หรือไฟล์ผลงาน"], JSON_UNESCAPED_UNICODE);
+        exit();
+    }
+
+    if ($googleDriveLink !== '') {
+        portfolio_validate_google_drive_link($googleDriveLink);
+        $fileName = $title !== '' ? $title : 'Google Drive';
+        $filePath = $googleDriveLink;
+        $mimeType = 'text/uri-list';
+    }
 
     // ระบบจัดการไฟล์อัปโหลด
-    if (isset($_FILES['file']) && $_FILES['file']['error'] === UPLOAD_ERR_OK) {
-        $uploadDir = '/var/www/html/uploads/portfolio/';
+    if ($googleDriveLink === '' && $hasUploadedFile) {
+        $uploadDir = __DIR__ . '/../../../uploads/portfolio/';
         if (!file_exists($uploadDir)) {
-            mkdir($uploadDir, 0777, true);
+            mkdir($uploadDir, 0755, true);
         }
 
         $file = $_FILES['file'];
@@ -74,6 +122,9 @@ try {
 
     echo json_encode(["status" => "success", "message" => "เพิ่มผลงานสำเร็จ"]);
 
+} catch (InvalidArgumentException $e) {
+    http_response_code(400);
+    echo json_encode(["status" => "error", "message" => $e->getMessage()], JSON_UNESCAPED_UNICODE);
 } catch (Exception $e) {
     http_response_code(500);
     echo json_encode(["status" => "error", "message" => $e->getMessage()]);

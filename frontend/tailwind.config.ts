@@ -79,6 +79,10 @@ export default {
           DEFAULT: "hsl(var(--yellow))",
           foreground: "hsl(var(--yellow-foreground))",
         },
+        lightpurple: {
+          DEFAULT: "hsl(var(--lightpurple))",
+          foreground: "hsl(var(--lightpurple-foreground))",
+        },
         card: {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
