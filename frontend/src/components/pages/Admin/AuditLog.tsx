@@ -4,7 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar, Search, User, FileEdit, Trash2, Plus, Shield } from "lucide-react";
+import { Calendar, Search, User, FileEdit, Trash2, Plus, Shield, FileUp, FileDown } from "lucide-react";
 import ExportButton from "@/components/dashboard/ExportButton";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
@@ -14,7 +14,7 @@ interface AuditEntry {
   timestamp: string;
   user: string;
   userRole: string;
-  action: "create" | "update" | "delete" | "role_change";
+  action: "create" | "update" | "delete" | "role_change" | "export" | "import";
   resource: string;
   details: string;
   ipAddress: string;
@@ -25,6 +25,8 @@ const actionIcons: Record<AuditEntry["action"], React.ReactNode> = {
   update: <FileEdit className="h-4 w-4" />,
   delete: <Trash2 className="h-4 w-4" />,
   role_change: <Shield className="h-4 w-4" />,
+  import: <FileDown className="h-4 w-4" />,
+  export: <FileUp className="h-4 w-4" />,
 };
 
 const actionLabels: Record<AuditEntry["action"], string> = {
@@ -32,13 +34,17 @@ const actionLabels: Record<AuditEntry["action"], string> = {
   update: "แก้ไข",
   delete: "ลบ",
   role_change: "เปลี่ยน Role",
+  import: "นำเข้าข้อมูล",
+  export: "ส่งออกข้อมูล",
 };
 
 const actionColors: Record<AuditEntry["action"], string> = {
   create: "bg-success",
-  update: "border-primary/25 bg-primary/15 text-primary",
+  update: "bg-primary",
   delete: "bg-destructive",
   role_change: "bg-warning",
+  import: "border-primary/25 bg-primary/15 text-primary",
+  export: "bg-warning",
 };
 
 export default function AuditLog() {

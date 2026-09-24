@@ -451,23 +451,6 @@
                 require_once 'components/Teacher/ProjectsPage/update_project.php';
                 break;
 
-            // ProjectDocs
-            case 'get-project-docs':
-                require_once 'components/Teacher/ProjectDocs/get_project_docs.php';
-                break;
-            case 'create-project-doc':
-                require_once 'components/Teacher/ProjectDocs/create_project_doc.php';
-                break;
-            case 'upload-project-file':
-                require_once 'components/Teacher/ProjectDocs/upload_project_file.php';
-                break;
-            case 'update-project-doc':
-                require_once 'components/Teacher/ProjectDocs/update_project_doc.php';
-                break;
-            case 'delete-project-doc':
-                require_once 'components/Teacher/ProjectDocs/delete_project_doc.php';
-                break;
-
             // ProjectLinks
             case 'get-project-links':
                 require_once 'components/Teacher/ProjectLinks/get_project_links.php';
