@@ -190,7 +190,7 @@ try {
     $yearFilter = $academicYear !== '' ? $academicYear : 'all';
     $semesterFilter = $semester !== '' ? $semester : 'all';
     $curriculumNote = $curriculum ? ", curriculum={$curriculum['start_year']}-{$curriculum['end_year']}" : '';
-    logAudit($db, $adminUserId, 'update', 'exports', "ส่งออกข้อมูล {$category} รูปแบบ {$format} จำนวน {$recordCount} รายการ ({$fieldCount} fields, year={$yearFilter}, semester={$semesterFilter}{$curriculumNote})");
+    logAudit($db, $adminUserId, 'export', 'export', "ส่งออกข้อมูล {$category} รูปแบบ {$format} จำนวน {$recordCount} รายการ ({$fieldCount} fields, year={$yearFilter}, semester={$semesterFilter}{$curriculumNote})");
 
     $fileSuffix = $curriculum
         ? "_{$curriculum['start_year']}-{$curriculum['end_year']}"

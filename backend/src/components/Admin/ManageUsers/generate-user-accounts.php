@@ -1,7 +1,7 @@
 <?php
 require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../Auth/password_helpers.php';
-require_once __DIR__ . '/../../../config/audit_helper.php'; // 🌟 ดึงไฟล์ audit_helper มาใช้งาน
+require_once __DIR__ . '/../../../config/audit_helper.php';
 
 header("Content-Type: application/json");
 
@@ -127,8 +127,8 @@ try {
         $message .= " (อาจารย์ {$facultyCount}, นักศึกษา {$studentCount})";
     }
 
-    // 🌟 บันทึกลง Audit Log ว่ามีการใช้เครื่องมือสร้างบัญชี (นำเข้าบัญชี)
-    logAudit($db, $_SESSION['user_id'], 'import', 'users', $message);
+    //  บันทึกเป็น 'create' และส่ง Resource 'import_data'
+    logAudit($db, $_SESSION['user_id'], 'create', 'import_data', $message);
 
     echo json_encode([
         "status" => "success",

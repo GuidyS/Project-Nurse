@@ -314,11 +314,11 @@ try {
                 $update = $db->prepare("UPDATE import_history SET status = 'success', record_count = :count WHERE id = :id");
                 $update->execute([':count' => $finalCount, ':id' => $importId]);
 
-                // 🌟 เปลี่ยน 'create' เป็น 'import'
+                // บันทึกเป็น 'create' ลงฐานข้อมูล (เพื่อไม่ให้ฐานข้อมูลปฏิเสธ) และส่ง resource 'import_data'
                 logAudit(
                     $db,
                     $adminUserId,
-                    'import',
+                    'create',
                     'import_data',
                     "นำเข้าข้อมูล {$importType} สำเร็จ: {$finalCount} รายการ (ไฟล์: {$file['name']})"
                 );

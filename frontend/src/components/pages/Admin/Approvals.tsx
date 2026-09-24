@@ -8,8 +8,21 @@ import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
 import { CheckCircle, XCircle, Clock, FileText, Loader2 } from "lucide-react";
 import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 type ApprovalStatus = "pending" | "approved" | "rejected";
+
+interface ApprovalPayload {
+  to_advisor_id?: string;
+  to_advisor_name?: string;
+  student_id?: string;
+  student_ids?: string[];
+  student_info_list?: string[];
+  student_count?: number;
+  reason?: string;
+  [key: string]: any;
+}
 
 interface ApprovalRequest {
   id: string;
@@ -21,9 +34,9 @@ interface ApprovalRequest {
   description: string;
   date: string;
   status: ApprovalStatus;
-  payload?: Record<string, unknown> | null;
-  before?: Record<string, unknown> | null;
-  after?: Record<string, unknown> | null;
+  payload?: ApprovalPayload | null;
+  before?: Record<string, any> | null;
+  after?: Record<string, any> | null;
   documentUrl?: string | null;
   reviewNote?: string | null;
   reviewedAt?: string | null;
@@ -96,6 +109,7 @@ export default function Approvals() {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<{ id: string; action: "approve" | "reject" } | null>(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [reviewNote, setReviewNote] = useState("");
   const { toast } = useToast();
 
   const fetchApprovals = useCallback(async () => {
@@ -121,6 +135,7 @@ export default function Approvals() {
   }, [fetchApprovals]);
 
   const openConfirm = (id: string, action: "approve" | "reject") => {
+    setReviewNote("");
     setPendingAction({ id, action });
     setIsConfirmOpen(true);
   };
@@ -129,16 +144,17 @@ export default function Approvals() {
     if (!pendingAction) return;
     const { id, action } = pendingAction;
     const endpoint = action === "approve" ? "approve-request" : "reject-request";
-    const reviewNote = window.prompt(action === "reject" ? "Review note / reject reason" : "Review note (optional)") || null;
+    const normalizedReviewNote = reviewNote.trim() || null;
     const successTitle = action === "approve" ? "อนุมัติคำขอสำเร็จ" : "ปฏิเสธคำขอสำเร็จ";
     const failureTitle = action === "approve" ? "อนุมัติคำขอไม่สำเร็จ" : "ปฏิเสธคำขอไม่สำเร็จ";
 
     try {
       setUpdatingId(id);
-      await api.post(`/index.php?page=${endpoint}`, { id, reviewNote });
+      await api.post(`/index.php?page=${endpoint}`, { id, reviewNote: normalizedReviewNote });
       toast({ title: successTitle });
       setIsConfirmOpen(false);
       setPendingAction(null);
+      setReviewNote("");
       await fetchApprovals();
     } catch (error) {
       toast({
@@ -185,28 +201,67 @@ export default function Approvals() {
       <TableRow key={approval.id}>
         <TableCell>{getTypeBadge(approval.type)}</TableCell>
         <TableCell className="font-medium">{approval.requester}</TableCell>
-        <TableCell className="max-w-[360px]">
+        <TableCell className="max-w-[420px]">
           <div className="space-y-1">
-            <p>{approval.description}</p>
-            {approval.targetRefId && (
-              <p className="text-xs text-muted-foreground">
-                อ้างอิง: {approval.targetRefType || "-"} / {approval.targetRefId}
-              </p>
-            )}
-            {approval.documentUrl && (
-              <a
-                href={approval.documentUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="block text-xs text-primary underline-offset-2 hover:underline"
-              >
-                Open document link
-              </a>
-            )}
-            {formatJsonDetail(approval.payload) && (
-              <p className="truncate text-xs text-muted-foreground">
-                Payload: {formatJsonDetail(approval.payload)}
-              </p>
+            {approval.type === "student_transfer" ? (
+              <div className="space-y-1">
+                <div className="font-medium text-sm text-foreground">
+                  {approval.title || "คำร้องขอโอนย้ายนักศึกษา"}
+                </div>
+                {approval.payload?.to_advisor_name && (
+                  <p className="text-xs text-muted-foreground">
+                    <span className="font-medium text-foreground">โอนย้ายไปให้อาจารย์:</span>{" "}
+                    {approval.payload.to_advisor_name}
+                  </p>
+                )}
+                {Array.isArray(approval.payload?.student_info_list) && approval.payload.student_info_list.length > 0 ? (
+                  <div className="text-xs">
+                    <span className="font-medium text-foreground">
+                      นักศึกษา ({approval.payload.student_info_list.length} คน):
+                    </span>
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {approval.payload.student_info_list.map((info: string, idx: number) => (
+                        <Badge key={idx} variant="secondary" className="text-xs font-normal">
+                          {info}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                ) : approval.targetRefId ? (
+                  <p className="text-xs text-muted-foreground">
+                    รหัสนักศึกษา: {approval.targetRefId}
+                  </p>
+                ) : null}
+                {approval.description && (
+                  <p className="text-xs text-muted-foreground">
+                    <span className="font-medium text-foreground">เหตุผล:</span> {approval.description}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <>
+                <p>{approval.description}</p>
+                {approval.targetRefId && (
+                  <p className="text-xs text-muted-foreground">
+                    อ้างอิง: {approval.targetRefType || "-"} / {approval.targetRefId}
+                  </p>
+                )}
+                {approval.documentUrl && (
+                  <a
+                    href={approval.documentUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block text-xs text-primary underline-offset-2 hover:underline"
+                  >
+                    Open document link
+                  </a>
+                )}
+                {formatJsonDetail(approval.payload) && (
+                  <p className="truncate text-xs text-muted-foreground">
+                    Payload: {formatJsonDetail(approval.payload)}
+                  </p>
+                )}
+              </>
             )}
             {formatJsonDetail(approval.before) && (
               <p className="truncate text-xs text-muted-foreground">
@@ -364,7 +419,10 @@ export default function Approvals() {
       open={isConfirmOpen}
       onOpenChange={(open) => {
         setIsConfirmOpen(open);
-        if (!open) setPendingAction(null);
+        if (!open) {
+          setPendingAction(null);
+          setReviewNote("");
+        }
       }}
       title={pendingAction?.action === "reject" ? "ยืนยันการปฏิเสธ" : "ยืนยันการอนุมัติ"}
       description={
@@ -376,7 +434,25 @@ export default function Approvals() {
       variant={pendingAction?.action === "reject" ? "destructive" : "default"}
       onConfirm={updateApprovalStatus}
       isLoading={updatingId !== null}
-    />
+      showCloseButton
+    >
+      <div className="space-y-2">
+        <Label htmlFor="approval-review-note">
+          {pendingAction?.action === "reject" ? "เหตุผลการปฏิเสธ" : "หมายเหตุการอนุมัติ"}
+        </Label>
+        <Textarea
+          id="approval-review-note"
+          value={reviewNote}
+          onChange={(event) => setReviewNote(event.target.value)}
+          placeholder={
+            pendingAction?.action === "reject"
+              ? "ระบุเหตุผลการปฏิเสธ (ไม่บังคับ)"
+              : "ระบุหมายเหตุการอนุมัติ (ไม่บังคับ)"
+          }
+          disabled={updatingId !== null}
+        />
+      </div>
+    </ConfirmActionDialog>
     </>
   );
 }

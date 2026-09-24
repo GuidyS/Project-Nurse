@@ -63,12 +63,34 @@ function advisorName(PDO $db, string $advisorId): string
 
 function transferRow(PDO $db, array $request, array $payload, string $type, string $otherAdvisorId): array
 {
-    $studentId = (string)($payload['student_id'] ?? $request['target_ref_id'] ?? '');
+    $studentIds = !empty($payload['student_ids']) && is_array($payload['student_ids'])
+        ? array_values(array_filter(array_map('strval', $payload['student_ids'])))
+        : [];
+    if (empty($studentIds)) {
+        $single = (string)($payload['student_id'] ?? $request['target_ref_id'] ?? '');
+        if ($single !== '') {
+            $studentIds = array_values(array_filter(array_map('trim', explode(',', $single))));
+        }
+    }
+
+    $names = [];
+    foreach ($studentIds as $sid) {
+        $names[] = studentName($db, $sid);
+    }
+
+    $studentIdDisplay = count($studentIds) > 1
+        ? implode(', ', $studentIds)
+        : (count($studentIds) === 1 ? $studentIds[0] : '-');
+
+    $studentNameDisplay = !empty($names) ? implode(', ', $names) : '-';
 
     return [
         'id' => (string)$request['approval_request_id'],
-        'studentId' => $studentId,
-        'studentName' => studentName($db, $studentId),
+        'studentId' => $studentIdDisplay,
+        'studentName' => $studentNameDisplay,
+        'studentIds' => $studentIds,
+        'studentNames' => $names,
+        'studentCount' => count($studentIds),
         'otherAdvisor' => advisorName($db, $otherAdvisorId),
         'reason' => $payload['reason'] ?? $request['description'] ?? '',
         'date' => substr((string)$request['created_at'], 0, 10),
@@ -131,13 +153,29 @@ try {
         }
     }
 
-    $students = $db->query("
-        SELECT
-            CAST(student_id AS CHAR) AS id,
-            CONCAT(CAST(student_id AS CHAR), ' - ', TRIM(CONCAT(COALESCE(title, ''), COALESCE(first_name_th, ''), ' ', COALESCE(last_name_th, '')))) AS name
-        FROM student
-        ORDER BY student_id
-    ")->fetchAll(PDO::FETCH_ASSOC);
+    $studentsStmt = $db->prepare("
+        SELECT DISTINCT
+            CAST(s.student_id AS CHAR) AS id,
+            CONCAT(CAST(s.student_id AS CHAR), ' - ', TRIM(CONCAT(COALESCE(s.title, ''), COALESCE(s.first_name_th, ''), ' ', COALESCE(s.last_name_th, '')))) AS name
+        FROM student s
+        INNER JOIN student_advisor_mapping sam ON s.student_id = sam.student_id
+        WHERE CAST(sam.faculty_id AS CHAR) = :current_faculty_id
+          AND NOT EXISTS (
+              SELECT 1
+              FROM approval_requests ar
+              WHERE ar.request_type = 'student_transfer'
+                AND ar.status = 'pending'
+                AND (
+                    ar.target_ref_id = CAST(s.student_id AS CHAR)
+                    OR JSON_UNQUOTE(JSON_EXTRACT(ar.payload_json, '$.student_id')) = CAST(s.student_id AS CHAR)
+                    OR JSON_CONTAINS(ar.payload_json->'$.student_ids', JSON_QUOTE(CAST(s.student_id AS CHAR)))
+                    OR FIND_IN_SET(CAST(s.student_id AS CHAR), REPLACE(ar.target_ref_id, ' ', '')) > 0
+                )
+          )
+        ORDER BY id
+    ");
+    $studentsStmt->execute([':current_faculty_id' => $current['faculty_id']]);
+    $students = $studentsStmt->fetchAll(PDO::FETCH_ASSOC);
 
     $advisorStmt = $db->prepare("
         SELECT
