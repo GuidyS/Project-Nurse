@@ -170,7 +170,7 @@ try {
     $fieldCount = count($selectedKeys);
     $yearFilter = $academicYear !== '' ? $academicYear : 'all';
     $semesterFilter = $semester !== '' ? $semester : 'all';
-    logAudit($db, $adminUserId, 'update', 'exports', "ส่งออกข้อมูล {$category} รูปแบบ {$format} จำนวน {$recordCount} รายการ ({$fieldCount} fields, year={$yearFilter}, semester={$semesterFilter})");
+    logAudit($db, $adminUserId, 'export', 'export', "ส่งออกข้อมูล {$category} รูปแบบ {$format} จำนวน {$recordCount} รายการ ({$fieldCount} fields, year={$yearFilter}, semester={$semesterFilter})");
 
     $fileSuffix = $academicYear !== '' ? '_' . $academicYear : '';
 

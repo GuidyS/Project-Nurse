@@ -40,11 +40,11 @@ const actionLabels: Record<AuditEntry["action"], string> = {
 
 const actionColors: Record<AuditEntry["action"], string> = {
   create: "bg-success",
-  update: "bg-primary",
+  update: "bg-blue",
   delete: "bg-destructive",
-  role_change: "bg-warning",
-  import: "border-primary/25 bg-primary/15 text-primary",
-  export: "bg-warning",
+  role_change: "bg-yellow",
+  import: "bg-lightorange",
+  export: "bg-orange",
 };
 
 export default function AuditLog() {
@@ -161,6 +161,8 @@ export default function AuditLog() {
                   <SelectItem value="update">แก้ไข</SelectItem>
                   <SelectItem value="delete">ลบ</SelectItem>
                   <SelectItem value="role_change">เปลี่ยน Role</SelectItem>
+                  <SelectItem value="import">นำเข้าข้อมูล</SelectItem>
+                  <SelectItem value="export">ส่งออกข้อมูล</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={roleFilter} onValueChange={setRoleFilter}>

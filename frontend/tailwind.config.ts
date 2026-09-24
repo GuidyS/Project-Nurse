@@ -1,4 +1,5 @@
 import type { Config } from "tailwindcss";
+import tailwindcssAnimate from "tailwindcss-animate";
 
 export default {
   darkMode: ["class"],
@@ -54,6 +55,30 @@ export default {
           DEFAULT: "hsl(var(--popover))",
           foreground: "hsl(var(--popover-foreground))",
         },
+        blue: {
+          DEFAULT: "hsl(var(--blue))",
+          foreground: "hsl(var(--blue-foreground))",
+        },
+        orange: {
+          DEFAULT: "hsl(var(--orange))",
+          foreground: "hsl(var(--orange-foreground))",
+        },
+        lightorange: {
+          DEFAULT: "hsl(var(--lightorange))",
+          foreground: "hsl(var(--lightorange-foreground))",
+        },
+        slategray: {
+          DEFAULT: "hsl(var(--slategray))",
+          foreground: "hsl(var(--slategray-foreground))",
+        },
+        lightslategray: {
+          DEFAULT: "hsl(var(--lightslategray))",
+          foreground: "hsl(var(--lightslategray-foreground))",
+        },
+        yellow: {
+          DEFAULT: "hsl(var(--yellow))",
+          foreground: "hsl(var(--yellow-foreground))",
+        },
         card: {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
@@ -90,5 +115,5 @@ export default {
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [tailwindcssAnimate],
 } satisfies Config;

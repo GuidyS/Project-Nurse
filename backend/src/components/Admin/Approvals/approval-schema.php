@@ -3,6 +3,12 @@ require_once __DIR__ . '/../../../config/audit_helper.php';
 
 function ensureApprovalRequestsSchema(PDO $db): void
 {
+    static $ensured = false;
+    if ($ensured || $db->inTransaction()) {
+        return;
+    }
+    $ensured = true;
+
     try {
         $db->exec("
             CREATE TABLE IF NOT EXISTS approval_requests (
@@ -159,7 +165,9 @@ function approvalEncodeJson($value): ?string
 
 function approvalCreateRequest(PDO $db, array $request): int
 {
-    ensureApprovalRequestsSchema($db);
+    if (!$db->inTransaction()) {
+        ensureApprovalRequestsSchema($db);
+    }
 
     $requesterUserId = (int)($request['requester_user_id'] ?? approvalCurrentUserId() ?? 0);
     $requestType = (string)($request['request_type'] ?? '');
@@ -245,38 +253,49 @@ function approvalApplyRequest(PDO $db, array $request): void
 
 function approvalApplyStudentTransfer(PDO $db, array $payload): void
 {
-    $studentId = (string)($payload['student_id'] ?? '');
+    $studentIds = !empty($payload['student_ids']) && is_array($payload['student_ids'])
+        ? array_values(array_filter(array_map('strval', $payload['student_ids'])))
+        : [];
+    if (!empty($payload['student_id']) && !in_array((string)$payload['student_id'], $studentIds, true)) {
+        $studentIds[] = (string)$payload['student_id'];
+    }
     $toAdvisorId = (string)($payload['to_advisor_id'] ?? '');
 
-    if ($studentId === '' || $toAdvisorId === '') {
+    if (empty($studentIds) || $toAdvisorId === '') {
         return;
     }
 
-    $stmtCheck = $db->prepare("SELECT mapping_id FROM student_advisor_mapping WHERE student_id = :student_id LIMIT 1");
-    $stmtCheck->execute([':student_id' => $studentId]);
-    $existing = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+    foreach ($studentIds as $studentId) {
+        $studentId = trim((string)$studentId);
+        if ($studentId === '') {
+            continue;
+        }
 
-    if ($existing) {
-        $stmt = $db->prepare("
-            UPDATE student_advisor_mapping
-            SET faculty_id = :faculty_id
-            WHERE student_id = :student_id
-        ");
-        $stmt->execute([
-            ':faculty_id' => $toAdvisorId,
-            ':student_id' => $studentId,
-        ]);
-        return;
+        $stmtCheck = $db->prepare("SELECT mapping_id FROM student_advisor_mapping WHERE student_id = :student_id LIMIT 1");
+        $stmtCheck->execute([':student_id' => $studentId]);
+        $existing = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+
+        if ($existing) {
+            $stmt = $db->prepare("
+                UPDATE student_advisor_mapping
+                SET faculty_id = :faculty_id
+                WHERE student_id = :student_id
+            ");
+            $stmt->execute([
+                ':faculty_id' => $toAdvisorId,
+                ':student_id' => $studentId,
+            ]);
+        } else {
+            $stmt = $db->prepare("
+                INSERT INTO student_advisor_mapping (student_id, faculty_id, advisor_type, academic_year)
+                VALUES (:student_id, :faculty_id, 'General', YEAR(CURRENT_DATE))
+            ");
+            $stmt->execute([
+                ':student_id' => $studentId,
+                ':faculty_id' => $toAdvisorId,
+            ]);
+        }
     }
-
-    $stmt = $db->prepare("
-        INSERT INTO student_advisor_mapping (student_id, faculty_id, advisor_type, academic_year)
-        VALUES (:student_id, :faculty_id, 'General', YEAR(CURRENT_DATE))
-    ");
-    $stmt->execute([
-        ':student_id' => $studentId,
-        ':faculty_id' => $toAdvisorId,
-    ]);
 }
 
 function approvalApplyDocumentLink(PDO $db, string $targetType, string $targetId): void
