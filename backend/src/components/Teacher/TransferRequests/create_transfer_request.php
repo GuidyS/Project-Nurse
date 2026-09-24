@@ -21,7 +21,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 $data = json_decode(file_get_contents('php://input'), true) ?: [];
 
-if (empty($data['student_id']) || empty($data['to_advisor_id']) || !isset($data['reason'])) {
+$studentIds = !empty($data['student_ids']) && is_array($data['student_ids']) ? $data['student_ids'] : [];
+if (!empty($data['student_id']) && !in_array($data['student_id'], $studentIds)) {
+    $studentIds[] = $data['student_id'];
+}
+
+if (empty($studentIds) || empty($data['to_advisor_id']) || !isset($data['reason'])) {
     http_response_code(400);
     echo json_encode(['status' => 'error', 'message' => 'Missing transfer request fields'], JSON_UNESCAPED_UNICODE);
     exit;
@@ -68,7 +73,6 @@ try {
 
     $fromAdvisorRef = (string)($data['from_advisor_id'] ?? $_SESSION['username'] ?? $_SESSION['user_id'] ?? '');
     $toAdvisorRef = (string)$data['to_advisor_id'];
-    $studentId = (string)$data['student_id'];
     $reason = trim((string)$data['reason']);
 
     $fromAdvisor = resolveAdvisor($db, $fromAdvisorRef);
@@ -78,34 +82,47 @@ try {
         throw new Exception('Requester advisor not found');
     }
 
-    $payload = [
-        'student_id' => $studentId,
-        'from_advisor_id' => $fromAdvisor['faculty_id'],
-        'to_advisor_id' => $toAdvisor['faculty_id'],
-        'from_advisor_user_id' => $fromAdvisor['user_id'],
-        'to_advisor_user_id' => $toAdvisor['user_id'],
-        'reason' => $reason,
-    ];
+    $db->beginTransaction();
+    $createdIds = [];
 
-    $requestId = approvalCreateRequest($db, [
-        'request_type' => 'student_transfer',
-        'requester_user_id' => $fromAdvisor['user_id'],
-        'target_ref_type' => 'student',
-        'target_ref_id' => $studentId,
-        'title' => 'Advisor transfer request',
-        'description' => $reason,
-        'payload_json' => $payload,
-    ]);
+    foreach ($studentIds as $studentId) {
+        $studentId = (string)$studentId;
+        $payload = [
+            'student_id' => $studentId,
+            'from_advisor_id' => $fromAdvisor['faculty_id'],
+            'to_advisor_id' => $toAdvisor['faculty_id'],
+            'from_advisor_user_id' => $fromAdvisor['user_id'],
+            'to_advisor_user_id' => $toAdvisor['user_id'],
+            'reason' => $reason,
+        ];
 
-    // บันทึกระบบ Audit Log
-    logAudit($db, $fromAdvisor['user_id'], 'create', 'transfer_requests', "สร้างคำร้องขอโอนย้ายนักศึกษา {$studentId} ไปยังอาจารย์ {$toAdvisor['faculty_id']}");
+        $requestId = approvalCreateRequest($db, [
+            'request_type' => 'student_transfer',
+            'requester_user_id' => $fromAdvisor['user_id'],
+            'target_ref_type' => 'student',
+            'target_ref_id' => $studentId,
+            'title' => 'Advisor transfer request',
+            'description' => $reason,
+            'payload_json' => $payload,
+        ]);
+        
+        $createdIds[] = $requestId;
+
+        // บันทึกระบบ Audit Log
+        logAudit($db, $fromAdvisor['user_id'], 'create', 'transfer_requests', "สร้างคำร้องขอโอนย้ายนักศึกษา {$studentId} ไปยังอาจารย์ {$toAdvisor['faculty_id']}");
+    }
+    
+    $db->commit();
 
     echo json_encode([
         'status' => 'success',
         'message' => 'Transfer request created and sent to Admin',
-        'id' => $requestId,
+        'ids' => $createdIds,
     ], JSON_UNESCAPED_UNICODE);
 } catch (Exception $e) {
+    if (isset($db) && $db->inTransaction()) {
+        $db->rollBack();
+    }
     http_response_code(500);
     echo json_encode(['status' => 'error', 'message' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
 }

@@ -131,13 +131,17 @@ try {
         }
     }
 
-    $students = $db->query("
-        SELECT
-            CAST(student_id AS CHAR) AS id,
-            CONCAT(CAST(student_id AS CHAR), ' - ', TRIM(CONCAT(COALESCE(title, ''), COALESCE(first_name_th, ''), ' ', COALESCE(last_name_th, '')))) AS name
-        FROM student
-        ORDER BY student_id
-    ")->fetchAll(PDO::FETCH_ASSOC);
+    $studentsStmt = $db->prepare("
+        SELECT DISTINCT
+            CAST(s.student_id AS CHAR) AS id,
+            CONCAT(CAST(s.student_id AS CHAR), ' - ', TRIM(CONCAT(COALESCE(s.title, ''), COALESCE(s.first_name_th, ''), ' ', COALESCE(s.last_name_th, '')))) AS name
+        FROM student s
+        INNER JOIN student_advisor_mapping sam ON s.student_id = sam.student_id
+        WHERE CAST(sam.faculty_id AS CHAR) = :current_faculty_id
+        ORDER BY id
+    ");
+    $studentsStmt->execute([':current_faculty_id' => $current['faculty_id']]);
+    $students = $studentsStmt->fetchAll(PDO::FETCH_ASSOC);
 
     $advisorStmt = $db->prepare("
         SELECT

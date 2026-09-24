@@ -8,6 +8,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Checkbox } from '@/components/ui/checkbox';
 import { UserCheck, UserPlus, Clock, CheckCircle, XCircle, AlertCircle, Plus } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import api from '@/lib/axios';
@@ -58,7 +60,7 @@ export default function TransferRequests() {
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [newRequest, setNewRequest] = useState({ studentId: '', toAdvisorId: '', reason: '' });
+  const [newRequest, setNewRequest] = useState<{ studentIds: string[], toAdvisorId: string, reason: string }>({ studentIds: [], toAdvisorId: '', reason: '' });
   const [pendingApproveId, setPendingApproveId] = useState<string | null>(null);
   const [isApproveOpen, setIsApproveOpen] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
@@ -138,13 +140,13 @@ export default function TransferRequests() {
       }
 
       await api.post('/components/Teacher/TransferRequests/create_transfer_request.php', {
-        student_id: newRequest.studentId,
+        student_ids: newRequest.studentIds,
         to_advisor_id: newRequest.toAdvisorId,
         reason: newRequest.reason,
         from_advisor_id: facultyId
       });
       setIsCreateDialogOpen(false);
-      setNewRequest({ studentId: '', toAdvisorId: '', reason: '' });
+      setNewRequest({ studentIds: [], toAdvisorId: '', reason: '' });
       fetchData();
     } catch (err) {
       console.error(err);
@@ -401,20 +403,34 @@ export default function TransferRequests() {
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
-                <Label>นักศึกษา</Label>
-                <Select 
-                  value={newRequest.studentId} 
-                  onValueChange={(val) => setNewRequest({ ...newRequest, studentId: val })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="เลือกนักศึกษา..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {dropdowns.students.map(std => (
-                      <SelectItem key={std.id} value={std.id.toString()}>{std.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>นักศึกษา (เลือกได้หลายคน)</Label>
+                <ScrollArea className="h-48 border rounded-md p-2">
+                  {dropdowns.students.length === 0 ? (
+                    <div className="text-center text-sm text-muted-foreground p-4">ไม่มีนักศึกษาในความดูแล</div>
+                  ) : (
+                    dropdowns.students.map(std => (
+                      <div key={std.id} className="flex items-center space-x-2 py-2">
+                        <Checkbox 
+                          id={`std-${std.id}`}
+                          checked={newRequest.studentIds.includes(std.id.toString())}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setNewRequest(prev => ({ ...prev, studentIds: [...prev.studentIds, std.id.toString()] }));
+                            } else {
+                              setNewRequest(prev => ({ ...prev, studentIds: prev.studentIds.filter(id => id !== std.id.toString()) }));
+                            }
+                          }}
+                        />
+                        <label
+                          htmlFor={`std-${std.id}`}
+                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                        >
+                          {std.name}
+                        </label>
+                      </div>
+                    ))
+                  )}
+                </ScrollArea>
               </div>
               <div className="grid gap-2">
                 <Label>อาจารย์ปลายทาง</Label>
@@ -445,7 +461,7 @@ export default function TransferRequests() {
               <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                 ยกเลิก
               </Button>
-              <Button onClick={handleCreateRequest} disabled={!newRequest.studentId || !newRequest.toAdvisorId}>
+              <Button onClick={handleCreateRequest} disabled={newRequest.studentIds.length === 0 || !newRequest.toAdvisorId}>
                 สร้างคำขอ
               </Button>
             </DialogFooter>
