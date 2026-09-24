@@ -680,11 +680,11 @@ export default function CLOPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
+    <div className="app-page">
+      <div className="app-page-header">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight leading-snug">การจัดการ CLO รายวิชา</h1>
-          <p className="text-muted-foreground">Course Learning Outcomes Management</p>
+          <h1 className="app-page-title">การจัดการ CLO รายวิชา</h1>
+          <p className="app-page-description">Course Learning Outcomes Management</p>
         </div>
         {isAdmin && (
           <Button variant="outline" className="gap-2" onClick={() => setYloEditorOpen(true)}>

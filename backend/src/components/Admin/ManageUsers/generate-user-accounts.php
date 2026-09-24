@@ -1,13 +1,7 @@
 <?php
-/**
- * Generate login accounts from faculty + student profiles.
- * username = faculty_id / student_id
- * password = birth_date as DDMM + Buddhist year (e.g. 1976-12-25 → 25122519)
- * role_id stays NULL for admin to assign later.
- */
 require_once __DIR__ . '/../../../config/config.php';
-require_once __DIR__ . '/../../../config/audit_helper.php';
 require_once __DIR__ . '/../../Auth/password_helpers.php';
+require_once __DIR__ . '/../../../config/audit_helper.php'; // 🌟 ดึงไฟล์ audit_helper มาใช้งาน
 
 header("Content-Type: application/json");
 
@@ -133,7 +127,8 @@ try {
         $message .= " (อาจารย์ {$facultyCount}, นักศึกษา {$studentCount})";
     }
 
-    logAudit($db, $_SESSION['user_id'] ?? null, 'create', 'users', "สร้างบัญชีผู้ใช้จำนวน {$imported} รายการ (อาจารย์ {$facultyCount}, นักศึกษา {$studentCount}, ข้ามซ้ำ {$skippedExisting}, ไม่มีวันเกิด {$skippedNoBirth}, ข้อมูลไม่ถูกต้อง {$skippedInvalid})");
+    // 🌟 บันทึกลง Audit Log ว่ามีการใช้เครื่องมือสร้างบัญชี (นำเข้าบัญชี)
+    logAudit($db, $_SESSION['user_id'], 'import', 'users', $message);
 
     echo json_encode([
         "status" => "success",
@@ -149,3 +144,4 @@ try {
     http_response_code(400);
     echo json_encode(["status" => "error", "message" => $e->getMessage()], JSON_UNESCAPED_UNICODE);
 }
+?>

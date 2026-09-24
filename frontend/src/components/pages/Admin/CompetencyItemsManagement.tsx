@@ -173,12 +173,12 @@ export default function CompetencyItemsManagement() {
   };
 
   return (
-    <div className="p-6 space-y-6 animate-fade-in max-w-5xl mx-auto">
-      <div className="flex items-center gap-2">
+    <div className="app-page max-w-5xl animate-fade-in">
+      <div className="app-page-header flex-row items-center justify-start">
         <ListChecks className="h-6 w-6 text-primary" />
         <div>
-          <h1 className="text-2xl font-bold text-foreground">จัดการรายการประเมินสมรรถนะหลัก</h1>
-          <p className="text-muted-foreground text-sm">สร้าง/แก้ไข/ลบรายการประเมินตามหัวข้อ PLO แต่ละหลักสูตรและชั้นปี (ระบบจัดลำดับให้อัตโนมัติ)</p>
+          <h1 className="app-page-title">จัดการรายการประเมินสมรรถนะหลัก</h1>
+          <p className="app-page-description">สร้าง/แก้ไข/ลบรายการประเมินตามหัวข้อ PLO แต่ละหลักสูตรและชั้นปี (ระบบจัดลำดับให้อัตโนมัติ)</p>
         </div>
       </div>
 

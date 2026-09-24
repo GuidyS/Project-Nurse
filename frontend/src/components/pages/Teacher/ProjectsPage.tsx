@@ -869,11 +869,11 @@ const ProjectsPage = () => {
   const activeFilterCount = Number(statusFilter !== "all") + Number(academicYearFilter !== "all");
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="app-page animate-fade-in">
+      <div className="app-page-header">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">จัดการโครงการ</h1>
-          <p className="text-muted-foreground mt-1">สร้าง แก้ไข และติดตามความคืบหน้าโครงการภาควิชา</p>
+          <h1 className="app-page-title">จัดการโครงการ</h1>
+          <p className="app-page-description">สร้าง แก้ไข และติดตามความคืบหน้าโครงการภาควิชา</p>
         </div>
         {canManageProjects && (
           <div className="flex flex-wrap gap-2">
@@ -1002,6 +1002,9 @@ const ProjectsPage = () => {
             const facultyMembers = projectFacultyMembers(project);
             const visibleFacultyMembers = facultyMembers.slice(0, 3);
             const hiddenFacultyCount = Math.max(0, facultyMembers.length - visibleFacultyMembers.length);
+            const plos = projectPlos(project);
+            const visiblePlos = plos.slice(0, 4);
+            const hiddenPloCount = Math.max(0, plos.length - visiblePlos.length);
 
             return (
               <div key={project.project_id} className="bg-card rounded-xl shadow-sm border p-5 hover:shadow-md transition-shadow relative">
@@ -1016,6 +1019,18 @@ const ProjectsPage = () => {
                     <h3 className="font-semibold text-foreground line-clamp-2">{project.project_name_th}</h3>
                     {project.project_name_en && (
                       <p className="text-xs text-muted-foreground mt-1 truncate">{project.project_name_en}</p>
+                    )}
+                    {plos.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {visiblePlos.map((plo) => (
+                          <Badge key={`${project.project_id}-${plo}`} variant="secondary" className="text-[11px]">
+                            {plo}
+                          </Badge>
+                        ))}
+                        {hiddenPloCount > 0 && (
+                          <Badge variant="outline" className="text-[11px]">+{hiddenPloCount}</Badge>
+                        )}
+                      </div>
                     )}
                   </div>
 
@@ -1511,6 +1526,20 @@ const ProjectsPage = () => {
               <div className="space-y-1">
                 <p className="text-muted-foreground">ประเภทโครงการ</p>
                 <Badge variant="outline">{projectTypeLabels[normalizeProjectType(viewProject.project_type)]}</Badge>
+              </div>
+              <div className="space-y-2">
+                <p className="text-muted-foreground">PLO ที่เชื่อมกับโครงการ</p>
+                {projectPlos(viewProject).length === 0 ? (
+                  <p className="font-medium text-foreground">-</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {projectPlos(viewProject).map((plo) => (
+                      <Badge key={`${viewProject.project_id}-detail-${plo}`} variant="secondary">
+                        {plo}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="space-y-1">
                 <p className="text-muted-foreground">ชื่อโครงการ (ภาษาไทย)</p>

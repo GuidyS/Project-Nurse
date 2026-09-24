@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
-import { Download, FileSpreadsheet, FileText, Users, BookOpen, FolderKanban, GraduationCap, Calendar } from "lucide-react";
+import { Download, FileSpreadsheet, FileText, Users, BookOpen, FolderKanban, GraduationCap, Calendar, Library } from "lucide-react";
 import api from "@/lib/axios";
 
 type ExportField = { key: string; label: string };
@@ -24,7 +24,6 @@ const exportCategories: {
     fields: [
       { key: "student_id", label: "รหัสนักศึกษา" },
       { key: "full_name_th", label: "ชื่อ-นามสกุล" },
-      { key: "nickname", label: "ชื่อเล่น" },
       { key: "gender", label: "เพศ" },
       { key: "year_level", label: "ชั้นปี" },
       { key: "gpa", label: "GPA" },
@@ -32,7 +31,6 @@ const exportCategories: {
       { key: "email", label: "อีเมล" },
       { key: "phone", label: "เบอร์โทร" },
       { key: "admission_year", label: "ปีที่เข้าศึกษา" },
-      { key: "hometown_province", label: "ภูมิลำเนา" },
     ],
   },
   {
@@ -55,16 +53,13 @@ const exportCategories: {
     value: "courses",
     label: "ข้อมูลรายวิชา",
     icon: BookOpen,
+    // ฟิลด์ตรงกับหน้า "จัดการหลักสูตรรอบ 5 ปี" — ส่งออกรายวิชาของหลักสูตรที่ใช้งานในระบบ
     fields: [
       { key: "subject_code", label: "รหัสวิชา" },
       { key: "subject_name_th", label: "ชื่อวิชา (ไทย)" },
       { key: "subject_name_en", label: "ชื่อวิชา (อังกฤษ)" },
       { key: "credit", label: "หน่วยกิต" },
-      { key: "credit_desc", label: "หน่วยกิต (รายละเอียด)" },
       { key: "subject_type", label: "ประเภทวิชา" },
-      { key: "department", label: "ภาควิชา" },
-      { key: "year_level", label: "ชั้นปี" },
-      { key: "semester", label: "ภาคเรียน" },
     ],
   },
   {
@@ -82,18 +77,52 @@ const exportCategories: {
   },
 ];
 
-const academicYears = ["2568", "2567", "2566", "2565", "2564"];
+// ปีการศึกษาปัจจุบัน (พ.ศ.) — ปีการศึกษาเริ่มเดือนมิถุนายน ช่วง ม.ค.–พ.ค. ยังนับเป็นปีการศึกษาก่อนหน้า
+const getCurrentAcademicYear = (now = new Date()) =>
+  now.getFullYear() + 543 - (now.getMonth() < 5 ? 1 : 0);
+
+// ปีการศึกษาปัจจุบันย้อนหลังรวม 5 ปี (เช่น 2569 → 2569–2565) เลื่อนตามปีจริงโดยไม่ต้องแก้โค้ด
+const currentAcademicYear = getCurrentAcademicYear();
+const academicYears = Array.from({ length: 5 }, (_, i) => String(currentAcademicYear - i));
 const semesters = ["ทั้งหมด", "ภาคเรียนที่ 1", "ภาคเรียนที่ 2", "ภาคฤดูร้อน"];
+
+// อาจารย์ / รายวิชา ส่งออกทั้งหมด ไม่มีตัวกรองปีการศึกษา/ภาคเรียน
+const categoriesWithoutFilters = ["teachers", "courses"];
+
+interface ActiveCurriculum {
+  start_year: number;
+  end_year: number;
+  label: string;
+}
 
 export default function ExportData() {
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedFields, setSelectedFields] = useState<string[]>([]);
   const [format, setFormat] = useState("xlsx");
-  const [academicYear, setAcademicYear] = useState("2568");
+  const [academicYear, setAcademicYear] = useState(academicYears[0]);
   const [semester, setSemester] = useState("ทั้งหมด");
+  // undefined = กำลังโหลด, null = ยังไม่มีหลักสูตรในระบบ
+  const [activeCurriculum, setActiveCurriculum] = useState<ActiveCurriculum | null | undefined>(undefined);
   const { toast } = useToast();
 
   const currentCategory = exportCategories.find((c) => c.value === selectedCategory);
+  const showFilters = !categoriesWithoutFilters.includes(selectedCategory);
+
+  // รายวิชาส่งออกตามหลักสูตรที่ใช้งาน (ตั้งค่าที่หน้า "จัดการหลักสูตรรอบ 5 ปี")
+  useEffect(() => {
+    if (selectedCategory !== "courses") return;
+    let cancelled = false;
+    api.get("/index.php?page=get-curriculum-cycles")
+      .then((res) => {
+        if (!cancelled) setActiveCurriculum(res.data?.data?.active_cycle ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setActiveCurriculum(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedCategory]);
 
   const handleFieldToggle = (field: string) => {
     setSelectedFields((prev) =>
@@ -132,8 +161,8 @@ export default function ExportData() {
         category: selectedCategory,
         fields: selectedFields,
         format: format,
-        academicYear: academicYear,
-        semester: semester
+        academicYear: showFilters ? academicYear : "",
+        semester: showFilters ? semester : ""
       }, {
         responseType: 'blob' // 👈 สำคัญมาก! บอกให้ axios รับข้อมูลเป็นไฟล์
       });
@@ -142,8 +171,13 @@ export default function ExportData() {
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
-      // ตั้งชื่อไฟล์ เช่น ข้อมูลนักศึกษา_2568.csv
-      link.setAttribute('download', `${currentCategory?.label}_${academicYear}.${format}`); 
+      // ตั้งชื่อไฟล์ เช่น ข้อมูลนักศึกษา_2568.csv, ข้อมูลรายวิชา_2572-2577.xlsx, ข้อมูลอาจารย์.xlsx
+      const suffix = showFilters
+        ? `_${academicYear}`
+        : selectedCategory === "courses" && activeCurriculum
+          ? `_${activeCurriculum.start_year}-${activeCurriculum.end_year}`
+          : "";
+      link.setAttribute('download', `${currentCategory?.label}${suffix}.${format}`);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -199,7 +233,26 @@ export default function ExportData() {
               </CardContent>
             </Card>
 
-            {/* Filters */}
+            {/* ข้อมูลรายวิชามาจากหลักสูตรที่ใช้งาน */}
+            {selectedCategory === "courses" && (
+              <Card className="app-section-card">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Library className="h-4 w-4 text-primary" /> หลักสูตรที่ส่งออก
+                  </CardTitle>
+                  <CardDescription>
+                    {activeCurriculum === undefined
+                      ? "กำลังโหลด..."
+                      : activeCurriculum
+                        ? `รายวิชาทั้งหมดของหลักสูตร ${activeCurriculum.label} (หลักสูตรที่ใช้งานในระบบ เปลี่ยนได้ที่หน้า "จัดการหลักสูตรรอบ 5 ปี")`
+                        : 'ยังไม่มีหลักสูตรในระบบ — จะส่งออกรายวิชาทั้งหมดจากฐานข้อมูลรายวิชาแทน'}
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+            )}
+
+            {/* Filters (อาจารย์ / รายวิชา ส่งออกทั้งหมด ไม่มีตัวกรอง) */}
+            {showFilters && (
             <Card className="app-section-card">
               <CardHeader>
                 <CardTitle className="text-base">ตัวกรอง</CardTitle>
@@ -235,6 +288,7 @@ export default function ExportData() {
                 </div>
               </CardContent>
             </Card>
+            )}
           </div>
 
           {/* Field Selection & Format */}

@@ -40,11 +40,10 @@ function getExportSchema(): array
         'students' => [
             'table' => 'student',
             'order_by' => 'student_id ASC',
-            'select' => ['student_id', 'title', 'first_name_th', 'last_name_th', 'nickname', 'gender', 'year_level', 'gpa', 'status', 'email', 'phone', 'admission_year', 'hometown_province'],
+            'select' => ['student_id', 'title', 'first_name_th', 'last_name_th', 'gender', 'year_level', 'gpa', 'status', 'email', 'phone', 'admission_year'],
             'fields' => [
                 'student_id'        => ['label' => 'รหัสนักศึกษา',  'resolve' => fn($r) => $r['student_id']],
                 'full_name_th'      => ['label' => 'ชื่อ-นามสกุล',  'resolve' => $fullNameTh],
-                'nickname'          => ['label' => 'ชื่อเล่น',       'resolve' => fn($r) => $r['nickname']],
                 'gender'            => ['label' => 'เพศ',           'resolve' => fn($r) => $r['gender']],
                 'year_level'        => ['label' => 'ชั้นปี',         'resolve' => fn($r) => $r['year_level']],
                 'gpa'               => ['label' => 'GPA',           'resolve' => fn($r) => $r['gpa']],
@@ -52,7 +51,6 @@ function getExportSchema(): array
                 'email'             => ['label' => 'อีเมล',         'resolve' => fn($r) => $r['email']],
                 'phone'             => ['label' => 'เบอร์โทร',      'resolve' => fn($r) => $r['phone']],
                 'admission_year'    => ['label' => 'ปีที่เข้าศึกษา', 'resolve' => fn($r) => $r['admission_year']],
-                'hometown_province' => ['label' => 'ภูมิลำเนา',     'resolve' => fn($r) => $r['hometown_province']],
             ],
         ],
         'teachers' => [

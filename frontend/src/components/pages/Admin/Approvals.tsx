@@ -256,10 +256,12 @@ export default function Approvals() {
 
   return (
     <>
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight py-1">อนุมัติคำขอ</h1>
-        <p className="text-muted-foreground">ดำเนินการตามคำขอจากอาจารย์และผู้ใช้งานในระบบ</p>
+    <div className="app-page">
+      <div className="app-page-header">
+        <div>
+          <h1 className="app-page-title">อนุมัติคำขอ</h1>
+          <p className="app-page-description">ดำเนินการตามคำขอจากอาจารย์และผู้ใช้งานในระบบ</p>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">

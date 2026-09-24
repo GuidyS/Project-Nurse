@@ -100,6 +100,11 @@ const getPreviewMenuSections = (user: any) => {
   return previewMenuSectionsByRole[previewRole] || [];
 };
 
+const sidebarIconOverrides: Record<string, string> = {
+  "competency-items-management": "ListChecks",
+  "curriculum-cycles": "Library",
+};
+
 export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
 
   const [menuSections, setMenuSections] = useState<any[]>([]);
@@ -254,7 +259,7 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
           {/* พื้นที่ Logo */}
           <div className="relative h-10 w-10 shrink-0">
             <div className="flex h-full w-full items-center justify-center rounded-full bg-[#8a2be2] overflow-hidden shadow-sm">
-              <img src="../../Nurse_logo.jpg" alt="Logo" className="object-cover w-full h-full" />
+              <img src="../../Nurse_logo.png" alt="Logo" className="object-cover w-full h-full" />
             </div>
 
             {/* ปุ่ม Trigger ตอน "หุบ" (จะแสดงทับ Logo เป๊ะๆ เมื่อ Hover) */}
@@ -304,7 +309,7 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
 
               <SidebarMenu>
                 {filteredItems.map((item: any) => {
-                  const Icon = getIcon(item.icon);
+                  const Icon = getIcon(sidebarIconOverrides[item.url] || item.icon);
                   const isActive = activeItem === item.url;
                   return (
                     <SidebarMenuItem key={item.url}>
