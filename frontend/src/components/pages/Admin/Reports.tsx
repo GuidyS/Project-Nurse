@@ -431,11 +431,11 @@ export default function Reports() {
   }, [filteredRows]);
 
   return (
-    <div className="p-6 space-y-6 animate-fade-in">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <div className="app-page">
+      <div className="app-page-header">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">รายงานงบประมาณและโครงการ</h1>
-          <p className="text-muted-foreground">
+          <h1 className="app-page-title">รายงานงบประมาณและโครงการ</h1>
+          <p className="app-page-description">
             ภาพรวมงบแผน โครงการ กิจกรรมย่อย และเอกสารประกอบของคณะพยาบาลศาสตร์
           </p>
         </div>
@@ -452,7 +452,7 @@ export default function Reports() {
         </div>
       )}
 
-      <Card>
+      <Card className="app-section-card">
         <CardHeader>
           <CardTitle className="text-base">ตัวกรองรายงาน</CardTitle>
           <CardDescription>เลือกปี ยุทธศาสตร์ ผู้รับผิดชอบ หรือค้นหาโครงการ/กิจกรรมย่อย</CardDescription>
@@ -513,7 +513,7 @@ export default function Reports() {
       </Card>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
-        <Card>
+        <Card className="app-stat-card">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">โครงการ</p>
@@ -522,7 +522,7 @@ export default function Reports() {
             <p className="mt-2 text-2xl font-bold">{summaryStats.totalProjects}</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="app-stat-card">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">กิจกรรมย่อย</p>
@@ -531,19 +531,19 @@ export default function Reports() {
             <p className="mt-2 text-2xl font-bold">{summaryStats.totalActivities}</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="app-stat-card">
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">งบเสนอรวม</p>
             <p className="mt-2 text-xl font-bold">{formatCurrency(summaryStats.proposedTotal)}</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="app-stat-card">
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">งบใช้จริงรวม</p>
             <p className="mt-2 text-xl font-bold">{formatCurrency(summaryStats.actualTotal)}</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="app-stat-card">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">ส่วนต่างงบ</p>
@@ -552,7 +552,7 @@ export default function Reports() {
             <p className="mt-2 text-xl font-bold">{formatCurrency(summaryStats.balance)}</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="app-stat-card">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">เอกสารครบ</p>
@@ -564,14 +564,14 @@ export default function Reports() {
       </div>
 
       <div className="grid gap-4 xl:grid-cols-3">
-        <Card className="xl:col-span-2">
+        <Card className="app-section-card xl:col-span-2">
           <CardHeader>
             <CardTitle className="text-base">ภาพรวมตามยุทธศาสตร์</CardTitle>
             <CardDescription>จำนวนโครงการ กิจกรรมย่อย งบประมาณ และเอกสารในแต่ละยุทธศาสตร์</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-2">
             {strategySummaries.map((item) => (
-              <div key={item.strategy} className="rounded-lg border p-4">
+              <div key={item.strategy} className="app-interactive-card p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="font-medium">{item.strategy}</p>
@@ -586,7 +586,7 @@ export default function Reports() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="app-section-card">
           <CardHeader>
             <CardTitle className="text-base">แหล่งงบประมาณ</CardTitle>
             <CardDescription>สรุปงบแยกตามแหล่งเงินจากไฟล์งบแผน</CardDescription>
@@ -594,7 +594,7 @@ export default function Reports() {
           <CardContent className="space-y-3">
             {displayBudgetBreakdown.map((source) => {
               return (
-                <div key={source.key} className="rounded-lg border p-3">
+                <div key={source.key} className="app-interactive-card p-3">
                   <div className="flex items-center gap-2">
                     <WalletCards className="h-4 w-4 text-primary" />
                     <p className="font-medium">{source.label}</p>
@@ -616,7 +616,7 @@ export default function Reports() {
         </Card>
       </div>
 
-      <Card>
+      <Card className="app-section-card">
         <CardHeader>
           <div>
             <CardTitle className="text-base">ตารางโครงการและกิจกรรมย่อย</CardTitle>

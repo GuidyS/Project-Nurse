@@ -34,6 +34,7 @@ try {
         exit();
     }
 
+    // รับได้ทั้ง subject_id และ subject_code (วิชาที่มีเฉพาะในหน้า "จัดการหลักสูตร")
     $subjectCode = null;
     if (!empty($input['subject_id'])) {
         $subjectStmt = $pdo->prepare("SELECT subject_code FROM subject WHERE subject_id = :subject_id LIMIT 1");

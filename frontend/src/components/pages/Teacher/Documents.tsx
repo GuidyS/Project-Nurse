@@ -24,8 +24,8 @@ type DocumentItem = {
 
 const getStatusBadge = (status: string) => {
   switch (status) {
-    case 'approved': return <Badge className="bg-green-500 hover:bg-green-600">อนุมัติแล้ว</Badge>;
-    case 'pending': return <Badge className="bg-yellow-500 hover:bg-yellow-600">รอตรวจสอบ</Badge>;
+    case 'approved': return <Badge className="bg-green-500">อนุมัติแล้ว</Badge>;
+    case 'pending': return <Badge className="bg-yellow-500">รอตรวจสอบ</Badge>;
     case 'rejected': return <Badge variant="destructive">ถูกปฏิเสธ</Badge>;
     default: return <Badge variant="secondary">{status}</Badge>;
   }

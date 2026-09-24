@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Edit, Trash2, Save, BookOpen, Target, Loader2, Settings2, Plus, AlertCircle } from "lucide-react";
+import { Edit, Trash2, Save, BookOpen, Target, Loader2, Settings2, Plus, AlertCircle, Library } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -19,9 +19,19 @@ import api from "@/lib/axios";
 import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
 
 interface Course {
-  subject_id: number;
+  // null = วิชาที่มีเฉพาะในหน้า "จัดการหลักสูตร" (ยังไม่มีในตาราง subject) — ระบุวิชาด้วย subject_code แทน
+  subject_id: number | null;
   subject_code: string;
   subject_name_th: string;
+}
+
+// หลักสูตรที่ใช้งานในระบบ (ตั้งค่าที่หน้า "จัดการหลักสูตร")
+interface ActiveCurriculum {
+  id: number;
+  start_year: number;
+  end_year: number;
+  is_explicit: boolean;
+  label: string;
 }
 
 interface PloMeta {
@@ -449,7 +459,11 @@ export default function CLOPage() {
   const { toast } = useToast();
 
   const [courses, setCourses] = useState<Course[]>([]);
+  const [isLoadingCourses, setIsLoadingCourses] = useState(true);
+  // selectedCourse = รหัสวิชา (subject_code)
   const [selectedCourse, setSelectedCourse] = useState<string>("");
+  // รายวิชาตามหลักสูตรที่ใช้งานในระบบ — null = ยังไม่มีหลักสูตร (แสดงรายวิชาทั้งหมดแบบเดิม)
+  const [curriculum, setCurriculum] = useState<ActiveCurriculum | null>(null);
   const [clos, setClos] = useState<CLO[]>([]);
   const [ploCatalog, setPloCatalog] = useState<PloMeta[]>([]);
   const [yloMatrix, setYloMatrix] = useState<YloMatrix>({});
@@ -469,30 +483,44 @@ export default function CLOPage() {
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
     const fetchCourses = async () => {
+      setIsLoadingCourses(true);
       try {
+        // API คืนเฉพาะรายวิชาของหลักสูตรที่ใช้งานในระบบ (ยังไม่มีหลักสูตร = รายวิชาทั้งหมดแบบเดิม)
         const res = await api.get('/index.php?page=get-subjects');
+        if (cancelled) return;
         if (res.data.status === 'success') {
           const list: Course[] = res.data.data || [];
           setCourses(list);
           setIsAdmin(res.data.is_admin === true);
-          // เลือกวิชาแรกอัตโนมัติ เพื่อให้ matrix/catalog โหลดก่อนเปิด dialog "แก้ไข YLO"
-          if (list.length > 0) {
-            setSelectedCourse((prev) => prev || `${list[0].subject_id}`);
-          }
+          setCurriculum(res.data.curriculum ?? null);
+          // คงวิชาเดิมไว้ถ้ายังอยู่ในหลักสูตรที่เลือก ไม่งั้นเลือกวิชาแรก (ให้ matrix/catalog โหลดก่อนเปิด "แก้ไข YLO")
+          setSelectedCourse((prev) =>
+            list.some((course) => course.subject_code === prev) ? prev : list[0]?.subject_code ?? ""
+          );
+        } else {
+          toast({ title: "ข้อผิดพลาด", description: res.data?.message || "ดึงข้อมูลรายวิชาไม่สำเร็จ", variant: "destructive" });
         }
       } catch {
-        toast({ title: "ข้อผิดพลาด", description: "ดึงข้อมูลรายวิชาไม่สำเร็จ", variant: "destructive" });
+        if (!cancelled) {
+          toast({ title: "ข้อผิดพลาด", description: "ดึงข้อมูลรายวิชาไม่สำเร็จ", variant: "destructive" });
+        }
+      } finally {
+        if (!cancelled) setIsLoadingCourses(false);
       }
     };
     fetchCourses();
+    return () => {
+      cancelled = true;
+    };
   }, [toast]);
 
   const fetchCLOs = useCallback(async (withSpinner = true) => {
     if (!selectedCourse) return;
     if (withSpinner) setIsLoading(true);
     try {
-      const res = await api.get(`/index.php?page=get-clos&subject_id=${selectedCourse}`);
+      const res = await api.get('/index.php?page=get-clos', { params: { subject_code: selectedCourse } });
       if (res.data?.status === 'success') {
         const payload = res.data.data;
         if (Array.isArray(payload)) {
@@ -542,7 +570,7 @@ export default function CLOPage() {
 
     try {
       const res = await api.post('/index.php?page=add-clo', {
-        subject_id: parseInt(selectedCourse),
+        subject_code: selectedCourse,
         clo_code: addFormData.clo_code || null,
         description: addFormData.description,
         ylo_id: addFormData.ylo_id || null,
@@ -575,7 +603,7 @@ export default function CLOPage() {
     try {
       const res = await api.post('/index.php?page=update-clo', {
         clo_id: isEditing,
-        subject_id: parseInt(selectedCourse),
+        subject_code: selectedCourse,
         clo_code: editFormData.clo_code || null,
         description: editFormData.description,
         ylo_id: editFormData.ylo_id || null,
@@ -611,7 +639,7 @@ export default function CLOPage() {
     try {
       const res = await api.post('/index.php?page=delete-clo', {
         clo_id: pendingDeleteId,
-        subject_id: parseInt(selectedCourse),
+        subject_code: selectedCourse,
       });
 
       if (res.data.status !== 'success') {
@@ -652,11 +680,11 @@ export default function CLOPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
+    <div className="app-page">
+      <div className="app-page-header">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight leading-snug">การจัดการ CLO รายวิชา</h1>
-          <p className="text-muted-foreground">Course Learning Outcomes Management</p>
+          <h1 className="app-page-title">การจัดการ CLO รายวิชา</h1>
+          <p className="app-page-description">Course Learning Outcomes Management</p>
         </div>
         {isAdmin && (
           <Button variant="outline" className="gap-2" onClick={() => setYloEditorOpen(true)}>
@@ -667,22 +695,34 @@ export default function CLOPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="md:col-span-1 space-y-4">
-          <div className="bg-card rounded-xl shadow-card p-4">
-            <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
-              <BookOpen className="h-4 w-4" /> เลือกรายวิชา
-            </h3>
-            <Select value={selectedCourse} onValueChange={setSelectedCourse}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="-- เลือกรหัสวิชา --" />
-              </SelectTrigger>
-              <SelectContent>
-                {courses.map((course) => (
-                  <SelectItem key={course.subject_id} value={`${course.subject_id}`}>
-                    {course.subject_code} - {course.subject_name_th}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="bg-card rounded-xl shadow-card p-4 space-y-5">
+            {curriculum && (
+              <div className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2">
+                <p className="flex items-center gap-2 text-sm font-medium text-foreground">
+                  <Library className="h-4 w-4 text-primary" /> หลักสูตร {curriculum.label}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  แสดงเฉพาะรายวิชาของหลักสูตรที่ใช้งานในระบบ (เปลี่ยนได้ที่หน้า "จัดการหลักสูตร")
+                </p>
+              </div>
+            )}
+            <div>
+              <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
+                <BookOpen className="h-4 w-4" /> เลือกรายวิชา
+              </h3>
+              <Select value={selectedCourse} onValueChange={setSelectedCourse} disabled={courses.length === 0}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder={isLoadingCourses ? "กำลังโหลดรายวิชา..." : "-- เลือกรหัสวิชา --"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {courses.map((course) => (
+                    <SelectItem key={course.subject_code} value={course.subject_code}>
+                      {course.subject_code} - {course.subject_name_th}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
 
@@ -760,7 +800,7 @@ export default function CLOPage() {
                       <div className="flex justify-between items-start gap-4">
                         <div className="space-y-2 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
-                            <Badge className="bg-primary/10 text-primary hover:bg-primary/20">
+                            <Badge className="bg-primary/10 text-primary">
                               {clo.clo_code || `CLO ${index + 1}`}
                             </Badge>
                             {clo.ylo_id && <Badge variant="secondary">{clo.ylo_id}</Badge>}
@@ -811,8 +851,23 @@ export default function CLOPage() {
             </div>
           ) : (
             <div className="bg-card rounded-xl shadow-card p-12 text-center">
+              {isLoadingCourses ? (
+                <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
+              ) : (
+              <>
               <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              {courses.length === 0 ? (
+              {courses.length === 0 && curriculum ? (
+                <>
+                  <h3 className="font-semibold text-foreground mb-2">
+                    {isAdmin ? "หลักสูตรนี้ยังไม่มีรายวิชา" : "ไม่มีรายวิชาที่คุณสอนในหลักสูตรนี้"}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {isAdmin
+                      ? 'เพิ่มรายวิชาของหลักสูตรได้ที่หน้า "จัดการหลักสูตร"'
+                      : "กรุณาติดต่อผู้ดูแลระบบเพื่อมอบหมายรายวิชาในหลักสูตรนี้"}
+                  </p>
+                </>
+              ) : courses.length === 0 ? (
                 <>
                   <h3 className="font-semibold text-foreground mb-2">ไม่มีรายวิชาที่คุณรับผิดชอบ</h3>
                   <p className="text-sm text-muted-foreground">
@@ -826,6 +881,8 @@ export default function CLOPage() {
                   <h3 className="font-semibold text-foreground mb-2">เลือกรายวิชา</h3>
                   <p className="text-sm text-muted-foreground">กรุณาเลือกรายวิชาด้านซ้ายมือเพื่อดูและแก้ไข CLO</p>
                 </>
+              )}
+              </>
               )}
             </div>
           )}

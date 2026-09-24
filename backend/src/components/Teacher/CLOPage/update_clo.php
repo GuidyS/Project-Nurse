@@ -35,12 +35,8 @@ try {
         exit();
     }
 
-    $subjectCode = null;
-    if (!empty($input['subject_id'])) {
-        $subjectStmt = $pdo->prepare("SELECT subject_code FROM subject WHERE subject_id = :subject_id LIMIT 1");
-        $subjectStmt->execute([':subject_id' => $input['subject_id']]);
-        $subjectCode = $subjectStmt->fetchColumn() ?: null;
-    }
+    // รับได้ทั้ง subject_id และ subject_code (วิชาที่มีเฉพาะในหน้า "จัดการหลักสูตร")
+    $subjectCode = cloResolveSubjectCode($pdo, (array)$input);
 
     $mappingData = loadActiveMappingData($pdo);
     $existing = null;
@@ -56,6 +52,7 @@ try {
         exit();
     }
 
+    // แก้ CLO ได้เฉพาะวิชาที่ตนเองสอน (admin แก้ได้ทุกวิชา)
     $ownerCode = (string)($existing['subject_code'] ?? $subjectCode ?? '');
     if ($ownerCode !== '' && !cloAccessCanEditSubject($pdo, $_SESSION['user_id'], $ownerCode)) {
         cloAccessDenySubject($ownerCode);

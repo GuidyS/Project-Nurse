@@ -4,17 +4,17 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Search, Edit, Trash2, MoreHorizontal, UserPlus, Upload } from "lucide-react";
+import { Loader2, Search, Edit, Trash2, MoreHorizontal, UserPlus, Upload, Users as UsersIcon } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import api from "@/lib/axios";
 import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ImportDataDialog, type ImportDataTypeOption } from "@/components/shared/ImportDataDialog";
 
 interface User {
   id: string;
@@ -66,12 +66,18 @@ const studentPdfOptions = [
   { value: "student_certificate_file", label: "ไฟล์ประกาศนียบัตร/ใบรับรอง" },
 ];
 
+const userImportTypes: ImportDataTypeOption[] = [
+  { value: "students", label: "ข้อมูลนักศึกษา", icon: UsersIcon, description: "นำเข้ารายชื่อนักศึกษาใหม่" },
+  { value: "teachers", label: "ข้อมูลอาจารย์", icon: UsersIcon, description: "นำเข้ารายชื่ออาจารย์" },
+];
+
 export default function UsersManagement() {
   const [users, setUsers] = useState<User[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [roleTab, setRoleTab] = useState<RoleTab>("teacher");
   const [isGenerateOpen, setIsGenerateOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
   // 🎯 States สำหรับ Dialog แก้ไขข้อมูลเชิงลึก
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
@@ -408,23 +414,29 @@ export default function UsersManagement() {
 
   return (
     <>
-      <div className="p-6 space-y-6 animate-fade-in">
-        <div className="flex items-center justify-between">
+      <div className="app-page">
+        <div className="app-page-header">
           <div>
-            <h1 className="text-3xl font-bold text-foreground py-1">จัดการผู้ใช้</h1>
-            <p className="text-muted-foreground">สร้างบัญชีจากข้อมูลอาจารย์/นักศึกษา แก้ไข ลบ และมอบบทบาท</p>
+            <h1 className="app-page-title">จัดการผู้ใช้</h1>
+            <p className="app-page-description">สร้างบัญชีจากข้อมูลอาจารย์/นักศึกษา แก้ไข ลบ และมอบบทบาท</p>
           </div>
-          <Button className="gap-2" onClick={() => setIsGenerateOpen(true)} disabled={isGenerating}>
-            {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
-            สร้างบัญชีจากข้อมูลในระบบ
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" className="gap-2" onClick={() => setIsImportOpen(true)}>
+              <Upload className="h-4 w-4" />
+              Import ข้อมูล
+            </Button>
+            <Button className="gap-2" onClick={() => setIsGenerateOpen(true)} disabled={isGenerating}>
+              {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
+              สร้างบัญชีจากข้อมูลในระบบ
+            </Button>
+          </div>
         </div>
 
-        <Card>
+        <Card className="app-section-card">
           <CardHeader className="space-y-4">
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <div>
-                <CardTitle className="py-2">รายชื่อผู้ใช้</CardTitle>
+                <CardTitle>รายชื่อผู้ใช้</CardTitle>
                 <CardDescription>
                   {roleLabels[roleTab]} {tabCount(roleTab)} คน · ทั้งหมด {users.length} คน
                 </CardDescription>
@@ -442,26 +454,26 @@ export default function UsersManagement() {
             <Tabs value={roleTab} onValueChange={(value) => setRoleTab(value as RoleTab)}>
               <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
                 {roleTabs.map((tab) => (
-                  <TabsTrigger key={tab.value} value={tab.value} className="gap-1.5">
+                  <TabsTrigger key={tab.value} value={tab.value} className="group gap-2">
                     {tab.label}
-                    <Badge variant="secondary" className="h-5 min-w-5 px-1.5 text-[10px]">
+                    <span className="text-xs font-semibold tabular-nums text-muted-foreground group-data-[state=active]:text-primary">
                       {tabCount(tab.value)}
-                    </Badge>
+                    </span>
                   </TabsTrigger>
                 ))}
               </TabsList>
             </Tabs>
           </CardHeader>
           <CardContent>
-            <Table>
+            <Table className="min-w-[980px] table-fixed">
               <TableHeader>
                 <TableRow>
-                  <TableHead>ผู้ใช้</TableHead>
-                  <TableHead>รหัสประจำตัว</TableHead>
-                  <TableHead>บทบาท</TableHead>
-                  <TableHead>สถานะ</TableHead>
-                  <TableHead>วันที่สร้าง</TableHead>
-                  <TableHead className="text-right">จัดการ</TableHead>
+                  <TableHead className="w-[28%]">ผู้ใช้</TableHead>
+                  <TableHead className="w-[14%]">รหัสประจำตัว</TableHead>
+                  <TableHead className="w-[22%]">บทบาท</TableHead>
+                  <TableHead className="w-[11%]">สถานะ</TableHead>
+                  <TableHead className="w-[15%]">วันที่สร้าง</TableHead>
+                  <TableHead className="w-[10%] text-right">จัดการ</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -475,14 +487,7 @@ export default function UsersManagement() {
                   filteredUsers.map((user) => (
                     <TableRow key={user.id}>
                       <TableCell>
-                        <div className="flex items-center gap-3">
-                          <Avatar className="h-8 w-8">
-                            <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                              {user.fullName.charAt(0)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <span className="font-medium">{user.fullName}</span>
-                        </div>
+                        <span className="font-medium">{user.fullName}</span>
                       </TableCell>
                       <TableCell className="text-muted-foreground">{user.email}</TableCell>
                       <TableCell>
@@ -499,7 +504,10 @@ export default function UsersManagement() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={user.status === "active" ? "default" : "secondary"} className={user.status === "active" ? "bg-success" : ""}>
+                        <Badge
+                          variant={user.status === "active" ? "default" : "destructive"}
+                          className={user.status === "active" ? "bg-success" : "bg-destructive text-destructive-foreground"}
+                        >
                           {user.status === "active" ? "ใช้งาน" : "ระงับ"}
                         </Badge>
                       </TableCell>
@@ -507,7 +515,11 @@ export default function UsersManagement() {
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-muted-foreground hover:bg-muted hover:text-foreground"
+                            >
                               <MoreHorizontal className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
@@ -606,6 +618,15 @@ export default function UsersManagement() {
         variant="default"
         onConfirm={handleGenerateAccounts}
         isLoading={isGenerating}
+      />
+
+      <ImportDataDialog
+        open={isImportOpen}
+        onOpenChange={setIsImportOpen}
+        importTypes={userImportTypes}
+        title="Import ข้อมูลผู้ใช้"
+        description="นำเข้าข้อมูลนักศึกษาและอาจารย์จากไฟล์ Excel หรือ CSV"
+        onImported={fetchUsers}
       />
 
       <ConfirmActionDialog

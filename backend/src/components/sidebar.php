@@ -33,12 +33,14 @@ $positionSectionMap = [
 
 // 2. SQL Query ดึงเมนูตามระบบสิทธิ์
 $sql = "SELECT m.* FROM system_sidebar_menus m 
-        WHERE m.permission_required IN (
+        WHERE m.is_active = 1
+        AND m.url NOT IN ('import-data', 'project-docs')
+        AND (m.permission_required IN (
             SELECT p.permission_name FROM permissions p
             JOIN position_permission pp ON p.permission_id = pp.permission_id
             JOIN user_position up ON pp.position_id = up.position_id
             WHERE up.user_id = :user_id
-        ) OR m.permission_required IS NULL 
+        ) OR m.permission_required IS NULL)
         ORDER BY m.menu_id ASC";
 
 $stmt = $db->prepare($sql);

@@ -4,6 +4,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/../../../config/audit_helper.php';
 require_once __DIR__ . '/../Approvals/approval-schema.php';
 
 // นำเข้าเครื่องมือสร้าง Excel
@@ -39,11 +40,10 @@ function getExportSchema(): array
         'students' => [
             'table' => 'student',
             'order_by' => 'student_id ASC',
-            'select' => ['student_id', 'title', 'first_name_th', 'last_name_th', 'nickname', 'gender', 'year_level', 'gpa', 'status', 'email', 'phone', 'admission_year', 'hometown_province'],
+            'select' => ['student_id', 'title', 'first_name_th', 'last_name_th', 'gender', 'year_level', 'gpa', 'status', 'email', 'phone', 'admission_year'],
             'fields' => [
                 'student_id'        => ['label' => 'รหัสนักศึกษา',  'resolve' => fn($r) => $r['student_id']],
                 'full_name_th'      => ['label' => 'ชื่อ-นามสกุล',  'resolve' => $fullNameTh],
-                'nickname'          => ['label' => 'ชื่อเล่น',       'resolve' => fn($r) => $r['nickname']],
                 'gender'            => ['label' => 'เพศ',           'resolve' => fn($r) => $r['gender']],
                 'year_level'        => ['label' => 'ชั้นปี',         'resolve' => fn($r) => $r['year_level']],
                 'gpa'               => ['label' => 'GPA',           'resolve' => fn($r) => $r['gpa']],
@@ -51,7 +51,6 @@ function getExportSchema(): array
                 'email'             => ['label' => 'อีเมล',         'resolve' => fn($r) => $r['email']],
                 'phone'             => ['label' => 'เบอร์โทร',      'resolve' => fn($r) => $r['phone']],
                 'admission_year'    => ['label' => 'ปีที่เข้าศึกษา', 'resolve' => fn($r) => $r['admission_year']],
-                'hometown_province' => ['label' => 'ภูมิลำเนา',     'resolve' => fn($r) => $r['hometown_province']],
             ],
         ],
         'teachers' => [
@@ -127,14 +126,29 @@ try {
     
     $whereClause = "";
     $params = [];
-    if ($academicYear !== '') {
+    $semester = $data['semester'] ?? 'ทั้งหมด';
+
+    if ($academicYear !== '' && $academicYear !== 'ทั้งหมด') {
         if ($category === 'students') {
-            $yearPrefix = substr($academicYear, 2, 2);
-            $whereClause = " WHERE student_id LIKE :yearPrefix";
-            $params[':yearPrefix'] = $yearPrefix . '%';
-        } elseif ($category === 'projects') {
-            $whereClause = " WHERE academic_year = :year";
+            $whereClause .= ($whereClause ? " AND " : " WHERE ") . "admission_year = :year";
             $params[':year'] = $academicYear;
+        } elseif ($category === 'projects' || $category === 'courses') {
+            $whereClause .= ($whereClause ? " AND " : " WHERE ") . "academic_year = :year";
+            $params[':year'] = $academicYear;
+        }
+    }
+
+    if ($semester !== '' && $semester !== 'ทั้งหมด') {
+        if ($category === 'courses') {
+            $semNum = 0;
+            if ($semester === 'ภาคเรียนที่ 1') $semNum = 1;
+            elseif ($semester === 'ภาคเรียนที่ 2') $semNum = 2;
+            elseif ($semester === 'ภาคฤดูร้อน') $semNum = 3;
+            
+            if ($semNum > 0) {
+                $whereClause .= ($whereClause ? " AND " : " WHERE ") . "semester = :sem";
+                $params[':sem'] = $semNum;
+            }
         }
     }
 
@@ -151,6 +165,12 @@ try {
         }
         $exportData[] = $line;
     }
+
+    $recordCount = count($exportData);
+    $fieldCount = count($selectedKeys);
+    $yearFilter = $academicYear !== '' ? $academicYear : 'all';
+    $semesterFilter = $semester !== '' ? $semester : 'all';
+    logAudit($db, $adminUserId, 'update', 'exports', "ส่งออกข้อมูล {$category} รูปแบบ {$format} จำนวน {$recordCount} รายการ ({$fieldCount} fields, year={$yearFilter}, semester={$semesterFilter})");
 
     $fileSuffix = $academicYear !== '' ? '_' . $academicYear : '';
 

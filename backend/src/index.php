@@ -46,6 +46,19 @@
                 require_once 'components/ProfilePage/get_profile.php';
                 break;
 
+            // LicenseReminder (ใบประกอบวิชาชีพ: อัปโหลดรูป + แจ้งเตือนใกล้หมดอายุ)
+            case 'upload-license-image':
+                require_once 'components/Teacher/LicenseReminder/upload_license_image.php';
+                break;
+            case 'run-license-reminders':
+                require_once 'components/Teacher/LicenseReminder/run_license_reminders.php';
+                break;
+
+            // ProjectReminder (แจ้งเตือนแอดมินเมื่อโครงการใกล้สิ้นสุด)
+            case 'run-project-reminders':
+                require_once 'components/Teacher/ProjectReminder/run_project_reminders.php';
+                break;
+
             // NotificationPage
             case 'get-notifications':
                 require_once 'components/NotificationPage/get_notifications.php';
@@ -138,6 +151,18 @@
                 require_once 'components/Teacher/CoursesPage/api.php';
                 break;
 
+            // CurriculumCycles (จัดการหลักสูตรรอบ 5 ปี — เฉพาะผู้ดูแลระบบ)
+            case 'get-curriculum-cycles':
+            case 'save-curriculum-cycle':
+            case 'delete-curriculum-cycle':
+            case 'save-curriculum-subject':
+            case 'delete-curriculum-subject':
+            case 'delete-curriculum-subjects':
+            case 'import-curriculum-subjects':
+            case 'activate-curriculum-cycle':
+                require_once 'components/Admin/CurriculumCycles/curriculum_cycles_api.php';
+                break;
+
             /* -------- Teacher -------- */
 
             // Advises
@@ -152,6 +177,17 @@
                 break;
             case 'send-advisor-message':
                 require_once 'components/Teacher/Advises/send_advisor_message.php';
+                break;
+
+            // AdviseNotes
+            case 'get-advise-notes':
+                require_once 'components/Teacher/AdviseNotes/get_advise_notes.php';
+                break;
+            case 'save-advise-note':
+                require_once 'components/Teacher/AdviseNotes/save_advise_note.php';
+                break;
+            case 'get-advise-students':
+                require_once 'components/Teacher/AdviseNotes/get_advise_students.php';
                 break;
 
             // AdvisorNotifications (การแจ้งเตือนของอาจารย์)
@@ -347,7 +383,7 @@
                 require_once 'components/Teacher/ResearchSummary/get_research_summary.php';
                 break;
 
-            /* -------- Research -------- */
+            // Research
             case 'get-research-faculty':
                 require_once 'components/Research/get_faculty.php';
                 break;
@@ -364,17 +400,6 @@
             // PLOYLOReport
             case 'get-plo-ylo-report':
                 require_once 'components/Teacher/PLOYLOReport/get_plo_ylo_report.php';
-                break;
-
-            // AdviseNotes
-            case 'get-advise-notes':
-                require_once 'components/Teacher/AdviseNotes/get_advise_notes.php';
-                break;
-            case 'save-advise-note':
-                require_once 'components/Teacher/AdviseNotes/save_advise_note.php';
-                break;
-            case 'get-advise-students':
-                require_once 'components/Teacher/AdviseNotes/get_advise_students.php';
                 break;
 
             // MyCourses
@@ -426,17 +451,6 @@
                 require_once 'components/Teacher/ProjectsPage/update_project.php';
                 break;
 
-            // ProjectDocs
-            case 'get-project-docs':
-                require_once 'components/Teacher/ProjectDocs/get_project_docs.php';
-                break;
-            case 'create-project-doc':
-                require_once 'components/Teacher/ProjectDocs/create_project_doc.php';
-                break;
-            case 'upload-project-file':
-                require_once 'components/Teacher/ProjectDocs/upload_project_file.php';
-                break;
-
             // ProjectLinks
             case 'get-project-links':
                 require_once 'components/Teacher/ProjectLinks/get_project_links.php';
@@ -468,8 +482,8 @@
             case 'update-task-status':
                 require_once 'components/Teacher/ScheduleTasks/update_task_status.php';
                 break;
-            case 'update-task-status':
-                require_once 'components/Teacher/ScheduleTasks/update_task_status.php';
+            case 'update-schedule-task':
+                require_once 'components/Teacher/ScheduleTasks/update_schedule_task.php';
                 break;
             case 'delete-schedule-task':
                 require_once 'components/Teacher/ScheduleTasks/delete_schedule_task.php';

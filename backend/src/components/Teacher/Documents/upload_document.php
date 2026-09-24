@@ -20,10 +20,15 @@ try {
         $semester = $input['semester'] ?? 1;
         $googleDriveLink = trim($input['google_drive_link']);
 
-        $sql = "SELECT subject_name_th FROM subject WHERE subject_code = :code";
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute([':code' => $courseCode]);
-        $subjectName = $stmt->fetchColumn() ?: '';
+        // ชื่อวิชาตามหลักสูตรที่ใช้งานก่อน แล้วค่อยถอยไปใช้ตาราง subject
+        require_once __DIR__ . '/../../../config/active_curriculum.php';
+        $subjectName = activeCurriculumSubjectName($pdo, (string)$courseCode);
+        if ($subjectName === null) {
+            $sql = "SELECT subject_name_th FROM subject WHERE subject_code = :code";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([':code' => $courseCode]);
+            $subjectName = $stmt->fetchColumn() ?: '';
+        }
         
         $insertSql = "INSERT INTO tqf_documents 
             (subject_code, subject_name, tqf_type, academic_year, semester, approval_status, responsible_teacher, file_name, file_path) 

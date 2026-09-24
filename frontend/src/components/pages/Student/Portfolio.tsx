@@ -30,10 +30,10 @@ const typeLabels: Record<PortfolioItem["type"], string> = {
 };
 
 const typeColors: Record<PortfolioItem["type"], string> = {
-  certificate: "bg-primary",
+  certificate: "border-primary/25 bg-primary/15 text-primary",
   project: "bg-success",
   activity: "bg-warning",
-  award: "bg-purple-500",
+  award: "border-purple-300 bg-purple-100 text-purple-700",
 };
 
 const Portfolio = () => {

@@ -14,9 +14,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
 
 const getScoreBadge = (score: number) => {
-  if (score >= 4.5) return <Badge className="bg-[#10b981] hover:bg-[#059669] text-white border-none rounded-full px-4">ดีเยี่ยม</Badge>;
-  if (score >= 4.0) return <Badge className="bg-[#3b82f6] hover:bg-[#2563eb] text-white border-none rounded-full px-4">ดี</Badge>;
-  if (score >= 3.0) return <Badge className="bg-[#94a3b8] hover:bg-[#64748b] text-white border-none rounded-full px-4">พอใช้</Badge>;
+  if (score >= 4.5) return <Badge className="bg-[#10b981] text-white border-none rounded-full px-4">ดีเยี่ยม</Badge>;
+  if (score >= 4.0) return <Badge className="bg-[#3b82f6] text-white border-none rounded-full px-4">ดี</Badge>;
+  if (score >= 3.0) return <Badge className="bg-[#94a3b8] text-white border-none rounded-full px-4">พอใช้</Badge>;
   return <Badge variant="destructive" className="rounded-full px-4">ต้องปรับปรุง</Badge>;
 };
 

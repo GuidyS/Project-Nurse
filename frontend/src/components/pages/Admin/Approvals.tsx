@@ -39,7 +39,7 @@ const typeLabels: Record<string, string> = {
 
 const typeColors: Record<string, string> = {
   grade_change: "bg-blue-500",
-  student_transfer: "bg-purple-500",
+  student_transfer: "border-primary/25 bg-primary/15 text-primary",
   project_request: "bg-green-500",
   document_approve: "bg-orange-500",
 };
@@ -59,7 +59,7 @@ Object.assign(typeLabels, {
 
 Object.assign(typeColors, {
   permission_change: "bg-blue-500",
-  student_transfer: "bg-purple-500",
+  student_transfer: "border-primary/25 bg-primary/15 text-primary",
   document_link_approval: "bg-orange-500",
   sensitive_change: "bg-slate-700",
 });
@@ -256,10 +256,12 @@ export default function Approvals() {
 
   return (
     <>
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight py-1">อนุมัติคำขอ</h1>
-        <p className="text-muted-foreground">ดำเนินการตามคำขอจากอาจารย์และผู้ใช้งานในระบบ</p>
+    <div className="app-page">
+      <div className="app-page-header">
+        <div>
+          <h1 className="app-page-title">อนุมัติคำขอ</h1>
+          <p className="app-page-description">ดำเนินการตามคำขอจากอาจารย์และผู้ใช้งานในระบบ</p>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">

@@ -4,7 +4,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -199,15 +198,15 @@ export default function RolesManagement() {
 
   return (
     <>
-      <div className="p-6 space-y-6 animate-fade-in">
-        <div className="flex items-center justify-between">
+      <div className="app-page">
+        <div className="app-page-header">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">จัดการ Role</h1>
-            <p className="text-muted-foreground">มอบหมายและถอด Role ของผู้ใช้ในระบบ</p>
+            <h1 className="app-page-title">จัดการ Role</h1>
+            <p className="app-page-description">มอบหมายและถอด Role ของผู้ใช้ในระบบ</p>
           </div>
         </div>
 
-        <Card>
+        <Card className="app-section-card">
           <CardHeader className="space-y-4">
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <div>
@@ -229,24 +228,24 @@ export default function RolesManagement() {
             <Tabs value={roleTab} onValueChange={(value) => setRoleTab(value as RoleTab)}>
               <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
                 {roleTabs.map((tab) => (
-                  <TabsTrigger key={tab.value} value={tab.value} className="gap-1.5">
+                  <TabsTrigger key={tab.value} value={tab.value} className="group gap-2">
                     {tab.label}
-                    <Badge variant="secondary" className="h-5 min-w-5 px-1.5 text-[10px]">
+                    <span className="text-xs font-semibold tabular-nums text-muted-foreground group-data-[state=active]:text-primary">
                       {tabCount(tab.value)}
-                    </Badge>
+                    </span>
                   </TabsTrigger>
                 ))}
               </TabsList>
             </Tabs>
           </CardHeader>
           <CardContent>
-            <Table>
+            <Table className="min-w-[760px] table-fixed">
               <TableHeader>
                 <TableRow>
-                  <TableHead>ผู้ใช้</TableHead>
-                  <TableHead>อีเมล</TableHead>
-                  <TableHead>Role ปัจจุบัน</TableHead>
-                  <TableHead className="text-right">จัดการ</TableHead>
+                  <TableHead className="w-[34%]">ผู้ใช้</TableHead>
+                  <TableHead className="w-[20%]">รหัสประจำตัว</TableHead>
+                  <TableHead className="w-[30%]">Role ปัจจุบัน</TableHead>
+                  <TableHead className="w-[16%] text-right">จัดการ</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -260,14 +259,7 @@ export default function RolesManagement() {
                   filteredUsers.map((user) => (
                     <TableRow key={user.id}>
                       <TableCell>
-                        <div className="flex items-center gap-3">
-                          <Avatar className="h-8 w-8">
-                            <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                              {user.fullName.charAt(0)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <span className="font-medium">{user.fullName}</span>
-                        </div>
+                        <span className="font-medium">{user.fullName}</span>
                       </TableCell>
                       <TableCell className="text-muted-foreground">{user.email}</TableCell>
                       <TableCell>

@@ -1,6 +1,7 @@
 <?php
 if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/../../../config/active_curriculum.php';
 require_once __DIR__ . '/../CLOPage/curriculum_repository.php';
 require_once __DIR__ . '/subject_term_helpers.php';
 
@@ -18,7 +19,7 @@ try {
     $sql_faculty = "SELECT faculty_id as id, CONCAT(IFNULL(title,''), ' ', first_name_th, ' ', last_name_th) as name FROM faculty";
     $stmt_faculty = $db->query($sql_faculty);
     $faculties = $stmt_faculty->fetchAll(PDO::FETCH_ASSOC);
-    
+
     $facultyMap = [];
     foreach ($faculties as $f) {
         $facultyMap[$f['id']] = $f['name'];
@@ -57,18 +58,32 @@ try {
         }
     }
 
+    // 4. รายวิชา — ตามหลักสูตรที่ใช้งานในระบบ (ตั้งค่าที่หน้า "จัดการหลักสูตร")
+    //    ถ้ายังไม่มีหลักสูตรในระบบ ใช้รายวิชาทั้งหมดจากตาราง subject แบบเดิม
+    subjectTermEnsureColumn($db);
+    $curriculumSubjects = activeCurriculumSubjects($db);
+    if ($curriculumSubjects !== null) {
+        $subjects = array_map(static fn(array $subject): array => [
+            'subject_id' => $subject['subject_id'],
+            'subject_code' => $subject['subject_code'],
+            'subject_name_th' => $subject['subject_name'],
+            'credit' => $subject['credit'],
+            'semester' => $subject['semester'],
+            'academic_year' => $subject['academic_year'],
+        ], $curriculumSubjects);
+    } else {
+        $sql_subject = "SELECT subject_id, subject_code, subject_name_th, credit, semester, academic_year FROM subject WHERE is_active = 1 ORDER BY subject_code ASC";
+        $subjects = $db->query($sql_subject)->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    // จำนวนวิชาของอาจารย์แต่ละคน นับเฉพาะวิชาที่แสดงในหน้านี้
+    $listedCodes = array_fill_keys(array_map(static fn(array $s): string => mb_strtolower((string)$s['subject_code']), $subjects), true);
     $instructorCourseCounts = [];
-    foreach ($instructorMap as $fid) {
-        if (!empty($fid)) {
+    foreach ($instructorMap as $code => $fid) {
+        if (!empty($fid) && isset($listedCodes[mb_strtolower((string)$code)])) {
             $instructorCourseCounts[$fid] = ($instructorCourseCounts[$fid] ?? 0) + 1;
         }
     }
-
-    // 4. ดึงรายวิชาทั้งหมด
-    subjectTermEnsureColumn($db);
-    $sql_subject = "SELECT subject_id, subject_code, subject_name_th, credit, semester, academic_year FROM subject WHERE is_active = 1 ORDER BY subject_code ASC";
-    $stmt_subject = $db->query($sql_subject);
-    $subjects = $stmt_subject->fetchAll(PDO::FETCH_ASSOC);
 
     $courseList = [];
     foreach ($subjects as $s) {
@@ -77,11 +92,12 @@ try {
         $instructorName = $instructorId ? ($facultyMap[$instructorId] ?? 'ไม่ทราบชื่ออาจารย์') : null;
 
         $courseList[] = [
-            "id" => $code, 
+            "id" => $code,
             "code" => $code,
             "name" => $s['subject_name_th'],
             "credits" => (int)$s['credit'],
-            "students" => $enrollment[$s['subject_id']] ?? 0,
+            // วิชาที่มีเฉพาะในหลักสูตรยังไม่มีข้อมูลลงทะเบียน
+            "students" => $s['subject_id'] !== null ? ($enrollment[$s['subject_id']] ?? 0) : 0,
             "semester" => $s['semester'] === null ? null : (int)$s['semester'],
             "academic_year" => $s['academic_year'] === null ? null : (int)$s['academic_year'],
             "term_label" => subjectTermLabel($s['semester'], $s['academic_year']),
@@ -100,10 +116,12 @@ try {
     }
 
     echo json_encode([
-        "status" => "success", 
+        "status" => "success",
         "data" => [
             "courses" => $courseList,
-            "instructors" => $instructorList
+            "instructors" => $instructorList,
+            // หลักสูตรที่ใช้งานในระบบ (null = ยังไม่มีหลักสูตร)
+            "curriculum" => activeCurriculumCycle($db),
         ]
     ]);
 

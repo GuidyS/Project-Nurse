@@ -161,6 +161,8 @@ export default function AuditLog() {
                   <SelectItem value="update">แก้ไข</SelectItem>
                   <SelectItem value="delete">ลบ</SelectItem>
                   <SelectItem value="role_change">เปลี่ยน Role</SelectItem>
+                  <SelectItem value="import">นำเข้าข้อมูล</SelectItem>
+                  <SelectItem value="export">ส่งออกข้อมูล</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={roleFilter} onValueChange={setRoleFilter}>

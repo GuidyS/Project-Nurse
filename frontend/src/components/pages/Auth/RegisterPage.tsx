@@ -91,7 +91,7 @@ const RegisterPage = ({ onBackToLogin }: RegisterPageProps) => {
       <div className="space-y-4 text-center flex flex-col items-center">
         <div className="relative h-28 w-28 shrink-0 overflow-hidden rounded-full shadow-md border-4 border-[#8a2be2]/10">
           <img
-            src="../../Nurse_logo.jpg"
+            src="/Nurse_logo.png"
             alt="Logo"
             className="object-cover w-full h-full scale-110"
           />

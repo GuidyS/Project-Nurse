@@ -5,6 +5,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
 require_once __DIR__ . '/../CLOPage/clo_mapping_helpers.php';
 require_once __DIR__ . '/../CLOPage/curriculum_repository.php';
+require_once __DIR__ . '/../../../config/active_curriculum.php';
 
 $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -16,10 +17,19 @@ try {
         exit();
     }
 
-    $sql_subjects = "SELECT subject_code as code, subject_name_th as name FROM subject WHERE is_active = 1 ORDER BY subject_code ASC";
-    $stmt_subjects = $pdo->prepare($sql_subjects);
-    $stmt_subjects->execute();
-    $courses = $stmt_subjects->fetchAll(PDO::FETCH_ASSOC);
+    // รายวิชาตามหลักสูตรที่ใช้งานในระบบ (หน้า "จัดการหลักสูตร") — ยังไม่มีหลักสูตรใช้ตาราง subject แบบเดิม
+    $curriculumSubjects = activeCurriculumSubjects($pdo);
+    if ($curriculumSubjects !== null) {
+        $courses = array_map(
+            static fn(array $subject): array => ['code' => $subject['subject_code'], 'name' => $subject['subject_name']],
+            $curriculumSubjects
+        );
+    } else {
+        $sql_subjects = "SELECT subject_code as code, subject_name_th as name FROM subject WHERE is_active = 1 ORDER BY subject_code ASC";
+        $stmt_subjects = $pdo->prepare($sql_subjects);
+        $stmt_subjects->execute();
+        $courses = $stmt_subjects->fetchAll(PDO::FETCH_ASSOC);
+    }
 
     $frameworkId = getActiveFrameworkId($pdo);
     $plos = [];
@@ -63,6 +73,7 @@ try {
             "courses" => $courses,
             "plos" => $plos,
             "cloMap" => empty($cloMap) ? new stdClass() : $cloMap,
+            "curriculum" => activeCurriculumCycle($pdo),
         ],
     ], JSON_UNESCAPED_UNICODE);
 } catch (PDOException $e) {

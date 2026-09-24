@@ -48,6 +48,63 @@ const getDisplayName = (user: any) => {
   return candidates[0] || username || "ไม่ระบุชื่อ";
 };
 
+const previewMenuSectionsByRole: Record<string, any[]> = {
+  admin: [
+    {
+      sectionTitle: "Admin",
+      items: [
+        { title: "จัดการผู้ใช้", url: "users-management", icon: "Users" },
+        { title: "จัดการ Role", url: "roles-management", icon: "UserCog" },
+        { title: "Audit Log", url: "audit-log", icon: "ClipboardList" },
+        { title: "อนุมัติคำขอ", url: "approvals", icon: "CheckCircle" },
+        { title: "นำเข้าข้อมูล", url: "import-data", icon: "Upload" },
+        { title: "ส่งออกข้อมูล", url: "export-data", icon: "Download" },
+        { title: "รายงาน", url: "reports", icon: "BarChart3" },
+        { title: "จัดการหลักสูตร", url: "curriculum-cycles", icon: "BookOpen" },
+      ],
+    },
+  ],
+  teacher: [
+    {
+      sectionTitle: "Teacher",
+      items: [
+        { title: "รายวิชาของฉัน", url: "my-courses", icon: "BookOpen" },
+        { title: "จัดการรายวิชา", url: "courses", icon: "Library" },
+        { title: "CLO", url: "clos", icon: "Target" },
+        { title: "นักศึกษาที่รับผิดชอบ", url: "students-info", icon: "Users" },
+        { title: "มอบหมายอาจารย์", url: "assign-instructors", icon: "UserCheck" },
+        { title: "โครงการ", url: "projectspage", icon: "FolderKanban" },
+        { title: "เอกสารโครงการ", url: "project-docs", icon: "FileText" },
+        { title: "Evidence", url: "evidence", icon: "Archive" },
+        { title: "Transfer Requests", url: "transfer-requests", icon: "ArrowRightLeft" },
+      ],
+    },
+  ],
+  student: [
+    {
+      sectionTitle: "Student",
+      items: [
+        { title: "Transcript", url: "transcript", icon: "FileText" },
+        { title: "Portfolio", url: "portfolio", icon: "FolderOpen" },
+        { title: "วัคซีน", url: "student-vaccinations", icon: "Syringe" },
+        { title: "สุขภาพ", url: "student-health-records", icon: "HeartPulse" },
+        { title: "สมรรถนะ", url: "student-competency-view", icon: "ClipboardCheck" },
+        { title: "โครงการของฉัน", url: "my-projects", icon: "FolderKanban" },
+      ],
+    },
+  ],
+};
+
+const getPreviewMenuSections = (user: any) => {
+  const previewRole = typeof user?.__previewRole === "string" ? user.__previewRole : "";
+  return previewMenuSectionsByRole[previewRole] || [];
+};
+
+const sidebarIconOverrides: Record<string, string> = {
+  "competency-items-management": "ListChecks",
+  "curriculum-cycles": "Library",
+};
+
 export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
 
   const [menuSections, setMenuSections] = useState<any[]>([]);
@@ -65,7 +122,12 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
       setMenuSections(sections);
     } catch (error) {
       console.error('Failed to fetch menus:', error);
-      toast.error('โหลดเมนูไม่สำเร็จ');
+      const previewSections = import.meta.env.DEV ? getPreviewMenuSections(readStoredUser()) : [];
+      if (previewSections.length > 0) {
+        setMenuSections(previewSections);
+      } else {
+        toast.error('โหลดเมนูไม่สำเร็จ');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -197,7 +259,7 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
           {/* พื้นที่ Logo */}
           <div className="relative h-10 w-10 shrink-0">
             <div className="flex h-full w-full items-center justify-center rounded-full bg-[#8a2be2] overflow-hidden shadow-sm">
-              <img src="../../Nurse_logo.jpg" alt="Logo" className="object-cover w-full h-full" />
+              <img src="../../Nurse_logo.png" alt="Logo" className="object-cover w-full h-full" />
             </div>
 
             {/* ปุ่ม Trigger ตอน "หุบ" (จะแสดงทับ Logo เป๊ะๆ เมื่อ Hover) */}
@@ -247,7 +309,7 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
 
               <SidebarMenu>
                 {filteredItems.map((item: any) => {
-                  const Icon = getIcon(item.icon);
+                  const Icon = getIcon(sidebarIconOverrides[item.url] || item.icon);
                   const isActive = activeItem === item.url;
                   return (
                     <SidebarMenuItem key={item.url}>

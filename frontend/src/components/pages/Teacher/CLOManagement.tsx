@@ -247,11 +247,11 @@ export default function CLOManagement() {
   const formPloTotal = sumPloWeights(newCLO.plo_weights);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
+    <div className="app-page">
+      <div className="app-page-header">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight  leading-snug">กำหนด CLO</h1>
-          <p className="text-muted-foreground">กำหนดผลลัพธ์การเรียนรู้ระดับรายวิชา (เชื่อมโยง PLO หลายรายการ)</p>
+          <h1 className="app-page-title">กำหนด CLO</h1>
+          <p className="app-page-description">กำหนดผลลัพธ์การเรียนรู้ระดับรายวิชา (เชื่อมโยง PLO หลายรายการ)</p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) resetForm(); }}>
           <DialogTrigger asChild>
@@ -377,7 +377,7 @@ export default function CLOManagement() {
             </SelectTrigger>
             <SelectContent>
               {courses.map((course) => (
-                <SelectItem key={course.subject_id} value={course.subject_code}>
+                <SelectItem key={course.subject_code} value={course.subject_code}>
                   {course.subject_code} - {course.subject_name_th}
                 </SelectItem>
               ))}

@@ -36,7 +36,7 @@ const getTypeBadge = (type: string) => {
     case 'document':
       return <Badge className="bg-green-500"><FileText className="mr-1 h-3 w-3" />เอกสาร</Badge>;
     case 'video':
-      return <Badge className="bg-purple-500">วิดีโอ</Badge>;
+      return <Badge className="border-primary/25 bg-primary/15 text-primary">วิดีโอ</Badge>;
     default:
       return <Badge variant="secondary">{type}</Badge>;
   }

@@ -26,18 +26,14 @@ if (!isset($_SESSION['user_id'])) {
 try {
     $db = new Connect();
 
-    
     //  ระบบลบ Log อัตโนมัติ (เก่าเกิน 90 วัน)
-   
     try {
         $db->exec("DELETE FROM audit_log WHERE created_at < (NOW() - INTERVAL 90 DAY)");
     } catch (Exception $cleanupError) {
         error_log('Audit log cleanup failed: ' . $cleanupError->getMessage());
     }
 
-   
     //  เตรียม Query ค้นหา "ชื่อ-นามสกุล" จากรหัส (ทั้งนักศึกษาและอาจารย์)
-   
     $stmt_find_name = $db->prepare("
         SELECT fullname FROM (
             SELECT student_id as id, CONCAT(IFNULL(title, ''), IFNULL(first_name_th, ''), ' ', IFNULL(last_name_th, '')) as fullname FROM student
@@ -46,8 +42,7 @@ try {
         ) as all_users WHERE id = :id LIMIT 1
     ");
 
-    //  ดึงข้อมูลประวัติการใช้งาน
-
+    //  ดึงข้อมูลประวัติการใช้งานจากฐานข้อมูล
     $sql = "SELECT a.audit_log_id as id, a.created_at as timestamp, 
                    u.username as user, u.role_id,
                    a.action_type as action, a.resource, a.details, a.ip_address as ipAddress
@@ -70,9 +65,8 @@ try {
         // ส่ง Action กลับเป็นคำดั้งเดิมให้ระบบ Frontend แสดงป้ายสี (สร้าง, แก้ไข, ลบ)
         $actionRaw = strtolower($log['action']);
 
-        //  แปลงคำภาษาอังกฤษในวงเล็บ (Resource) เป็นภาษาไทย
-       
-       $resourceTh = $log['resource'];
+        //  แปลงคำภาษาอังกฤษ (Resource) เป็นภาษาไทย
+        $resourceTh = $log['resource'];
         switch (strtolower($log['resource'])) {
             // หมวดหมู่ดั้งเดิม 
             case 'approval_request':
@@ -103,14 +97,14 @@ try {
             case 'notifications': $resourceTh = 'การแจ้งเตือน'; break;
             case 'reports': $resourceTh = 'รายงานระบบ'; break;
             
-            //  หมวดหลักสูตร 
+            // หมวดหลักสูตร 
             case 'curriculum': $resourceTh = 'ข้อมูลหลักสูตร'; break;
             case 'curriculum_subjects': $resourceTh = 'รายวิชาในหลักสูตร'; break;
             case 'curriculum_cycles': $resourceTh = 'รอบหลักสูตร'; break;
             case 'curriculum_plo': $resourceTh = 'จัดการ PLO'; break;
             case 'curriculum_ylo': $resourceTh = 'จัดการ YLO'; break;
             
-            //  หมวดทั่วไปและของวันนี้ 
+            // หมวดทั่วไปและของวันนี้ 
             case 'project':
             case 'projects': $resourceTh = 'โครงการ'; break;
             case 'my_projects': $resourceTh = 'โครงการของฉัน'; break; 
@@ -131,31 +125,24 @@ try {
 
         $details = $log['details'] ?: '';
         
-        // ลบข้อความในวงเล็บภาษาอังกฤษ [english] ทิ้งจากรายละเอียด เพื่อไม่ให้แสดงซ้ำซ้อน
+        // ลบข้อความในวงเล็บภาษาอังกฤษทิ้งจากรายละเอียด เพื่อไม่ให้แสดงซ้ำซ้อน
         $details = preg_replace('/^\[[a-zA-Z0-9_]+\]\s*/', '', $details);
-
         // ตัดข้อความ "(user_id=XX)" ทิ้งไปเลย เพื่อความสวยงาม
         $details = preg_replace('/\s*\(user_id=\d+\)/', '', $details);
 
-      
         //  ดึงชื่อและนามสกุลมาต่อท้ายรหัสอัตโนมัติ
-      
-        // ค้นหารหัสความยาว 8-15 ตัวอักษรที่โผล่มาในคำอธิบาย
         if (preg_match('/([0-9]{8,15})/', $details, $matchId)) {
             $foundId = $matchId[1];
             try {
                 $stmt_find_name->execute([':id' => $foundId]);
                 $foundName = $stmt_find_name->fetchColumn();
                 if ($foundName) {
-                    // นำชื่อที่หาเจอไปแทรกต่อท้ายรหัส เช่น 44172033 (ชื่อ-นามสกุล)
                     $details = preg_replace('/\b' . $foundId . '\b/', $foundId . ' (' . trim($foundName) . ')', $details, 1);
                 }
             } catch (Exception $ex) {}
         }
 
-       
         //  แปลงข้อความภาษาอังกฤษเก่าๆ ให้เป็นภาษาไทย
-     
         if (preg_match('/approve approval request ID:\s*(\d+)/i', $details, $m)) {
             $details = "อนุมัติคำร้องขอ (ID: {$m[1]})";
         }
@@ -168,7 +155,7 @@ try {
             $details = "สร้างคำร้องขอ (ID: {$m[1]}) - เรื่อง: {$topic}";
         }
 
-        // ดักจับข้อความ Export 
+        // ดักจับข้อความ Export (ส่งออก)
         if (preg_match('/export approval request ID: \d+ - category=(\w+); format=(\w+); rows=(\d+)/i', $details, $matches)) {
             $categoryTh = $matches[1];
             if (strtolower($categoryTh) === 'projects') $categoryTh = 'โครงการ';
@@ -185,14 +172,14 @@ try {
             $actionRaw = 'export';
         }
         
-        //  ดักจับข้อความ Import (นำเข้าข้อมูล)
-        elseif (stripos($details, 'import') !== false) {
+        // ดักจับข้อความ Import (นำเข้าข้อมูล) เพื่อสั่งเปลี่ยนป้ายที่หน้าเว็บให้เป็น 'import'
+        elseif (strtolower($log['resource']) === 'import_data' || stripos($details, 'import') !== false) {
             $details = str_ireplace('import', 'นำเข้าข้อมูล', $details);
             $details = str_ireplace('format=', 'รูปแบบ: ', $details);
             $details = str_ireplace('rows=', 'จำนวนรายการ: ', $details);
             $details = str_ireplace('success=', 'สำเร็จ: ', $details);
             $details = str_ireplace('failed=', 'ล้มเหลว: ', $details);
-            $actionRaw = 'import';
+            $actionRaw = 'import'; 
         }
 
         $result[] = [

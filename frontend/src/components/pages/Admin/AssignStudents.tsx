@@ -178,10 +178,12 @@ export default function AssignStudents() {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight leading-snug">จัดการนักศึกษา</h1>
-        <p className="text-muted-foreground">มอบหมายนักศึกษาในความดูแลให้อาจารย์ที่ปรึกษาและอาจารย์ปฏิบัติ</p>
+    <div className="app-page animate-fade-in">
+      <div className="app-page-header">
+        <div>
+          <h1 className="app-page-title">จัดการนักศึกษา</h1>
+          <p className="app-page-description">มอบหมายนักศึกษาในความดูแลให้อาจารย์ที่ปรึกษาและอาจารย์ปฏิบัติ</p>
+        </div>
       </div>
 
       {/* เลือกประเภทอาจารย์ + ตัวอาจารย์ */}
@@ -189,7 +191,7 @@ export default function AssignStudents() {
         <div className="grid gap-2">
           <Label className="font-semibold">ประเภทอาจารย์</Label>
           <Select value={advisorType} onValueChange={setAdvisorType}>
-            <SelectTrigger>
+            <SelectTrigger className="border-border bg-card shadow-sm hover:border-primary/50">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -206,7 +208,11 @@ export default function AssignStudents() {
           <Label className="font-semibold">รายชื่ออาจารย์</Label>
           <Popover open={teacherPickerOpen} onOpenChange={setTeacherPickerOpen} modal>
             <PopoverTrigger asChild>
-              <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
+              <Button
+                variant="outline"
+                role="combobox"
+                className="w-full justify-between border-border bg-card font-normal shadow-sm hover:border-primary/50 hover:bg-card"
+              >
                 <span className={selectedTeacherLabel ? '' : 'text-muted-foreground'}>
                   {selectedTeacherLabel || 'เลือกอาจารย์...'}
                 </span>

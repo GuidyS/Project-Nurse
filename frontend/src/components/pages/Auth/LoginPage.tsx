@@ -31,6 +31,7 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [showResetPassword, setShowResetPassword] = useState(false);
   const [roleUnassignedOpen, setRoleUnassignedOpen] = useState(false);
+  const [accountSuspendedOpen, setAccountSuspendedOpen] = useState(false);
 
   const handleBackToLogin = () => {
     setShowResetPassword(false);
@@ -46,6 +47,15 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
       message.includes("ยังไม่ถูกมอบบทบาท")
     ) {
       setRoleUnassignedOpen(true);
+      return true;
+    }
+    return false;
+  };
+
+  const showAccountSuspendedPopup = (payload?: { message?: string }) => {
+    const message = payload?.message || "";
+    if (message.includes("บัญชีถูกระงับ")) {
+      setAccountSuspendedOpen(true);
       return true;
     }
     return false;
@@ -82,6 +92,8 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
       
       toast.success("เข้าสู่ระบบสำเร็จ");
       onLoginSuccess(response.data.user);
+    } else if (showAccountSuspendedPopup(response.data)) {
+      // แสดงข้อความสถานะบัญชีแบบเด่นชัด
     } else if (showRoleUnassignedPopup(response.data)) {
       // card popup
     } else {
@@ -89,7 +101,9 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
     }
   } catch (error: any) {
     const data = error.response?.data;
-    if (showRoleUnassignedPopup(data)) {
+    if (showAccountSuspendedPopup(data)) {
+      // แสดงข้อความสถานะบัญชีแบบเด่นชัด
+    } else if (showRoleUnassignedPopup(data)) {
       // card popup
     } else {
       const message = data?.message || "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง";
@@ -143,11 +157,7 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
       <div className="w-full max-w-md space-y-6"> 
         <div className="space-y-4 text-center flex flex-col items-center">
           <div className="relative h-28 w-28 shrink-0 overflow-hidden rounded-full shadow-md border-4 border-[#8a2be2]/10">
-            <img 
-              src="../../Nurse_logo.jpg" 
-              alt="Logo" 
-              className="object-cover w-full h-full scale-110" 
-            />
+            <img src="/Nurse_logo.png" alt="Logo" className="object-cover w-full h-full" />
           </div>
           <h1 className="text-2xl font-semibold tracking-tight text-card-foreground">เข้าสู่ระบบ</h1>
         </div>
@@ -288,6 +298,23 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
           </AlertDialogHeader>
           <AlertDialogFooter className="sm:justify-center">
             <AlertDialogAction className="min-w-28">รับทราบ</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={accountSuspendedOpen} onOpenChange={setAccountSuspendedOpen}>
+        <AlertDialogContent className="app-dialog-md">
+          <AlertDialogHeader>
+            <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+              <ShieldAlert className="h-7 w-7" />
+            </div>
+            <AlertDialogTitle className="text-center text-xl">บัญชีถูกระงับการใช้งาน</AlertDialogTitle>
+            <AlertDialogDescription className="text-center text-base leading-7">
+              ไม่สามารถเข้าสู่ระบบด้วยบัญชีนี้ได้ กรุณาติดต่อผู้ดูแลระบบเพื่อขอเปิดใช้งานบัญชี
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="sm:justify-center">
+            <AlertDialogAction className="min-w-32">รับทราบ</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

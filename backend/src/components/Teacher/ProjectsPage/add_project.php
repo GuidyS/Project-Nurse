@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../ProjectShared/project_helpers.php';
 require_once __DIR__ . '/../MyProjects/my_project_member_helpers.php';
+require_once __DIR__ . '/../ProjectReminder/project_reminder_helpers.php';
 require_once __DIR__ . '/../../../config/audit_helper.php'; // นำเข้า Audit Helper
 
 $db = project_db();
@@ -175,6 +176,14 @@ try {
     $db->commit();
 
     logAudit($db, $auth['user_id'], 'create', 'projects', "เพิ่มโครงการใหม่: {$nameTh} (ID: {$projectId})");
+
+    // วันสิ้นสุดอาจอยู่ในช่วงแจ้งเตือนแล้ว → เช็กโครงการนี้ทันที (พังก็ไม่กระทบการบันทึก)
+    try {
+        session_write_close();
+        projectReminderProcess($db, $projectId);
+    } catch (Throwable $e) {
+        error_log('project reminder: ' . $e->getMessage());
+    }
 
     project_json([
         "status" => "success",

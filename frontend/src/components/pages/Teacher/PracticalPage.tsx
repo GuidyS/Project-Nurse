@@ -289,7 +289,7 @@ const PracticalPage = () => {
 
   const getPerformanceBadge = (score: number) => {
     if (score >= 90) return <Badge className="bg-success text-success-foreground">ดีเยี่ยม</Badge>;
-    if (score >= 80) return <Badge className="bg-primary text-primary-foreground">ดี</Badge>;
+    if (score >= 80) return <Badge className="border-primary/25 bg-primary/15 text-primary">ดี</Badge>;
     if (score >= 70) return <Badge variant="secondary">พอใช้</Badge>;
     return <Badge variant="destructive">ต้องปรับปรุง</Badge>;
   };

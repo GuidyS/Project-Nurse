@@ -1,27 +1,16 @@
 import { useEffect, useState } from "react";
 import {
   Bell,
-  Moon,
-  Sun,
-  Globe,
   Lock,
   Eye,
   EyeOff,
   Save,
-  Monitor,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
@@ -31,19 +20,8 @@ const SettingsPage = () => {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const savedTheme =
-    typeof window !== "undefined" ? localStorage.getItem("theme") || "system" : "system";
-  
-  const applyTheme = (theme: string) => {
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const shouldUseDark = theme === "dark" || (theme === "system" && prefersDark);
-
-    document.documentElement.classList.toggle("dark", shouldUseDark);
-    localStorage.setItem("theme", theme);
-  };
 
   const [settings, setSettings] = useState({
-    theme: localStorage.getItem("theme") || "dark",
     language: "th",
     emailNotifications: true,
     pushNotifications: true,
@@ -52,31 +30,15 @@ const SettingsPage = () => {
   const [isSavingSettings, setIsSavingSettings] = useState(false);
 
   useEffect(() => {
-    const applyTheme = () => {
-      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-      const shouldUseDark = settings.theme === "dark" || (settings.theme === "system" && prefersDark);
-
-      document.documentElement.classList.toggle("dark", shouldUseDark);
-    };
-
-    localStorage.setItem("theme", settings.theme);
-    applyTheme();
-
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    mediaQuery.addEventListener("change", applyTheme);
-
-    return () => mediaQuery.removeEventListener("change", applyTheme);
-  }, [settings.theme]);
+    document.documentElement.classList.remove("dark");
+    localStorage.setItem("theme", "light");
+  }, []);
 
   const [passwords, setPasswords] = useState({
     current: "",
     new: "",
     confirm: "",
   });
-
-  useEffect(() => {
-    applyTheme(settings.theme);
-  }, [settings.theme]);
 
   useEffect(() => {
     const loadNotificationSettings = async () => {
@@ -154,92 +116,18 @@ const SettingsPage = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="app-page">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">ตั้งค่า</h1>
-        <p className="text-muted-foreground">จัดการการตั้งค่าระบบและความเป็นส่วนตัว</p>
+      <div className="app-page-header">
+        <div>
+          <h1 className="app-page-title">ตั้งค่า</h1>
+          <p className="app-page-description">จัดการการแจ้งเตือนและความปลอดภัยของบัญชีผู้ใช้</p>
+        </div>
       </div>
 
       <div className="grid gap-6">
-        {/* Appearance Settings */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Monitor className="h-5 w-5" />
-              การแสดงผล
-            </CardTitle>
-            <CardDescription>ปรับแต่งธีมและภาษาของระบบ</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label>ธีม</Label>
-                <p className="text-sm text-muted-foreground">เลือกธีมการแสดงผล</p>
-              </div>
-              <Select
-                value={settings.theme}
-                onValueChange={(value) => {
-                  setSettings({ ...settings, theme: value });
-                  applyTheme(value);
-                }}
-              >
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="light">
-                    <div className="flex items-center gap-2">
-                      <Sun className="h-4 w-4" />
-                      สว่าง
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="dark">
-                    <div className="flex items-center gap-2">
-                      <Moon className="h-4 w-4" />
-                      มืด
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="system">
-                    <div className="flex items-center gap-2">
-                      <Monitor className="h-4 w-4" />
-                      ตามระบบ
-                    </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/*
-            <Separator />
-
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label className="flex items-center gap-2">
-                  <Globe className="h-4 w-4" />
-                  ภาษา
-                </Label>
-                <p className="text-sm text-muted-foreground">เลือกภาษาที่ใช้แสดงผล</p>
-              </div>
-              <Select
-                value={settings.language}
-                onValueChange={(value) => setSettings({ ...settings, language: value })}
-              >
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="th">ไทย</SelectItem>
-                  <SelectItem value="en">English</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            */}
-          </CardContent>
-        </Card>
-
         {/* Notification Settings */}
-        <Card>
+        <Card className="app-section-card">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Bell className="h-5 w-5" />
@@ -294,7 +182,7 @@ const SettingsPage = () => {
         </Card>
 
         {/* Security Settings */}
-        <Card>
+        <Card className="app-section-card">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Lock className="h-5 w-5" />

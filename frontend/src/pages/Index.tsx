@@ -33,7 +33,6 @@ import Students from "@/components/pages/Teacher/Students";
 import ScheduleTasks from "@/components/pages/Teacher/ScheduleTasks";
 import ProjectReports from "@/components/pages/Teacher/ProjectReports";
 import ProjectLinks from "@/components/pages/Teacher/ProjectLinks";
-import ProjectDocs from "@/components/pages/Teacher/ProjectDocs";
 import ProgramReports from "@/components/pages/Teacher/ProgramReports";
 import Approvals from "@/components/pages/Admin/Approvals";
 import AuditLog from "@/components/pages/Admin/AuditLog";
@@ -49,15 +48,14 @@ import Retention from "@/components/pages/Teacher/Retention";
 import PracticalPage from '@/components/pages/Teacher/PracticalPage';
 import FacultyDimensionPage from '@/components/pages/Teacher/FacultyDimensionPage';
 import ProjectAssessments from "@/components/pages/Teacher/ProjectAssessments";
-
-
-import AdvisorCompetencyView from "@/components/pages/Teacher/AdvisorCompetencyView";
+import StudentVaccinationPage from "@/components/pages/Student/StudentVaccinationPage";
 import AdvisorVaccinationView from "@/components/pages/Teacher/AdvisorVaccinationView";
+import StudentHealthRecordsPage from "@/components/pages/Student/StudentHealthRecordsPage";
 import AdvisorHealthRecordsView from "@/components/pages/Teacher/AdvisorHealthRecordsView";
-import StudentVaccinations from "@/components/pages/Student/StudentVaccinationPage";
-import StudentHealthRecords from "@/components/pages/Student/StudentHealthRecordsPage";
-import StudentCompetencyView from "@/components/pages/Student/StudentCompetencyView";
+import AdvisorCompetencyView from "@/components/pages/Teacher/AdvisorCompetencyView";
 import CompetencyItemsManagement from "@/components/pages/Admin/CompetencyItemsManagement";
+import StudentCompetencyView from "@/components/pages/Student/StudentCompetencyView"; 
+import CurriculumCycles from "@/components/pages/Admin/CurriculumCycles";
 
 type LoginUserPayload = Record<string, unknown> & {
   role_id?: unknown;
@@ -107,6 +105,7 @@ const Index = () => {
     return () => window.removeEventListener("app:navigate", onNavigate);
   }, []);
 
+  // คอมโพเนนต์หน้าจอเมื่อไม่มีสิทธิ์เข้าถึง (Unauthorized)
   const UnauthorizedView = () => (
     <div className="flex flex-col items-center justify-center h-[70vh] text-center space-y-4">
       <div className="p-4 bg-red-100 rounded-full text-red-600">
@@ -118,6 +117,7 @@ const Index = () => {
   );
 
   const renderPage = () => {
+    // 1. ดึงข้อมูลสิทธิ์ปัจจุบันเสมอ เมื่อมีการเรนเดอร์หน้าใหม่
     const savedUser = localStorage.getItem('user');
     const userObj = savedUser ? JSON.parse(savedUser) : null;
     const roleId = userObj ? Number(userObj.role_id) : 0;
@@ -134,7 +134,7 @@ const Index = () => {
       activeItem === "research-summary" &&
       new URLSearchParams(window.location.search).get("page") === "research-summary";
 
-    // 1. หมวดหน้า Auth
+    // 2. หมวดทั่วไปที่ทุกคนเข้าถึงได้ (Public / All Roles)
     if (activeItem === "login") {
       return (
         <LoginPage 
@@ -166,48 +166,50 @@ const Index = () => {
       );
     }
     
-    // 2. หมวดทั่วไปที่ทุก Role เข้าถึงได้
     if (activeItem === "register") return <RegisterPage onBackToLogin={() => setActiveItem("login")} />;
     if (activeItem === "profile") return <ProfilePage />;
-    if (activeItem === "notifications") return <NotificationsPage />;
+    if (activeItem === "notifications") return <NotificationsPage />; //*
     if (activeItem === "settings") return <SettingsPage />;
+    // "โครงการของฉัน" เป็นหน้าเดียวของหมวดโครงการที่เปิดให้ทุก Role
+    // (หน้าโครงการที่เหลือเป็นของแอดมินอย่างเดียว — คุมสิทธิ์จริงที่ backend อีกชั้น)
     if (activeItem === "my-projects") return <MyProjects />;
 
-    // 3. 🔒 หมวดสิทธิ์ Admin (Role 1)
-    const adminPages = [
-      "approvals", "audit-log", "export-data", "import-data", "reports", 
-      "roles-management", "users-management", "competency-items-management", "competency-items"
-    ];
+    // 3. 🔒 หมวดสิทธิ์ผู้ดูแลระบบ (Admin - Role 1)
+    const adminPages = ["approvals", "audit-log", "export-data", "import-data", "reports", "roles-management", "users-management", "competency-items-management"];
     if (adminPages.includes(activeItem)) {
       if (roleId !== 1 && !(roleId == 2 && positionId == 1)) return <UnauthorizedView />;
       switch (activeItem) {
-        case "approvals": return <Approvals />;
-        case "audit-log": return <AuditLog />;
-        case "export-data": return <ExportData />;
-        case "import-data": return <ImportData />;
+        case "approvals": return <Approvals />;                                 //*
+        case "audit-log": return <AuditLog />;                                     //*
+        case "export-data": return <ExportData />;                                 //*
+        case "import-data": return <ImportData />;                                 //*
         case "reports": return <Reports />;
-        case "roles-management": return <RolesManagement />;
-        case "users-management": return <UsersManagement />;
-        case "competency-items-management":
-        case "competency-items":
-          return <CompetencyItemsManagement />;
+        case "roles-management": return <RolesManagement />;                       //*
+        case "users-management": return <UsersManagement />;                       //*
+        case "competency-items-management": return <CompetencyItemsManagement />;
       }
     }
 
+    // 3.1 🔒 มอบหมายนักศึกษาให้อาจารย์ — แอดมินเท่านั้น (คณบดีก็เข้าไม่ได้)
     if (activeItem === "assign-students") {
       if (roleId !== 1) return <UnauthorizedView />;
       return <AssignStudents />;
     }
 
-    const projectAdminPages = ["projectspage", "project-docs", "project-links", "project-reports"];
+    // 3.1.1 🔒 จัดการหลักสูตรรอบ 5 ปี — แอดมินเท่านั้น
+    if (activeItem === "curriculum-cycles") {
+      if (roleId !== 1) return <UnauthorizedView />;
+      return <CurriculumCycles />;
+    }
+
+    // 3.2 🔒 หมวดโครงการ — แอดมินจัดการคนเดียวทั้งหมด
+    // (ยกเว้น "โครงการของฉัน" ที่เปิดให้ทุก Role ไปแล้วด้านบน)
+    const projectAdminPages = ["projectspage", "project-links", "project-reports"];
     if (projectAdminPages.includes(activeItem)) {
       switch (activeItem) {
         case "projectspage":
           if (!canViewProjectPage) return <UnauthorizedView />;
           return <ProjectsPage />;
-        case "project-docs":
-          if (roleId !== 1) return <UnauthorizedView />;
-          return <ProjectDocs />;
         case "project-links":
           if (roleId !== 1) return <UnauthorizedView />;
           return <ProjectLinks />;
@@ -234,81 +236,66 @@ const Index = () => {
       }
     }
 
-    // 5. 🔒 หมวดสิทธิ์อาจารย์ (Teacher - Role 2) หรือ Admin
+    // 5. 🔒 หมวดสิทธิ์อาจารย์และคณะกรรมการ (Teacher - Role 2) หรือ Admin
     const teacherPages = [
       "courses", "five-year-summary", "clo-management", "clos",
       "plo-ylo-report", "course-report", "course-students", "documents", "assign-instructors", "clo-map",
       "evidence", "grades", "my-courses", "performance", "practical-students",
       "program-reports", "schedule-tasks", "advise-notes", "advisor-notifications", "advises",
       "students", "students-info", "transfer-requests", "my-research", "research-summary", "project-assessments",
-      // รองรับ URL จากระบบฐานข้อมูล
-      "advisor-vaccination-view", "view-student-vaccinations",
-      "advisor-health-records-view", "view-student-health-records",
-      "advisor-competency-view", "student-competency"
+      "advisor-vaccination-view", "advisor-health-records-view",
+      "advisor-competency-view"
     ];
     
     if (teacherPages.includes(activeItem)) {
       if (activeItem === "research-summary" && !isResearchPreviewRoute && !canViewResearchSummary) return <UnauthorizedView />;
       if (!isResearchPreviewRoute && roleId !== 1 && roleId !== 2) return <UnauthorizedView />;
       switch (activeItem) {
-        case "courses": return <CoursesPage />;
-        case "five-year-summary": return <FiveYearSummary />;
-        case "clo-management": return <CLOManagement />;
-        case "clos": return <CLOPage />;
-        case "plo-ylo-report": return <PLOYLOReport />;
-        case "course-report": return <CourseReports />;
-        case "course-students": return <CourseStudents />;
-        case "documents": return <Documents />;
-        case "assign-instructors": return <AssignInstructors />;
-        case "clo-map": return <CLOMap />;
-        case "evidence": return <Evidence />;
-        case "grades": return <Grades />;
-        case "my-courses": return <MyCourses />;
+        case "courses": return <CoursesPage />;                                     //*
+        case "five-year-summary": return <FiveYearSummary />;                       //*
+        case "clo-management": return <CLOManagement />;                            //*
+        case "clos": return <CLOPage />; // แก้ไขให้ใช้ CLOPage หน้าเดียว                //*
+        case "plo-ylo-report": return <PLOYLOReport />;                                  //*
+        case "course-report": return <CourseReports />;                             //*
+        case "course-students": return <CourseStudents />;                          //* /* ผลการประเมิน CLO รายบุคคล */ /* อจ.ติ้กว่าเด็กคนไหนผ่านบ้าง */
+        case "documents": return <Documents />;                                     //*
+        case "assign-instructors": return <AssignInstructors />;                    //*
+        case "clo-map": return <CLOMap />;                                          //*
+        case "evidence": return <Evidence />;                                       //*
+        case "grades": return <Grades />;                                           //*
+        case "my-courses": return <MyCourses />;                                    //*
         case "performance": return <Performance />;
-        case "practical-students": return <PracticalPage />;
-        case "program-reports": return <ProgramReports />;
-        case "schedule-tasks": return <ScheduleTasks />;
-        case "advise-notes": return <AdviseNotes />;
+        case "practical-students": return <PracticalPage />;                    //* /* ดูรายชื่อนศ.และประเมินผลการฝึกปฏิบัติของเด็กได้*/ /* อจ.ปฏิบัติ */
+        case "program-reports": return <ProgramReports />;                          //*
+        case "schedule-tasks": return <ScheduleTasks />;                            //*
+        case "advise-notes": return <AdviseNotes />;                                      //*
         case "advisor-notifications": return <AdvisorNotifications />;
         case "advises": return <Advises />;
-        case "students": return <Students />;
-        case "students-info": return <StudentsInfo />;
-        case "transfer-requests": return <TransferRequests />;
+        case "students": return <Students />;                                       /* รายชื่อเด็กทั้งระบบ */
+        case "students-info": return <StudentsInfo />;                              /* รายชื่อเด็กในที่ปรึกษาของอจ. */
+        case "transfer-requests": return <TransferRequests />;                      //*
         case "research-summary": return <ResearchSummary />;
         case "project-assessments": return <ProjectAssessments />;
-        case "advisor-vaccination-view":
-        case "view-student-vaccinations":
-          return <AdvisorVaccinationView />;
-        case "advisor-health-records-view":
-        case "view-student-health-records":
-          return <AdvisorHealthRecordsView />;
-        case "advisor-competency-view":
-        case "student-competency":
-          return <AdvisorCompetencyView />;
+        case "advisor-vaccination-view": return <AdvisorVaccinationView />;  
+        case "advisor-health-records-view": return <AdvisorHealthRecordsView />;
+        case "advisor-competency-view": return <AdvisorCompetencyView />;
       }
     }
 
     // 6. 🔒 หมวดสิทธิ์นักศึกษา (Student - Role 3) หรือ Admin
-    const studentPages = [
-      "transcript", "portfolio", 
-      // รองรับ URL จากระบบฐานข้อมูล
-      "student-vaccinations", 
-      "student-health-records", 
-      "student-competency-view", "my-competency"
-    ];
+    const studentPages = ["transcript", "portfolio", "student-vaccinations", "student-health-records", "student-competency-view"];
     if (studentPages.includes(activeItem)) {
       if (roleId !== 1 && roleId !== 3) return <UnauthorizedView />;
       switch (activeItem) {
-        case "transcript": return <Transcript />;
+        case "transcript": return <Transcript />;                                   //*
         case "portfolio": return <Portfolio />;
-        case "student-vaccinations": return <StudentVaccinations />;
-        case "student-health-records": return <StudentHealthRecords />;
-        case "student-competency-view":
-        case "my-competency":
-          return <StudentCompetencyView />;
+        case "student-vaccinations": return <StudentVaccinationPage />;
+        case "student-health-records": return <StudentHealthRecordsPage />;
+        case "student-competency-view": return <StudentCompetencyView />;
       }
     }
 
+    // ถ้าพิมพ์เมนูแปลกๆ เข้ามาที่ไม่มีในระบบ ให้โยนกลับไปหน้า Profile
     return <ProfilePage />;
   };
 

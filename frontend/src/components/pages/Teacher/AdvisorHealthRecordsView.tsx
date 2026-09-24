@@ -203,7 +203,7 @@ export default function AdvisorHealthRecordsView() {
                 <div className="flex items-center gap-2 pt-2 border-t border-border/50 text-sm">
                   <span className="text-muted-foreground">ภาวะสุขภาพโดยรวม:</span>
                   {record.overall_status === "healthy" ? (
-                    <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border-emerald-500/20">
+                    <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20">
                       แข็งแรงดี
                     </Badge>
                   ) : (

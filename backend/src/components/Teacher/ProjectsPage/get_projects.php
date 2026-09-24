@@ -89,6 +89,7 @@ try {
     $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     $documentsByProject = [];
+    $plosByProject = [];
     $membersByProject = [];
     $projectIds = array_values(array_filter(array_map(
         static fn(array $project): int => (int) $project['project_id'],
@@ -135,6 +136,22 @@ try {
                 "mime_type" => $document['mime_type'],
                 "file_size" => $document['file_size'] !== null ? (int) $document['file_size'] : null,
             ];
+        }
+
+        $ploStmt = $db->prepare("
+            SELECT project_id, outcome_code
+            FROM project_outcome_links
+            WHERE project_id IN (" . implode(',', $placeholders) . ")
+              AND outcome_type = 'plo'
+            ORDER BY project_id ASC, outcome_code ASC
+        ");
+        $ploStmt->execute($docParams);
+        foreach ($ploStmt->fetchAll(PDO::FETCH_ASSOC) as $link) {
+            $id = (string) $link['project_id'];
+            $code = trim((string) ($link['outcome_code'] ?? ''));
+            if ($code !== '') {
+                $plosByProject[$id][] = $code;
+            }
         }
 
         foreach ($projects as $project) {
@@ -221,6 +238,7 @@ try {
     foreach ($projects as &$project) {
         $id = (string) $project['project_id'];
         $project['documents'] = $documentsByProject[$id] ?? [];
+        $project['plos'] = array_values(array_unique($plosByProject[$id] ?? []));
         $project['member_details'] = $membersByProject[$id] ?? [];
         $project['member_names'] = array_map(
             static fn(array $member): string => (string) $member['name'],

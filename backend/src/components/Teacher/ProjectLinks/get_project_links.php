@@ -15,6 +15,7 @@ foreach ($possible_paths as $path) {
     }
 }
 require_once __DIR__ . '/../CLOPage/curriculum_repository.php';
+require_once __DIR__ . '/../../../config/active_curriculum.php';
 
 $origin = $_SERVER['HTTP_ORIGIN'] ?? 'http://localhost:5173';
 $allowedOrigins = ['http://localhost:5173', 'http://127.0.0.1:5173'];
@@ -109,13 +110,25 @@ try {
         }
     }
 
-    foreach (($mappingData['clos'] ?? []) as $clo) {
-        $code = $clo['subject_code'] ?? null;
-        if ($code) {
-            $closByCode[$code] = [
-                'code' => $code,
-                'description' => $code . ': ' . ($clo['subject_name'] ?? $code)
+    // รายวิชาให้ติ๊ก = รายวิชาของหลักสูตรที่ใช้งานในระบบ (หน้า "จัดการหลักสูตร")
+    // ถ้ายังไม่มีหลักสูตรในระบบ ใช้รายการเดิมจาก mapping_json
+    $curriculumSubjects = activeCurriculumSubjects($db);
+    if ($curriculumSubjects !== null) {
+        foreach ($curriculumSubjects as $subject) {
+            $closByCode[$subject['subject_code']] = [
+                'code' => $subject['subject_code'],
+                'description' => $subject['subject_code'] . ': ' . $subject['subject_name'],
             ];
+        }
+    } else {
+        foreach (($mappingData['clos'] ?? []) as $clo) {
+            $code = $clo['subject_code'] ?? null;
+            if ($code) {
+                $closByCode[$code] = [
+                    'code' => $code,
+                    'description' => $code . ': ' . ($clo['subject_name'] ?? $code)
+                ];
+            }
         }
     }
 
@@ -141,7 +154,9 @@ try {
         }
         foreach ($projectLinks['clos'] as $code) {
             if (!in_array($code, $cloCodes, true)) {
-                $clos[] = ['code' => $code, 'description' => $code . ' (legacy mapping)'];
+                // วิชาที่เคยติ๊กไว้แต่ไม่อยู่ในหลักสูตรที่ใช้งาน — แสดงไว้ให้เอาติ๊กออกได้
+                $label = $curriculumSubjects !== null ? ' (ไม่อยู่ในหลักสูตรที่ใช้งาน)' : ' (legacy mapping)';
+                $clos[] = ['code' => $code, 'description' => $code . $label];
                 $cloCodes[] = $code;
             }
         }
@@ -154,7 +169,8 @@ try {
             "plos" => $plos,
             "ylos" => $ylos,
             "clos" => $clos,
-            "links" => empty($matrix) ? new stdClass() : $matrix
+            "links" => empty($matrix) ? new stdClass() : $matrix,
+            "curriculum" => activeCurriculumCycle($db),
         ]
     ], JSON_UNESCAPED_UNICODE);
 

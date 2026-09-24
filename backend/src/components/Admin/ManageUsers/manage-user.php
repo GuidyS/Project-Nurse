@@ -1,6 +1,7 @@
 <?php
 if (session_status() === PHP_SESSION_NONE) { session_start(); }
 require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/../../../config/audit_helper.php';
 header('Access-Control-Allow-Origin: ' . (in_array($_SERVER['HTTP_ORIGIN'] ?? '', ['http://localhost:5173', 'http://127.0.0.1:5173'], true) ? ($_SERVER['HTTP_ORIGIN'] ?? '') : 'http://localhost:5173'));
 header('Vary: Origin');
 header("Access-Control-Allow-Credentials: true");
@@ -407,7 +408,7 @@ try {
         return $documents;
     }
 
-    // 🔍 1. [GET] ดึงรายละเอียดเชิงลึกของผู้ใช้เพื่อนำไปแสดงในฟอร์มแก้ไข
+    //  [GET] ดึงรายละเอียดเชิงลึกของผู้ใช้เพื่อนำไปแสดงในฟอร์มแก้ไข
     if ($method === 'GET') {
         $id = isset($_GET['id']) ? $_GET['id'] : null;
         if (!$id) throw new Exception("ไม่พบ ID ผู้ใช้");
@@ -436,7 +437,7 @@ try {
         exit();
     }
 
-    // 📝 2. [POST] บันทึกข้อมูลที่แก้ไข / ลบเอกสาร
+    //  [POST] บันทึกข้อมูลที่แก้ไข / ลบเอกสาร
     if ($method === 'POST') {
         $isMultipart = strpos($_SERVER['CONTENT_TYPE'] ?? '', 'multipart/form-data') !== false;
         if ($isMultipart) {
@@ -739,12 +740,24 @@ try {
         exit();
     }
 
-    // 🗑️ 3. [DELETE] ลบข้อมูล
+    //  [DELETE] ลบข้อมูล
     if ($method === 'DELETE') {
         $id = $_GET['id'] ?? null;
         if (!$id) throw new Exception("ไม่พบ ID");
+        $userStmt = $db->prepare("SELECT username, role_id, status FROM users WHERE user_id = :id LIMIT 1");
+        $userStmt->execute([':id' => $id]);
+        $deletedUser = $userStmt->fetch(PDO::FETCH_ASSOC);
+        if (!$deletedUser) throw new Exception("ไม่พบผู้ใช้งานในระบบ");
+
         $stmt = $db->prepare("DELETE FROM users WHERE user_id = :id");
         $stmt->execute([':id' => $id]);
+        logAudit(
+            $db,
+            $_SESSION['user_id'] ?? null,
+            'delete',
+            'users',
+            "ลบบัญชีผู้ใช้ {$deletedUser['username']} (user_id={$id}, role_id={$deletedUser['role_id']}, status={$deletedUser['status']})"
+        );
         echo json_encode(["status" => "success"]);
         exit();
     }

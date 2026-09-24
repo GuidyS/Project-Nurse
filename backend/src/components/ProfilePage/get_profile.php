@@ -1,6 +1,7 @@
 <?php
 if (session_status() == PHP_SESSION_NONE) { session_start(); }
 require_once __DIR__ . '/../../config/config.php';
+require_once __DIR__ . '/../Teacher/LicenseReminder/license_reminder_helpers.php';
 require_once __DIR__ . '/../../config/audit_helper.php';
 
 if (!isset($_SESSION['user_id'])) {
@@ -148,6 +149,7 @@ function resolveFacultyFileUrl(string $rawPath, bool $preferDirectImage = false)
     $normalizedRelative = ltrim(str_replace('\\', '/', $path), '/');
     $baseName = basename($normalizedRelative);
 
+    // Accepted physical locations (Apache serves /var/www/html/*)
     $localCandidates = [
         $normalizedRelative,
         'uploads/' . $normalizedRelative,
@@ -453,10 +455,12 @@ try {
                 $profile['admission_year'] ?? null
             );
 
+            // บังคับอัปเดตข้อมูลปีและชั้นปีเป็นค่า Real-time
             $profile['admission_year'] = (string)$academicInfo['entry_year'];
             $profile['year_level']     = $academicInfo['year_level'];
             $profile['academic_year']  = $academicInfo['academic_year'];
 
+            // แมปฟิลด์ที่อยู่และรหัสประจำตัวประชาชน
             $profile['id_card_number'] = $profile['id_card_number'] ?? null;
             $profile['parent_address'] = $profile['father_address'] ?? $profile['mother_address'] ?? null;
             $profile['home_address']   = $profile['home_address'] ?? $profile['address'] ?? null;
@@ -500,6 +504,8 @@ try {
             $profile = array_merge($profile, $authPayload);
             echo json_encode(["status" => "success", "role" => "student", "data" => $profile], JSON_UNESCAPED_UNICODE);
         } else {
+            // โค้ดเดิมของ Teacher / Other Roles ไม่แตะต้อง[cite: 15]
+            licenseReminderEnsureSchema($db); // ให้มีคอลัมน์ license_image ก่อน SELECT *
             $stmt = $db->prepare("SELECT * FROM faculty WHERE faculty_id = :id LIMIT 1");
             $stmt->execute(['id' => $u_info['username']]);
             $profile = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
@@ -531,6 +537,7 @@ try {
         if ((int)$u_info['role_id'] === 3) {
             $parentAddress = !empty($input['parent_address']) ? trim((string)$input['parent_address']) : (!empty($input['father_address']) ? trim((string)$input['father_address']) : null);
             
+            // ดักจับและแปลงตัวเลขให้ถูกต้อง ป้องกัน Database Type Error
             $rawHeight = isset($input['height']) ? trim((string)$input['height']) : '';
             $height    = ($rawHeight !== '' && is_numeric($rawHeight)) ? floatval($rawHeight) : null;
 
@@ -546,6 +553,7 @@ try {
                 $bmi = round($weight / ($hMeter * $hMeter), 1);
             }
 
+            // กรองรหัสประจำตัวประชาชนให้เหลือเฉพาะตัวเลขความยาวสูงสุด 13 หลัก
             $rawIdCard = !empty($input['id_card_number']) ? trim((string)$input['id_card_number']) : '';
             $idCardNumber = $rawIdCard !== '' ? substr(preg_replace('/\D/', '', $rawIdCard), 0, 13) : null;
             if ($idCardNumber === '') {
@@ -554,6 +562,7 @@ try {
 
             $homeAddress = !empty($input['home_address']) ? trim((string)$input['home_address']) : (!empty($input['address']) ? trim((string)$input['address']) : null);
 
+            // กรองเบอร์โทรศัพท์ให้เหลือเฉพาะตัวเลข
             $phone = !empty($input['phone']) ? substr(preg_replace('/\D/', '', (string)$input['phone']), 0, 15) : null;
             $fatherPhone = !empty($input['father_phone']) ? substr(preg_replace('/\D/', '', (string)$input['father_phone']), 0, 15) : null;
             $motherPhone = !empty($input['mother_phone']) ? substr(preg_replace('/\D/', '', (string)$input['mother_phone']), 0, 15) : null;
@@ -605,29 +614,56 @@ try {
                 ':mother_address'   => $parentAddress,
                 ':student_id'       => $u_info['username']
             ]);
-
-            // บันทึก Audit Log เมื่อนักศึกษาอัปเดตข้อมูล
-            logAudit($db, $id, 'update', 'profile', 'นักศึกษาแก้ไขข้อมูลส่วนตัว (รหัส: ' . $u_info['username'] . ')');
-
         } else {
-            // โค้ดสำหรับ Teacher
-            $sql = "UPDATE faculty SET first_name_en = ?, last_name_en = ?, gender = ?, birth_date = ?, email = ?, phone = ?, current_address = ?, nursing_council_no = ? WHERE faculty_id = ?";
+            // อีเมลใช้ส่งแจ้งเตือนใบประกอบวิชาชีพ จึงต้องเป็นรูปแบบที่ถูกต้อง (เว้นว่างได้)
+            $email = trim((string)($input['email'] ?? ''));
+            if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                http_response_code(400);
+                echo json_encode(["status" => "error", "message" => "รูปแบบอีเมลไม่ถูกต้อง"], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+
+            // วันหมดอายุใบประกอบวิชาชีพ (YYYY-MM-DD ปี ค.ศ.) — เว้นว่างได้
+            $licenseExpiry = trim((string)($input['license_expiry'] ?? ''));
+            if ($licenseExpiry === '') {
+                $licenseExpiry = null;
+            } else {
+                $parts = explode('-', $licenseExpiry);
+                $validDate = preg_match('/^\d{4}-\d{2}-\d{2}$/', $licenseExpiry)
+                    && checkdate((int)$parts[1], (int)$parts[2], (int)$parts[0])
+                    && (int)$parts[0] >= 1950 && (int)$parts[0] <= 2200;
+                if (!$validDate) {
+                    http_response_code(400);
+                    echo json_encode(["status" => "error", "message" => "วันหมดอายุใบประกอบวิชาชีพไม่ถูกต้อง"], JSON_UNESCAPED_UNICODE);
+                    exit;
+                }
+            }
+
+            $sql = "UPDATE faculty SET first_name_en = ?, last_name_en = ?, gender = ?, birth_date = ?, email = ?, phone = ?, current_address = ?, nursing_council_no = ?, license_expiry = ? WHERE faculty_id = ?";
             $db->prepare($sql)->execute([
                 $input['first_name_en'] ?? null,
                 $input['last_name_en'] ?? null,
                 $input['gender'] ?? null,
                 $input['birth_date'] ?? null,
-                $input['email'] ?? null,
+                $email !== '' ? $email : null,
                 $input['phone'] ?? null,
                 $input['current_address'] ?? null,
                 $input['nursing_council_no'] ?? null,
+                $licenseExpiry,
                 $u_info['username']
             ]);
 
             // บันทึก Audit Log เมื่ออาจารย์อัปเดตข้อมูล
             logAudit($db, $id, 'update', 'profile', 'อาจารย์/บุคลากรแก้ไขข้อมูลส่วนตัว (รหัส: ' . $u_info['username'] . ')');
-        }
 
+            // เพิ่งแก้วันหมดอายุ/อีเมล → เช็กแจ้งเตือนของคนนี้ทันที (พังก็ไม่กระทบการบันทึก)
+            try {
+                session_write_close();
+                licenseReminderProcess($db, (string)$u_info['username']);
+            } catch (Throwable $e) {
+                error_log('license reminder: ' . $e->getMessage());
+            }
+        }
         echo json_encode(["status" => "success"], JSON_UNESCAPED_UNICODE);
         exit;
     }
