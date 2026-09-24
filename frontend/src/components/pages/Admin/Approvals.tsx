@@ -11,6 +11,17 @@ import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
 
 type ApprovalStatus = "pending" | "approved" | "rejected";
 
+interface ApprovalPayload {
+  to_advisor_id?: string;
+  to_advisor_name?: string;
+  student_id?: string;
+  student_ids?: string[];
+  student_info_list?: string[];
+  student_count?: number;
+  reason?: string;
+  [key: string]: any;
+}
+
 interface ApprovalRequest {
   id: string;
   type: string;
@@ -21,9 +32,9 @@ interface ApprovalRequest {
   description: string;
   date: string;
   status: ApprovalStatus;
-  payload?: Record<string, unknown> | null;
-  before?: Record<string, unknown> | null;
-  after?: Record<string, unknown> | null;
+  payload?: ApprovalPayload | null;
+  before?: Record<string, any> | null;
+  after?: Record<string, any> | null;
   documentUrl?: string | null;
   reviewNote?: string | null;
   reviewedAt?: string | null;
@@ -185,28 +196,67 @@ export default function Approvals() {
       <TableRow key={approval.id}>
         <TableCell>{getTypeBadge(approval.type)}</TableCell>
         <TableCell className="font-medium">{approval.requester}</TableCell>
-        <TableCell className="max-w-[360px]">
+        <TableCell className="max-w-[420px]">
           <div className="space-y-1">
-            <p>{approval.description}</p>
-            {approval.targetRefId && (
-              <p className="text-xs text-muted-foreground">
-                อ้างอิง: {approval.targetRefType || "-"} / {approval.targetRefId}
-              </p>
-            )}
-            {approval.documentUrl && (
-              <a
-                href={approval.documentUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="block text-xs text-primary underline-offset-2 hover:underline"
-              >
-                Open document link
-              </a>
-            )}
-            {formatJsonDetail(approval.payload) && (
-              <p className="truncate text-xs text-muted-foreground">
-                Payload: {formatJsonDetail(approval.payload)}
-              </p>
+            {approval.type === "student_transfer" ? (
+              <div className="space-y-1">
+                <div className="font-medium text-sm text-foreground">
+                  {approval.title || "คำร้องขอโอนย้ายนักศึกษา"}
+                </div>
+                {approval.payload?.to_advisor_name && (
+                  <p className="text-xs text-muted-foreground">
+                    <span className="font-medium text-foreground">โอนย้ายไปให้อาจารย์:</span>{" "}
+                    {approval.payload.to_advisor_name}
+                  </p>
+                )}
+                {Array.isArray(approval.payload?.student_info_list) && approval.payload.student_info_list.length > 0 ? (
+                  <div className="text-xs">
+                    <span className="font-medium text-foreground">
+                      นักศึกษา ({approval.payload.student_info_list.length} คน):
+                    </span>
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {approval.payload.student_info_list.map((info: string, idx: number) => (
+                        <Badge key={idx} variant="secondary" className="text-xs font-normal">
+                          {info}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                ) : approval.targetRefId ? (
+                  <p className="text-xs text-muted-foreground">
+                    รหัสนักศึกษา: {approval.targetRefId}
+                  </p>
+                ) : null}
+                {approval.description && (
+                  <p className="text-xs text-muted-foreground">
+                    <span className="font-medium text-foreground">เหตุผล:</span> {approval.description}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <>
+                <p>{approval.description}</p>
+                {approval.targetRefId && (
+                  <p className="text-xs text-muted-foreground">
+                    อ้างอิง: {approval.targetRefType || "-"} / {approval.targetRefId}
+                  </p>
+                )}
+                {approval.documentUrl && (
+                  <a
+                    href={approval.documentUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block text-xs text-primary underline-offset-2 hover:underline"
+                  >
+                    Open document link
+                  </a>
+                )}
+                {formatJsonDetail(approval.payload) && (
+                  <p className="truncate text-xs text-muted-foreground">
+                    Payload: {formatJsonDetail(approval.payload)}
+                  </p>
+                )}
+              </>
             )}
             {formatJsonDetail(approval.before) && (
               <p className="truncate text-xs text-muted-foreground">

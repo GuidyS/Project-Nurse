@@ -14,11 +14,14 @@ import { UserCheck, UserPlus, Clock, CheckCircle, XCircle, AlertCircle, Plus } f
 import { useState, useEffect } from 'react';
 import api from '@/lib/axios';
 import { ConfirmActionDialog } from '@/components/ui/ConfirmActionDialog';
+import { useToast } from '@/hooks/use-toast';
 
 interface TransferRequestItem {
   id: string;
   studentId: string;
   studentName: string;
+  studentIds?: string[];
+  studentCount?: number;
   otherAdvisor: string;
   reason: string;
   date: string;
@@ -50,6 +53,7 @@ const getStatusBadge = (status: string) => {
 };
 
 export default function TransferRequests() {
+  const { toast } = useToast();
   const [incomingRequests, setIncomingRequests] = useState<TransferRequestItem[]>([]);
   const [outgoingRequests, setOutgoingRequests] = useState<TransferRequestItem[]>([]);
   const [historyRequests, setHistoryRequests] = useState<TransferRequestItem[]>([]);
@@ -60,6 +64,7 @@ export default function TransferRequests() {
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [newRequest, setNewRequest] = useState<{ studentIds: string[], toAdvisorId: string, reason: string }>({ studentIds: [], toAdvisorId: '', reason: '' });
   const [pendingApproveId, setPendingApproveId] = useState<string | null>(null);
   const [isApproveOpen, setIsApproveOpen] = useState(false);
@@ -131,6 +136,8 @@ export default function TransferRequests() {
   };
 
   const handleCreateRequest = async () => {
+    if (newRequest.studentIds.length === 0 || !newRequest.toAdvisorId) return;
+    setIsSubmitting(true);
     try {
       const savedUser = localStorage.getItem('user');
       let facultyId = '1';
@@ -139,18 +146,62 @@ export default function TransferRequests() {
         facultyId = userObj.faculty_id || userObj.id || userObj.username || '1';
       }
 
-      await api.post('/components/Teacher/TransferRequests/create_transfer_request.php', {
+      const res = await api.post('/components/Teacher/TransferRequests/create_transfer_request.php', {
         student_ids: newRequest.studentIds,
         to_advisor_id: newRequest.toAdvisorId,
         reason: newRequest.reason,
         from_advisor_id: facultyId
       });
-      setIsCreateDialogOpen(false);
-      setNewRequest({ studentIds: [], toAdvisorId: '', reason: '' });
-      fetchData();
-    } catch (err) {
+
+      if (res.data?.status === 'success') {
+        toast({
+          title: "สร้างคำขอสำเร็จ",
+          description: "ส่งคำร้องขอโอนย้ายนักศึกษาเรียบร้อยแล้ว",
+        });
+        setIsCreateDialogOpen(false);
+        setNewRequest({ studentIds: [], toAdvisorId: '', reason: '' });
+        await fetchData();
+      } else {
+        toast({
+          variant: "destructive",
+          title: "ไม่สามารถสร้างคำขอได้",
+          description: res.data?.message || "เกิดข้อผิดพลาดในการสร้างคำขอ",
+        });
+      }
+    } catch (err: any) {
       console.error(err);
+      toast({
+        variant: "destructive",
+        title: "เกิดข้อผิดพลาด",
+        description: err.response?.data?.message || "ไม่สามารถส่งคำขอโอนย้ายได้",
+      });
+    } finally {
+      setIsSubmitting(false);
     }
+  };
+
+  // กรองนักศึกษาที่มีคำขอโอนย้ายที่รอดำเนินการ (pending) ออก เพื่อไม่ให้ส่งคำขอซ้ำ
+  const pendingStudentIds = new Set<string>();
+  outgoingRequests
+    .filter((req) => req.status === 'pending')
+    .forEach((req) => {
+      if (Array.isArray(req.studentIds) && req.studentIds.length > 0) {
+        req.studentIds.forEach((id) => pendingStudentIds.add(id.toString().trim()));
+      } else if (req.studentId) {
+        req.studentId.toString().split(',').forEach((id) => {
+          const trimmed = id.trim();
+          if (trimmed) pendingStudentIds.add(trimmed);
+        });
+      }
+    });
+
+  const availableStudents = dropdowns.students.filter(
+    (std) => !pendingStudentIds.has(std.id.toString())
+  );
+
+  const handleOpenCreateDialog = () => {
+    setNewRequest({ studentIds: [], toAdvisorId: '', reason: '' });
+    setIsCreateDialogOpen(true);
   };
 
   return (
@@ -161,7 +212,7 @@ export default function TransferRequests() {
             <h1 className="text-3xl font-bold tracking-tight">ร้องขอรับมอบนักศึกษา</h1>
             <p className="text-muted-foreground">จัดการคำขอรับมอบนักศึกษาระหว่างอาจารย์ที่ปรึกษา</p>
           </div>
-          <Button onClick={() => setIsCreateDialogOpen(true)}>
+          <Button onClick={handleOpenCreateDialog}>
             <Plus className="mr-2 h-4 w-4" />
             สร้างคำขอย้าย
           </Button>
@@ -258,8 +309,23 @@ export default function TransferRequests() {
                       </TableRow>
                     ) : incomingRequests.map((request) => (
                       <TableRow key={request.id}>
-                        <TableCell className="font-medium">{request.studentId}</TableCell>
-                        <TableCell>{request.studentName}</TableCell>
+                        <TableCell className="font-medium">
+                          {request.studentCount && request.studentCount > 1 ? (
+                            <div className="space-y-0.5">
+                              <Badge variant="outline" className="text-xs font-normal">
+                                {request.studentCount} คน
+                              </Badge>
+                              <div className="text-xs text-muted-foreground truncate max-w-[140px]" title={request.studentId}>
+                                {request.studentId}
+                              </div>
+                            </div>
+                          ) : (
+                            request.studentId
+                          )}
+                        </TableCell>
+                        <TableCell className="max-w-[200px] truncate" title={request.studentName}>
+                          {request.studentName}
+                        </TableCell>
                         <TableCell>{request.otherAdvisor}</TableCell>
                         <TableCell className="max-w-[200px] truncate">{request.reason}</TableCell>
                         <TableCell>{request.date}</TableCell>
@@ -302,8 +368,23 @@ export default function TransferRequests() {
                       </TableRow>
                     ) : outgoingRequests.map((request) => (
                       <TableRow key={request.id}>
-                        <TableCell className="font-medium">{request.studentId}</TableCell>
-                        <TableCell>{request.studentName}</TableCell>
+                        <TableCell className="font-medium">
+                          {request.studentCount && request.studentCount > 1 ? (
+                            <div className="space-y-0.5">
+                              <Badge variant="outline" className="text-xs font-normal">
+                                {request.studentCount} คน
+                              </Badge>
+                              <div className="text-xs text-muted-foreground truncate max-w-[140px]" title={request.studentId}>
+                                {request.studentId}
+                              </div>
+                            </div>
+                          ) : (
+                            request.studentId
+                          )}
+                        </TableCell>
+                        <TableCell className="max-w-[200px] truncate" title={request.studentName}>
+                          {request.studentName}
+                        </TableCell>
                         <TableCell>{request.otherAdvisor}</TableCell>
                         <TableCell className="max-w-[200px] truncate">{request.reason}</TableCell>
                         <TableCell>{request.date}</TableCell>
@@ -343,8 +424,23 @@ export default function TransferRequests() {
                       </TableRow>
                     ) : historyRequests.map((item) => (
                       <TableRow key={item.id}>
-                        <TableCell className="font-medium">{item.studentId}</TableCell>
-                        <TableCell>{item.studentName}</TableCell>
+                        <TableCell className="font-medium">
+                          {item.studentCount && item.studentCount > 1 ? (
+                            <div className="space-y-0.5">
+                              <Badge variant="outline" className="text-xs font-normal">
+                                {item.studentCount} คน
+                              </Badge>
+                              <div className="text-xs text-muted-foreground truncate max-w-[140px]" title={item.studentId}>
+                                {item.studentId}
+                              </div>
+                            </div>
+                          ) : (
+                            item.studentId
+                          )}
+                        </TableCell>
+                        <TableCell className="max-w-[200px] truncate" title={item.studentName}>
+                          {item.studentName}
+                        </TableCell>
                         <TableCell>
                           <Badge variant={item.type === 'incoming' ? 'default' : 'secondary'}>
                             {item.type === 'incoming' ? 'รับเข้า' : 'มอบออก'}
@@ -405,10 +501,12 @@ export default function TransferRequests() {
               <div className="grid gap-2">
                 <Label>นักศึกษา (เลือกได้หลายคน)</Label>
                 <ScrollArea className="h-48 border rounded-md p-2">
-                  {dropdowns.students.length === 0 ? (
-                    <div className="text-center text-sm text-muted-foreground p-4">ไม่มีนักศึกษาในความดูแล</div>
+                  {availableStudents.length === 0 ? (
+                    <div className="text-center text-sm text-muted-foreground p-4">
+                      ไม่มีนักศึกษาในความดูแล หรือนักศึกษาทุกคนมีคำขอโอนย้ายที่รอดำเนินการอยู่แล้ว
+                    </div>
                   ) : (
-                    dropdowns.students.map(std => (
+                    availableStudents.map(std => (
                       <div key={std.id} className="flex items-center space-x-2 py-2">
                         <Checkbox 
                           id={`std-${std.id}`}
@@ -458,11 +556,11 @@ export default function TransferRequests() {
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+              <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)} disabled={isSubmitting}>
                 ยกเลิก
               </Button>
-              <Button onClick={handleCreateRequest} disabled={newRequest.studentIds.length === 0 || !newRequest.toAdvisorId}>
-                สร้างคำขอ
+              <Button onClick={handleCreateRequest} disabled={newRequest.studentIds.length === 0 || !newRequest.toAdvisorId || isSubmitting}>
+                {isSubmitting ? 'กำลังส่งคำขอ...' : 'สร้างคำขอ'}
               </Button>
             </DialogFooter>
           </DialogContent>

@@ -25,6 +25,7 @@ $studentIds = !empty($data['student_ids']) && is_array($data['student_ids']) ? $
 if (!empty($data['student_id']) && !in_array($data['student_id'], $studentIds)) {
     $studentIds[] = $data['student_id'];
 }
+$studentIds = array_values(array_unique(array_filter(array_map('trim', array_map('strval', $studentIds)))));
 
 if (empty($studentIds) || empty($data['to_advisor_id']) || !isset($data['reason'])) {
     http_response_code(400);
@@ -82,42 +83,116 @@ try {
         throw new Exception('Requester advisor not found');
     }
 
-    $db->beginTransaction();
-    $createdIds = [];
-
-    foreach ($studentIds as $studentId) {
-        $studentId = (string)$studentId;
-        $payload = [
-            'student_id' => $studentId,
-            'from_advisor_id' => $fromAdvisor['faculty_id'],
-            'to_advisor_id' => $toAdvisor['faculty_id'],
-            'from_advisor_user_id' => $fromAdvisor['user_id'],
-            'to_advisor_user_id' => $toAdvisor['user_id'],
-            'reason' => $reason,
-        ];
-
-        $requestId = approvalCreateRequest($db, [
-            'request_type' => 'student_transfer',
-            'requester_user_id' => $fromAdvisor['user_id'],
-            'target_ref_type' => 'student',
-            'target_ref_id' => $studentId,
-            'title' => 'Advisor transfer request',
-            'description' => $reason,
-            'payload_json' => $payload,
-        ]);
-        
-        $createdIds[] = $requestId;
-
-        // บันทึกระบบ Audit Log
-        logAudit($db, $fromAdvisor['user_id'], 'create', 'transfer_requests', "สร้างคำร้องขอโอนย้ายนักศึกษา {$studentId} ไปยังอาจารย์ {$toAdvisor['faculty_id']}");
+    if ($fromAdvisor['faculty_id'] === $toAdvisor['faculty_id'] || ($fromAdvisor['user_id'] && $fromAdvisor['user_id'] === $toAdvisor['user_id'])) {
+        http_response_code(400);
+        echo json_encode(['status' => 'error', 'message' => 'ไม่สามารถโอนย้ายนักศึกษาให้อาจารย์ท่านเดิมได้'], JSON_UNESCAPED_UNICODE);
+        exit;
     }
-    
-    $db->commit();
+
+    // ตรวจสอบว่านักศึกษาอยู่ในความดูแลของอาจารย์ผู้ขอหรือไม่
+    $stdPlaceholders = implode(',', array_fill(0, count($studentIds), '?'));
+    $ownershipStmt = $db->prepare("
+        SELECT DISTINCT CAST(student_id AS CHAR) AS student_id
+        FROM student_advisor_mapping
+        WHERE CAST(faculty_id AS CHAR) = ?
+          AND student_id IN ($stdPlaceholders)
+    ");
+    $ownershipParams = array_merge([(string)$fromAdvisor['faculty_id']], $studentIds);
+    $ownershipStmt->execute($ownershipParams);
+    $validStudentIds = $ownershipStmt->fetchAll(PDO::FETCH_COLUMN);
+
+    $invalidIds = array_diff($studentIds, $validStudentIds);
+    if (!empty($invalidIds)) {
+        http_response_code(400);
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'พบรหัสนักศึกษาที่ไม่อยู่ในความดูแลของท่าน: ' . implode(', ', $invalidIds)
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    // ตรวจสอบว่ามีนักศึกษาคนใดที่มีคำร้องขอโอนย้ายที่รอดำเนินการอยู่แล้วหรือไม่ เพื่อป้องกันการส่งคำขอซ้ำ
+    $stmt = $db->prepare("
+        SELECT approval_request_id, target_ref_id, payload_json
+        FROM approval_requests
+        WHERE request_type = 'student_transfer'
+          AND status = 'pending'
+    ");
+    $stmt->execute();
+    $pendingRequests = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $pendingStudentMap = [];
+    foreach ($pendingRequests as $pReq) {
+        $pPayload = json_decode((string)($pReq['payload_json'] ?? ''), true) ?: [];
+        if (!empty($pPayload['student_ids']) && is_array($pPayload['student_ids'])) {
+            foreach ($pPayload['student_ids'] as $sid) {
+                $pendingStudentMap[(string)$sid] = true;
+            }
+        }
+        if (!empty($pPayload['student_id'])) {
+            $pendingStudentMap[(string)$pPayload['student_id']] = true;
+        }
+        if (!empty($pReq['target_ref_id'])) {
+            foreach (explode(',', (string)$pReq['target_ref_id']) as $sid) {
+                $sid = trim($sid);
+                if ($sid !== '') {
+                    $pendingStudentMap[$sid] = true;
+                }
+            }
+        }
+    }
+
+    $duplicateIds = array_values(array_intersect($studentIds, array_keys($pendingStudentMap)));
+    if (!empty($duplicateIds)) {
+        http_response_code(400);
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'มีนักศึกษาบางท่านมีคำขอโอนย้ายที่รอดำเนินการอยู่แล้ว ไม่สามารถส่งคำขอซ้ำได้: ' . implode(', ', $duplicateIds)
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    $db->beginTransaction();
+
+    $studentCount = count($studentIds);
+    $targetRefId = $studentCount === 1 ? $studentIds[0] : implode(',', $studentIds);
+    $title = $studentCount === 1
+        ? "โอนย้ายนักศึกษา ({$studentIds[0]})"
+        : "โอนย้ายนักศึกษา ({$studentCount} คน)";
+
+    $payload = [
+        'student_ids' => $studentIds,
+        'student_id' => $studentCount === 1 ? $studentIds[0] : null,
+        'from_advisor_id' => $fromAdvisor['faculty_id'],
+        'to_advisor_id' => $toAdvisor['faculty_id'],
+        'from_advisor_user_id' => $fromAdvisor['user_id'],
+        'to_advisor_user_id' => $toAdvisor['user_id'],
+        'reason' => $reason,
+    ];
+
+    $requestId = approvalCreateRequest($db, [
+        'request_type' => 'student_transfer',
+        'requester_user_id' => $fromAdvisor['user_id'],
+        'target_ref_type' => 'student',
+        'target_ref_id' => $targetRefId,
+        'title' => $title,
+        'description' => $reason,
+        'payload_json' => $payload,
+    ]);
+
+    // บันทึกระบบ Audit Log
+    $studentsStr = implode(', ', $studentIds);
+    logAudit($db, $fromAdvisor['user_id'], 'create', 'transfer_requests', "สร้างคำร้องขอโอนย้ายนักศึกษา {$studentCount} คน ({$studentsStr}) ไปยังอาจารย์ {$toAdvisor['faculty_id']}");
+
+    if ($db->inTransaction()) {
+        $db->commit();
+    }
 
     echo json_encode([
         'status' => 'success',
         'message' => 'Transfer request created and sent to Admin',
-        'ids' => $createdIds,
+        'id' => $requestId,
+        'ids' => [$requestId],
     ], JSON_UNESCAPED_UNICODE);
 } catch (Exception $e) {
     if (isset($db) && $db->inTransaction()) {
