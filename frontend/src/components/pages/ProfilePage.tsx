@@ -236,7 +236,10 @@ export default function ProfilePage() {
   const userInitial = profileData.first_name_th?.charAt(0) || "ญ";
   const pdfDocuments = Array.isArray(profileData.pdf_documents) ? profileData.pdf_documents : [];
   const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8080").replace(/\/$/, "");
-  const profilePictureRaw = profileData.profile_picture_url || profileData.profile_picture || "";
+  const profilePictureRaw =
+    userRole === "teacher"
+      ? profileData.profile_picture_url || ""
+      : profileData.profile_picture_url || profileData.profile_picture || "";
   const profilePictureUrl = profilePictureRaw
     ? (profilePictureRaw.startsWith("http") ? profilePictureRaw : `${apiBaseUrl}/${profilePictureRaw.replace(/^\//, "")}`)
     : "";
@@ -259,7 +262,6 @@ export default function ProfilePage() {
             onClick={() => { 
               setFormData({
                 ...profileData,
-                id_card_number: profileData.id_card_number || "",
                 parent_address: parentAddress || "",
                 home_address: profileData.home_address || profileData.address || ""
               });
@@ -348,7 +350,6 @@ export default function ProfilePage() {
                 <InfoRow icon={<GraduationCap className="h-4 w-4 text-primary" />} label="เกรดเฉลี่ย (GPA)" value={profileData.gpa} />
                 <InfoRow icon={<Activity className="h-4 w-4 text-primary" />} label="ส่วนสูง / น้ำหนัก" value={profileData.height && profileData.weight ? `${profileData.height} ซม. / ${profileData.weight} กก.` : null} />
                 <InfoRow icon={<Activity className="h-4 w-4 text-primary" />} label="ดัชนีมวลกาย (BMI)" value={profileData.bmi || calculateBMI(profileData.height, profileData.weight)} />
-                <InfoRow icon={<ShieldCheck className="h-4 w-4 text-primary" />} label="รหัสประจำตัวประชาชน" value={profileData.id_card_number} />
                 <InfoRow icon={<Calendar className="h-4 w-4 text-primary" />} label="ปีการศึกษาที่เข้าศึกษา" value={academicCalculated.entryYear} />
                 <div className="md:col-span-2">
                   <InfoRow icon={<MapPin className="h-4 w-4 text-primary" />} label="ที่อยู่ปัจจุบัน" value={profileData.home_address || profileData.address} />
@@ -525,17 +526,6 @@ export default function ProfilePage() {
                         onChange={(e) => handleNumericInputChange(e, 10)}
                         placeholder="08XXXXXXXX"
                         maxLength={10}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="id_card_number">รหัสประจำตัวประชาชน (13 หลัก)</Label>
-                      <Input
-                        id="id_card_number"
-                        name="id_card_number"
-                        value={formData.id_card_number || ""}
-                        onChange={(e) => handleNumericInputChange(e, 13)}
-                        placeholder="ตัวเลข 13 หลัก"
-                        maxLength={13}
                       />
                     </div>
                     <div className="space-y-2">

@@ -9,7 +9,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
-import { Loader2 } from "lucide-react";
+import { Loader2, X } from "lucide-react";
+import type { ReactNode } from "react";
 
 
 interface ConfirmActionDialogProps {
@@ -23,6 +24,8 @@ interface ConfirmActionDialogProps {
   isLoading?: boolean;
   /** destructive = ลบ/ปฏิเสธ/ระงับ, default = อนุมัติ/เปิดใช้งาน */
   variant?: "destructive" | "default";
+  children?: ReactNode;
+  showCloseButton?: boolean;
 }
 
 export function ConfirmActionDialog({
@@ -35,6 +38,8 @@ export function ConfirmActionDialog({
   onConfirm,
   isLoading = false,
   variant = "destructive",
+  children,
+  showCloseButton = false,
 }: ConfirmActionDialogProps) {
   return (
     <AlertDialog
@@ -45,10 +50,20 @@ export function ConfirmActionDialog({
       }}
     >
       <AlertDialogContent className="app-dialog-md">
+        {showCloseButton && (
+          <AlertDialogCancel
+            disabled={isLoading}
+            className="absolute right-4 top-4 mt-0 h-6 w-6 border-0 bg-transparent p-0 opacity-70 shadow-none hover:bg-transparent hover:opacity-100 focus:ring-2 focus:ring-ring focus:ring-offset-2"
+          >
+            <X className="h-4 w-4" />
+            <span className="sr-only">ปิด</span>
+          </AlertDialogCancel>
+        )}
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
+        {children}
         <AlertDialogFooter>
           <AlertDialogCancel disabled={isLoading}>{cancelLabel}</AlertDialogCancel>
           <AlertDialogAction

@@ -33,6 +33,22 @@ if (!$item_id) {
     exit();
 }
 
+function portfolio_detail_file_url(?string $path): ?string
+{
+    $path = trim((string)$path);
+    if ($path === '') {
+        return null;
+    }
+
+    if (preg_match('/^https?:\/\//i', $path)) {
+        return $path;
+    }
+
+    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    $host = $_SERVER['HTTP_HOST'] ?? 'localhost:8080';
+    return $scheme . '://' . $host . '/' . ltrim($path, '/');
+}
+
 try {
     $db = new Connect();
     
@@ -42,8 +58,12 @@ try {
                 title, 
                 type, 
                 description, 
-                file_name as fileName, 
-                file_path as filePath,
+                file_name,
+                file_name AS fileName, 
+                file_path,
+                file_path AS filePath,
+                mime_type,
+                file_category,
                 DATE_FORMAT(created_at, '%Y-%m-%d %H:%i') as date 
             FROM portfolio 
             WHERE portfolio_id = :id AND student_id = :student_id 
@@ -59,11 +79,7 @@ try {
 
     if ($portfolio_detail) {
         // เสริม URL สัมบูรณ์ (Absolute URL) ให้กับไฟล์แนบ เพื่อให้หน้าบ้านสามารถส่งเปิดดูไฟล์ (Preview) ได้ทันที
-        if (!empty($portfolio_detail['filePath'])) {
-            $portfolio_detail['fileUrl'] = "http://localhost:8080/" . $portfolio_detail['filePath']; 
-        } else {
-            $portfolio_detail['fileUrl'] = null;
-        }
+        $portfolio_detail['fileUrl'] = portfolio_detail_file_url($portfolio_detail['file_path'] ?? $portfolio_detail['filePath'] ?? null);
 
         echo json_encode([
             "status" => "success",

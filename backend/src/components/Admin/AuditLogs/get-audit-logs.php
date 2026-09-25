@@ -58,7 +58,7 @@ try {
     foreach($logs as $log) {
         
         $roleStr = 'นักศึกษา';
-        if ($log['role_id'] == 1) $roleStr = 'ผู้ดูแลระบบ (Admin)';
+        if ($log['role_id'] == 1) $roleStr = 'ผู้ดูแลระบบ';
         else if ($log['role_id'] == 2) $roleStr = 'อาจารย์';
         else if ($log['role_id'] == 5) $roleStr = 'คณบดี';
 
@@ -111,6 +111,7 @@ try {
             case 'project_assessments': $resourceTh = 'ประเมินผลโครงการ'; break; 
             case 'documents': $resourceTh = 'เอกสาร มคอ.'; break; 
             case 'import_data': $resourceTh = 'นำเข้าข้อมูลระบบ'; break; 
+            case 'export': $resourceTh = 'ส่งออกข้อมูล'; break; 
             case 'course_students': $resourceTh = 'จัดการนักศึกษาในรายวิชา'; break; 
             case 'subjects':
             case 'subject': $resourceTh = 'รายวิชา'; break;

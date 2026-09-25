@@ -408,7 +408,7 @@ try {
         return $documents;
     }
 
-    //  [GET] ดึงรายละเอียดเชิงลึกของผู้ใช้เพื่อนำไปแสดงในฟอร์มแก้ไข
+    // 🔍 1. [GET] ดึงรายละเอียดเชิงลึกของผู้ใช้เพื่อนำไปแสดงในฟอร์มแก้ไข
     if ($method === 'GET') {
         $id = isset($_GET['id']) ? $_GET['id'] : null;
         if (!$id) throw new Exception("ไม่พบ ID ผู้ใช้");
@@ -437,7 +437,7 @@ try {
         exit();
     }
 
-    //  [POST] บันทึกข้อมูลที่แก้ไข / ลบเอกสาร
+    // 📝 2. [POST] บันทึกข้อมูลที่แก้ไข / ลบเอกสาร
     if ($method === 'POST') {
         $isMultipart = strpos($_SERVER['CONTENT_TYPE'] ?? '', 'multipart/form-data') !== false;
         if ($isMultipart) {
@@ -648,7 +648,7 @@ try {
                         gpa = :gpa, hometown_province = :hometown_province, height = :height, 
                         weight = :weight, bmi = :bmi, home_phone = :home_phone, home_address = :home_address,
                         status = :status, graduation_date = :graduation_date, dropout_date = :dropout_date,
-                        dropout_reason = :dropout_reason, id_card_number = :id_card_number, admission_year = :admission_year
+                        dropout_reason = :dropout_reason, admission_year = :admission_year
                     WHERE student_id = :sid";
             $stmt = $db->prepare($sql);
             $stmt->execute([
@@ -663,7 +663,7 @@ try {
                 ':home_phone' => $details['home_phone'] ?? null, ':home_address' => $details['home_address'] ?? null,
                 ':status' => $details['status'] ?? null, ':graduation_date' => !empty($details['graduation_date']) ? $details['graduation_date'] : null, 
                 ':dropout_date' => !empty($details['dropout_date']) ? $details['dropout_date'] : null, 
-                ':dropout_reason' => $details['dropout_reason'] ?? null, ':id_card_number' => $details['id_card_number'] ?? null, 
+                ':dropout_reason' => $details['dropout_reason'] ?? null,
                 ':admission_year' => $details['admission_year'] ?? null, ':sid' => $u_info['username']
             ]);
         } else {
@@ -740,7 +740,7 @@ try {
         exit();
     }
 
-    //  [DELETE] ลบข้อมูล
+    // 🗑️ 3. [DELETE] ลบข้อมูล
     if ($method === 'DELETE') {
         $id = $_GET['id'] ?? null;
         if (!$id) throw new Exception("ไม่พบ ID");
