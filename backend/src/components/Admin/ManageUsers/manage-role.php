@@ -114,7 +114,7 @@ try {
     $uStmt->execute([$userId]);
     $targetUser = $uStmt->fetchColumn() ?: "ID: {$userId}";
 
-    $roleLabel = ($newRole === 'admin') ? 'ผู้ดูแลระบบ' : (($newRole === 'teacher') ? 'อาจารย์' : 'นักศึกษา');
+    $roleLabel = ($newRole === 'admin') ? 'ผู้ดูแลระบบ' : (($newRole === 'teacher') ? 'อาจารย์' : 'ผู้ใช้');
     $logDetail = "เปลี่ยนบทบาทผู้ใช้ {$targetUser} เป็น {$roleLabel}";
     if ($newRole === 'teacher' && $primaryPosition) {
         $logDetail .= " (ตำแหน่งหลัก: {$primaryPosition})";

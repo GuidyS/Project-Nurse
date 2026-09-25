@@ -1376,7 +1376,6 @@ const ProjectsPage = () => {
                   <Label>เอกสาร Google Drive</Label>
                   <p className="text-xs text-muted-foreground">แนบลิงก์เอกสารตั้งต้นให้โครงการใหม่ หากกรอกต้องระบุชื่อ วันที่ และลิงก์ให้ครบ</p>
                 </div>
-                <div className="grid gap-4 md:grid-cols-2">
                   <div className="grid gap-2">
                     <Label htmlFor="create-project-document-name">ชื่อเอกสาร</Label>
                     <Input
@@ -1387,17 +1386,6 @@ const ProjectsPage = () => {
                       disabled={isSubmitting}
                     />
                   </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="create-project-document-date">วันที่เอกสาร</Label>
-                    <Input
-                      id="create-project-document-date"
-                      type="date"
-                      value={createDocumentForm.date}
-                      onChange={(event) => setCreateDocumentForm((prev) => ({ ...prev, date: event.target.value }))}
-                      disabled={isSubmitting}
-                    />
-                  </div>
-                </div>
                 <div className="grid gap-2">
                   <Label htmlFor="create-project-document-drive-link">ลิงก์ Google Drive</Label>
                   <div className="relative">
@@ -1678,34 +1666,21 @@ const ProjectsPage = () => {
                 required
               />
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="edit-project-document-date">วันที่เอกสาร</Label>
-                <Input
-                  id="edit-project-document-date"
-                  type="date"
-                  value={documentEditForm.date}
-                  onChange={(event) => setDocumentEditForm((prev) => ({ ...prev, date: event.target.value }))}
-                  disabled={isSavingDocument}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-project-document-drive-link">ลิงก์ Google Drive</Label>
+              <Label htmlFor="edit-project-document-drive-link">ลิงก์ Google Drive</Label>
                 <div className="relative">
                   <GoogleDriveIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
                   <Input
                     id="edit-project-document-drive-link"
                     type="url"
                     value={documentEditDriveLink}
-                    onChange={(event) => setDocumentEditDriveLink(event.target.value)}
+                      onChange={(event) => setDocumentEditDriveLink(event.target.value)}
                     placeholder="https://drive.google.com/..."
                     className="pl-10"
                     disabled={isSavingDocument}
                     required
                   />
                 </div>
-              </div>
             </div>
             {editingDocument && (
               <div className="rounded-lg border bg-muted/30 p-3 text-sm">
@@ -1747,8 +1722,6 @@ const ProjectsPage = () => {
                 )}
               </div>
             </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="project-document-name">ชื่อเอกสาร</Label>
                 <Input
@@ -1760,18 +1733,6 @@ const ProjectsPage = () => {
                   required
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="project-document-date">วันที่เอกสาร</Label>
-                <Input
-                  id="project-document-date"
-                  type="date"
-                  value={uploadForm.date}
-                  onChange={(event) => setUploadForm((prev) => ({ ...prev, date: event.target.value }))}
-                  disabled={isUploadingDocuments}
-                  required
-                />
-              </div>
-            </div>
 
             <div className="space-y-2">
               <Label htmlFor="project-document-drive-link">ลิงก์ Google Drive</Label>
