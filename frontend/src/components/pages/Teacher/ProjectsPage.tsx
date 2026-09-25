@@ -1103,13 +1103,6 @@ const ProjectsPage = () => {
                     <span className="text-muted-foreground">ช่วงเวลา</span>
                     <span className="font-medium text-foreground">{formatDate(project.start_date)} - {formatDate(project.end_date)}</span>
                   </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">ความคืบหน้า</span>
-                      <span className="font-medium text-foreground">{progress}%</span>
-                    </div>
-                    <Progress value={progress} className="h-2" />
-                  </div>
                   <div className="space-y-2 text-xs">
                     <div className="flex items-start gap-2">
                       <UserCheck className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />
@@ -1307,30 +1300,11 @@ const ProjectsPage = () => {
                 <SelectContent>
                   <SelectItem value="pending">รออนุมัติ</SelectItem>
                   <SelectItem value="active">กำลังดำเนินการ</SelectItem>
-                  <SelectItem
-                    value="completed"
-                    disabled={!editMode || Number(projects.find((project) => project.project_id.toString() === formData.project_id)?.progress || 0) < 100}
-                  >
-                    เสร็จสิ้น
-                  </SelectItem>
+                  <SelectItem value="completed">เสร็จสิ้น</SelectItem>
                   <SelectItem value="cancelled">ไม่อนุมัติ/ยกเลิก</SelectItem>
                 </SelectContent>
               </Select>
-              {editMode && Number(projects.find((project) => project.project_id.toString() === formData.project_id)?.progress || 0) < 100 && (
-                <p className="text-xs text-muted-foreground">
-                  สถานะเสร็จสิ้นจะเลือกได้เมื่อความคืบหน้าโครงการครบ 100%
-                </p>
-              )}
             </div>
-            {editMode && (
-              <div className="space-y-2 rounded-lg border bg-muted/30 p-3">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">ความคืบหน้าปัจจุบัน</span>
-                  <span className="font-medium text-foreground">{editingProgress}%</span>
-                </div>
-                <Progress value={editingProgress} className="h-2" />
-              </div>
-            )}
             <div className="grid gap-4 md:grid-cols-3">
               <div className="grid gap-2">
                 <Label>งบเสนอ (บาท)</Label>
@@ -1481,13 +1455,6 @@ const ProjectsPage = () => {
 
                 return (
                   <>
-                    <div className="space-y-2 rounded-lg border bg-muted/30 p-3">
-                      <div className="flex items-center justify-between">
-                        <p className="text-muted-foreground">ความคืบหน้า</p>
-                        <p className="font-medium text-foreground">{progress}%</p>
-                      </div>
-                      <Progress value={progress} className="h-2" />
-                    </div>
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <div className="space-y-1 rounded-lg border bg-muted/30 p-3">
                         <p className="text-muted-foreground">ผู้ดำเนินโครงการ</p>
