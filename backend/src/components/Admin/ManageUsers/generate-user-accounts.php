@@ -37,7 +37,7 @@ try {
         exit();
     }
 
-    /** @return string|null password DDMM + Buddhist year, or null if invalid */
+    /** @return string|null password DDMM + Gregorian year, or null if invalid */
     $passwordFromBirthDate = static function (?string $birthDate): ?string {
         if ($birthDate === null || trim($birthDate) === '') {
             return null;
@@ -48,8 +48,8 @@ try {
         }
         $day = (int)date('d', $ts);
         $month = (int)date('m', $ts);
-        $beYear = (int)date('Y', $ts) + 543;
-        return sprintf('%02d%02d%d', $day, $month, $beYear);
+        $year = (int)date('Y', $ts);
+        return sprintf('%02d%02d%d', $day, $month, $year);
     };
 
     // Count skips: existing accounts + missing birth_date

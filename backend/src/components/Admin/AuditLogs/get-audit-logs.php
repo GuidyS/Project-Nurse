@@ -58,7 +58,7 @@ try {
     foreach($logs as $log) {
         
         $roleStr = 'นักศึกษา';
-        if ($log['role_id'] == 1) $roleStr = 'ผู้ดูแลระบบ (Admin)';
+        if ($log['role_id'] == 1) $roleStr = 'ผู้ดูแลระบบ';
         else if ($log['role_id'] == 2) $roleStr = 'อาจารย์';
         else if ($log['role_id'] == 5) $roleStr = 'คณบดี';
 

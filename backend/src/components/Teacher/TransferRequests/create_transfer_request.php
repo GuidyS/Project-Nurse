@@ -155,7 +155,7 @@ try {
     $db->beginTransaction();
 
     $studentCount = count($studentIds);
-    $targetRefId = $studentCount === 1 ? $studentIds[0] : implode(',', $studentIds);
+    $targetRefId = $studentCount === 1 ? $studentIds[0] : null;
     $title = $studentCount === 1
         ? "โอนย้ายนักศึกษา ({$studentIds[0]})"
         : "โอนย้ายนักศึกษา ({$studentCount} คน)";

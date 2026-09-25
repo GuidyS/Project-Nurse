@@ -93,6 +93,9 @@
             case 'generate-user-accounts':
                 require_once 'components/Admin/ManageUsers/generate-user-accounts.php';
                 break;
+            case 'reset-user-birthdate-passwords':
+                require_once 'components/Admin/ManageUsers/reset-user-birthdate-passwords.php';
+                break;
             case 'competency-items':
                 require_once 'components/Admin/CompetencyItems/get_competency_items.php';
                 break;
@@ -521,6 +524,9 @@
                 break;
             case 'save-portfolio':
                 require_once 'components/Student/Portfolio/save_portfolio.php';
+                break;
+            case 'update-portfolio':
+                require_once 'components/Student/Portfolio/update_portfolio.php';
                 break;
             case 'delete-portfolio':
                 require_once 'components/Student/Portfolio/delete_portfolio.php';
