@@ -42,12 +42,13 @@ try {
         ) as all_users WHERE id = :id LIMIT 1
     ");
 
-    //  ดึงข้อมูลประวัติการใช้งานจากฐานข้อมูล
+    // 🌟 ดึงข้อมูลประวัติการใช้งานจากฐานข้อมูล (กรองเอา 'profile' และ 'ข้อมูลส่วนตัว' ออกไปเลย)
     $sql = "SELECT a.audit_log_id as id, a.created_at as timestamp, 
                    u.username as user, u.role_id,
                    a.action_type as action, a.resource, a.details, a.ip_address as ipAddress
             FROM audit_log a
             LEFT JOIN users u ON a.user_id = u.user_id
+            WHERE a.resource NOT IN ('profile', 'ข้อมูลส่วนตัว')
             ORDER BY a.created_at DESC
             LIMIT 500";
             

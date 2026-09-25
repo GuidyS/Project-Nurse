@@ -51,35 +51,6 @@ export default function Students() {
       student.studentId.includes(searchTerm)
   );
 
-  const handleExport = () => {
-    try {
-      const headers = ['รหัสนักศึกษา', 'ชื่อ-นามสกุล', 'ชั้นปี', 'เกรดเฉลี่ย', 'สถานะ'];
-      const csvRows = [headers.join(',')];
-      
-      filteredStudents.forEach(student => {
-        csvRows.push([
-          student.studentId,
-          student.name,
-          student.year || '-',
-          student.gpa || '-',
-          student.status === 'active' ? 'ปกติ' : (student.status === 'warning' ? 'ต้องติดตาม' : student.status)
-        ].join(','));
-      });
-      
-      const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + csvRows.join('\n');
-      const encodedUri = encodeURI(csvContent);
-      
-      const link = document.createElement("a");
-      link.setAttribute("href", encodedUri);
-      link.setAttribute("download", `รายชื่อนักศึกษา.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    } catch (error) {
-      console.error('Error exporting data:', error);
-    }
-  };
-
   if (isLoading) {
     return <div className="flex items-center justify-center p-8">กำลังโหลดข้อมูล...</div>;
   }
@@ -92,10 +63,6 @@ export default function Students() {
             <h1 className="text-3xl font-bold tracking-tight leading-snug">รายชื่อนักศึกษา</h1>
             <p className="text-muted-foreground">นักศึกษาที่ลงทะเบียนในรายวิชาที่สอน</p>
           </div>
-          <Button variant="outline" onClick={handleExport}>
-            <Download className="mr-2 h-4 w-4" />
-            ส่งออกรายชื่อ
-          </Button>
         </div>
 
         {/* Stats */}

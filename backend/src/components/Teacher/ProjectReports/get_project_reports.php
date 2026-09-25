@@ -14,7 +14,8 @@ try {
     $stmt = $db->query("
         SELECT
             project_id AS id,
-            COALESCE(NULLIF(project_name_th, ''), NULLIF(project_name_en, ''), CONCAT('Project #', project_id)) AS name
+            COALESCE(NULLIF(project_name_th, ''), NULLIF(project_name_en, ''), CONCAT('Project #', project_id)) AS name,
+            COALESCE(project_type, 'other') AS project_type
         FROM project
         ORDER BY project_id DESC
     ");

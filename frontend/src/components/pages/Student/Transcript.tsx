@@ -1,11 +1,10 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Download, FileText, GraduationCap, TrendingUp, BookOpen, Calendar, Printer, Loader2 } from "lucide-react";
+import { GraduationCap, TrendingUp, BookOpen, Calendar, Printer, Loader2 } from "lucide-react";
 import api from "@/lib/axios";
 
 interface CourseGrade {
@@ -88,13 +87,6 @@ const Transcript = () => {
   // นับจำนวนภาคเรียนที่มีเกรดจริง
   const totalSemesters = Array.from(new Set(filteredGrades.map(g => `${g.year}-${g.semester}`))).length;
 
-  const handleExport = (format: "pdf" | "excel") => {
-    toast({ title: "กำลังส่งออก Transcript", description: `กำลังสร้างไฟล์ ${format.toUpperCase()}...` });
-    setTimeout(() => {
-      toast({ title: "ส่งออกสำเร็จ", description: `ดาวน์โหลด Transcript.${format} เรียบร้อยแล้ว` });
-    }, 1500);
-  };
-
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center h-[60vh] gap-2">
@@ -110,17 +102,6 @@ const Transcript = () => {
           <div>
             <h1 className="text-3xl font-bold tracking-tight leading-snug">ใบแสดงผลการเรียน</h1>
             <p className="text-muted-foreground">ดูและส่งออกรายงานผลการศึกษาอย่างเป็นทางการของคุณ</p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" className="gap-2" onClick={() => handleExport("pdf")}>
-              <FileText className="h-4 w-4" /> ส่งออก PDF
-            </Button>
-            <Button variant="outline" className="gap-2" onClick={() => handleExport("excel")}>
-              <Download className="h-4 w-4" /> ส่งออก Excel
-            </Button>
-            <Button variant="outline" className="gap-2" onClick={() => window.print()}>
-              <Printer className="h-4 w-4" /> พิมพ์
-            </Button>
           </div>
         </div>
 

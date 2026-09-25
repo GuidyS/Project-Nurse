@@ -959,7 +959,7 @@ const PdfDocumentsSection = ({ documents }: { documents: any[] }) => {
     return (
       <div className="md:col-span-2 rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
         ยังไม่มีไฟล์ PDF ในระบบ — ลิงก์ Google Drive ในฐานข้อมูล (เช่น ประวัติ/Resume) หรือไฟล์ที่อัปโหลดผ่านผู้ดูแลระบบจะแสดงที่นี่
-        เอกสารรับรองอื่น (บัตรสภา, ใบอนุญาต, ใบรับรองการสอน) ให้ผู้ใช้อัปโหลดภายหลัง[cite: 16]
+        เอกสารรับรองอื่น (บัตรสภา, ใบอนุญาต, ใบรับรองการสอน) ให้ผู้ใช้อัปโหลดภายหลัง
       </div>
     );
   }

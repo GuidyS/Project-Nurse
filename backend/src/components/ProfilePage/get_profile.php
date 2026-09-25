@@ -38,15 +38,34 @@ function buildCurrentAuthPayload(PDO $db, int $userId): array {
     ");
     $permStmt->execute([':user_id' => $userId]);
     $permissions = $permStmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+    $roleId = (int)($auth['role_id'] ?? 0);
+    $positionId = (int)($auth['position_id'] ?? 0);
 
-    $_SESSION['role_id'] = (int)($auth['role_id'] ?? 0);
+    if (empty($permissions) && $roleId === 3) {
+        $fallbackPositionId = 8;
+        $fallbackPermStmt = $db->prepare("
+            SELECT DISTINCT p.permission_name
+            FROM permissions p
+            JOIN position_permission pp ON p.permission_id = pp.permission_id
+            WHERE pp.position_id = :position_id
+            ORDER BY p.permission_name
+        ");
+        $fallbackPermStmt->execute([':position_id' => $fallbackPositionId]);
+        $permissions = $fallbackPermStmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+        if (!empty($permissions) && $positionId === 0) {
+            $positionId = $fallbackPositionId;
+        }
+    }
+
+    $_SESSION['role_id'] = $roleId;
+    $_SESSION['position_id'] = $positionId;
     $_SESSION['permissions'] = $permissions;
 
     return [
         'user_id' => (int)$auth['user_id'],
         'username' => (string)$auth['username'],
-        'role_id' => (int)($auth['role_id'] ?? 0),
-        'position_id' => (int)($auth['position_id'] ?? 0),
+        'role_id' => $roleId,
+        'position_id' => $positionId,
         'permissions' => $permissions,
     ];
 }

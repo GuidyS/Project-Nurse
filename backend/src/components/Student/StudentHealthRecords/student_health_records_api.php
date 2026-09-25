@@ -30,7 +30,7 @@ try {
     $student_id = $user['username'];
     $method = $_SERVER['REQUEST_METHOD'];
 
-    // 🔍 [GET] ดึงข้อมูลสุขภาพชั้นปีที่ 1-4
+    //  [GET] ดึงข้อมูลสุขภาพชั้นปีที่ 1-4
     if ($method === 'GET') {
         $query = "SELECT * FROM student_health_records WHERE student_id = :sid ORDER BY year_level ASC";
         $stmt = $db->prepare($query);
@@ -41,7 +41,7 @@ try {
         exit;
     }
 
-    // 💾 [POST] บันทึกหรืออัปเดตข้อมูลสุขภาพ
+    // [POST] บันทึกหรืออัปเดตข้อมูลสุขภาพ
     if ($method === 'POST') {
         $input = json_decode(file_get_contents("php://input"), true);
         $records = $input['records'] ?? [];
@@ -81,6 +81,16 @@ try {
                     $bmi = round($weight / ($heightMeter * $heightMeter), 2);
                 }
 
+                //  แก้ไข: ตรวจสอบค่าสถานะ ถ้าไม่มีการส่งค่ามาให้เป็น null (ไม่บังคับติ๊ก)
+                $ostatus = null;
+                if (!empty($item['overall_status'])) {
+                    if ($item['overall_status'] === 'has_health_issue') {
+                        $ostatus = 'has_health_issue';
+                    } elseif ($item['overall_status'] === 'healthy') {
+                        $ostatus = 'healthy';
+                    }
+                }
+
                 $stmt->execute([
                     ':sid'     => $student_id,
                     ':y_level' => (int)($item['year_level'] ?? 1),
@@ -88,8 +98,8 @@ try {
                     ':height'  => $height,
                     ':weight'  => $weight,
                     ':bmi'     => $bmi,
-                    ':ostatus' => ($item['overall_status'] === 'has_health_issue') ? 'has_health_issue' : 'healthy',
-                    ':detail'  => ($item['overall_status'] === 'has_health_issue') ? ($item['health_issue_detail'] ?? '') : null,
+                    ':ostatus' => $ostatus,
+                    ':detail'  => ($ostatus === 'has_health_issue') ? ($item['health_issue_detail'] ?? '') : null,
                 ]);
             }
             $db->commit();
@@ -102,7 +112,7 @@ try {
             throw $e;
         }
 
-        echo json_encode(["status" => "success", "message" => "บันทึกข้อมูลภาวะสุขภาพเรียบร้อยแล้ว"], JSON_UNESCAPED_UNICODE);
+        echo json_encode(["status" => "success", "message" => "บันหนทึกข้อมูลภาวะสุขภาพเรียบร้อยแล้ว"], JSON_UNESCAPED_UNICODE);
         exit;
     }
 
@@ -110,3 +120,4 @@ try {
     http_response_code(500);
     echo json_encode(["status" => "error", "message" => $e->getMessage()], JSON_UNESCAPED_UNICODE);
 }
+?>
