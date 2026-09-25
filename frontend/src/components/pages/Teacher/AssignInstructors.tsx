@@ -279,39 +279,6 @@ export default function AssignInstructors() {
                   className="max-w-sm"
                 />
               </div>
-
-              {/* ค่าตั้งต้นของทั้งหน้า — กรอกครั้งเดียวใช้กับทุกวิชาที่มอบหมายต่อจากนี้ */}
-              <div className="flex items-center gap-2 rounded-lg border bg-muted/30 px-3 py-2">
-                <CalendarRange className="h-4 w-4 text-primary shrink-0" />
-                <Label className="text-xs text-muted-foreground whitespace-nowrap">
-                  ใช้กับทุกวิชา
-                </Label>
-                <Input
-                  type="number"
-                  min="1"
-                  max="3"
-                  placeholder="เทอม"
-                  value={defaultSemester}
-                  onChange={(e) => {
-                    setDefaultSemester(e.target.value);
-                    localStorage.setItem('assignDefaultSemester', e.target.value);
-                  }}
-                  className="w-20 h-9 text-center"
-                />
-                <span className="text-muted-foreground">/</span>
-                <Input
-                  type="number"
-                  min="2500"
-                  max="2600"
-                  placeholder="ปีการศึกษา"
-                  value={defaultAcademicYear}
-                  onChange={(e) => {
-                    setDefaultAcademicYear(e.target.value);
-                    localStorage.setItem('assignDefaultAcademicYear', e.target.value);
-                  }}
-                  className="w-28 h-9 text-center"
-                />
-              </div>
             </div>
           </CardHeader>
           <CardContent>

@@ -997,7 +997,6 @@ const ProjectsPage = () => {
           {filteredProjects.map((project) => {
             const projectType = normalizeProjectType(project.project_type);
             const status = normalizeStatus(project.status);
-            const progress = projectProgress(project);
             const responsibleName = projectResponsibleName(project);
             const facultyMembers = projectFacultyMembers(project);
             const visibleFacultyMembers = facultyMembers.slice(0, 3);

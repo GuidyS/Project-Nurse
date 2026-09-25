@@ -338,8 +338,6 @@ const NotificationsPage = () => {
         category: notificationCategory,
         recipient_ids: selectedRecipients,
       });
-      const sent = Number(response.data?.sent ?? selectedRecipients.length);
-      const skipped = Number(response.data?.skipped ?? 0);
 
       await loadNotifications();
       setIsDialogOpen(false);

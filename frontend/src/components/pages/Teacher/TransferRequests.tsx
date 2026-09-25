@@ -220,10 +220,19 @@ export default function TransferRequests() {
 
   const handleSelectAllFilteredStudents = () => {
     const filteredStudentIds = filteredStudents.map((std) => std.id.toString());
-    setNewRequest((prev) => ({
-      ...prev,
-      studentIds: Array.from(new Set([...prev.studentIds, ...filteredStudentIds])),
-    }));
+    setNewRequest((prev) => {
+      if (areFilteredStudentsSelected) {
+        return {
+          ...prev,
+          studentIds: prev.studentIds.filter((id) => !filteredStudentIds.includes(id)),
+        };
+      }
+
+      return {
+        ...prev,
+        studentIds: Array.from(new Set([...prev.studentIds, ...filteredStudentIds])),
+      };
+    });
   };
 
   const handleOpenCreateDialog = () => {
@@ -544,11 +553,11 @@ export default function TransferRequests() {
                         type="button"
                         variant="outline"
                         size="sm"
-                        className="h-9 shrink-0"
+                        className="h-9 w-[100px] shrink-0"
                         onClick={handleSelectAllFilteredStudents}
-                        disabled={filteredStudents.length === 0 || areFilteredStudentsSelected}
+                        disabled={filteredStudents.length === 0}
                       >
-                        เลือกทั้งหมด
+                        {areFilteredStudentsSelected ? 'ยกเลิก' : 'เลือกทั้งหมด'}
                       </Button>
                     </div>
                   </div>
