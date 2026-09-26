@@ -141,33 +141,28 @@ try {
     ]);
     $items = $itemStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
  
-    //  FIX: จัดกลุ่มรายการประเมินตาม PLO พร้อมระบบกรอง "แถวซ้ำ" 
+    // จัดกลุ่มรายการประเมินตาม PLO (พร้อมกรองแถวซ้ำ)
     $itemsByPlo = [];
-    $seenItems = []; // ใช้เก็บรายการที่เคยดึงมาแล้วเพื่อเช็กซ้ำ
+    $seenItems = []; 
     
     foreach ($items as $item) {
-        // สร้าง Key เฉพาะตัวขึ้นมา เพื่อดูว่าข้อนี้ซ้ำไหม (PLO + ลำดับข้อ + ข้อความ)
         $uniqueKey = $item['plo_id'] . '_' . $item['sequence_no'] . '_' . md5($item['competency_name']);
-        
-        // ถ้ารายการนี้ยังไม่เคยถูกเพิ่มเข้าไป ให้เพิ่มเข้าไป
         if (!isset($seenItems[$uniqueKey])) {
             $itemsByPlo[$item['plo_id']][] = $item;
             $seenItems[$uniqueKey] = true;
         }
     }
  
-    // กันชื่อ PLO ขึ้นซ้ำคำ (เช่น "PLO1 PLO 1: ...")
+    // 🌟 FIX: ระบบตัดคำนำหน้าชื่อ PLO/YLO ที่ซ้ำซ้อน (เวอร์ชันฉลาดขึ้น)
     $stripPloCodePrefix = function (string $code, string $name): string {
-        $code = trim($code);
         $name = trim($name);
-        if ($code === '' || $name === '') {
-            return $name;
-        }
-        if (stripos($name, $code) === 0) {
-            $stripped = preg_replace('/^' . preg_quote($code, '/') . '\s*:?\s*/i', '', $name);
-            return trim($stripped) !== '' ? trim($stripped) : $name;
-        }
-        return $name;
+        
+        // Regex นั้ดักจับตัวอักษรภาษาอังกฤษนำหน้า (เช่น PLO, YLO) 
+        // ตามด้วยเว้นวรรค (มี/ไม่มีก็ได้) ตามด้วยตัวเลข และปิดด้วย : หรือ - (มี/ไม่มีก็ได้)
+        // ตัวอย่างที่ดักได้ลบเกลี้ยง: "PLO 1:", "PLO1 :", "YLO 2 -", "PLO3"
+        $stripped = preg_replace('/^[A-Za-z]+\s*\d+\s*[:\-]?\s*/', '', $name);
+        
+        return trim($stripped) !== '' ? trim($stripped) : $name;
     };
  
     $groups = array_map(function ($plo) use ($itemsByPlo, $stripPloCodePrefix) {
