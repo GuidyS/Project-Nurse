@@ -130,18 +130,6 @@ try {
         }
     }
 
-    if ($projectType !== 'culture') {
-        $satisfactionStmt = $db->prepare("SELECT COUNT(*) FROM project_satisfaction_responses WHERE project_id = :project_id");
-        $satisfactionStmt->execute([':project_id' => $projectId]);
-        if ((int)$satisfactionStmt->fetchColumn() > 0) {
-            project_json([
-                "status" => "error",
-                "message" => "โครงการนี้มีข้อมูลความพึงพอใจอยู่ กรุณาลบข้อมูลก่อนเปลี่ยนประเภท",
-            ], 409);
-            exit;
-        }
-    }
-
     $db->beginTransaction();
 
     $stmt = $db->prepare("

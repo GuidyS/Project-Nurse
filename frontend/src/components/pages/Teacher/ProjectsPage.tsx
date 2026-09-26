@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { Plus, Search, Filter, Eye, Edit, MoreVertical, Upload, Link2, ClipboardCheck, Trash2, Loader2, UserCheck, Users } from "lucide-react";
+import { Plus, Search, Filter, Eye, Edit, MoreVertical, Upload, Link2, Trash2, Loader2, UserCheck, Users } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -355,7 +355,7 @@ const ProjectsPage = () => {
   const currentUser = getCurrentUser();
   const canManageProjects = Number(currentUser?.role_id || 0) === 1;
 
-  const navigateToProjectPage = (page: "project-links" | "project-assessments", projectId: number) => {
+  const navigateToProjectPage = (page: "project-links", projectId: number) => {
     if (!canManageProjects) return;
     sessionStorage.setItem("pendingProjectId", String(projectId));
     window.dispatchEvent(new CustomEvent("app:navigate", { detail: { page } }));
@@ -1060,14 +1060,6 @@ const ProjectsPage = () => {
                               onClick={() => navigateToProjectPage("project-links", project.project_id)}
                             >
                               <Link2 className="h-4 w-4 text-purple-500" /> เชื่อมโยงระดับ LO
-                            </DropdownMenuItem>
-                          )}
-                          {projectType !== "other" && (
-                            <DropdownMenuItem
-                              className="gap-2"
-                              onClick={() => navigateToProjectPage("project-assessments", project.project_id)}
-                            >
-                              <ClipboardCheck className="h-4 w-4 text-cyan-600" /> ประเมินผู้เข้าร่วม
                             </DropdownMenuItem>
                           )}
                           <DropdownMenuSeparator />

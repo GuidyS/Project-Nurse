@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -82,6 +82,8 @@ export default function StudentVaccinationPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [groups, setGroups] = useState<VaccineGroup[]>(DEFAULT_GROUPS);
+  
+  const tableRef = useRef<HTMLDivElement>(null);
 
   const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8080").replace(/\/$/, "");
 
@@ -145,14 +147,29 @@ export default function StudentVaccinationPage() {
       remark: "",
       doses: [{ id: `dose-${Date.now()}-1`, label_type: "dose", received_date: "" }]
     };
+    
     setGroups([...groups, newGroup]);
+    
+    toast({ 
+      title: "✅ เพิ่มรายการใหม่สำเร็จ", 
+      description: `แถววัคซีนลำดับที่ ${nextSeq} ถูกเพิ่มต่อท้ายตารางแล้ว`,
+      className: "bg-green-500 text-white border-none",
+    });
+
+    setTimeout(() => {
+      if (tableRef.current) {
+        tableRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }
+    }, 150);
   };
 
+  //  เพิ่มการยืนยันก่อนลบทั้งแถว
   const handleDeleteGroup = (id: string) => {
-    setGroups(groups.filter(g => g.id !== id));
+    if (window.confirm("คุณแน่ใจหรือไม่ว่าต้องการลบรายการวัคซีนนี้? ข้อมูลที่ยังไม่ได้บันทึกจะหายไป")) {
+      setGroups(groups.filter(g => g.id !== id));
+    }
   };
 
-  // 💉 เพิ่มเข็มใหม่
   const handleAddDose = (groupId: string) => {
     setGroups(groups.map(g => {
       if (g.id === groupId) {
@@ -165,7 +182,6 @@ export default function StudentVaccinationPage() {
     }));
   };
 
-  // 📅 เพิ่มปีใหม่
   const handleAddYear = (groupId: string) => {
     setGroups(groups.map(g => {
       if (g.id === groupId) {
@@ -178,17 +194,19 @@ export default function StudentVaccinationPage() {
     }));
   };
 
-  // 🗑️ ลบรายการเจาะจงรายบรรทัด
+  //  เพิ่มการยืนยันก่อนลบรายเข็ม/ปี
   const handleDeleteSpecificDose = (groupId: string, doseId: string) => {
-    setGroups(groups.map(g => {
-      if (g.id === groupId) {
-        return {
-          ...g,
-          doses: g.doses.filter(d => d.id !== doseId)
-        };
-      }
-      return g;
-    }));
+    if (window.confirm("คุณแน่ใจหรือไม่ว่าต้องการลบเข็ม/ปี นี้?")) {
+      setGroups(groups.map(g => {
+        if (g.id === groupId) {
+          return {
+            ...g,
+            doses: g.doses.filter(d => d.id !== doseId)
+          };
+        }
+        return g;
+      }));
+    }
   };
 
   const handleDoseDateChange = (groupId: string, doseId: string, date: string) => {
@@ -216,7 +234,6 @@ export default function StudentVaccinationPage() {
     }));
   };
 
-  // คำนวณ Label แยกตามประเภท (เข็ม หรือ ปี) อย่างอิสระ
   const getDoseLabel = (doses: DoseItem[], currentIndex: number) => {
     const currentItem = doses[currentIndex];
     const subList = doses.slice(0, currentIndex + 1);
@@ -267,8 +284,14 @@ export default function StudentVaccinationPage() {
         toast({ title: "บันทึกข้อมูลเรียบร้อยแล้ว" });
         fetchData();
       }
-    } catch (error) {
-      toast({ title: "บันทึกล้มเหลว", description: "ไม่สามารถบันทึกข้อมูลได้", variant: "destructive" });
+    } catch (error: any) {
+      //  ดึง Error จากฐานข้อมูลมาแสดงบนหน้าเว็บให้เห็นชัดๆ
+      const errorMessage = error.response?.data?.message || "ไม่สามารถบันทึกข้อมูลได้ กรุณาลองใหม่อีกครั้ง";
+      toast({ 
+        title: "บันทึกล้มเหลว", 
+        description: errorMessage, 
+        variant: "destructive" 
+      });
     } finally {
       setSaving(false);
     }
@@ -296,10 +319,14 @@ export default function StudentVaccinationPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={handleAddGroup} className="gap-1.5 border-dashed">
-            <Plus className="h-4 w-4" /> เพิ่มวัคซีน/โรคใหม่
+          <Button 
+            variant="outline" 
+            onClick={handleAddGroup} 
+            className="gap-1.5 font-bold border-2 border-primary text-primary hover:bg-primary hover:text-primary-foreground shadow-sm transition-all"
+          >
+            <Plus className="h-4 w-4 stroke-[3px]" /> เพิ่มวัคซีน/โรคใหม่
           </Button>
-          <Button onClick={handleSave} disabled={saving} className="gap-2 shrink-0">
+          <Button onClick={handleSave} disabled={saving} className="gap-2 shrink-0 shadow-sm">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             บันทึกข้อมูล
           </Button>
@@ -307,7 +334,7 @@ export default function StudentVaccinationPage() {
       </div>
 
       <Card>
-        <CardContent className="p-0">
+        <CardContent className="p-0" ref={tableRef}>
           <div className="overflow-x-auto">
             <Table className="border-collapse border border-border w-full text-sm">
               <TableHeader className="bg-muted/50">
@@ -322,7 +349,7 @@ export default function StudentVaccinationPage() {
               </TableHeader>
               <TableBody className="divide-y divide-border">
                 {groups.map((group) => (
-                  <TableRow key={group.id} className="divide-x divide-border align-top">
+                  <TableRow key={group.id} className="divide-x divide-border align-top hover:bg-muted/30 transition-colors">
                     {/* ลำดับ */}
                     <TableCell className="p-3 text-center">
                       <Input
@@ -512,7 +539,7 @@ export default function StudentVaccinationPage() {
                         type="button"
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                        className="h-8 w-8 text-destructive hover:bg-destructive/10 transition-colors"
                         onClick={() => handleDeleteGroup(group.id)}
                         title="ลบแถวนี้"
                       >

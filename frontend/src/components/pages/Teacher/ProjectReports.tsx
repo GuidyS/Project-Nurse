@@ -113,14 +113,34 @@ export default function ProjectReports() {
     handleProjectChange(project.id.toString());
   };
 
-  const searchedProjects = projects.filter((project) => {
+  const getProjectsByType = (filter: ProjectTypeFilter) => projects.filter((project) => {
     const normalizedType = normalizeProjectType(project.project_type);
-    const matchesType = projectTypeFilter === 'all' || normalizedType === projectTypeFilter;
-    const search = projectSearch.trim().toLowerCase();
-    const matchesSearch = !search || `${project.id} ${project.name}`.toLowerCase().includes(search);
-
-    return matchesType && matchesSearch;
+    return filter === 'all' || normalizedType === filter;
   });
+
+  const typeFilteredProjects = getProjectsByType(projectTypeFilter);
+
+  const handleProjectTypeFilterChange = (value: string) => {
+    const nextFilter = value as ProjectTypeFilter;
+    const nextProjects = getProjectsByType(nextFilter);
+    const currentProject = projects.find((project) => project.id.toString() === selectedProject);
+    const currentMatchesFilter =
+      !currentProject || nextFilter === 'all' || normalizeProjectType(currentProject.project_type) === nextFilter;
+
+    setProjectTypeFilter(nextFilter);
+
+    if (!currentMatchesFilter && nextProjects.length > 0) {
+      handleProjectChange(nextProjects[0].id.toString());
+    }
+  };
+
+  const projectSearchText = projectSearch.trim();
+  const hasProjectSearchText = projectSearchText.length > 0;
+  const searchedProjects = hasProjectSearchText
+    ? typeFilteredProjects.filter((project) =>
+        `${project.id} ${project.name}`.toLowerCase().includes(projectSearchText.toLowerCase())
+      )
+    : [];
 
   const selectedProjectName = projects.find(p => p.id.toString() === selectedProject)?.name || 'project-report';
 
@@ -195,44 +215,68 @@ export default function ProjectReports() {
         {/* ส่วนเลือกโครงการ */}
         <Card>
           <CardContent className="pt-6">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
-              <div className="relative w-full lg:flex-1">
-                <Input
-                  value={projectSearch}
-                  onChange={(event) => {
-                    setProjectSearch(event.target.value);
-                    setIsProjectSearchOpen(true);
-                  }}
-                  onFocus={() => setIsProjectSearchOpen(true)}
-                  onBlur={() => setIsProjectSearchOpen(false)}
-                  placeholder="ค้นหารายชื่อโครงการ..."
-                  className="w-full"
-                />
-                {isProjectSearchOpen && (
-                  <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-64 overflow-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md">
-                    {searchedProjects.length === 0 ? (
-                      <div className="px-3 py-2 text-sm text-muted-foreground">
-                        ไม่พบโครงการที่ตรงกับคำค้นหา
-                      </div>
-                    ) : (
-                      searchedProjects.map((project) => (
-                        <button
-                          key={project.id}
-                          type="button"
-                          className="flex w-full flex-col rounded-sm px-3 py-2 text-left text-sm outline-none hover:bg-accent hover:text-accent-foreground"
-                          onMouseDown={(event) => event.preventDefault()}
-                          onClick={() => handleProjectSearchSelect(project)}
-                        >
-                          <span className="font-medium">{project.name}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {projectTypeLabels[normalizeProjectType(project.project_type)]}
-                          </span>
-                        </button>
-                      ))
-                    )}
-                  </div>
-                )}
+            <div className="flex w-full flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+
+              {/* Select Project */}
+              <div className="w-full lg:w-80">
+                <Select value={selectedProject} onValueChange={handleProjectChange} disabled={typeFilteredProjects.length === 0 || loading}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="เลือกโครงการ" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {typeFilteredProjects.map((project) => (
+                      <SelectItem key={project.id} value={project.id.toString()}>
+                        <span className="font-bold text-slate-900">{project.name}</span>
+                        <span className="mx-1 text-muted-foreground">•</span>
+                        <span className="text-muted-foreground">
+                          {projectTypeLabels[normalizeProjectType(project.project_type)]}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
+              <div className="flex w-full flex-col gap-3 sm:flex-row lg:w-auto lg:justify-end">
+                <div className="relative w-full sm:w-[400px]">
+                  <Input
+                    value={projectSearch}
+                    onChange={(event) => {
+                      setProjectSearch(event.target.value);
+                      setIsProjectSearchOpen(true);
+                    }}
+                    onFocus={() => setIsProjectSearchOpen(true)}
+                    onBlur={() => setIsProjectSearchOpen(false)}
+                    placeholder="ค้นหารายชื่อโครงการ..."
+                    className="w-full"
+                  />
+                  {isProjectSearchOpen && hasProjectSearchText && (
+                    <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-64 overflow-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md">
+                      {searchedProjects.length === 0 ? (
+                        <div className="px-3 py-2 text-sm text-muted-foreground">
+                          ไม่พบโครงการที่ตรงกับคำค้นหา
+                        </div>
+                      ) : (
+                        searchedProjects.map((project) => (
+                          <button
+                            key={project.id}
+                            type="button"
+                            className="flex w-full flex-col rounded-sm px-3 py-2 text-left text-sm outline-none hover:bg-accent hover:text-accent-foreground"
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => handleProjectSearchSelect(project)}
+                          >
+                            <span className="inline-flex min-w-0 items-center whitespace-nowrap">
+                              <span className="truncate font-bold text-slate-900">{project.name}</span>
+                              <span className="mx-1 shrink-0 text-muted-foreground">•</span>
+                              <span className="shrink-0 text-muted-foreground">
+                                {projectTypeLabels[normalizeProjectType(project.project_type)]}
+                              </span>
+                            </span>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="gap-2">
@@ -246,13 +290,9 @@ export default function ProjectReports() {
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent align="end" className="w-80 space-y-4">
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium">ตัวกรองโครงการ</p>
-                    <p className="text-xs text-muted-foreground">เลือกประเภทโครงการ</p>
-                  </div>
                   <div className="space-y-2">
                     <Label htmlFor="project-type-filter">ประเภทโครงการ</Label>
-                    <Select value={projectTypeFilter} onValueChange={(value) => setProjectTypeFilter(value as ProjectTypeFilter)}>
+                    <Select value={projectTypeFilter} onValueChange={handleProjectTypeFilterChange}>
                       <SelectTrigger id="project-type-filter">
                         <SelectValue placeholder="เลือกประเภทโครงการ" />
                       </SelectTrigger>
@@ -270,12 +310,13 @@ export default function ProjectReports() {
                     variant="outline"
                     className="w-full"
                     disabled={activeFilterCount === 0}
-                    onClick={() => setProjectTypeFilter('all')}
+                    onClick={() => handleProjectTypeFilterChange('all')}
                   >
                     ล้างตัวกรอง
                   </Button>
                 </PopoverContent>
               </Popover>
+              </div>
             </div>
           </CardContent>
         </Card>

@@ -12,7 +12,6 @@ import {
   ExternalLink,
   Image as ImageIcon,
   AlertCircle,
-  Users,
   Heart,
   Loader2,
   Upload,

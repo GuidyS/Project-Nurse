@@ -47,7 +47,6 @@ import DeanDashboard from "@/components/pages/Teacher/DeanDashboard";
 import Retention from "@/components/pages/Teacher/Retention";
 import PracticalPage from '@/components/pages/Teacher/PracticalPage';
 import FacultyDimensionPage from '@/components/pages/Teacher/FacultyDimensionPage';
-import ProjectAssessments from "@/components/pages/Teacher/ProjectAssessments";
 import StudentVaccinationPage from "@/components/pages/Student/StudentVaccinationPage";
 import AdvisorVaccinationView from "@/components/pages/Teacher/AdvisorVaccinationView";
 import StudentHealthRecordsPage from "@/components/pages/Student/StudentHealthRecordsPage";
@@ -254,7 +253,7 @@ const Index = () => {
       "plo-ylo-report", "course-report", "course-students", "documents", "assign-instructors", "clo-map",
       "evidence", "grades", "my-courses", "performance", "practical-students",
       "program-reports", "schedule-tasks", "advise-notes", "advisor-notifications", "advises",
-      "students", "students-info", "transfer-requests", "my-research", "research-summary", "project-assessments",
+      "students", "students-info", "transfer-requests", "my-research", "research-summary",
       "advisor-vaccination-view", "advisor-health-records-view",
       "advisor-competency-view"
     ];
@@ -287,7 +286,6 @@ const Index = () => {
         case "students-info": return <StudentsInfo />;                              /* รายชื่อเด็กในที่ปรึกษาของอจ. */
         case "transfer-requests": return <TransferRequests />;                      //*
         case "research-summary": return <ResearchSummary />;
-        case "project-assessments": return <ProjectAssessments />;
         case "advisor-vaccination-view": return <AdvisorVaccinationView />;  
         case "advisor-health-records-view": return <AdvisorHealthRecordsView />;
         case "advisor-competency-view": return <AdvisorCompetencyView />;

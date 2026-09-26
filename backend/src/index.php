@@ -470,11 +470,6 @@
                 require_once 'components/Teacher/ProjectReports/get_project_reports.php';
                 break;
 
-            // ProjectAssessments
-            case 'project-assessments':
-                require_once 'components/Teacher/ProjectAssessments/project_assessments.php';
-                break;
-
             // ScheduleTasks
             case 'create-schedule-task':
                 require_once 'components/Teacher/ScheduleTasks/create_schedule_task.php';
