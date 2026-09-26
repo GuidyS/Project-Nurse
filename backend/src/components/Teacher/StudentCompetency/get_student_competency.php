@@ -120,9 +120,6 @@ try {
     $plos = $ploStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
  
     // ดึงรายการประเมินสมรรถนะของชั้นปีนั้น
-    // หมายเหตุ: ถ้ายังเจอแถวซ้ำที่หน้าจอ ต้นเหตุคือข้อมูลใน competency_items เองซ้ำกันจริง
-    // (เช่น มี 2 แถวที่ plo_id + sequence_no + competency_name เหมือนกันเป๊ะ) query นี้ดึงมาตรงตามที่มีจริง
-    // ต้องไปลบตัวซ้ำที่ต้นทางในตาราง competency_items ผ่านหน้า Admin หรือ SQL โดยตรง โค้ดฝั่งนี้แก้ให้ไม่ได้
     $itemStmt = $db->prepare("
         SELECT ci.id, ci.plo_id, COALESCE(cp.plo_code, '') AS plo_code, COALESCE(cp.name, '') AS plo_name,
                ci.sequence_no, ci.competency_name, ci.is_scorable,
@@ -144,18 +141,22 @@ try {
     ]);
     $items = $itemStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
  
-    // จัดกลุ่มรายการประเมินตาม PLO
+    //  FIX: จัดกลุ่มรายการประเมินตาม PLO พร้อมระบบกรอง "แถวซ้ำ" 
     $itemsByPlo = [];
+    $seenItems = []; // ใช้เก็บรายการที่เคยดึงมาแล้วเพื่อเช็กซ้ำ
+    
     foreach ($items as $item) {
-        $itemsByPlo[$item['plo_id']][] = $item;
+        // สร้าง Key เฉพาะตัวขึ้นมา เพื่อดูว่าข้อนี้ซ้ำไหม (PLO + ลำดับข้อ + ข้อความ)
+        $uniqueKey = $item['plo_id'] . '_' . $item['sequence_no'] . '_' . md5($item['competency_name']);
+        
+        // ถ้ารายการนี้ยังไม่เคยถูกเพิ่มเข้าไป ให้เพิ่มเข้าไป
+        if (!isset($seenItems[$uniqueKey])) {
+            $itemsByPlo[$item['plo_id']][] = $item;
+            $seenItems[$uniqueKey] = true;
+        }
     }
  
-    // ✅ FIX: กันชื่อ PLO ขึ้นซ้ำคำ (เช่น "PLO1 PLO 1: ...")
-    // สาเหตุคือข้อมูลจริงใน curriculum_plo.name ดันมีคำว่า plo_code ติดอยู่ในตัวเองด้วย
-    // (เช่น plo_code="PLO1", name="PLO 1: ประยุกต์ความรู้...") พอ frontend เอามาต่อกัน
-    // "{plo_code} {plo_name}" เลยเห็นซ้ำ — วิธีที่ถูกต้องจริงๆ คือไปแก้ข้อมูลที่ต้นทาง (curriculum_plo.name)
-    // ให้ไม่มีคำว่า code ติดอยู่ แต่ใส่ตัวกันไว้ชั้นนี้ด้วย เผื่อมีข้อมูลแบบนี้หลุดเข้ามาอีกในอนาคต
-    // ไม่ต้องพึ่งความสะอาดของข้อมูล 100% ตลอดไป
+    // กันชื่อ PLO ขึ้นซ้ำคำ (เช่น "PLO1 PLO 1: ...")
     $stripPloCodePrefix = function (string $code, string $name): string {
         $code = trim($code);
         $name = trim($name);
@@ -175,7 +176,7 @@ try {
         return $plo;
     }, $plos);
  
-    // ส่งคืนข้อมูลครบทุกฟิลด์ที่หน้าบ้านอาจเรียกใช้งาน
+    // ส่งคืนข้อมูล
     echo json_encode([
         "status" => "success",
         "data" => [
@@ -193,3 +194,4 @@ try {
     http_response_code(500);
     echo json_encode(["status" => "error", "message" => $e->getMessage()], JSON_UNESCAPED_UNICODE);
 }
+?>
