@@ -48,7 +48,7 @@ try {
         $fullName = $studentId;
     }
 
-    // คำนวณปีการศึกษาและชั้นปีโดยตรงจากรหัสนักศึกษา (รหัส 66 -> ปี 4)
+    // คำนวณปีการศึกษาและชั้นปีโดยตรงจากรหัสนักศึกษา
     $now = new DateTime();
     $currentYearBE = (int)$now->format('Y') + 543;
     $cutOffDate = new DateTime($now->format('Y') . '-08-10 00:00:00');
@@ -89,13 +89,14 @@ try {
                 "year_level"    => $yearLevel,
                 "academic_year" => $academicYear,
                 "framework"     => null,
-                "items"         => []
+                "items"         => [],
+                "groups"        => []
             ]
         ], JSON_UNESCAPED_UNICODE);
         exit;
     }
 
-    // ดึงเกณฑ์ประเมินสมรรถนะตามชั้นปีจริง (ปี 4)
+    // ดึงเกณฑ์ประเมินสมรรถนะตามชั้นปีจริง
     $itemStmt = $db->prepare("
         SELECT 
             ci.id, 
@@ -122,7 +123,31 @@ try {
         ':fid' => $framework['id'],
         ':yl'  => $yearLevel,
     ]);
-    $items = $itemStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    $rawItems = $itemStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+    //  นำลอจิกจากฝั่งอาจารย์มาใส่: ยุบแถวซ้ำขั้นเด็ดขาดและรักษาสถานะคะแนน
+    $processedItems = [];
+    $seenItems = []; // เก็บ index ว่าข้อนี้ถูก push ไปที่ตำแหน่งไหนใน $processedItems
+
+    foreach ($rawItems as $item) {
+        $uniqueKey = $item['plo_id'] . '_' . $item['sequence_no'];
+
+        // ระบบตัดคำนำหน้าชื่อ PLO ที่ซ้ำซ้อน
+        $cleanName = trim($item['plo_name']);
+        $stripped = preg_replace('/^[A-Za-z]+\s*\d+\s*[:\-]?\s*/', '', $cleanName);
+        $item['plo_name'] = trim($stripped) !== '' ? trim($stripped) : $cleanName;
+
+        if (!isset($seenItems[$uniqueKey])) {
+            $processedItems[] = $item;
+            $seenItems[$uniqueKey] = count($processedItems) - 1; 
+        } else {
+            // ถ้าเจอซ้ำ ให้เช็กว่าตัวใหม่มีคะแนนไหม ถ้ามีให้เอามาทับ
+            $idx = $seenItems[$uniqueKey];
+            if (empty($processedItems[$idx]['score']) && !empty($item['score'])) {
+                $processedItems[$idx] = $item;
+            }
+        }
+    }
 
     echo json_encode([
         "status" => "success",
@@ -132,7 +157,7 @@ try {
             "year_level"    => $yearLevel,
             "academic_year" => $academicYear,
             "framework"     => $framework,
-            "items"         => $items
+            "items"         => $processedItems 
         ]
     ], JSON_UNESCAPED_UNICODE);
 
@@ -140,3 +165,4 @@ try {
     http_response_code(500);
     echo json_encode(["status" => "error", "message" => $e->getMessage()], JSON_UNESCAPED_UNICODE);
 }
+?>

@@ -141,27 +141,35 @@ try {
     ]);
     $items = $itemStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
  
-    // จัดกลุ่มรายการประเมินตาม PLO (พร้อมกรองแถวซ้ำ)
+    // 🌟 FIX: จัดกลุ่มรายการประเมินตาม PLO พร้อมระบบ "ยุบแถวซ้ำขั้นเด็ดขาด" และ "รักษาสถานะคะแนน"
     $itemsByPlo = [];
-    $seenItems = []; 
+    $seenItems = []; // ใช้เก็บลำดับ (Index) ของข้อที่เคยดึงมาแล้ว
     
     foreach ($items as $item) {
-        $uniqueKey = $item['plo_id'] . '_' . $item['sequence_no'] . '_' . md5($item['competency_name']);
+        // ใช้แค่ PLO_ID + ลำดับข้อ (ห้ามมีข้อซ้ำกันใน PLO เดียวกัน)
+        $uniqueKey = $item['plo_id'] . '_' . $item['sequence_no'];
+        
         if (!isset($seenItems[$uniqueKey])) {
+            // ยังไม่เคยเจอข้อนี้ ให้บันทึกลงไป
             $itemsByPlo[$item['plo_id']][] = $item;
-            $seenItems[$uniqueKey] = true;
+            $seenItems[$uniqueKey] = count($itemsByPlo[$item['plo_id']]) - 1; // จำว่าอยู่ตำแหน่งไหน
+        } else {
+            // ถ้าเคยเจอ "ข้อซ้ำ" แล้ว ให้เช็กว่าตัวใหม่มี "คะแนน" ไหม?
+            $idx = $seenItems[$uniqueKey];
+            $existingItem = $itemsByPlo[$item['plo_id']][$idx];
+            
+            // ถ้าตัวเก่า (ที่โชว์อยู่) ไม่มีคะแนน แต่ตัวที่ซ้ำดันมีคะแนน 
+            // ให้เอาตัวที่มีคะแนนไปทับที่เดิมทันที (ป้องกันคะแนนหาย)
+            if (empty($existingItem['score']) && !empty($item['score'])) {
+                $itemsByPlo[$item['plo_id']][$idx] = $item;
+            }
         }
     }
  
-    // 🌟 FIX: ระบบตัดคำนำหน้าชื่อ PLO/YLO ที่ซ้ำซ้อน (เวอร์ชันฉลาดขึ้น)
+    // ระบบตัดคำนำหน้าชื่อ PLO/YLO ที่ซ้ำซ้อน
     $stripPloCodePrefix = function (string $code, string $name): string {
         $name = trim($name);
-        
-        // Regex นั้ดักจับตัวอักษรภาษาอังกฤษนำหน้า (เช่น PLO, YLO) 
-        // ตามด้วยเว้นวรรค (มี/ไม่มีก็ได้) ตามด้วยตัวเลข และปิดด้วย : หรือ - (มี/ไม่มีก็ได้)
-        // ตัวอย่างที่ดักได้ลบเกลี้ยง: "PLO 1:", "PLO1 :", "YLO 2 -", "PLO3"
         $stripped = preg_replace('/^[A-Za-z]+\s*\d+\s*[:\-]?\s*/', '', $name);
-        
         return trim($stripped) !== '' ? trim($stripped) : $name;
     };
  
