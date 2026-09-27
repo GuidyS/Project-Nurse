@@ -4,11 +4,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Check, Shield, Search, UserCog } from "lucide-react";
+import { Check, Search, UserCog } from "lucide-react";
 import { cn } from "@/lib/utils";
 import api from "@/lib/axios";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -26,7 +26,6 @@ type RoleTab = "teacher" | "student" | "admin" | "unassigned";
 const roles = [
   { value: "admin", label: "ผู้ดูแลระบบ", description: "สิทธิ์เต็มในการจัดการระบบ" },
   { value: "teacher", label: "อาจารย์", description: "สิทธิ์ในการจัดการข้อมูลการเรียนการสอน" },
-  { value: "student", label: "นักศึกษา", description: "สิทธิ์ในการดูข้อมูลตนเอง" },
 ];
 
 const teacherSubRoles = [
@@ -41,14 +40,12 @@ const teacherSubRoles = [
 
 const roleLabels: Record<string, string> = {
   admin: "ผู้ดูแลระบบ",
-  student: "นักศึกษา",
   teacher: "อาจารย์",
   unassigned: "รอจัดบทบาท",
 };
 
 const roleTabs: { value: RoleTab; label: string }[] = [
   { value: "teacher", label: "อาจารย์" },
-  { value: "student", label: "นักศึกษา" },
   { value: "admin", label: "ผู้ดูแลระบบ" },
   { value: "unassigned", label: "รอจัดบทบาท" },
 ];

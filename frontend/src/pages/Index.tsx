@@ -47,7 +47,6 @@ import DeanDashboard from "@/components/pages/Teacher/DeanDashboard";
 import Retention from "@/components/pages/Teacher/Retention";
 import PracticalPage from '@/components/pages/Teacher/PracticalPage';
 import FacultyDimensionPage from '@/components/pages/Teacher/FacultyDimensionPage';
-import ProjectAssessments from "@/components/pages/Teacher/ProjectAssessments";
 import StudentVaccinationPage from "@/components/pages/Student/StudentVaccinationPage";
 import AdvisorVaccinationView from "@/components/pages/Teacher/AdvisorVaccinationView";
 import StudentHealthRecordsPage from "@/components/pages/Student/StudentHealthRecordsPage";
@@ -56,43 +55,47 @@ import AdvisorCompetencyView from "@/components/pages/Teacher/AdvisorCompetencyV
 import CompetencyItemsManagement from "@/components/pages/Admin/CompetencyItemsManagement";
 import StudentCompetencyView from "@/components/pages/Student/StudentCompetencyView"; 
 import CurriculumCycles from "@/components/pages/Admin/CurriculumCycles";
+import { getPageFromUrl, navigateToPage } from "@/lib/projectNavigation";
 
 type LoginUserPayload = Record<string, unknown> & {
   role_id?: unknown;
   position_id?: unknown;
 };
 
-const Index = () => {
-  const [activeItem, setActiveItem] = useState(() => {
-    const urlPage = new URLSearchParams(window.location.search).get("page");
-    if (urlPage) return urlPage;
+const getDefaultActiveItem = () => {
+  const urlPage = getPageFromUrl();
+  if (urlPage) return urlPage;
 
-    const savedUser = localStorage.getItem('user');
-    if (savedUser) {
-      const userObj = JSON.parse(savedUser);
-      const roleId = Number(userObj.role_id);
-      const positionId = Number(userObj.position_id);
+  const savedUser = localStorage.getItem('user');
+  if (savedUser) {
+    const userObj = JSON.parse(savedUser);
+    const roleId = Number(userObj.role_id);
+    const positionId = Number(userObj.position_id);
 
-      switch (roleId) {
-        case 1:
-          return "users-management";
-        case 2:
-          if (positionId === 1) return "dean-dashboard";
-          if (positionId === 2) return "my-courses";
-          if (positionId === 3) return "advises";
-          if (positionId === 4) return "practical-students";
-          if (positionId === 5) return "clos";
-          if (positionId === 6) return "my-projects";
-          if (positionId === 9) return "research-summary";
-          return "profile";
-        case 3:
-          return "transcript";
-      }
-      return "profile";
+    switch (roleId) {
+      case 1:
+        return "users-management";
+      case 2:
+        if (positionId === 1) return "dean-dashboard";
+        if (positionId === 2) return "my-courses";
+        if (positionId === 3) return "advises";
+        if (positionId === 4) return "practical-students";
+        if (positionId === 5) return "clos";
+        if (positionId === 6) return "my-projects";
+        if (positionId === 9) return "research-summary";
+        return "profile";
+      case 3:
+        return "transcript";
     }
+    return "profile";
+  }
 
-    return "login";
-  });
+  return "login";
+};
+
+const Index = () => {
+  const [activeItem, setActiveItem] = useState(getDefaultActiveItem);
+  const handleItemClick = (item: string) => navigateToPage(item);
 
   useEffect(() => {
     const onNavigate = (event: Event) => {
@@ -101,8 +104,16 @@ const Index = () => {
         setActiveItem(detail.page);
       }
     };
+    const onPopState = () => {
+      setActiveItem(getDefaultActiveItem());
+    };
+
     window.addEventListener("app:navigate", onNavigate);
-    return () => window.removeEventListener("app:navigate", onNavigate);
+    window.addEventListener("popstate", onPopState);
+    return () => {
+      window.removeEventListener("app:navigate", onNavigate);
+      window.removeEventListener("popstate", onPopState);
+    };
   }, []);
 
   // คอมโพเนนต์หน้าจอเมื่อไม่มีสิทธิ์เข้าถึง (Unauthorized)
@@ -132,7 +143,7 @@ const Index = () => {
       import.meta.env.DEV &&
       !userObj &&
       activeItem === "research-summary" &&
-      new URLSearchParams(window.location.search).get("page") === "research-summary";
+      getPageFromUrl() === "research-summary";
 
     // 2. หมวดทั่วไปที่ทุกคนเข้าถึงได้ (Public / All Roles)
     if (activeItem === "login") {
@@ -242,7 +253,7 @@ const Index = () => {
       "plo-ylo-report", "course-report", "course-students", "documents", "assign-instructors", "clo-map",
       "evidence", "grades", "my-courses", "performance", "practical-students",
       "program-reports", "schedule-tasks", "advise-notes", "advisor-notifications", "advises",
-      "students", "students-info", "transfer-requests", "my-research", "research-summary", "project-assessments",
+      "students", "students-info", "transfer-requests", "my-research", "research-summary",
       "advisor-vaccination-view", "advisor-health-records-view",
       "advisor-competency-view"
     ];
@@ -275,7 +286,6 @@ const Index = () => {
         case "students-info": return <StudentsInfo />;                              /* รายชื่อเด็กในที่ปรึกษาของอจ. */
         case "transfer-requests": return <TransferRequests />;                      //*
         case "research-summary": return <ResearchSummary />;
-        case "project-assessments": return <ProjectAssessments />;
         case "advisor-vaccination-view": return <AdvisorVaccinationView />;  
         case "advisor-health-records-view": return <AdvisorHealthRecordsView />;
         case "advisor-competency-view": return <AdvisorCompetencyView />;
@@ -311,7 +321,7 @@ const Index = () => {
 
   return (
     <MainLayout 
-      onItemClick={setActiveItem}
+      onItemClick={handleItemClick}
       activeItem={activeItem}
     >
       {renderPage()}

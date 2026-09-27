@@ -1,7 +1,7 @@
 <?php
 require_once __DIR__ . '/../../../config/config.php';
-require_once __DIR__ . '/../../Auth/password_helpers.php';
 require_once __DIR__ . '/../../../config/audit_helper.php';
+require_once __DIR__ . '/user-account-import-helper.php';
 
 header("Content-Type: application/json");
 
@@ -37,95 +37,21 @@ try {
         exit();
     }
 
-    /** @return string|null password DDMM + Gregorian year, or null if invalid */
-    $passwordFromBirthDate = static function (?string $birthDate): ?string {
-        if ($birthDate === null || trim($birthDate) === '') {
-            return null;
-        }
-        $ts = strtotime($birthDate);
-        if ($ts === false) {
-            return null;
-        }
-        $day = (int)date('d', $ts);
-        $month = (int)date('m', $ts);
-        $year = (int)date('Y', $ts);
-        return sprintf('%02d%02d%d', $day, $month, $year);
-    };
-
-    // Count skips: existing accounts + missing birth_date
-    $skippedExisting = (int)$db->query(
-        "SELECT (
-            (SELECT COUNT(*) FROM faculty f
-              WHERE EXISTS (SELECT 1 FROM users u WHERE u.username = CAST(f.faculty_id AS CHAR)))
-          + (SELECT COUNT(*) FROM student s
-              WHERE EXISTS (SELECT 1 FROM users u WHERE u.username = CAST(s.student_id AS CHAR)))
-        ) AS c"
-    )->fetchColumn();
-
-    $skippedNoBirth = (int)$db->query(
-        "SELECT (
-            (SELECT COUNT(*) FROM faculty f
-              WHERE f.birth_date IS NULL
-                AND NOT EXISTS (SELECT 1 FROM users u WHERE u.username = CAST(f.faculty_id AS CHAR)))
-          + (SELECT COUNT(*) FROM student s
-              WHERE s.birth_date IS NULL
-                AND NOT EXISTS (SELECT 1 FROM users u WHERE u.username = CAST(s.student_id AS CHAR)))
-        ) AS c"
-    )->fetchColumn();
-
     $candidatesStmt = $db->query(
         "SELECT CAST(f.faculty_id AS CHAR) AS username, f.birth_date AS birth_date, 'faculty' AS source
          FROM faculty f
-         WHERE f.birth_date IS NOT NULL
-           AND NOT EXISTS (SELECT 1 FROM users u WHERE u.username = CAST(f.faculty_id AS CHAR))
          UNION ALL
          SELECT CAST(s.student_id AS CHAR), s.birth_date, 'student'
-         FROM student s
-         WHERE s.birth_date IS NOT NULL
-           AND NOT EXISTS (SELECT 1 FROM users u WHERE u.username = CAST(s.student_id AS CHAR))"
+         FROM student s"
     );
     $candidates = $candidatesStmt->fetchAll(PDO::FETCH_ASSOC);
 
-    $insertStmt = $db->prepare(
-        "INSERT INTO users (username, password_hash, role_id) VALUES (?, ?, NULL)"
-    );
+    $summary = createUserAccountsFromRows($db, $candidates, [
+        'faculty' => null,
+        'student' => 3,
+    ]);
 
-    $imported = 0;
-    $facultyCount = 0;
-    $studentCount = 0;
-    $skippedInvalid = 0;
-
-    $db->beginTransaction();
-    try {
-        foreach ($candidates as $row) {
-            $username = trim((string)($row['username'] ?? ''));
-            $plain = $passwordFromBirthDate($row['birth_date'] ?? null);
-
-            if ($username === '' || $plain === null) {
-                $skippedInvalid++;
-                continue;
-            }
-
-            $hash = hashAuthPassword($plain);
-            $insertStmt->execute([$username, $hash]);
-            $imported++;
-
-            if (($row['source'] ?? '') === 'faculty') {
-                $facultyCount++;
-            } else {
-                $studentCount++;
-            }
-        }
-        $db->commit();
-    } catch (Exception $e) {
-        $db->rollBack();
-        throw $e;
-    }
-
-    $message = "สร้างบัญชีสำเร็จ {$imported} รายการ";
-    if ($facultyCount || $studentCount) {
-        $message .= " (อาจารย์ {$facultyCount}, นักศึกษา {$studentCount})";
-    }
+    $message = buildUserAccountCreationMessage($summary);
 
     //  บันทึกเป็น 'create' และส่ง Resource 'import_data'
     logAudit($db, $_SESSION['user_id'], 'create', 'import_data', $message);
@@ -133,12 +59,12 @@ try {
     echo json_encode([
         "status" => "success",
         "message" => $message,
-        "imported" => $imported,
-        "facultyCount" => $facultyCount,
-        "studentCount" => $studentCount,
-        "skippedExisting" => $skippedExisting,
-        "skippedNoBirth" => $skippedNoBirth,
-        "skippedInvalid" => $skippedInvalid,
+        "imported" => $summary['created'],
+        "facultyCount" => $summary['facultyCount'],
+        "studentCount" => $summary['studentCount'],
+        "skippedExisting" => $summary['skippedExisting'],
+        "skippedNoBirth" => $summary['skippedNoBirth'],
+        "skippedInvalid" => $summary['skippedInvalid'],
     ], JSON_UNESCAPED_UNICODE);
 } catch (Exception $e) {
     http_response_code(400);

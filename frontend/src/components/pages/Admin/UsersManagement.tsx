@@ -1,15 +1,15 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect} from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Search, Edit, Trash2, MoreHorizontal, UserPlus, Upload, Users as UsersIcon, KeyRound } from "lucide-react";
+import { Loader2, Search, Edit, Trash2, MoreHorizontal, Upload, Users as UsersIcon } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import api from "@/lib/axios";
 import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
@@ -75,10 +75,6 @@ export default function UsersManagement() {
   const [users, setUsers] = useState<User[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [roleTab, setRoleTab] = useState<RoleTab>("teacher");
-  const [isGenerateOpen, setIsGenerateOpen] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [isResetPasswordsOpen, setIsResetPasswordsOpen] = useState(false);
-  const [isResettingPasswords, setIsResettingPasswords] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   // 🎯 States สำหรับ Dialog แก้ไขข้อมูลเชิงลึก
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -125,81 +121,6 @@ export default function UsersManagement() {
   useEffect(() => {
     fetchUsers();
   }, []);
-
-  const handleGenerateAccounts = async () => {
-    try {
-      setIsGenerating(true);
-      const response = await api.post("/index.php?page=generate-user-accounts");
-      if (response.data?.status === "success") {
-        const imported = response.data.imported ?? 0;
-        const skippedExisting = response.data.skippedExisting ?? 0;
-        const skippedNoBirth = response.data.skippedNoBirth ?? 0;
-        toast({
-          title: "สร้างบัญชีสำเร็จ",
-          description:
-            `สร้าง ${imported} บัญชี` +
-            (response.data.facultyCount || response.data.studentCount
-              ? ` (อาจารย์ ${response.data.facultyCount ?? 0}, นักศึกษา ${response.data.studentCount ?? 0})`
-              : "") +
-            (skippedExisting ? `, มีบัญชีแล้ว ${skippedExisting}` : "") +
-            (skippedNoBirth ? `, ไม่มีวันเกิด ${skippedNoBirth}` : ""),
-        });
-        setIsGenerateOpen(false);
-        fetchUsers();
-      } else {
-        toast({
-          title: "สร้างบัญชีไม่สำเร็จ",
-          description: response.data?.message || "เกิดข้อผิดพลาด",
-          variant: "destructive",
-        });
-      }
-    } catch (error: any) {
-      toast({
-        title: "สร้างบัญชีไม่สำเร็จ",
-        description: error?.response?.data?.message || "เกิดข้อผิดพลาด",
-        variant: "destructive",
-      });
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const handleResetBirthdatePasswords = async () => {
-    try {
-      setIsResettingPasswords(true);
-      const response = await api.post("/index.php?page=reset-user-birthdate-passwords");
-      if (response.data?.status === "success") {
-        const updated = response.data.updated ?? 0;
-        const skippedNoBirth = response.data.skippedNoBirth ?? 0;
-        const skippedUnmatched = response.data.skippedUnmatched ?? 0;
-        toast({
-          title: "รีเซ็ตรหัสผ่านสำเร็จ",
-          description:
-            `อัปเดต ${updated} บัญชี` +
-            (response.data.facultyCount || response.data.studentCount
-              ? ` (อาจารย์ ${response.data.facultyCount ?? 0}, นักศึกษา ${response.data.studentCount ?? 0})`
-              : "") +
-            (skippedNoBirth ? `, ไม่มีวันเกิด ${skippedNoBirth}` : "") +
-            (skippedUnmatched ? `, ไม่พบข้อมูลวันเกิด ${skippedUnmatched}` : ""),
-        });
-        setIsResetPasswordsOpen(false);
-      } else {
-        toast({
-          title: "รีเซ็ตรหัสผ่านไม่สำเร็จ",
-          description: response.data?.message || "เกิดข้อผิดพลาด",
-          variant: "destructive",
-        });
-      }
-    } catch (error: any) {
-      toast({
-        title: "รีเซ็ตรหัสผ่านไม่สำเร็จ",
-        description: error?.response?.data?.message || "เกิดข้อผิดพลาด",
-        variant: "destructive",
-      });
-    } finally {
-      setIsResettingPasswords(false);
-    }
-  };
 
   // 🎯 ดึงข้อมูลเข้าฟอร์มแก้ไข
   const handleEditClick = async (userId: string) => {
@@ -464,14 +385,6 @@ export default function UsersManagement() {
               <Upload className="h-4 w-4" />
               Import ข้อมูล
             </Button>
-            <Button variant="outline" className="gap-2" onClick={() => setIsResetPasswordsOpen(true)} disabled={isResettingPasswords}>
-              {isResettingPasswords ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
-              รีเซ็ตรหัสผ่านเป็นวันเกิด ค.ศ.
-            </Button>
-            <Button className="gap-2" onClick={() => setIsGenerateOpen(true)} disabled={isGenerating}>
-              {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
-              สร้างบัญชีจากข้อมูลในระบบ
-            </Button>
           </div>
         </div>
 
@@ -650,28 +563,6 @@ export default function UsersManagement() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      <ConfirmActionDialog
-        open={isGenerateOpen}
-        onOpenChange={setIsGenerateOpen}
-        title="ยืนยันการสร้างบัญชี"
-        description="ระบบจะสร้างบัญชีจากข้อมูลอาจารย์และนักศึกษาที่มีวันเกิดในฐานข้อมูล โดยใช้รหัสประจำตัวเป็นชื่อผู้ใช้ และรหัสผ่านเริ่มต้นเป็นวันเกิดรูปแบบวันเดือนปี ค.ศ. (เช่น 25/12/1976 → 25121976) บัญชีที่สร้างจะอยู่ในสถานะรอจัดบทบาท และจะข้ามคนที่มีบัญชีอยู่แล้วหรือไม่มีวันเกิด"
-        confirmLabel="สร้างบัญชี"
-        variant="default"
-        onConfirm={handleGenerateAccounts}
-        isLoading={isGenerating}
-      />
-
-      <ConfirmActionDialog
-        open={isResetPasswordsOpen}
-        onOpenChange={setIsResetPasswordsOpen}
-        title="ยืนยันการรีเซ็ตรหัสผ่าน"
-        description="ระบบจะรีเซ็ตรหัสผ่านของบัญชีที่ผูกกับข้อมูลอาจารย์หรือนักศึกษาที่มีวันเกิด ให้เป็นวันเกิดรูปแบบวันเดือนปี ค.ศ. (เช่น 25/12/1976 → 25121976) และจะข้ามบัญชีที่ไม่มีวันเกิดหรือไม่พบข้อมูลอาจารย์/นักศึกษา"
-        confirmLabel="รีเซ็ตรหัสผ่าน"
-        variant="default"
-        onConfirm={handleResetBirthdatePasswords}
-        isLoading={isResettingPasswords}
-      />
 
       <ImportDataDialog
         open={isImportOpen}

@@ -57,7 +57,6 @@ interface Project {
   project_type?: ProjectType | null;
   type: string;
   status: string;
-  progress: number;
   budget: number;
   spent: number;
   members: number;
@@ -104,7 +103,6 @@ interface CreateProjectForm {
   end_date: string;
   budget_allocated: string;
   budget_spent: string;
-  progress_percent: string;
 }
 
 const createInitialForm = (): CreateProjectForm => ({
@@ -117,7 +115,6 @@ const createInitialForm = (): CreateProjectForm => ({
   end_date: '',
   budget_allocated: '',
   budget_spent: '',
-  progress_percent: '',
 });
 
 const getStatusBadge = (status: string) => {
@@ -255,7 +252,6 @@ export default function MyProjects() {
       end_date: project.end_date || '',
       budget_allocated: project.budget != null ? String(project.budget) : '',
       budget_spent: project.spent != null ? String(project.spent) : '',
-      progress_percent: project.progress != null ? String(project.progress) : '',
     });
     setEditingProjectId(project.id);
     setSelectedFacultyIds(project.member_faculty_ids || []);
@@ -351,7 +347,6 @@ export default function MyProjects() {
     const academicYear = createForm.academic_year === '' ? null : Number(createForm.academic_year);
     const budgetAllocated = createForm.budget_allocated === '' ? null : Number(createForm.budget_allocated);
     const budgetSpent = createForm.budget_spent === '' ? null : Number(createForm.budget_spent);
-    const progressPercent = createForm.progress_percent === '' ? null : Number(createForm.progress_percent);
 
     if (academicYear !== null && (!Number.isFinite(academicYear) || academicYear <= 0)) {
       return 'ปีการศึกษาต้องเป็นตัวเลขมากกว่า 0';
@@ -363,10 +358,6 @@ export default function MyProjects() {
 
     if (budgetSpent !== null && (!Number.isFinite(budgetSpent) || budgetSpent < 0)) {
       return 'งบที่ใช้จริงต้องไม่ติดลบ';
-    }
-
-    if (progressPercent !== null && (!Number.isFinite(progressPercent) || progressPercent < 0 || progressPercent > 100)) {
-      return 'ความคืบหน้าต้องอยู่ระหว่าง 0 ถึง 100';
     }
 
     if (createForm.start_date && createForm.end_date && createForm.end_date < createForm.start_date) {
@@ -401,7 +392,6 @@ export default function MyProjects() {
       end_date: createForm.end_date || null,
       budget_allocated: createForm.budget_allocated ? Number(createForm.budget_allocated) : null,
       budget_spent: createForm.budget_spent ? Number(createForm.budget_spent) : null,
-      progress_percent: createForm.progress_percent ? Number(createForm.progress_percent) : null,
       member_faculty_ids: selectedFacultyIds,
     };
 
@@ -600,16 +590,6 @@ export default function MyProjects() {
                       <DollarSign className="h-4 w-4 text-muted-foreground" />
                       <span className="text-sm">ใช้จ่าย: ฿{project.spent.toLocaleString()} / ฿{project.budget.toLocaleString()}</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">ความคืบหน้า: {project.progress}%</span>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span>ความคืบหน้า</span>
-                      <span>{project.progress}%</span>
-                    </div>
-                    <Progress value={project.progress} />
                   </div>
                   {project.member_faculties && project.member_faculties.length > 0 && (
                     <div className="space-y-2">
@@ -817,20 +797,6 @@ export default function MyProjects() {
                     value={createForm.budget_spent}
                     onChange={(event) => updateCreateForm('budget_spent', event.target.value)}
                     placeholder="0.00"
-                  />
-                </div>
-
-                <div className="grid gap-2">
-                  <Label htmlFor="project-progress">ความคืบหน้า (%)</Label>
-                  <Input
-                    id="project-progress"
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    value={createForm.progress_percent}
-                    onChange={(event) => updateCreateForm('progress_percent', event.target.value)}
-                    placeholder="0"
                   />
                 </div>
             </div>

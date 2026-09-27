@@ -16,12 +16,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -449,10 +443,6 @@ const StudentsInfo = () => {
             จัดการข้อมูลนักศึกษาที่อยู่ในความดูแลภาคปฏิบัติ (สัดส่วน 1:8)
           </p>
         </div>
-        <Button variant="outline" className="gap-2" onClick={handleExport}>
-          <Download className="h-4 w-4" />
-          ส่งออกรายชื่อ
-        </Button>
       </div>
 
       {/* Search & Filter */}

@@ -7,6 +7,7 @@ import { Users, Search, AlertTriangle, CheckCircle, MessageSquare, Loader2 } fro
 import { useState, useEffect } from 'react';
 import api from '@/lib/axios';
 import { useToast } from '@/hooks/use-toast';
+import { navigateToPage } from '@/lib/projectNavigation';
 
 const getStatusBadge = (status: string) => {
   switch (status) {
@@ -161,7 +162,7 @@ export default function Advises() {
                       <TableCell className="text-center">{getStatusBadge(student.status)}</TableCell>
                       <TableCell className="text-center text-muted-foreground">{student.lastContact}</TableCell>
                       <TableCell className="text-center">
-                        <Button size="sm" onClick={() => { window.location.href = "/?page=advise-notes"; }}>
+                        <Button size="sm" onClick={() => navigateToPage("advise-notes")}>
                           บันทึกคำปรึกษา
                         </Button>
                       </TableCell>

@@ -39,7 +39,8 @@ try {
             p.start_date,
             p.end_date,
             CASE
-                WHEN COALESCE(pp.members, 0) + COALESCE(pfm.members, 0) > 0 THEN COALESCE(pp.members, 0) + COALESCE(pfm.members, 0)
+                WHEN p.responsible_faculty_id IS NOT NULL THEN COALESCE(pfm.members, 0) + 1
+                WHEN COALESCE(pfm.members, 0) > 0 THEN COALESCE(pfm.members, 0)
                 ELSE COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(p.mapping_json, '$.member_count')) AS UNSIGNED), 0)
             END AS members,
             COALESCE(pb.budget, 0) AS budget,
@@ -52,11 +53,6 @@ try {
             COALESCE(pl.progress, 0) AS progress
         FROM project p
         LEFT JOIN faculty f ON f.faculty_id = p.responsible_faculty_id
-        LEFT JOIN (
-            SELECT project_id, COUNT(*) AS members
-            FROM project_participants
-            GROUP BY project_id
-        ) pp ON pp.project_id = p.project_id
         LEFT JOIN (
             SELECT project_id, COUNT(DISTINCT faculty_id) AS members
             FROM project_faculty_members
@@ -165,29 +161,6 @@ try {
                     "role" => "ผู้ดำเนินโครงการ",
                 ];
             }
-        }
-
-        $studentStmt = $db->prepare("
-            SELECT
-                pp.project_id,
-                s.student_id,
-                CONCAT_WS(' ', NULLIF(s.title, ''), NULLIF(s.first_name_th, ''), NULLIF(s.last_name_th, '')) AS name
-            FROM project_participants pp
-            INNER JOIN student s ON s.student_id = pp.student_id
-            WHERE pp.project_id IN (" . implode(',', $placeholders) . ")
-            ORDER BY pp.project_id ASC, s.student_id ASC
-        ");
-        $studentStmt->execute($docParams);
-
-        foreach ($studentStmt->fetchAll(PDO::FETCH_ASSOC) as $member) {
-            $id = (string) $member['project_id'];
-            $name = trim((string) ($member['name'] ?? ''));
-            $membersByProject[$id][] = [
-                "id" => (int) $member['student_id'],
-                "name" => $name !== '' ? $name : (string) $member['student_id'],
-                "type" => "student",
-                "role" => "สมาชิกโครงการ",
-            ];
         }
 
         $memberTableStmt = $db->prepare("

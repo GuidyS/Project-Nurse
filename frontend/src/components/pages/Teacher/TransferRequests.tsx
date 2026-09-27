@@ -7,10 +7,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
-import { UserCheck, UserPlus, Clock, CheckCircle, XCircle, AlertCircle, Plus } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
+import { UserCheck, UserPlus, Clock, CheckCircle, XCircle, AlertCircle, Plus, ArrowRight } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import api from '@/lib/axios';
 import { ConfirmActionDialog } from '@/components/ui/ConfirmActionDialog';
@@ -66,6 +67,8 @@ export default function TransferRequests() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [newRequest, setNewRequest] = useState<{ studentIds: string[], toAdvisorId: string, reason: string }>({ studentIds: [], toAdvisorId: '', reason: '' });
+  const [studentSearch, setStudentSearch] = useState('');
+  const [advisorSearch, setAdvisorSearch] = useState('');
   const [pendingApproveId, setPendingApproveId] = useState<string | null>(null);
   const [isApproveOpen, setIsApproveOpen] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
@@ -199,8 +202,43 @@ export default function TransferRequests() {
     (std) => !pendingStudentIds.has(std.id.toString())
   );
 
+  const filteredStudents = availableStudents.filter((std) => {
+    const search = studentSearch.trim().toLowerCase();
+    if (!search) return true;
+    return `${std.id} ${std.name}`.toLowerCase().includes(search);
+  });
+
+  const filteredAdvisors = dropdowns.advisors.filter((adv) => {
+    const search = advisorSearch.trim().toLowerCase();
+    if (!search) return true;
+    return `${adv.id} ${adv.name}`.toLowerCase().includes(search);
+  });
+
+  const areFilteredStudentsSelected = filteredStudents.length > 0 && filteredStudents.every((std) =>
+    newRequest.studentIds.includes(std.id.toString())
+  );
+
+  const handleSelectAllFilteredStudents = () => {
+    const filteredStudentIds = filteredStudents.map((std) => std.id.toString());
+    setNewRequest((prev) => {
+      if (areFilteredStudentsSelected) {
+        return {
+          ...prev,
+          studentIds: prev.studentIds.filter((id) => !filteredStudentIds.includes(id)),
+        };
+      }
+
+      return {
+        ...prev,
+        studentIds: Array.from(new Set([...prev.studentIds, ...filteredStudentIds])),
+      };
+    });
+  };
+
   const handleOpenCreateDialog = () => {
     setNewRequest({ studentIds: [], toAdvisorId: '', reason: '' });
+    setStudentSearch('');
+    setAdvisorSearch('');
     setIsCreateDialogOpen(true);
   };
 
@@ -490,7 +528,7 @@ export default function TransferRequests() {
 
         {/* Create Request Dialog */}
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogContent className="app-dialog-lg">
+          <DialogContent className="app-dialog-5xl">
             <DialogHeader>
               <DialogTitle>สร้างคำขอมอบนักศึกษา (ส่งออก)</DialogTitle>
               <DialogDescription>
@@ -498,54 +536,114 @@ export default function TransferRequests() {
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label>นักศึกษา (เลือกได้หลายคน)</Label>
-                <ScrollArea className="h-48 border rounded-md p-2">
-                  {availableStudents.length === 0 ? (
-                    <div className="text-center text-sm text-muted-foreground p-4">
-                      ไม่มีนักศึกษาในความดูแล หรือนักศึกษาทุกคนมีคำขอโอนย้ายที่รอดำเนินการอยู่แล้ว
+
+              <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+                <div className="grid gap-2">
+                  {/* Select Students */}
+                  <Label className="shrink-0">นักศึกษา (เลือกได้หลายคน)</Label>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <div className="flex flex-1 gap-2">
+                      <Input
+                        value={studentSearch}
+                        onChange={(e) => setStudentSearch(e.target.value)}
+                        placeholder="ค้นหารายชื่อนักศึกษา..."
+                        className="h-9"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-9 w-[100px] shrink-0"
+                        onClick={handleSelectAllFilteredStudents}
+                        disabled={filteredStudents.length === 0}
+                      >
+                        {areFilteredStudentsSelected ? 'ยกเลิก' : 'เลือกทั้งหมด'}
+                      </Button>
                     </div>
-                  ) : (
-                    availableStudents.map(std => (
-                      <div key={std.id} className="flex items-center space-x-2 py-2">
-                        <Checkbox 
-                          id={`std-${std.id}`}
-                          checked={newRequest.studentIds.includes(std.id.toString())}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              setNewRequest(prev => ({ ...prev, studentIds: [...prev.studentIds, std.id.toString()] }));
-                            } else {
-                              setNewRequest(prev => ({ ...prev, studentIds: prev.studentIds.filter(id => id !== std.id.toString()) }));
-                            }
-                          }}
-                        />
-                        <label
-                          htmlFor={`std-${std.id}`}
-                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                        >
-                          {std.name}
-                        </label>
+                  </div>
+                  <ScrollArea className="h-48 border rounded-md p-2">
+                    {availableStudents.length === 0 ? (
+                      <div className="text-center text-sm text-muted-foreground p-4">
+                        ไม่มีนักศึกษาในความดูแล หรือนักศึกษาทุกคนมีคำขอโอนย้ายที่รอดำเนินการอยู่แล้ว
                       </div>
-                    ))
-                  )}
-                </ScrollArea>
-              </div>
-              <div className="grid gap-2">
-                <Label>อาจารย์ปลายทาง</Label>
-                <Select 
-                  value={newRequest.toAdvisorId} 
-                  onValueChange={(val) => setNewRequest({ ...newRequest, toAdvisorId: val })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="เลือกอาจารย์..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {dropdowns.advisors.map(adv => (
-                      <SelectItem key={adv.id} value={adv.id.toString()}>{adv.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+                    ) : filteredStudents.length === 0 ? (
+                      <div className="text-center text-sm text-muted-foreground p-4">
+                        ไม่พบนักศึกษาที่ตรงกับคำค้นหา
+                      </div>
+                    ) : (
+                      filteredStudents.map(std => (
+                        <div key={std.id} className="flex items-center space-x-2 py-2">
+                          <Checkbox 
+                            id={`std-${std.id}`}
+                            checked={newRequest.studentIds.includes(std.id.toString())}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setNewRequest(prev => ({ ...prev, studentIds: [...prev.studentIds, std.id.toString()] }));
+                              } else {
+                                setNewRequest(prev => ({ ...prev, studentIds: prev.studentIds.filter(id => id !== std.id.toString()) }));
+                              }
+                            }}
+                          />
+                          <label
+                            htmlFor={`std-${std.id}`}
+                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                          >
+                            {std.name}
+                          </label>
+                        </div>
+                      ))
+                    )}
+                  </ScrollArea>
+                </div>
+
+                {/* Arrow */}
+                <div className="flex items-center justify-center py-1 md:py-0">
+                  <ArrowRight className="h-6 w-6 rotate-90 text-muted-foreground md:rotate-0" />
+                </div>
+                
+                {/* Select Teachers */}
+                <div className="grid gap-2">
+                  <Label className="shrink-0">อาจารย์ปลายทาง</Label>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <Input
+                      value={advisorSearch}
+                      onChange={(e) => setAdvisorSearch(e.target.value)}
+                      placeholder="ค้นหารายชื่ออาจารย์..."
+                      className="h-9"
+                    />
+                  </div>
+                  <ScrollArea className="h-48 border rounded-md p-2">
+                    {dropdowns.advisors.length === 0 ? (
+                      <div className="text-center text-sm text-muted-foreground p-4">
+                        ไม่มีรายชื่ออาจารย์ปลายทาง
+                      </div>
+                    ) : filteredAdvisors.length === 0 ? (
+                      <div className="text-center text-sm text-muted-foreground p-4">
+                        ไม่พบอาจารย์ที่ตรงกับคำค้นหา
+                      </div>
+                    ) : (
+                      filteredAdvisors.map((adv) => {
+                        const advisorId = adv.id.toString();
+                        const isSelected = newRequest.toAdvisorId === advisorId;
+                        return (
+                          <button
+                            key={adv.id}
+                            type="button"
+                            className={cn(
+                              "flex w-full items-center rounded-md px-3 py-2 text-left text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground",
+                              isSelected && "bg-primary/10 text-primary ring-1 ring-primary/25"
+                            )}
+                            onClick={() => setNewRequest((prev) => ({ ...prev, toAdvisorId: advisorId }))}
+                          >
+                            {adv.name}
+                          </button>
+                        );
+                      })
+                    )}
+                  </ScrollArea>
+                  </div>
+                </div>
+
               <div className="grid gap-2">
                 <Label>เหตุผลการขอย้าย</Label>
                 <Textarea
