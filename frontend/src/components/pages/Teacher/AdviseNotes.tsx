@@ -108,10 +108,10 @@ export default function AdviseNotes() {
   return (
     <>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="app-page-header">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight leading-snug ">บันทึกการให้คำปรึกษา</h1>
-            <p className="text-muted-foreground">บันทึกการให้คำปรึกษานักศึกษา</p>
+            <h1 className="app-page-title">บันทึกการให้คำปรึกษา</h1>
+            <p className="app-page-description">บันทึกการให้คำปรึกษานักศึกษา</p>
           </div>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>

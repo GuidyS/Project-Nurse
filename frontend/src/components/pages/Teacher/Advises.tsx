@@ -7,6 +7,7 @@ import { Users, Search, AlertTriangle, CheckCircle, MessageSquare, Loader2 } fro
 import { useState, useEffect } from 'react';
 import api from '@/lib/axios';
 import { useToast } from '@/hooks/use-toast';
+import { navigateToPage } from '@/lib/projectNavigation';
 
 const getStatusBadge = (status: string) => {
   switch (status) {
@@ -63,9 +64,11 @@ export default function Advises() {
   return (
     <>
       <div className="space-y-6 animate-fade-in">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight leading-snug">นักศึกษาในที่ปรึกษา</h1>
-          <p className="text-muted-foreground">จัดการนักศึกษาที่อยู่ในความดูแล (สัดส่วน 1:12)</p>
+        <div className="app-page-header">
+          <div className="min-w-0">
+          <h1 className="app-page-title">นักศึกษาในที่ปรึกษา</h1>
+          <p className="app-page-description">จัดการนักศึกษาที่อยู่ในความดูแล (สัดส่วน 1:12)</p>
+          </div>
         </div>
 
         {/* Stats Cards */}
@@ -161,7 +164,7 @@ export default function Advises() {
                       <TableCell className="text-center">{getStatusBadge(student.status)}</TableCell>
                       <TableCell className="text-center text-muted-foreground">{student.lastContact}</TableCell>
                       <TableCell className="text-center">
-                        <Button size="sm" onClick={() => { window.location.href = "/?page=advise-notes"; }}>
+                        <Button size="sm" onClick={() => navigateToPage("advise-notes")}>
                           บันทึกคำปรึกษา
                         </Button>
                       </TableCell>

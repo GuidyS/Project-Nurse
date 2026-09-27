@@ -40,11 +40,28 @@ $sql = "SELECT m.* FROM system_sidebar_menus m
             JOIN position_permission pp ON p.permission_id = pp.permission_id
             JOIN user_position up ON pp.position_id = up.position_id
             WHERE up.user_id = :user_id
+            UNION
+            SELECT p2.permission_name FROM permissions p2
+            JOIN position_permission pp2 ON p2.permission_id = pp2.permission_id
+            WHERE pp2.position_id = 8
+              AND EXISTS (
+                  SELECT 1 FROM users u
+                  WHERE u.user_id = :student_user_id
+                    AND u.role_id = 3
+              )
+              AND NOT EXISTS (
+                  SELECT 1 FROM user_position up2
+                  WHERE up2.user_id = :student_user_id_no_position
+              )
         ) OR m.permission_required IS NULL)
         ORDER BY m.menu_id ASC";
 
 $stmt = $db->prepare($sql);
-$stmt->execute([':user_id' => $user_id]);
+$stmt->execute([
+    ':user_id' => $user_id,
+    ':student_user_id' => $user_id,
+    ':student_user_id_no_position' => $user_id,
+]);
 $menu_items = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 $sections = [];
@@ -80,6 +97,10 @@ $userPositions = $posStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 $roleStmt = $db->prepare("SELECT role_id FROM users WHERE user_id = :user_id LIMIT 1");
 $roleStmt->execute([':user_id' => $user_id]);
 $roleId = (int)($roleStmt->fetchColumn() ?: 0);
+
+if (empty($userPositions) && $roleId === 3) {
+    $userPositions[] = ['position_id' => 8, 'is_primary' => 1];
+}
 
 $prioritySections = [];
 foreach ($userPositions as $row) {

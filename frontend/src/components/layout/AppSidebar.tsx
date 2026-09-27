@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { 
   Sidebar, 
   SidebarContent, 
@@ -98,6 +98,11 @@ const previewMenuSectionsByRole: Record<string, any[]> = {
 const getPreviewMenuSections = (user: any) => {
   const previewRole = typeof user?.__previewRole === "string" ? user.__previewRole : "";
   return previewMenuSectionsByRole[previewRole] || [];
+};
+
+const sidebarIconOverrides: Record<string, string> = {
+  "competency-items-management": "ListChecks",
+  "curriculum-cycles": "Library",
 };
 
 export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
@@ -203,6 +208,11 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
   };
 
   const userName = getDisplayName(sidebarUser);
+  const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8080").replace(/\/$/, "");
+  const profilePictureRaw = typeof sidebarUser.profile_picture_url === 'string' ? sidebarUser.profile_picture_url.trim() : '';
+  const profilePictureUrl = profilePictureRaw
+    ? (/^https?:\/\//i.test(profilePictureRaw) ? profilePictureRaw : `${apiBaseUrl}/${profilePictureRaw.replace(/^\//, "")}`)
+    : "";
 
   // ดึงตัวอักษรตัวแรกจากชื่อ (เช่น 'สมชาย' จะได้ 'ส') 
   // หากไม่มีชื่อจะใช้ 'U' เป็นค่าเริ่มต้น
@@ -254,7 +264,7 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
           {/* พื้นที่ Logo */}
           <div className="relative h-10 w-10 shrink-0">
             <div className="flex h-full w-full items-center justify-center rounded-full bg-[#8a2be2] overflow-hidden shadow-sm">
-              <img src="../../Nurse_logo.jpg" alt="Logo" className="object-cover w-full h-full" />
+              <img src="../../Nurse_logo.png" alt="Logo" className="object-cover w-full h-full" />
             </div>
 
             {/* ปุ่ม Trigger ตอน "หุบ" (จะแสดงทับ Logo เป๊ะๆ เมื่อ Hover) */}
@@ -304,7 +314,7 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
 
               <SidebarMenu>
                 {filteredItems.map((item: any) => {
-                  const Icon = getIcon(item.icon);
+                  const Icon = getIcon(sidebarIconOverrides[item.url] || item.icon);
                   const isActive = activeItem === item.url;
                   return (
                     <SidebarMenuItem key={item.url}>
@@ -397,6 +407,9 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
           <div className="relative h-10 w-10 shrink-0">
             {/* เรียกใช้ Class จาก index.css */}
             <Avatar className="sidebar-profile-avatar">
+              {profilePictureUrl ? (
+                <AvatarImage src={profilePictureUrl} alt={userName} className="object-cover" />
+              ) : null}
               <AvatarFallback className="sidebar-profile-fallback">
                 {userInitial}
               </AvatarFallback>

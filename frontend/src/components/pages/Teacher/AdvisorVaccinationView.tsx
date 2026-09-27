@@ -151,12 +151,14 @@ export default function AdvisorVaccinationView() {
   if (view === "list") {
     return (
       <div className="p-6 space-y-6 animate-fade-in max-w-7xl mx-auto">
-        <div>
+        <div className="app-page-header">
+          <div className="min-w-0">
           <div className="flex items-center gap-2">
             <Users className="h-6 w-6 text-primary" />
-            <h1 className="text-2xl font-bold text-foreground">นักศึกษาในความดูแล</h1>
+            <h1 className="app-page-title">นักศึกษาในความดูแล</h1>
           </div>
-          <p className="text-sm text-muted-foreground mt-1">ข้อมูลภาวะสุขภาพและวัคซีนของนักศึกษา (โหมดดูข้อมูล)</p>
+          <p className="app-page-description">ข้อมูลภาวะสุขภาพและวัคซีนของนักศึกษา (โหมดดูข้อมูล)</p>
+          </div>
         </div>
 
         <div className="relative max-w-sm">
@@ -222,19 +224,19 @@ export default function AdvisorVaccinationView() {
   // ==========================================
   return (
     <div className="space-y-6 max-w-7xl mx-auto p-6 animate-fade-in">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
+      <div className="app-page-header">
+        <div className="flex min-w-0 items-start gap-3">
           <Button variant="outline" size="icon" onClick={handleBack} className="shrink-0">
             <ChevronLeft className="h-5 w-5" />
           </Button>
           <div>
             <div className="flex items-center gap-2">
               <ShieldAlert className="h-6 w-6 text-primary" />
-              <h1 className="text-2xl font-bold tracking-tight">
+              <h1 className="app-page-title">
                 ส่วนที่ 3 ข้อมูลภาวะสุขภาพและการได้รับวัคซีนป้องกันโรค
               </h1>
             </div>
-            <p className="text-sm text-muted-foreground mt-1">
+            <p className="app-page-description">
               ข้อมูลของ {selectedStudent?.full_name} (รหัสนักศึกษา: {selectedStudent?.student_id}) — <b>โหมดดูอย่างเดียว</b>
             </p>
           </div>

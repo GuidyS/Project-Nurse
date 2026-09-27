@@ -4,6 +4,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/../../../config/academic_calendar.php';
 
 header('Content-Type: application/json; charset=UTF-8');
 
@@ -60,7 +61,8 @@ try {
          ORDER BY academic_year DESC'
     )->fetchAll(PDO::FETCH_COLUMN));
 
-    $defaultYear = $years[0] ?? ((int)date('Y') + 543);
+    $years = academicYearOptions($years);
+    $defaultYear = currentAcademicYear();
     $academicYear = isset($_GET['year']) ? (int)$_GET['year'] : $defaultYear;
     if ($academicYear < 2500 || $academicYear > 2700) {
         $academicYear = $defaultYear;

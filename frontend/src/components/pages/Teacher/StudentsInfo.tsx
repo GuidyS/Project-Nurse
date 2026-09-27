@@ -16,12 +16,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -442,17 +436,13 @@ const StudentsInfo = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="app-page-header">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">นักศึกษาภาคปฏิบัติ</h1>
-          <p className="text-muted-foreground mt-1">
+          <h1 className="app-page-title">นักศึกษาภาคปฏิบัติ</h1>
+          <p className="app-page-description">
             จัดการข้อมูลนักศึกษาที่อยู่ในความดูแลภาคปฏิบัติ (สัดส่วน 1:8)
           </p>
         </div>
-        <Button variant="outline" className="gap-2" onClick={handleExport}>
-          <Download className="h-4 w-4" />
-          ส่งออกรายชื่อ
-        </Button>
       </div>
 
       {/* Search & Filter */}

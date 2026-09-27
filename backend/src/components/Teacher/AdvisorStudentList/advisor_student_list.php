@@ -6,6 +6,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
  
 if (session_status() == PHP_SESSION_NONE) { session_start(); }
 require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/../../Admin/AssignStudents/assign_students_helpers.php';
  
 header("Content-Type: application/json; charset=UTF-8");
  
@@ -40,15 +41,18 @@ try {
         $stmt2->execute();
     } else {
         // อาจารย์ที่ปรึกษา: เห็นเฉพาะนักศึกษาในความดูแลของตัวเอง
+        $advisorType = assignStudentsResolveType('advisor');
+        [$typeSql, $typeParams] = assignStudentsTypeCondition($advisorType, 'sam');
         $stmt2 = $db->prepare("
-            SELECT s.student_id, CONCAT(s.first_name_th, ' ', s.last_name_th) AS full_name, s.status,
+            SELECT DISTINCT s.student_id, CONCAT(s.first_name_th, ' ', s.last_name_th) AS full_name, s.status,
                    s.year_level, s.admission_year
             FROM student_advisor_mapping sam
             JOIN student s ON s.student_id = sam.student_id
             WHERE sam.faculty_id = :fid
+              AND $typeSql
             ORDER BY s.student_id
         ");
-        $stmt2->execute([':fid' => $user['username']]);
+        $stmt2->execute($typeParams + [':fid' => $user['username']]);
     }
  
     $students = $stmt2->fetchAll(PDO::FETCH_ASSOC) ?: [];

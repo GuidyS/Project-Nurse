@@ -55,13 +55,15 @@ try {
     foreach ($yearlyStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
         preg_match('/(\d+)/', (string) $row['ylo_code'], $matches);
         $year = $matches[1] ?? $row['ylo_code'];
-        $yearKey = 'เธเธต ' . $year;
-        if (!isset($yearlyMap[$yearKey])) {
-            $yearlyMap[$yearKey] = ['year' => $yearKey];
+        $yearLevel = is_numeric($year) ? (int) $year : (string) $year;
+        $yearKey = 'ปี ' . $year;
+        $mapKey = (string) $year;
+        if (!isset($yearlyMap[$mapKey])) {
+            $yearlyMap[$mapKey] = ['year' => $yearKey, 'yearLevel' => $yearLevel];
         }
 
         $ploKey = strtolower((string) $row['plo_code']);
-        $yearlyMap[$yearKey][$ploKey] = round((float) $row['achieved_score'], 2);
+        $yearlyMap[$mapKey][$ploKey] = round((float) $row['achieved_score'], 2);
     }
 
     project_json([

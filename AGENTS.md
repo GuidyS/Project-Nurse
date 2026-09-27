@@ -4,7 +4,7 @@
 - ระบบนี้เป็น MIS ของคณะพยาบาล สำหรับจัดการข้อมูลภายในคณะและข้อมูลผู้ใช้งานหลายบทบาท
 - ข้อมูลส่วนใหญ่เป็นข้อมูลอ่อนไหว เช่น ข้อมูลนักศึกษา อาจารย์ การให้คำปรึกษา เอกสาร portfolio รายงานผู้บริหาร audit log และ import/export
 - เอกสาร requirement หลัก: `Functional-Requirement NSP02.md`
-- schema/ฐานข้อมูลหลัก: `MYSQL_DATABASE (19-8-2569).sql`
+- schema/ฐานข้อมูลหลัก: `MYSQL_DATABASE.sql`
 - คู่มือติดตั้งเดิม: `README.md`
 - กฎไฟล์อัปโหลด: `backend/src/uploads/README.md`
 - ขอบเขตล่าสุด: ระบบนี้ตัดเรื่องการให้เกรด/ให้คะแนนออกแล้ว ห้ามเพิ่ม flow เกรดหรือคะแนนใหม่
@@ -16,7 +16,7 @@
 | ไลบรารี Frontend | Axios, React Query, React Router, lucide-react, zod, xlsx, jsPDF |
 | Backend | PHP 8.2 + Apache, PDO MySQL, PHP Session |
 | ไลบรารี Backend | PhpSpreadsheet ผ่าน Composer |
-| Database | MySQL อ้างอิง schema จาก `MYSQL_DATABASE (3-8-2569).sql` |
+| Database | MySQL อ้างอิง schema จาก `MYSQL_DATABASE.sql` |
 | Infra | Docker Compose, phpMyAdmin, timezone `Asia/Bangkok` |
 
 ## 3. รูปแบบสถาปัตยกรรม
@@ -63,7 +63,7 @@
 | import/export | ใช้ข้อมูลทดสอบเท่านั้น ห้ามใช้ dump จริงถ้าไม่ได้รับอนุญาต |
 
 - ยังไม่พบ automated test suite โดยตรง ถ้าใช้ manual test ต้องรายงานให้ชัด
-- งานที่แตะ DB ต้องเทียบ schema กับ `MYSQL_DATABASE (3-8-2569).sql`
+- งานที่แตะ DB ต้องเทียบ schema กับ `MYSQL_DATABASE.sql`
 - งานที่แตะสิทธิ์ ต้องทดสอบอย่างน้อยบทบาท Admin/SuperAdmin, Teacher และ Student เมื่อทำได้
 - ห้ามเพิ่มหรือทดสอบ flow เกรด/คะแนน เว้นแต่ผู้ใช้สั่งเปลี่ยนขอบเขตกลับอย่างชัดเจน
 

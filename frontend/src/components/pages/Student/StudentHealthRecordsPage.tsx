@@ -202,13 +202,13 @@ export default function StudentHealthRecordsPage() {
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto p-6 animate-fade-in">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="app-page-header">
         <div>
           <div className="flex items-center gap-2">
             <Activity className="h-6 w-6 text-primary" />
-            <h1 className="text-2xl font-bold tracking-tight">2. ภาวะสุขภาพ</h1>
+            <h1 className="app-page-title">2. ภาวะสุขภาพ</h1>
           </div>
-          <p className="text-sm text-muted-foreground mt-1">
+          <p className="app-page-description">
             ข้อมูลภาวะสุขภาพโดยรวม ส่วนสูง น้ำหนัก และดัชนีมวลกาย (BMI) ของนักศึกษาในแต่ละชั้นปี
           </p>
         </div>

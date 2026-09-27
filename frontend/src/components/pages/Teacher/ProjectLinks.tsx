@@ -134,6 +134,12 @@ export default function ProjectLinks() {
 
   return (
     <>
+      <div className="app-page-header mb-6">
+        <div>
+          <h1 className="app-page-title">เชื่อมโยงผลลัพธ์โครงการ</h1>
+          <p className="app-page-description">จัดการความเชื่อมโยงโครงการกับ PLO, YLO และ CLO</p>
+        </div>
+      </div>
       <div className="grid gap-6 md:grid-cols-3">
         {/* เมนูเลือกโครงการฝั่งซ้าย */}
         <div className="md:col-span-1 space-y-4">

@@ -62,7 +62,27 @@ try {
     $stmt->execute($params);
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
-    $requests = array_map(function ($row) {
+    $studentNameLookup = function (string $studentId) use ($db): string {
+        $stmt = $db->prepare("
+            SELECT TRIM(CONCAT(COALESCE(title, ''), COALESCE(first_name_th, ''), ' ', COALESCE(last_name_th, ''))) AS name
+            FROM student WHERE CAST(student_id AS CHAR) = :student_id LIMIT 1
+        ");
+        $stmt->execute([':student_id' => $studentId]);
+        $name = trim((string)$stmt->fetchColumn());
+        return $name !== '' ? $name : $studentId;
+    };
+
+    $advisorNameLookup = function (string $advisorId) use ($db): string {
+        $stmt = $db->prepare("
+            SELECT TRIM(CONCAT(COALESCE(title, ''), COALESCE(first_name_th, ''), ' ', COALESCE(last_name_th, ''))) AS name
+            FROM faculty WHERE CAST(faculty_id AS CHAR) = :advisor_id LIMIT 1
+        ");
+        $stmt->execute([':advisor_id' => $advisorId]);
+        $name = trim((string)$stmt->fetchColumn());
+        return $name !== '' ? $name : $advisorId;
+    };
+
+    $requests = array_map(function ($row) use ($studentNameLookup, $advisorNameLookup) {
         $requesterName = trim((string)($row['requester_full_name'] ?? ''));
         if ($requesterName === '') {
             $requesterName = $row['requester_username'] ?: 'Unknown requester';
@@ -72,6 +92,30 @@ try {
         $before = approvalDecodePayload($row['before_json'] ?? null);
         $after = approvalDecodePayload($row['after_json'] ?? null);
         $documentUrl = $payload['document_url'] ?? $payload['google_drive_url'] ?? $payload['file_path'] ?? null;
+
+        if ($row['request_type'] === 'student_transfer') {
+            $sIds = !empty($payload['student_ids']) && is_array($payload['student_ids'])
+                ? array_values(array_filter(array_map('strval', $payload['student_ids'])))
+                : [];
+            if (empty($sIds)) {
+                $single = (string)($payload['student_id'] ?? $row['target_ref_id'] ?? '');
+                if ($single !== '') {
+                    $sIds = array_values(array_filter(array_map('trim', explode(',', $single))));
+                }
+            }
+
+            $toAdvId = (string)($payload['to_advisor_id'] ?? '');
+            if ($toAdvId !== '') {
+                $payload['to_advisor_name'] = $advisorNameLookup($toAdvId);
+            }
+
+            $infoList = [];
+            foreach ($sIds as $sid) {
+                $infoList[] = $studentNameLookup($sid) . " ({$sid})";
+            }
+            $payload['student_info_list'] = $infoList;
+            $payload['student_count'] = count($sIds);
+        }
 
         return [
             'id' => (string)$row['approval_request_id'],

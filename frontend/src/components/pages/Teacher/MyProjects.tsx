@@ -1,8 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
-import { Download, Edit, Eye, FileText, FolderKanban, Users, Calendar, DollarSign, Loader2, Plus } from 'lucide-react';
+import { Download, Edit, Eye, FileText, FolderKanban, Users, User, Calendar, Loader2, Plus } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -22,8 +21,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FileDropInput } from '@/components/ui/FileDropInput';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
 
@@ -44,17 +44,20 @@ interface ProjectFacultyMember {
   role: string;
 }
 
+type ProjectType = 'academic_service' | 'culture' | 'other';
+type ProjectTypeFilter = 'all' | ProjectType;
+
 interface Project {
   id: string;
   name: string;
   project_name_th?: string;
   project_name_en?: string;
   description?: string;
+  project_type?: ProjectType | null;
   type: string;
   status: string;
-  progress: number;
-  budget: number;
-  spent: number;
+  budget: number | null;
+  spent: number | null;
   members: number;
   deadline: string;
   academic_year?: number | null;
@@ -74,6 +77,24 @@ interface FacultyOption {
 
 type ProjectStatus = 'pending' | 'active' | 'completed' | 'cancelled';
 
+const projectTypeLabels: Record<ProjectType, string> = {
+  academic_service: 'บริการวิชาการ',
+  culture: 'ทำนุบำรุงศิลปวัฒนธรรม',
+  other: 'อื่น ๆ / ยังไม่จำแนก',
+};
+
+const projectTypeTabs: { value: ProjectTypeFilter; label: string }[] = [
+  { value: 'all', label: 'ทั้งหมด' },
+  { value: 'academic_service', label: projectTypeLabels.academic_service },
+  { value: 'culture', label: projectTypeLabels.culture },
+  { value: 'other', label: projectTypeLabels.other },
+];
+
+const normalizeProjectType = (value?: ProjectType | null): ProjectType => value || 'other';
+
+const formatProjectBudget = (amount: number | null) =>
+  amount == null ? 'ยังไม่ระบุ' : `${amount.toLocaleString('th-TH', { maximumFractionDigits: 2 })} บาท`;
+
 interface CreateProjectForm {
   project_name_th: string;
   project_name_en: string;
@@ -84,7 +105,6 @@ interface CreateProjectForm {
   end_date: string;
   budget_allocated: string;
   budget_spent: string;
-  progress_percent: string;
 }
 
 const createInitialForm = (): CreateProjectForm => ({
@@ -97,7 +117,6 @@ const createInitialForm = (): CreateProjectForm => ({
   end_date: '',
   budget_allocated: '',
   budget_spent: '',
-  progress_percent: '',
 });
 
 const getStatusBadge = (status: string) => {
@@ -151,6 +170,7 @@ const getDocumentDisplayName = (document: ProjectDocument) => document.file_name
 
 export default function MyProjects() {
   const [projects, setProjects] = useState<Project[]>([]);
+  const [projectTypeFilter, setProjectTypeFilter] = useState<ProjectTypeFilter>('all');
   const [isLoading, setIsLoading] = useState(true);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -234,7 +254,6 @@ export default function MyProjects() {
       end_date: project.end_date || '',
       budget_allocated: project.budget != null ? String(project.budget) : '',
       budget_spent: project.spent != null ? String(project.spent) : '',
-      progress_percent: project.progress != null ? String(project.progress) : '',
     });
     setEditingProjectId(project.id);
     setSelectedFacultyIds(project.member_faculty_ids || []);
@@ -330,7 +349,6 @@ export default function MyProjects() {
     const academicYear = createForm.academic_year === '' ? null : Number(createForm.academic_year);
     const budgetAllocated = createForm.budget_allocated === '' ? null : Number(createForm.budget_allocated);
     const budgetSpent = createForm.budget_spent === '' ? null : Number(createForm.budget_spent);
-    const progressPercent = createForm.progress_percent === '' ? null : Number(createForm.progress_percent);
 
     if (academicYear !== null && (!Number.isFinite(academicYear) || academicYear <= 0)) {
       return 'ปีการศึกษาต้องเป็นตัวเลขมากกว่า 0';
@@ -342,10 +360,6 @@ export default function MyProjects() {
 
     if (budgetSpent !== null && (!Number.isFinite(budgetSpent) || budgetSpent < 0)) {
       return 'งบที่ใช้จริงต้องไม่ติดลบ';
-    }
-
-    if (progressPercent !== null && (!Number.isFinite(progressPercent) || progressPercent < 0 || progressPercent > 100)) {
-      return 'ความคืบหน้าต้องอยู่ระหว่าง 0 ถึง 100';
     }
 
     if (createForm.start_date && createForm.end_date && createForm.end_date < createForm.start_date) {
@@ -380,7 +394,6 @@ export default function MyProjects() {
       end_date: createForm.end_date || null,
       budget_allocated: createForm.budget_allocated ? Number(createForm.budget_allocated) : null,
       budget_spent: createForm.budget_spent ? Number(createForm.budget_spent) : null,
-      progress_percent: createForm.progress_percent ? Number(createForm.progress_percent) : null,
       member_faculty_ids: selectedFacultyIds,
     };
 
@@ -439,6 +452,12 @@ export default function MyProjects() {
     }
   };
 
+  const filteredProjects = useMemo(() => {
+    return projects.filter(
+      (project) => projectTypeFilter === 'all' || normalizeProjectType(project.project_type) === projectTypeFilter
+    );
+  }, [projectTypeFilter, projects]);
+
   if (isLoading) {
     return (
       <div className="flex h-96 items-center justify-center">
@@ -447,14 +466,14 @@ export default function MyProjects() {
     );
   }
 
-  const activeProjectsCount = projects.filter(
+  const activeProjectsCount = filteredProjects.filter(
     p => p.status === 'active' || p.status === 'กำลังดำเนินการ'
   ).length;
 
-  const pendingProjectsCount = projects.filter(
+  const pendingProjectsCount = filteredProjects.filter(
     p => p.status === 'pending' || p.status === 'รอดำเนินการ'
   ).length;
-  const completedProjectsCount = projects.filter(
+  const completedProjectsCount = filteredProjects.filter(
     p => p.status === 'completed' || p.status === 'เสร็จสิ้น'
   ).length;
   const editingProject = editingProjectId
@@ -471,14 +490,24 @@ export default function MyProjects() {
 
   return (
     <>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
+      <div className="app-page">
+        <div className="app-page-header">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight leading-snug">โครงการของฉัน</h1>
-            <p className="text-muted-foreground">โครงการที่คุณเป็นผู้รับผิดชอบหรือเป็นสมาชิก</p>
+            <h1 className="app-page-title">โครงการของฉัน</h1>
+            <p className="app-page-description">โครงการที่คุณเป็นผู้รับผิดชอบหรือเป็นสมาชิก</p>
           </div>
           <Badge variant="outline">อ่านอย่างเดียว</Badge>
         </div>
+
+        <Tabs value={projectTypeFilter} onValueChange={(value) => setProjectTypeFilter(value as ProjectTypeFilter)}>
+          <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
+            {projectTypeTabs.map((tab) => (
+              <TabsTrigger key={tab.value} value={tab.value}>
+                {tab.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
 
         {/* Stats */}
         <div className="grid gap-4 md:grid-cols-4">
@@ -488,7 +517,7 @@ export default function MyProjects() {
               <FolderKanban className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{projects.length}</div>
+              <div className="text-2xl font-bold">{filteredProjects.length}</div>
             </CardContent>
           </Card>
           <Card>
@@ -527,7 +556,7 @@ export default function MyProjects() {
         </div>
 
         {/* Project Cards */}
-        {projects.length === 0 ? (
+        {filteredProjects.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center h-48">
               <FolderKanban className="h-12 w-12 text-muted-foreground mb-2" />
@@ -536,7 +565,7 @@ export default function MyProjects() {
           </Card>
         ) : (
           <div className="grid gap-4">
-            {projects.map((project) => (
+            {filteredProjects.map((project) => (
               <Card key={project.id}>
                 <CardHeader>
                   <div className="flex items-center justify-between">
@@ -550,7 +579,7 @@ export default function MyProjects() {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid gap-4 md:grid-cols-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
                     <div className="flex items-center gap-2">
                       <Users className="h-4 w-4 text-muted-foreground" />
                       <span className="text-sm">{project.members} คน</span>
@@ -559,21 +588,17 @@ export default function MyProjects() {
                       <Calendar className="h-4 w-4 text-muted-foreground" />
                       <span className="text-sm">กำหนดส่ง: {project.deadline}</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <DollarSign className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm">ใช้จ่าย: ฿{project.spent.toLocaleString()} / ฿{project.budget.toLocaleString()}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">ความคืบหน้า: {project.progress}%</span>
-                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span>ความคืบหน้า</span>
-                      <span>{project.progress}%</span>
+                  <dl className="grid gap-4 rounded-lg bg-muted/40 p-4 sm:grid-cols-2">
+                    <div className="min-w-0 space-y-1">
+                      <dt className="text-sm text-muted-foreground">งบเสนอ</dt>
+                      <dd className="break-words text-base font-semibold tabular-nums">{formatProjectBudget(project.budget)}</dd>
                     </div>
-                    <Progress value={project.progress} />
-                  </div>
+                    <div className="min-w-0 space-y-1">
+                      <dt className="text-sm text-muted-foreground">ใช้จริง</dt>
+                      <dd className="break-words text-base font-semibold tabular-nums">{formatProjectBudget(project.spent)}</dd>
+                    </div>
+                  </dl>
                   {project.member_faculties && project.member_faculties.length > 0 && (
                     <div className="space-y-2">
                       <p className="text-sm font-medium">รายชื่อสมาชิก</p>
@@ -585,7 +610,7 @@ export default function MyProjects() {
                             className="max-w-full gap-1 rounded-md px-2 py-1"
                             title={`${member.name} - ${member.role}`}
                           >
-                            <Users className="h-3 w-3 shrink-0" />
+                            <User aria-hidden="true" className="h-3 w-3 shrink-0" />
                             <span className="max-w-[220px] truncate">{member.name}</span>
                             <span className="text-muted-foreground">({member.role})</span>
                           </Badge>
@@ -780,20 +805,6 @@ export default function MyProjects() {
                     value={createForm.budget_spent}
                     onChange={(event) => updateCreateForm('budget_spent', event.target.value)}
                     placeholder="0.00"
-                  />
-                </div>
-
-                <div className="grid gap-2">
-                  <Label htmlFor="project-progress">ความคืบหน้า (%)</Label>
-                  <Input
-                    id="project-progress"
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    value={createForm.progress_percent}
-                    onChange={(event) => updateCreateForm('progress_percent', event.target.value)}
-                    placeholder="0"
                   />
                 </div>
             </div>

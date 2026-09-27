@@ -270,10 +270,10 @@ export default function FiveYearSummary() {
   return (
     <>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="app-page-header">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight leading-snug">ผลสรุป 5 ปี</h1>
-            <p className="text-muted-foreground">สรุปผลการดำเนินงานหลักสูตร 5 ปีย้อนหลัง</p>
+            <h1 className="app-page-title">ผลสรุป 5 ปี</h1>
+            <p className="app-page-description">สรุปผลการดำเนินงานหลักสูตร 5 ปีย้อนหลัง</p>
           </div>
           <div className="flex gap-2">
             <Select value={selectedProgram} onValueChange={setSelectedProgram}>

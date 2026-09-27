@@ -1,4 +1,3 @@
-import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -7,6 +6,7 @@ import { BookOpen, Users, Target, TrendingUp, Loader2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
+import { navigateToPage } from "@/lib/projectNavigation";
 
 // กำหนด Interface ให้ TypeScript รู้จักโครงสร้างข้อมูล
 interface Course {
@@ -64,9 +64,11 @@ export default function MyCourses() {
   return (
     <>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">รายวิชาที่รับผิดชอบ</h1>
-          <p className="text-muted-foreground">รายวิชาทั้งหมดที่คุณเป็นผู้สอนหรือรับผิดชอบหลักสูตร</p>
+        <div className="app-page-header">
+          <div className="min-w-0">
+          <h1 className="app-page-title">รายวิชาที่รับผิดชอบ</h1>
+          <p className="app-page-description">รายวิชาทั้งหมดที่คุณเป็นผู้สอนหรือรับผิดชอบหลักสูตร</p>
+          </div>
         </div>
 
         {/* Stats */}
@@ -140,8 +142,8 @@ export default function MyCourses() {
                     <Progress value={course.cloProgress} />
                   </div>
                   <div className="flex gap-2 pt-2">
-                    <Button variant="outline" className="flex-1" onClick={() => window.location.href = `/?page=clos&course_id=${course.id}`}>จัดการ CLO</Button>
-                    <Button className="flex-1" onClick={() => window.location.href = `/?page=courses&action=grade&course_id=${course.id}`}>ให้คะแนน</Button>
+                    <Button variant="outline" className="flex-1" onClick={() => navigateToPage("clos", { course_id: course.id })}>จัดการ CLO</Button>
+                    <Button className="flex-1" onClick={() => navigateToPage("courses", { action: "grade", course_id: course.id })}>ให้คะแนน</Button>
                   </div>
                 </CardContent>
               </Card>

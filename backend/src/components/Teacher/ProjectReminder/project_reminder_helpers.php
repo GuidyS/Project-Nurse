@@ -123,7 +123,7 @@ function projectReminderContent(array $row, int $daysLeft): array
 
     $title = "ระยะเวลาโครงการใกล้สิ้นสุด ({$remaining})";
     $message = "โครงการ \"{$name}\" ({$type} ปีการศึกษา {$year}) จะสิ้นสุดวันที่ {$endText} ({$remaining}) "
-             . "ระยะเวลาของโครงการใกล้สิ้นสุดแล้ว กรุณาเริ่มดำเนินโครงการ | สถานะปัจจุบัน: {$status} | ผู้ดำเนินโครงการ: {$responsible}";
+             . "ระยะเวลาของโครงการใกล้สิ้นสุดแล้ว กรุณาเร่งดำเนินโครงการให้แล้วเสร็จ | สถานะปัจจุบัน: {$status} | ผู้ดำเนินโครงการ: {$responsible}";
 
     $h = static fn(string $value): string => htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
     $rows = [
@@ -155,7 +155,7 @@ function projectReminderContent(array $row, int $daysLeft): array
 HTML;
 
     $text = "เรียน ผู้ดูแลระบบ คณะพยาบาลศาสตร์\n\n"
-          . "ระยะเวลาของโครงการต่อไปนี้ใกล้สิ้นสุดแล้ว ({$remaining}) กรุณาเริ่มดำเนินโครงการ\n\n";
+          . "ระยะเวลาของโครงการใกล้สิ้นสุดแล้ว กรุณาเร่งดำเนินโครงการให้แล้วเสร็จ\n\n";
     foreach ($rows as $label => $value) {
         $text .= "{$label}: {$value}\n";
     }

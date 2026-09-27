@@ -13,9 +13,25 @@ if (!$student_id) {
     exit();
 }
 
+function portfolio_file_url(?string $path): ?string
+{
+    $path = trim((string)$path);
+    if ($path === '') {
+        return null;
+    }
+
+    if (preg_match('/^https?:\/\//i', $path)) {
+        return $path;
+    }
+
+    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    $host = $_SERVER['HTTP_HOST'] ?? 'localhost:8080';
+    return $scheme . '://' . $host . '/' . ltrim($path, '/');
+}
+
 try {
     $db = new Connect();
-    $sql = "SELECT portfolio_id AS id, title, type, description, DATE_FORMAT(created_at, '%Y-%m-%d') as date, file_name 
+    $sql = "SELECT portfolio_id AS id, title, type, description, DATE_FORMAT(created_at, '%Y-%m-%d') as date, file_name, file_path, mime_type, file_category 
             FROM portfolio 
             WHERE student_id = :student_id 
             ORDER BY created_at DESC";
@@ -23,6 +39,11 @@ try {
     $stmt = $db->prepare($sql);
     $stmt->execute([':student_id' => $student_id]);
     $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    foreach ($items as &$item) {
+        $item['fileUrl'] = portfolio_file_url($item['file_path'] ?? null);
+    }
+    unset($item);
 
     echo json_encode([
         "status" => "success",

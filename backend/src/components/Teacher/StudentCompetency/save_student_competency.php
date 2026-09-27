@@ -9,6 +9,41 @@ if (session_status() == PHP_SESSION_NONE) { session_start(); }
 require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../config/audit_helper.php';
 
+// นำเข้าลอจิกคำนวณปีการศึกษาให้ตรงกับหน้า Get
+if (file_exists(__DIR__ . '/../../../config/academic_helper.php')) {
+    require_once __DIR__ . '/../../../config/academic_helper.php';
+}
+
+if (!function_exists('calculateRealtimeAcademicInfo')) {
+    function calculateRealtimeAcademicInfo($studentId, $entryYearCandidate = null): array {
+        $now = new DateTime();
+        $currentYearBE = (int)$now->format('Y') + 543;
+        $cutOffDate = new DateTime($now->format('Y') . '-08-10 00:00:00');
+        $academicYear = ($now >= $cutOffDate) ? $currentYearBE : ($currentYearBE - 1);
+ 
+        $cleanId = trim((string)$studentId);
+        $entryYear = 0;
+ 
+        if (strlen($cleanId) >= 2 && is_numeric(substr($cleanId, 0, 2))) {
+            $entryYear = 2500 + (int)substr($cleanId, 0, 2);
+        } elseif (!empty($entryYearCandidate) && is_numeric($entryYearCandidate) && (int)$entryYearCandidate >= 2500) {
+            $entryYear = (int)$entryYearCandidate;
+        } else {
+            $entryYear = $academicYear;
+        }
+ 
+        $yearLevel = $academicYear - $entryYear + 1;
+        if ($yearLevel < 1) $yearLevel = 1;
+        if ($yearLevel > 8) $yearLevel = 8;
+ 
+        return [
+            'academic_year' => $academicYear,
+            'year_level'    => $yearLevel,
+            'entry_year'    => $entryYear
+        ];
+    }
+}
+
 ob_end_clean();
 header("Content-Type: application/json; charset=UTF-8");
 
@@ -41,7 +76,6 @@ try {
     $input = json_decode(file_get_contents('php://input'), true) ?: [];
     $targetStudentId = trim((string)($input['student_id'] ?? $input['studentId'] ?? ''));
     $scores = $input['scores'] ?? $input['items'] ?? [];
-    $academicYear = (int)($input['academic_year'] ?? 0);
 
     if ($targetStudentId === '' || empty($scores) || !is_array($scores)) {
         http_response_code(400);
@@ -49,10 +83,9 @@ try {
         exit;
     }
 
-    if ($academicYear <= 0) {
-        $now = new DateTime();
-        $academicYear = (int)$now->format('Y') + 543;
-    }
+    // 🌟 FIX: บังคับคำนวณปีการศึกษาให้ตรงกับหน้า Get เสมอ เพื่อป้องกันคะแนนกระจายไปอยู่คนละปี
+    $info = calculateRealtimeAcademicInfo($targetStudentId);
+    $academicYear = $info['academic_year'];
 
     $db->beginTransaction();
 
@@ -108,3 +141,4 @@ try {
     http_response_code(500);
     echo json_encode(["status" => "error", "message" => $e->getMessage()], JSON_UNESCAPED_UNICODE);
 }
+?>

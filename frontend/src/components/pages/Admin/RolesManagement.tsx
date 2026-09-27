@@ -4,12 +4,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Check, Shield, Search, UserCog } from "lucide-react";
+import { Check, Search, UserCog } from "lucide-react";
 import { cn } from "@/lib/utils";
 import api from "@/lib/axios";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -27,7 +26,6 @@ type RoleTab = "teacher" | "student" | "admin" | "unassigned";
 const roles = [
   { value: "admin", label: "ผู้ดูแลระบบ", description: "สิทธิ์เต็มในการจัดการระบบ" },
   { value: "teacher", label: "อาจารย์", description: "สิทธิ์ในการจัดการข้อมูลการเรียนการสอน" },
-  { value: "student", label: "นักศึกษา", description: "สิทธิ์ในการดูข้อมูลตนเอง" },
 ];
 
 const teacherSubRoles = [
@@ -42,14 +40,12 @@ const teacherSubRoles = [
 
 const roleLabels: Record<string, string> = {
   admin: "ผู้ดูแลระบบ",
-  student: "นักศึกษา",
   teacher: "อาจารย์",
   unassigned: "รอจัดบทบาท",
 };
 
 const roleTabs: { value: RoleTab; label: string }[] = [
   { value: "teacher", label: "อาจารย์" },
-  { value: "student", label: "นักศึกษา" },
   { value: "admin", label: "ผู้ดูแลระบบ" },
   { value: "unassigned", label: "รอจัดบทบาท" },
 ];
@@ -229,24 +225,24 @@ export default function RolesManagement() {
             <Tabs value={roleTab} onValueChange={(value) => setRoleTab(value as RoleTab)}>
               <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
                 {roleTabs.map((tab) => (
-                  <TabsTrigger key={tab.value} value={tab.value} className="gap-1.5">
+                  <TabsTrigger key={tab.value} value={tab.value} className="group gap-2">
                     {tab.label}
-                    <Badge variant="secondary" className="h-5 min-w-5 px-1.5 text-[10px]">
+                    <span className="text-xs font-semibold tabular-nums text-muted-foreground group-data-[state=active]:text-primary">
                       {tabCount(tab.value)}
-                    </Badge>
+                    </span>
                   </TabsTrigger>
                 ))}
               </TabsList>
             </Tabs>
           </CardHeader>
           <CardContent>
-            <Table>
+            <Table className="min-w-[760px] table-fixed">
               <TableHeader>
                 <TableRow>
-                  <TableHead>ผู้ใช้</TableHead>
-                  <TableHead>อีเมล</TableHead>
-                  <TableHead>Role ปัจจุบัน</TableHead>
-                  <TableHead className="text-right">จัดการ</TableHead>
+                  <TableHead className="w-[34%]">ผู้ใช้</TableHead>
+                  <TableHead className="w-[20%]">รหัสประจำตัว</TableHead>
+                  <TableHead className="w-[30%]">Role ปัจจุบัน</TableHead>
+                  <TableHead className="w-[16%] text-right">จัดการ</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -260,14 +256,7 @@ export default function RolesManagement() {
                   filteredUsers.map((user) => (
                     <TableRow key={user.id}>
                       <TableCell>
-                        <div className="flex items-center gap-3">
-                          <Avatar className="h-8 w-8">
-                            <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                              {user.fullName.charAt(0)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <span className="font-medium">{user.fullName}</span>
-                        </div>
+                        <span className="font-medium">{user.fullName}</span>
                       </TableCell>
                       <TableCell className="text-muted-foreground">{user.email}</TableCell>
                       <TableCell>

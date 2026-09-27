@@ -60,10 +60,10 @@ export default function PLOYLOReport() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="app-page-header">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight leading-snug">รายงาน PLO/YLO</h1>
-          <p className="text-muted-foreground">รายงานผลลัพธ์การเรียนรู้จากฐานข้อมูล</p>
+          <h1 className="app-page-title">รายงาน PLO/YLO</h1>
+          <p className="app-page-description">รายงานผลลัพธ์การเรียนรู้จากฐานข้อมูล</p>
         </div>
         <Button variant="outline" onClick={handleExport}>
           <Download className="mr-2 h-4 w-4" />

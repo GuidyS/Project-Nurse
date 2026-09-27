@@ -13,13 +13,15 @@ import {
   FileText,
   FolderKanban,
   Landmark,
-  Loader2,
   Search,
   TrendingDown,
   WalletCards,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
+import { useAcademicYearSelection } from "@/hooks/use-academic-year";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { academicYearOptions } from "@/lib/academicYear";
 
 type BudgetSource = string;
 
@@ -100,7 +102,6 @@ type ReportsApiData = {
   };
 };
 
-const fallbackAcademicYears = ["2568", "2567", "2566"];
 
 const fallbackBudgetSources: { key: BudgetSource; label: string }[] = [
   { key: "university", label: "มหาวิทยาลัยสยาม" },
@@ -331,10 +332,13 @@ const downloadCsv = (rows: AnnualProjectReportRow[], academicYear: string) => {
 };
 
 export default function Reports() {
-  const [academicYear, setAcademicYear] = useState("2568");
+  const { currentYear, academicYear, setAcademicYear } = useAcademicYearSelection();
   const [selectedStrategy, setSelectedStrategy] = useState("ทั้งหมด");
   const [selectedResponsible, setSelectedResponsible] = useState("ทั้งหมด");
   const [searchTerm, setSearchTerm] = useState("");
+  const debouncedSearch = useDebouncedValue(searchTerm);
+  const requestKey = JSON.stringify([academicYear, selectedStrategy, selectedResponsible, searchTerm]);
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
   const [reportData, setReportData] = useState<ReportsApiData | null>(null);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -360,6 +364,7 @@ export default function Reports() {
   useEffect(() => {
     const controller = new AbortController();
 
+    if (searchTerm !== debouncedSearch) return () => controller.abort();
     const loadReports = async () => {
       try {
         setLoading(true);
@@ -368,7 +373,7 @@ export default function Reports() {
             year: academicYear,
             strategy: selectedStrategy,
             responsible: selectedResponsible,
-            search: searchTerm,
+            search: debouncedSearch,
           },
           signal: controller.signal,
         });
@@ -377,7 +382,9 @@ export default function Reports() {
           throw new Error(response.data?.message || "โหลดข้อมูลรายงานไม่สำเร็จ");
         }
 
+        if (controller.signal.aborted) return;
         setReportData(response.data.data);
+        setLoadedKey(requestKey);
       } catch (error) {
         if (controller.signal.aborted) return;
         toast({
@@ -395,13 +402,13 @@ export default function Reports() {
     loadReports();
 
     return () => controller.abort();
-  }, [academicYear, selectedStrategy, selectedResponsible, searchTerm, toast]);
+  }, [academicYear, selectedStrategy, selectedResponsible, searchTerm, debouncedSearch, requestKey, toast]);
+
+  const resultsPending = loading || requestKey !== loadedKey;
 
   const filteredRows = reportData?.rows ?? [];
   const budgetSources = reportData?.budgetSources ?? fallbackBudgetSources;
-  const academicYears = reportData?.availableFilters.academicYears?.length
-    ? reportData.availableFilters.academicYears
-    : fallbackAcademicYears;
+  const academicYears = academicYearOptions([...(reportData?.availableFilters.academicYears ?? []), academicYear], currentYear);
   const strategies = ["ทั้งหมด", ...(reportData?.availableFilters.strategies ?? [])];
   const responsiblePeople = ["ทั้งหมด", ...(reportData?.availableFilters.responsiblePeople ?? [])];
   const summaryStats: SummaryStats = reportData?.summary ?? {
@@ -439,23 +446,18 @@ export default function Reports() {
             ภาพรวมงบแผน โครงการ กิจกรรมย่อย และเอกสารประกอบของคณะพยาบาลศาสตร์
           </p>
         </div>
-        <Button className="gap-2" onClick={() => downloadCsv(filteredRows, academicYear)}>
+        <Button className="gap-2" disabled={resultsPending || !reportData} onClick={() => downloadCsv(filteredRows, academicYear)}>
           <Download className="h-4 w-4" />
           ส่งออก CSV
         </Button>
       </div>
 
-      {loading && (
-        <div className="flex items-center gap-2 rounded-md border px-4 py-3 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          กำลังโหลดข้อมูลรายงานจาก API...
-        </div>
-      )}
-
       <Card className="app-section-card">
         <CardHeader>
           <CardTitle className="text-base">ตัวกรองรายงาน</CardTitle>
-          <CardDescription>เลือกปี ยุทธศาสตร์ ผู้รับผิดชอบ หรือค้นหาโครงการ/กิจกรรมย่อย</CardDescription>
+          <CardDescription role="status" aria-live="polite" className="h-10 sm:h-5">
+            {loading ? "กำลังอัปเดตผลลัพธ์…" : resultsPending ? "ผลลัพธ์ยังไม่พร้อมสำหรับตัวกรองปัจจุบัน" : "เลือกปี ยุทธศาสตร์ ผู้รับผิดชอบ หรือค้นหาโครงการ/กิจกรรมย่อย"}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -677,7 +679,7 @@ export default function Reports() {
                                 variant={row.approvalStatus === 'approved' ? 'default' : 'outline'}
                                 size="sm"
                                 className="h-8 gap-1"
-                                disabled={row.approvalStatus === 'approved'}
+                                disabled={resultsPending || row.approvalStatus === 'approved'}
                                 onClick={() => handleApproveBudget(row.id)}
                               >
                                 <CheckCircle2 className="h-3 w-3" />

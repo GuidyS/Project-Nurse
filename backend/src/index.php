@@ -29,6 +29,14 @@
 
     switch ($page) {
 
+            case 'academic-calendar':
+                require_once 'components/AcademicCalendar/get_academic_calendar.php';
+                break;
+
+            case 'export-years':
+                require_once 'components/Admin/ExportData/get_export_years.php';
+                break;
+
             // Auth
             case 'register':
                 require_once 'components/Auth/register.php';
@@ -92,6 +100,9 @@
                 break;
             case 'generate-user-accounts':
                 require_once 'components/Admin/ManageUsers/generate-user-accounts.php';
+                break;
+            case 'reset-user-birthdate-passwords':
+                require_once 'components/Admin/ManageUsers/reset-user-birthdate-passwords.php';
                 break;
             case 'competency-items':
                 require_once 'components/Admin/CompetencyItems/get_competency_items.php';
@@ -379,6 +390,9 @@
                 break;
 
             // ResearchSummary
+            case 'save-research-summary':
+                require_once 'components/Teacher/ResearchSummary/save_research_summary.php';
+                break;
             case 'get-research-summary':
                 require_once 'components/Teacher/ResearchSummary/get_research_summary.php';
                 break;
@@ -451,23 +465,6 @@
                 require_once 'components/Teacher/ProjectsPage/update_project.php';
                 break;
 
-            // ProjectDocs
-            case 'get-project-docs':
-                require_once 'components/Teacher/ProjectDocs/get_project_docs.php';
-                break;
-            case 'create-project-doc':
-                require_once 'components/Teacher/ProjectDocs/create_project_doc.php';
-                break;
-            case 'upload-project-file':
-                require_once 'components/Teacher/ProjectDocs/upload_project_file.php';
-                break;
-            case 'update-project-doc':
-                require_once 'components/Teacher/ProjectDocs/update_project_doc.php';
-                break;
-            case 'delete-project-doc':
-                require_once 'components/Teacher/ProjectDocs/delete_project_doc.php';
-                break;
-
             // ProjectLinks
             case 'get-project-links':
                 require_once 'components/Teacher/ProjectLinks/get_project_links.php';
@@ -482,11 +479,6 @@
             // ProjectReports
             case 'get-project-reports':
                 require_once 'components/Teacher/ProjectReports/get_project_reports.php';
-                break;
-
-            // ProjectAssessments
-            case 'project-assessments':
-                require_once 'components/Teacher/ProjectAssessments/project_assessments.php';
                 break;
 
             // ScheduleTasks
@@ -538,6 +530,9 @@
                 break;
             case 'save-portfolio':
                 require_once 'components/Student/Portfolio/save_portfolio.php';
+                break;
+            case 'update-portfolio':
+                require_once 'components/Student/Portfolio/update_portfolio.php';
                 break;
             case 'delete-portfolio':
                 require_once 'components/Student/Portfolio/delete_portfolio.php';

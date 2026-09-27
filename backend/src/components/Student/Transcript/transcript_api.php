@@ -31,7 +31,7 @@ require_once __DIR__ . '/../../../config/config.php';
 
 try {
     $db = new Connect();
-    $student_session_id = (float)$student_raw_id; 
+    $student_session_id = trim((string)$student_raw_id);
 
     // 1. ดึงข้อมูลส่วนตัวจากตาราง student
     $sql_profile = "SELECT student_id AS student_code, 
@@ -46,11 +46,19 @@ try {
     $stmt_profile->execute([':student_id' => $student_session_id]);
     $profile = $stmt_profile->fetch(PDO::FETCH_ASSOC);
 
-    // หากไม่เจอโปรไฟล์ ให้ดึงชื่อแรกจากตารางขึ้นมาเป็นตัวอย่างทดสอบระบบ
+    // Do not fall back to another student; transcript data must stay scoped to the logged-in student.
     if (!$profile) {
-        $sql_fallback = "SELECT student_id AS student_code, CONCAT(title, first_name_th, ' ', last_name_th) AS student_name, 'พยาบาลศาสตร์' AS faculty, 'พยาบาลศาสตรบัณฑิต' AS major, 2 AS current_year FROM student LIMIT 1";
-        $stmt_fb = $db->query($sql_fallback);
-        $profile = $stmt_fb->fetch(PDO::FETCH_ASSOC);
+        ob_clean();
+        http_response_code(404);
+        echo json_encode([
+            "status" => "error",
+            "message" => "Student profile not found",
+            "data" => [
+                "profile" => null,
+                "grades" => []
+            ]
+        ], JSON_UNESCAPED_UNICODE);
+        exit();
     }
 
     // 2. ลอจิกป้องกันตารางเกรด (grades) ไม่มีอยู่จริงในโครงสร้างปัจจุบันของคุณ
@@ -70,7 +78,7 @@ try {
                 ORDER BY g.year ASC, g.semester ASC";
 
         $stmt_grades = $db->prepare($sql_grades);
-        $stmt_grades->execute([':student_id' => $profile ? $profile['student_code'] : $student_session_id]);
+        $stmt_grades->execute([':student_id' => $profile['student_code']]);
         $grades = $stmt_grades->fetchAll(PDO::FETCH_ASSOC);
     } else {
         // 💡 ในกรณีที่ตารางเกรดยังทำไม่เสร็จ ระบบจะส่งค่าอาเรย์ว่างกลับไปหน้าบ้านก่อน เพื่อให้หน้าจอ Transcript โหลดผ่านได้ ไม่ค้างหมุนวนครับ

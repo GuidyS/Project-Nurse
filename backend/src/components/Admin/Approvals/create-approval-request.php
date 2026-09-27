@@ -16,6 +16,7 @@ try {
     }
 
     $db = new Connect();
+    ensureApprovalRequestsSchema($db);
     $userId = approvalRequireAuth($db);
     $payload = json_decode(file_get_contents('php://input'), true) ?: [];
     $roleId = approvalCurrentRoleId($db);

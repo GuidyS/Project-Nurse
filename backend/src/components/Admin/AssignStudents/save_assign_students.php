@@ -1,6 +1,7 @@
 <?php
 if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/../../../config/academic_calendar.php';
 require_once __DIR__ . '/../../../config/audit_helper.php';
 require_once __DIR__ . '/assign_students_helpers.php';
 
@@ -100,7 +101,7 @@ try {
 
     $insert = $db->prepare("INSERT INTO student_advisor_mapping (student_id, faculty_id, advisor_type, academic_year)
                             VALUES (?, ?, ?, ?)");
-    $academicYear = (int)date('Y') + 543;
+    $academicYear = currentAcademicYear();
     foreach ($studentIds as $sid) {
         $insert->execute([$sid, $facultyId, $type['key'], $academicYear]);
     }

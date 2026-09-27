@@ -1,6 +1,7 @@
 <?php
 if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/../../../config/academic_calendar.php';
  
 
  
@@ -10,8 +11,8 @@ define('APP_DEBUG', true);
 try {
     $db = new Connect();
  
-    // 1. กำหนดช่วงปี 5 ปีล่าสุด (ปีปัจจุบันแบบ พ.ศ.)
-    $current_year = date('Y') + 543;
+    // 1. กำหนดช่วงปีการศึกษา 5 ปีล่าสุดตามปฏิทินกลาง
+    $current_year = currentAcademicYear();
     $years = [$current_year-4, $current_year-3, $current_year-2, $current_year-1, $current_year];
  
     // โครงสร้างสำหรับเก็บผลลัพธ์

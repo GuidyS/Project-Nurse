@@ -1,7 +1,11 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FileText, Download, BarChart3, DollarSign } from 'lucide-react';
+import { FileText, Download, BarChart3, DollarSign, Filter } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend } from 'recharts';
 import * as XLSX from 'xlsx';
@@ -15,7 +19,26 @@ import { consumePendingProjectNavigation } from '@/lib/projectNavigation';
 interface ProjectOption {
   id: number;
   name: string;
+  project_type?: ProjectType;
 }
+
+type ProjectType = 'academic_service' | 'culture' | 'other';
+type ProjectTypeFilter = ProjectType | 'all';
+
+const projectTypeLabels: Record<ProjectType, string> = {
+  academic_service: 'บริการวิชาการ',
+  culture: 'ทำนุบำรุงศิลปวัฒนธรรม',
+  other: 'อื่น ๆ / ยังไม่จำแนก',
+};
+
+const projectTypeFilterOptions: { value: ProjectTypeFilter; label: string }[] = [
+  { value: 'all', label: 'ทั้งหมด' },
+  { value: 'academic_service', label: projectTypeLabels.academic_service },
+  { value: 'culture', label: projectTypeLabels.culture },
+  { value: 'other', label: projectTypeLabels.other },
+];
+
+const normalizeProjectType = (value?: ProjectType | null): ProjectType => value || 'other';
 
 interface ProjectStats {
   totalBudget: number;
@@ -39,12 +62,16 @@ interface ProgressRow {
 export default function ProjectReports() {
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [selectedProject, setSelectedProject] = useState<string>('');
+  const [projectSearch, setProjectSearch] = useState('');
+  const [isProjectSearchOpen, setIsProjectSearchOpen] = useState(false);
+  const [projectTypeFilter, setProjectTypeFilter] = useState<ProjectTypeFilter>('all');
   
   const [stats, setStats] = useState<ProjectStats>({ totalBudget: 0, totalSpent: 0, remaining: 0, progress: 0 });
   const [budgetData, setBudgetData] = useState<BudgetRow[]>([]);
   const [progressData, setProgressData] = useState<ProgressRow[]>([]);
   
   const [loading, setLoading] = useState(true);
+  const activeFilterCount = Number(projectTypeFilter !== 'all');
 
   // ฟังก์ชันดึงข้อมูลรายงานจาก API (แก้ไขให้ใช้ Axios Instance)
   const fetchReportData = async (projectId = '') => {
@@ -79,6 +106,41 @@ export default function ProjectReports() {
     setSelectedProject(val);
     fetchReportData(val);
   };
+
+  const handleProjectSearchSelect = (project: ProjectOption) => {
+    setProjectSearch(project.name);
+    setIsProjectSearchOpen(false);
+    handleProjectChange(project.id.toString());
+  };
+
+  const getProjectsByType = (filter: ProjectTypeFilter) => projects.filter((project) => {
+    const normalizedType = normalizeProjectType(project.project_type);
+    return filter === 'all' || normalizedType === filter;
+  });
+
+  const typeFilteredProjects = getProjectsByType(projectTypeFilter);
+
+  const handleProjectTypeFilterChange = (value: string) => {
+    const nextFilter = value as ProjectTypeFilter;
+    const nextProjects = getProjectsByType(nextFilter);
+    const currentProject = projects.find((project) => project.id.toString() === selectedProject);
+    const currentMatchesFilter =
+      !currentProject || nextFilter === 'all' || normalizeProjectType(currentProject.project_type) === nextFilter;
+
+    setProjectTypeFilter(nextFilter);
+
+    if (!currentMatchesFilter && nextProjects.length > 0) {
+      handleProjectChange(nextProjects[0].id.toString());
+    }
+  };
+
+  const projectSearchText = projectSearch.trim();
+  const hasProjectSearchText = projectSearchText.length > 0;
+  const searchedProjects = hasProjectSearchText
+    ? typeFilteredProjects.filter((project) =>
+        `${project.id} ${project.name}`.toLowerCase().includes(projectSearchText.toLowerCase())
+      )
+    : [];
 
   const selectedProjectName = projects.find(p => p.id.toString() === selectedProject)?.name || 'project-report';
 
@@ -132,11 +194,11 @@ export default function ProjectReports() {
 
   return (
     <>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
+      <div className="app-page">
+        <div className="app-page-header">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight leading-snug">รายงานสรุปโครงการ</h1>
-            <p className="text-muted-foreground">รายงานความคืบหน้าและงบประมาณสะสม</p>
+            <h1 className="app-page-title">รายงานสรุปโครงการ</h1>
+            <p className="app-page-description">รายงานความคืบหน้าและงบประมาณสะสม</p>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => handleExport('excel')} disabled={!selectedProject}>
@@ -153,18 +215,109 @@ export default function ProjectReports() {
         {/* ส่วนเลือกโครงการ */}
         <Card>
           <CardContent className="pt-6">
-            <Select value={selectedProject} onValueChange={handleProjectChange}>
-              <SelectTrigger className="w-[400px]">
-                <SelectValue placeholder="เลือกโครงการเพื่อดูรายงาน" />
-              </SelectTrigger>
-              <SelectContent>
-                {projects.map(p => (
-                  <SelectItem key={p.id} value={p.id.toString()}>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex w-full flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+
+              {/* Select Project */}
+              <div className="w-full lg:w-80">
+                <Select value={selectedProject} onValueChange={handleProjectChange} disabled={typeFilteredProjects.length === 0 || loading}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="เลือกโครงการ" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {typeFilteredProjects.map((project) => (
+                      <SelectItem key={project.id} value={project.id.toString()}>
+                        <span className="font-bold text-slate-900">{project.name}</span>
+                        <span className="mx-1 text-muted-foreground">•</span>
+                        <span className="text-muted-foreground">
+                          {projectTypeLabels[normalizeProjectType(project.project_type)]}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex w-full flex-col gap-3 sm:flex-row lg:w-auto lg:justify-end">
+                <div className="relative w-full sm:w-[400px]">
+                  <Input
+                    value={projectSearch}
+                    onChange={(event) => {
+                      setProjectSearch(event.target.value);
+                      setIsProjectSearchOpen(true);
+                    }}
+                    onFocus={() => setIsProjectSearchOpen(true)}
+                    onBlur={() => setIsProjectSearchOpen(false)}
+                    placeholder="ค้นหารายชื่อโครงการ..."
+                    className="w-full"
+                  />
+                  {isProjectSearchOpen && hasProjectSearchText && (
+                    <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-64 overflow-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md">
+                      {searchedProjects.length === 0 ? (
+                        <div className="px-3 py-2 text-sm text-muted-foreground">
+                          ไม่พบโครงการที่ตรงกับคำค้นหา
+                        </div>
+                      ) : (
+                        searchedProjects.map((project) => (
+                          <button
+                            key={project.id}
+                            type="button"
+                            className="flex w-full flex-col rounded-sm px-3 py-2 text-left text-sm outline-none hover:bg-accent hover:text-accent-foreground"
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => handleProjectSearchSelect(project)}
+                          >
+                            <span className="inline-flex min-w-0 items-center whitespace-nowrap">
+                              <span className="truncate font-bold text-slate-900">{project.name}</span>
+                              <span className="mx-1 shrink-0 text-muted-foreground">•</span>
+                              <span className="shrink-0 text-muted-foreground">
+                                {projectTypeLabels[normalizeProjectType(project.project_type)]}
+                              </span>
+                            </span>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="gap-2">
+                    <Filter className="h-4 w-4" />
+                    กรอง
+                    {activeFilterCount > 0 && (
+                      <Badge variant="secondary" className="ml-1 rounded-sm px-1.5 py-0 text-[11px]">
+                        {activeFilterCount}
+                      </Badge>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-80 space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="project-type-filter">ประเภทโครงการ</Label>
+                    <Select value={projectTypeFilter} onValueChange={handleProjectTypeFilterChange}>
+                      <SelectTrigger id="project-type-filter">
+                        <SelectValue placeholder="เลือกประเภทโครงการ" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {projectTypeFilterOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    disabled={activeFilterCount === 0}
+                    onClick={() => handleProjectTypeFilterChange('all')}
+                  >
+                    ล้างตัวกรอง
+                  </Button>
+                </PopoverContent>
+              </Popover>
+              </div>
+            </div>
           </CardContent>
         </Card>
 

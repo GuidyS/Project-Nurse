@@ -20,6 +20,15 @@
     --primary: 262 73% 51%;
     --primary-foreground: 0 0% 100%;
 
+    /* Brand palette */
+    --blue: 210 100% 56%;
+    --yellow: 44, 100%, 50%;
+    --orange: 24, 100%, 50%;
+    --lightpurple: 260, 100%, 70%;
+    --lightorange: 33 100% 50%;
+    --slategray: 210 14% 53%;
+    --lightslategray: 209, 14%, 70%;
+
     --secondary: 260 24% 96%;
     --secondary-foreground: 224 32% 20%;
 
@@ -204,12 +213,26 @@
     @apply flex flex-col gap-4 rounded-md border border-primary/10 bg-card px-5 py-5 shadow-sm sm:px-6 lg:flex-row lg:items-center lg:justify-between;
   }
 
+  .app-page-header > div {
+    min-width: 0;
+  }
+
+  .app-page-header.app-page-header-back {
+    @apply flex-row items-start justify-start;
+  }
+
+  .app-page-header svg {
+    flex-shrink: 0;
+  }
+
   .app-page-title {
-    @apply text-2xl font-bold leading-tight tracking-normal text-foreground sm:text-[1.7rem];
+    @apply text-2xl font-bold leading-snug tracking-normal text-foreground sm:text-[1.7rem];
+    overflow-wrap: anywhere;
   }
 
   .app-page-description {
-    @apply mt-1 max-w-3xl text-sm leading-6 text-muted-foreground;
+    @apply mt-2 max-w-3xl text-sm leading-6 text-muted-foreground;
+    overflow-wrap: anywhere;
   }
 
   .app-section-card {

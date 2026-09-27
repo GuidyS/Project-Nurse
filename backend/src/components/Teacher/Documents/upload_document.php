@@ -5,6 +5,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/../../../config/academic_calendar.php';
 require_once __DIR__ . '/../../../config/audit_helper.php'; // นำเข้า Audit Helper
 
 $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
@@ -16,7 +17,12 @@ try {
         $courseCode = $input['course'];
         $name = $input['name'];
         $type = $input['type']; // e.g. 'มคอ.3'
-        $academicYear = $input['academic_year'] ?? date('Y') + 543;
+        $academicYear = $input['academic_year'] ?? currentAcademicYear();
+        if (!is_scalar($academicYear) || !preg_match('/^\d{4}$/', (string)$academicYear) || (int)$academicYear < 2500 || (int)$academicYear > 2700) {
+            http_response_code(422);
+            echo json_encode(['status' => 'error', 'message' => 'ปีการศึกษาต้องเป็น พ.ศ. 2500–2700'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
         $semester = $input['semester'] ?? 1;
         $googleDriveLink = trim($input['google_drive_link']);
 
