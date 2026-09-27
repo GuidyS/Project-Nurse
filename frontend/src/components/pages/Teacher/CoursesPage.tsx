@@ -488,12 +488,6 @@ const CoursesPage = () => {
                       <DropdownMenuItem className="gap-2" onClick={() => openGradeDialog(course, false)}>
                         <Edit className="h-4 w-4" /> บันทึก/แก้ไขผลการเรียน
                       </DropdownMenuItem>
-                      <DropdownMenuItem className="gap-2" onClick={() => openGradeDialog(course, true)}>
-                        <Eye className="h-4 w-4" /> ดูรายชื่อนักศึกษา
-                      </DropdownMenuItem>
-                      <DropdownMenuItem className="gap-2">
-                        <Plus className="h-4 w-4" /> มอบหมาย Course Instructor
-                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TableCell>

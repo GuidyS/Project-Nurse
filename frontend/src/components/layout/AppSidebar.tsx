@@ -68,7 +68,6 @@ const previewMenuSectionsByRole: Record<string, any[]> = {
     {
       sectionTitle: "Teacher",
       items: [
-        { title: "รายวิชาของฉัน", url: "my-courses", icon: "BookOpen" },
         { title: "จัดการรายวิชา", url: "courses", icon: "Library" },
         { title: "CLO", url: "clos", icon: "Target" },
         { title: "นักศึกษาที่รับผิดชอบ", url: "students-info", icon: "Users" },

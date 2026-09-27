@@ -1,4 +1,4 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -16,19 +16,10 @@ type DocumentItem = {
   name: string;
   type: string;
   course: string;
+  academic_year: string;
   uploadedAt: string;
-  status: string;
   fileUrl?: string;
   downloadUrl?: string;
-};
-
-const getStatusBadge = (status: string) => {
-  switch (status) {
-    case 'approved': return <Badge className="bg-green-500">อนุมัติแล้ว</Badge>;
-    case 'pending': return <Badge className="bg-yellow-500">รอตรวจสอบ</Badge>;
-    case 'rejected': return <Badge variant="destructive">ถูกปฏิเสธ</Badge>;
-    default: return <Badge variant="secondary">{status}</Badge>;
-  }
 };
 
 export default function Documents() {
@@ -152,8 +143,8 @@ export default function Documents() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">อัปโหลดเอกสาร</h1>
-            <p className="text-muted-foreground">จัดการเอกสารรายวิชาต่างๆ</p>
+            <h1 className="text-3xl font-bold tracking-tight">คลังเอกสาร มคอ.</h1>
+            <p className="text-muted-foreground">จัดการเอกสาร มคอ.</p>
           </div>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
@@ -249,60 +240,12 @@ export default function Documents() {
           </Dialog>
         </div>
 
-        {/* Stats */}
-        <div className="grid gap-4 md:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">เอกสารทั้งหมด</CardTitle>
-              <FileText className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{documents.length}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">อนุมัติแล้ว</CardTitle>
-              <FileText className="h-4 w-4 text-green-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">
-                {safeDocuments.filter(d => d.status === 'approved').length}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">รอตรวจสอบ</CardTitle>
-              <FileText className="h-4 w-4 text-yellow-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-yellow-600">
-                {safeDocuments.filter(d => d.status === 'pending').length}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">TQF</CardTitle>
-              <FileText className="h-4 w-4 text-primary" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {documents.filter(d => d.type.includes('TQF')).length}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
         {/* Table */}
         <Card>
           <CardHeader>
-            <CardTitle>รายการเอกสาร</CardTitle>
-            <CardDescription>เอกสารรายวิชาทั้งหมด</CardDescription>
+            <CardTitle className="flex items-center justify-between">รายการเอกสาร
+              <Badge variant="outline">เอกสารทั้งหมด {documents.length}</Badge>
+            </CardTitle>
             <div className="flex items-center gap-2 pt-4">
               <Search className="h-4 w-4 text-muted-foreground" />
               <Input
@@ -321,8 +264,8 @@ export default function Documents() {
                   <TableHead>ชื่อเอกสาร</TableHead>
                   <TableHead>ประเภท</TableHead>
                   <TableHead>รายวิชา</TableHead>
+                  <TableHead>ปีการศึกษา</TableHead>
                   <TableHead>วันที่อัปโหลด</TableHead>
-                  <TableHead>สถานะ</TableHead>
                   <TableHead>การดำเนินการ</TableHead>
                 </TableRow>
               </TableHeader>
@@ -334,8 +277,8 @@ export default function Documents() {
                       <TableCell className="font-medium">{doc.name}</TableCell>
                       <TableCell><Badge variant="outline">{doc.type}</Badge></TableCell>
                       <TableCell>{doc.course}</TableCell>
+                      <TableCell>{doc.academic_year}</TableCell>
                       <TableCell>{doc.uploadedAt}</TableCell>
-                      <TableCell>{getStatusBadge(doc.status)}</TableCell>
                       <TableCell>
                         <div className="flex gap-2">
                           <Button 
@@ -371,7 +314,7 @@ export default function Documents() {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">ไม่พบข้อมูลเอกสารที่คุณค้นหา</TableCell>
+                    <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">ไม่พบข้อมูลเอกสารที่คุณค้นหา</TableCell>
                   </TableRow>
                 )}
               </TableBody>

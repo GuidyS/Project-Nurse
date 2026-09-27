@@ -29,11 +29,26 @@ try {
             $stmt->execute([':code' => $courseCode]);
             $subjectName = $stmt->fetchColumn() ?: '';
         }
+
+        $teacherName = $_SESSION['username'] ?? '';
+        if (!empty($_SESSION['user_id'])) {
+            $teacherStmt = $pdo->prepare("
+                SELECT TRIM(CONCAT(COALESCE(title, ''), COALESCE(first_name_th, ''), ' ', COALESCE(last_name_th, ''))) AS full_name
+                FROM faculty
+                WHERE user_id = :user_id
+                LIMIT 1
+            ");
+            $teacherStmt->execute([':user_id' => $_SESSION['user_id']]);
+            $resolvedTeacherName = trim((string) ($teacherStmt->fetchColumn() ?: ''));
+            if ($resolvedTeacherName !== '') {
+                $teacherName = $resolvedTeacherName;
+            }
+        }
         
         $insertSql = "INSERT INTO tqf_documents 
-            (subject_code, subject_name, tqf_type, academic_year, semester, approval_status, responsible_teacher, file_name, file_path) 
+            (subject_code, subject_name, tqf_type, academic_year, semester, responsible_teacher, file_name, file_path) 
             VALUES 
-            (:sc, :sn, :type, :year, :sem, 'รอหัวหน้าภาคฯ', :teacher, :fn, :fp)";
+            (:sc, :sn, :type, :year, :sem, :teacher, :fn, :fp)";
         
         $insertStmt = $pdo->prepare($insertSql);
         $insertStmt->execute([
@@ -42,21 +57,12 @@ try {
             ':type' => $type,
             ':year' => $academicYear,
             ':sem' => $semester,
-            ':teacher' => $_SESSION['username'] ?? '',
+            ':teacher' => $teacherName,
             ':fn' => $name,
             ':fp' => $googleDriveLink
         ]);
 
         $tqfId = $pdo->lastInsertId();
-        $requestSql = "INSERT INTO approval_requests 
-            (request_type, requester_user_id, target_ref_type, target_ref_id, title, status)
-            VALUES ('document_approve', :user, 'tqf_document', :ref_id, :title, 'pending')";
-        $reqStmt = $pdo->prepare($requestSql);
-        $reqStmt->execute([
-            ':user' => $_SESSION['user_id'] ?? 1,
-            ':ref_id' => $tqfId,
-            ':title' => "อนุมัติเอกสาร TQF: $name ($courseCode)"
-        ]);
 
         // บันทึก Log เมื่ออัปโหลดเอกสาร มคอ. ใหม่
         logAudit(

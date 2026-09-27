@@ -19,17 +19,14 @@ import FiveYearSummary from "@/components/pages/Teacher/FiveYearSummary";
 import CourseReports from "@/components/pages/Teacher/CourseReports";
 import Documents from "@/components/pages/Teacher/Documents";
 import AdviseNotes from "@/components/pages/Teacher/AdviseNotes";
-import AdvisorNotifications from "@/components/pages/Teacher/AdvisorNotifications";
 import Advises from "@/components/pages/Teacher/Advises";
 import AssignInstructors from "@/components/pages/Teacher/AssignInstructors";
 import CLOMap from "@/components/pages/Teacher/CLOMap";
 import Evidence from "@/components/pages/Teacher/Evidence";
 import Grades from "@/components/pages/Teacher/Grades";
-import MyCourses from "@/components/pages/Teacher/MyCourses";
 import MyProjects from "@/components/pages/Teacher/MyProjects";
 import Performance from "@/components/pages/Teacher/Performance";
 import TransferRequests from "@/components/pages/Teacher/TransferRequests";
-import Students from "@/components/pages/Teacher/Students";
 import ScheduleTasks from "@/components/pages/Teacher/ScheduleTasks";
 import ProjectReports from "@/components/pages/Teacher/ProjectReports";
 import ProjectLinks from "@/components/pages/Teacher/ProjectLinks";
@@ -77,7 +74,7 @@ const getDefaultActiveItem = () => {
         return "users-management";
       case 2:
         if (positionId === 1) return "dean-dashboard";
-        if (positionId === 2) return "my-courses";
+        if (positionId === 2) return "courses";
         if (positionId === 3) return "advises";
         if (positionId === 4) return "practical-students";
         if (positionId === 5) return "clos";
@@ -161,7 +158,7 @@ const Index = () => {
               case 1: setActiveItem("users-management"); break;
               case 2:
                 if (pId === 1) setActiveItem("dean-dashboard");
-                else if (pId === 2) setActiveItem("my-courses");
+                else if (pId === 2) setActiveItem("courses");
                 else if (pId === 3) setActiveItem("advises");
                 else if (pId === 4) setActiveItem("practical-students");
                 else if (pId === 5) setActiveItem("clos");
@@ -251,9 +248,9 @@ const Index = () => {
     const teacherPages = [
       "courses", "five-year-summary", "clo-management", "clos",
       "plo-ylo-report", "course-report", "course-students", "documents", "assign-instructors", "clo-map",
-      "evidence", "grades", "my-courses", "performance", "practical-students",
-      "program-reports", "schedule-tasks", "advise-notes", "advisor-notifications", "advises",
-      "students", "students-info", "transfer-requests", "my-research", "research-summary",
+      "evidence", "grades", "performance", "practical-students",
+      "program-reports", "schedule-tasks", "advise-notes", "advises",
+      "students-info", "transfer-requests", "my-research", "research-summary",
       "advisor-vaccination-view", "advisor-health-records-view",
       "advisor-competency-view"
     ];
@@ -274,15 +271,12 @@ const Index = () => {
         case "clo-map": return <CLOMap />;                                          //*
         case "evidence": return <Evidence />;                                       //*
         case "grades": return <Grades />;                                           //*
-        case "my-courses": return <MyCourses />;                                    //*
         case "performance": return <Performance />;
         case "practical-students": return <PracticalPage />;                    //* /* ดูรายชื่อนศ.และประเมินผลการฝึกปฏิบัติของเด็กได้*/ /* อจ.ปฏิบัติ */
         case "program-reports": return <ProgramReports />;                          //*
         case "schedule-tasks": return <ScheduleTasks />;                            //*
         case "advise-notes": return <AdviseNotes />;                                      //*
-        case "advisor-notifications": return <AdvisorNotifications />;
         case "advises": return <Advises />;
-        case "students": return <Students />;                                       /* รายชื่อเด็กทั้งระบบ */
         case "students-info": return <StudentsInfo />;                              /* รายชื่อเด็กในที่ปรึกษาของอจ. */
         case "transfer-requests": return <TransferRequests />;                      //*
         case "research-summary": return <ResearchSummary />;

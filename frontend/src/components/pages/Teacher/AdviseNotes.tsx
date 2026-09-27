@@ -15,7 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 const getTypeBadge = (type: string) => {
   switch (type) {
     case 'academic':
-      return <Badge variant="secondary">วิชาการ</Badge>;
+      return <Badge className="bg-purple-500">วิชาการ</Badge>;
     case 'warning':
       return <Badge className="bg-yellow-500">ติดตาม</Badge>;
     case 'critical':

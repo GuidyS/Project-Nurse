@@ -301,9 +301,7 @@ function approvalApplyStudentTransfer(PDO $db, array $payload): void
 function approvalApplyDocumentLink(PDO $db, string $targetType, string $targetId): void
 {
     try {
-        if ($targetType === 'tqf_document' && $targetId !== '') {
-            $stmt = $db->prepare("UPDATE tqf_documents SET approval_status = 'ส่งและถูกต้อง' WHERE id = :id");
-            $stmt->execute([':id' => $targetId]);
+        if ($targetType === 'tqf_document') {
             return;
         }
 

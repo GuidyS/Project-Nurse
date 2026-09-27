@@ -1,14 +1,12 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Search, Target, Loader2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import api from '@/lib/axios';
 import { useToast } from '@/hooks/use-toast';
-import HasPermission from '../Auth/HasPermission';
 
 const getStatusBadge = (status: string) => {
   switch (status) {
@@ -115,8 +113,7 @@ export default function CourseStudents() {
         {/* Students CLO Table */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Target className="h-5 w-5 text-primary" /> รายชื่อนักศึกษาและการประเมินผล
+            <CardTitle className="flex items-center gap-2">รายชื่อนักศึกษาและการประเมินผล
             </CardTitle>
             <CardDescription>คะแนนเฉลี่ยร้อยละแยกตามผลลัพธ์การเรียนรู้ (CLO)</CardDescription>
             <div className="flex items-center gap-2 pt-4">
@@ -150,7 +147,6 @@ export default function CourseStudents() {
                     ))}
                     <TableHead className="text-center">ภาพรวมวิชา</TableHead>
                     <TableHead>ผลประเมิน</TableHead>
-                    <TableHead>จัดการ</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -190,11 +186,6 @@ export default function CourseStudents() {
                           )}
                         </TableCell>
                         <TableCell>{getStatusBadge(student.status)}</TableCell>
-                        <TableCell>
-                          <HasPermission permission="manage_course_grading">
-                            <Button size="sm" variant="outline">ให้เกรด CLO</Button>
-                          </HasPermission>
-                        </TableCell>
                       </TableRow>
                     ))
                   )}

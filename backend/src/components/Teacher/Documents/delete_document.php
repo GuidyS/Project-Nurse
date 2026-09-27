@@ -31,11 +31,6 @@ try {
         $deleteSql = "DELETE FROM tqf_documents WHERE id = :id";
         $delStmt = $pdo->prepare($deleteSql);
         $delStmt->execute([':id' => $id]);
-        
-        // ลบคำร้องขอที่เกี่ยวข้อง
-        $reqSql = "DELETE FROM approval_requests WHERE target_ref_type = 'tqf_document' AND target_ref_id = :id";
-        $reqStmt = $pdo->prepare($reqSql);
-        $reqStmt->execute([':id' => $id]);
 
         // บันทึก Log เมื่อลบเอกสาร มคอ.
         $docName = $docInfo ? "{$docInfo['tqf_type']} ({$docInfo['file_name']})" : "ID: $id";
