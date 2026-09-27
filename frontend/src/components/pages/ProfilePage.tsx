@@ -12,8 +12,6 @@ import {
   ExternalLink,
   Image as ImageIcon,
   AlertCircle,
-  Users,
-  Heart,
   Loader2,
   Upload,
   BellRing,
@@ -375,7 +373,7 @@ export default function ProfilePage() {
                       {/* ข้อมูลมารดา */}
                       <div className="space-y-3">
                         <div className="flex items-center gap-2 text-primary font-medium border-b border-border pb-1">
-                          <Heart className="h-4 w-4" />
+                          <User className="h-4 w-4" />
                           <span>ข้อมูลมารดา</span>
                         </div>
                         <InfoRow icon={<User className="h-4 w-4 text-primary" />} label="ชื่อ-นามสกุลมารดา" value={motherFullName || null} />
@@ -751,7 +749,7 @@ export default function ProfilePage() {
                 {/* ข้อมูลมารดา */}
                 <div className="space-y-3 pt-2">
                   <span className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
-                    <Heart className="h-3.5 w-3.5" /> ข้อมูลมารดา
+                    <User className="h-3.5 w-3.5" /> ข้อมูลมารดา
                   </span>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">

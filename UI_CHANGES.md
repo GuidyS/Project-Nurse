@@ -1,30 +1,71 @@
-# รายการไฟล์ UI ที่ต่างจาก main
+# สรุปการแก้ไข UI
 
-เอกสารนี้แสดงเฉพาะไฟล์ UI/Frontend ที่เนื้อหาใน branch `earn-new-branch` ต่างจาก branch `main` ณ เวลาที่ตรวจสอบ
+วันที่อัปเดต: 27 กันยายน 2026
 
-ไม่รวมไฟล์ที่โค้ดเหมือน `main` แล้ว รวมถึงไม่รวม Backend, API และฐานข้อมูล
+## ไฟล์ที่แก้ไข
 
-## Layout และองค์ประกอบกลาง
+### 1. `frontend/src/components/layout/AppSidebar.tsx`
 
-- `frontend/src/components/layout/AppSidebar.tsx`
-- `frontend/src/components/ui/sonner.tsx` — ปรับ toast/แถบแจ้งเตือนมุมขวาล่าง รวมถึงขนาดที่ใหญ่ขึ้น
+- เพิ่ม `sidebarIconOverrides` เพื่อกำหนดไอคอน Lucide ให้เหมาะกับเมนูแต่ละรายการและลดการใช้ไอคอนซ้ำ
+- เปลี่ยนไอคอนเมนู **กำหนด CLO รายวิชา** เป็น `NotebookText`
+- ทำให้เมนูด้านล่าง เช่น **ข้อมูลส่วนตัว** รองรับ `sidebarIconOverrides` เช่นเดียวกับเมนูหลัก
+- ตัวอย่างไอคอนที่เปลี่ยน:
+  - Transcript → `ScrollText`
+  - Portfolio → `FolderOpen`
+  - ประวัติการได้รับวัคซีน → `Syringe`
+  - ข้อมูลภาวะสุขภาพ → `HeartPulse`
+  - ประเมิน Performance → `Gauge`
 
-## หน้าเข้าสู่ระบบ
+### 2. `frontend/src/components/pages/ProfilePage.tsx`
 
-- `frontend/src/components/pages/Auth/LoginPage.tsx`
+- เปลี่ยนไอคอนหัวข้อ **ข้อมูลมารดา** จาก `Heart` เป็น `User` ให้เหมือนหัวข้อ **ข้อมูลบิดา**
+- แก้ทั้งส่วนแสดงข้อมูลและส่วนแก้ไขข้อมูล
+- ลบ import `Heart` ที่ไม่ได้ใช้งานแล้ว
 
-## หน้าผู้ดูแลระบบ
+### 3. `frontend/src/components/pages/Teacher/CLOPage.tsx`
 
-- `frontend/src/components/pages/Admin/Approvals.tsx`
-- `frontend/src/components/pages/Admin/AssignStudents.tsx`
-- `frontend/src/components/pages/Admin/CompetencyItemsManagement.tsx`
-- `frontend/src/components/pages/Admin/RolesManagement.tsx`
-- `frontend/src/components/pages/Admin/UsersManagement.tsx`
+- ลบไอคอน `Target` หน้าหัวข้อ **รายการ CLO**
+- ลบเส้นขอบสีม่วงด้านบนของการ์ดรายการ CLO (`border-t-4 border-t-primary`)
+- ลบ import `Target` ที่ไม่ได้ใช้งานแล้ว
 
-## หน้าอาจารย์
+### 4. `frontend/src/components/pages/Teacher/StudentsInfo.tsx`
 
-- `frontend/src/components/pages/Teacher/CLOManagement.tsx`
-- `frontend/src/components/pages/Teacher/CLOPage.tsx`
-- `frontend/src/components/pages/Teacher/MyProjects.tsx`
-- `frontend/src/components/pages/Teacher/ProjectReports.tsx`
-- `frontend/src/components/pages/Teacher/ProjectsPage.tsx`
+- ลบวงกลมอักษรย่อหน้าชื่อนักศึกษาในตาราง โดยคงชื่อและอีเมลไว้
+- ลบโค้ดส่งออกรายชื่อ CSV และ import `Download` ที่ไม่ได้ใช้งาน
+- ปรับช่องค้นหาเป็น `type="search"` เพิ่มชื่อสำหรับ accessibility และขยายความกว้างเป็น `max-w-md`
+
+### 5. `frontend/src/index.css`
+
+- เพิ่มรูปแบบกลางสำหรับช่องค้นหาทั้งระบบ: ขอบโค้ง พื้นหลังการ์ด เงาบาง และสถานะ hover/focus ที่สอดคล้องกัน
+- รองรับทั้งช่องค้นหาใหม่ที่ใช้ `type="search"` และช่องค้นหาเดิมที่มี placeholder ขึ้นต้นด้วยคำว่า “ค้น”
+- เพิ่มรูปแบบกรอบหัวข้อกลางให้หน้าเดิมที่ยังไม่ได้ใช้ `app-page-header` มีกรอบเหมือนหน้า “โครงการของฉัน”
+
+### 6. `frontend/src/components/layout/MainLayout.tsx`
+
+- เพิ่ม class `app-page-content` เพื่อจำกัดขอบเขตการจัดรูปแบบกรอบหัวข้อไว้เฉพาะหน้าหลักหลังเข้าสู่ระบบ
+- หน้า Login/Register และ dialog จะไม่ถูก selector กรอบหัวข้อใหม่นี้กระทบ
+
+### 7. `frontend/src/components/pages/Admin/CompetencyItemsManagement.tsx`
+
+- ลบไอคอน `ListChecks` หน้าหัวข้อ **จัดการรายการประเมินสมรรถนะหลัก**
+- ลบ import `ListChecks` ที่ไม่ได้ใช้งานหลังนำไอคอนออก
+
+## การตรวจสอบ
+
+### รูปแบบหัวข้อทุกหน้า
+
+- ปรับชื่อหัวข้อหลักในกรอบให้มีขนาด `text-3xl` เท่ากันทุกหน้า
+- ซ่อนไอคอนตกแต่งที่อยู่หน้าชื่อหัวข้อ โดยยังคงไอคอนภายในปุ่มคำสั่งไว้
+- ปรับระยะห่างทั้งด้านบน ล่าง ซ้าย และขวาของหน้าให้ใช้ระยะจาก `MainLayout` จุดเดียว ทำให้กรอบและหัวข้อหลักเริ่มตรงกันทุกหน้า
+- ลบไอคอน `ListChecks` หน้าหัวข้อ “จัดการรายการประเมินสมรรถนะหลัก” ออกจาก component โดยตรง
+
+- ตรวจสอบชื่อไอคอนกับแพ็กเกจ `lucide-react` ที่ติดตั้งในโปรเจกต์แล้ว
+- ตรวจสอบแล้วว่าไอคอน Sidebar หลังใช้ override ไม่ซ้ำกัน
+- รัน `npm run build` สำเร็จ
+- รัน `npm run lint` แล้ว ส่วนที่แก้ไม่มี error ใหม่ แต่ lint ทั้งโปรเจกต์ยังไม่ผ่านเพราะ error เดิมใน `frontend/src/components/ui/textarea.tsx` และ warning เดิมของโปรเจกต์
+
+## หมายเหตุ
+
+- ไม่มีการแก้ไขฐานข้อมูลสำหรับการเปลี่ยนไอคอน Sidebar การเปลี่ยนแปลงทำผ่าน Frontend override เท่านั้น
+- งานปรับหน้ารายชื่อนักศึกษาภาคปฏิบัติเป็นการเปลี่ยน UI เท่านั้น ไม่มีการแก้ฐานข้อมูล สิทธิ์ หรือ flow เกรด/คะแนน
+- `frontend/package-lock.json` มีความแตกต่างเรื่อง newline อยู่ก่อนเริ่มงานนี้ จึงไม่รวมเป็นไฟล์ที่แก้ในรายการข้างต้น
