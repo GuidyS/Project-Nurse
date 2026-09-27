@@ -16,9 +16,9 @@ $input = json_decode(file_get_contents("php://input"), true);
 try {
     if (!empty($input['studentId']) && !empty($input['topic']) && !empty($input['summary'])) {
 
-        // หา student_id (PK) จาก student_code ที่หน้าเว็บส่งมา
-        $stmt_find_std = $pdo->prepare("SELECT student_id FROM student WHERE student_code = ? OR student_id = ? LIMIT 1");
-        $stmt_find_std->execute([$input['studentId'], $input['studentId']]);
+        // student_id เป็นรหัสนักศึกษาหลักตาม schema ปัจจุบัน
+        $stmt_find_std = $pdo->prepare("SELECT student_id FROM student WHERE student_id = ? LIMIT 1");
+        $stmt_find_std->execute([$input['studentId']]);
         $student = $stmt_find_std->fetch(PDO::FETCH_ASSOC);
 
         if (!$student) {

@@ -1,4 +1,4 @@
-# สรุปการแก้ไข UI
+# สรุปการแก้ไข UI และ API
 
 วันที่อัปเดต: 27 กันยายน 2026
 
@@ -50,6 +50,26 @@
 - ลบไอคอน `ListChecks` หน้าหัวข้อ **จัดการรายการประเมินสมรรถนะหลัก**
 - ลบ import `ListChecks` ที่ไม่ได้ใช้งานหลังนำไอคอนออก
 
+### 8. ไฟล์ Backend ที่แก้ให้ตรงกับ schema ปัจจุบัน
+
+- `backend/src/components/Teacher/Advises/get_advises.php`
+- `backend/src/components/Teacher/Advises/get_student_plo_mapping.php`
+- `backend/src/components/Teacher/Advises/save_student_plo_mapping.php`
+- `backend/src/components/Teacher/AdviseNotes/get_advise_notes.php`
+- `backend/src/components/Teacher/AdviseNotes/get_advise_students.php`
+- `backend/src/components/Teacher/AdviseNotes/save_advise_note.php`
+- `backend/src/components/Teacher/DeanDashboard/get_student_learning_outcomes.php`
+- `backend/src/components/Teacher/ProjectAssessments/project_assessments.php`
+- `backend/src/components/Teacher/TransferRequests/get_transfer_requests.php`
+
+รายละเอียดการแก้ไข:
+
+- เปลี่ยน query ที่อ้างคอลัมน์ `student.student_code` ซึ่งไม่มีใน schema ให้ใช้ `student.student_id`
+- คงชื่อ field `student_code` เฉพาะ response alias ที่ Frontend ยังใช้อยู่
+- คืนตัวกรอง `advisor_type` เพื่อแยกอาจารย์ที่ปรึกษากับอาจารย์ภาคปฏิบัติให้ถูกต้อง
+- แก้การตรวจสิทธิ์เข้าถึงข้อมูล PLO ให้เทียบกับ `student_id`
+- ไม่มีการแก้ schema, migration หรือข้อมูลในฐานข้อมูล
+
 ## การตรวจสอบ
 
 ### รูปแบบหัวข้อทุกหน้า
@@ -63,9 +83,12 @@
 - ตรวจสอบแล้วว่าไอคอน Sidebar หลังใช้ override ไม่ซ้ำกัน
 - รัน `npm run build` สำเร็จ
 - รัน `npm run lint` แล้ว ส่วนที่แก้ไม่มี error ใหม่ แต่ lint ทั้งโปรเจกต์ยังไม่ผ่านเพราะ error เดิมใน `frontend/src/components/ui/textarea.tsx` และ warning เดิมของโปรเจกต์
+- รัน `php -l` กับไฟล์ Backend ที่แก้ทั้ง 9 ไฟล์สำเร็จ
+- Smoke test แบบอ่านอย่างเดียวสำหรับ `get-advises`, `get-advise-notes` และ `get-advise-students` สำเร็จ
 
 ## หมายเหตุ
 
 - ไม่มีการแก้ไขฐานข้อมูลสำหรับการเปลี่ยนไอคอน Sidebar การเปลี่ยนแปลงทำผ่าน Frontend override เท่านั้น
 - งานปรับหน้ารายชื่อนักศึกษาภาคปฏิบัติเป็นการเปลี่ยน UI เท่านั้น ไม่มีการแก้ฐานข้อมูล สิทธิ์ หรือ flow เกรด/คะแนน
+- งานแก้ HTTP 500 ปรับเฉพาะ query และตัวกรองสิทธิ์ให้ตรงกับ schema เดิม ไม่มีการแก้ข้อมูลจริงหรือเพิ่ม flow เกรด/คะแนน
 - `frontend/package-lock.json` มีความแตกต่างเรื่อง newline อยู่ก่อนเริ่มงานนี้ จึงไม่รวมเป็นไฟล์ที่แก้ในรายการข้างต้น

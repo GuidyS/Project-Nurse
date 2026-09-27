@@ -20,7 +20,7 @@ try {
     // ประวัติการให้คำปรึกษาของอาจารย์ที่ล็อกอิน (advisor_id เก็บ users.user_id)
     $sql = "SELECT
                 a.advice_id as id,
-                IF(s.student_code LIKE 'TEMP-%', s.student_id, s.student_code) as studentId,
+                s.student_id as studentId,
                 CONCAT(IFNULL(s.title,''), s.first_name_th, ' ', s.last_name_th) as studentName,
                 DATE_FORMAT(a.created_at, '%Y-%m-%d') as date,
                 a.topic,

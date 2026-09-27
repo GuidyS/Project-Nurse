@@ -82,19 +82,19 @@ try {
         $studentStmt = $db->query("
             SELECT
                 student_id,
-                student_code,
+                student_id AS student_code,
                 TRIM(CONCAT(COALESCE(title, ''), COALESCE(first_name_th, ''), ' ', COALESCE(last_name_th, ''))) AS name,
                 year_level
             FROM student
             WHERE status = 'Active'
-            ORDER BY student_code, student_id
+            ORDER BY student_id
         ");
 
         $participantStmt = $db->prepare("
             SELECT
                 pp.student_id,
                 pp.status,
-                s.student_code,
+                s.student_id AS student_code,
                 TRIM(CONCAT(COALESCE(s.title, ''), COALESCE(s.first_name_th, ''), ' ', COALESCE(s.last_name_th, ''))) AS name,
                 s.year_level,
                 ps.is_satisfied,
@@ -104,7 +104,7 @@ try {
             LEFT JOIN project_satisfaction_responses ps
                 ON ps.project_id = pp.project_id AND ps.student_id = pp.student_id
             WHERE pp.project_id = :project_id
-            ORDER BY s.student_code, s.student_id
+            ORDER BY s.student_id
         ");
         $participantStmt->execute([':project_id' => $projectId]);
 

@@ -51,17 +51,13 @@ function advisorCanAccessStudent(PDO $db, int $advisorUserId, string $studentId)
         JOIN faculty f ON sam.faculty_id = f.faculty_id
         JOIN users u ON CAST(u.username AS CHAR) = CAST(f.faculty_id AS CHAR)
         WHERE u.user_id = :advisor_user_id
-          AND (
-              CAST(IF(s.student_code LIKE 'TEMP-%', s.student_id, s.student_code) AS CHAR) = :student_code
-              OR CAST(s.student_id AS CHAR) = :student_pk
-          )
+          AND CAST(s.student_id AS CHAR) = :student_id
         LIMIT 1
     ";
     $stmt = $db->prepare($sql);
     $stmt->execute([
         ':advisor_user_id' => $advisorUserId,
-        ':student_code' => $studentId,
-        ':student_pk' => $studentId,
+        ':student_id' => $studentId,
     ]);
     return (bool)$stmt->fetchColumn();
 }
