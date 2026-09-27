@@ -265,6 +265,13 @@ function approvalApplyStudentTransfer(PDO $db, array $payload): void
         return;
     }
 
+    $stmtTeacher = $db->prepare("SELECT TRIM(CONCAT(IFNULL(title,''), ' ', first_name_th, ' ', last_name_th)) FROM faculty WHERE faculty_id = ? LIMIT 1");
+    $stmtTeacher->execute([$toAdvisorId]);
+    $newAdvisorName = trim((string)$stmtTeacher->fetchColumn());
+    if ($newAdvisorName === '') {
+        $newAdvisorName = "อาจารย์รหัส {$toAdvisorId}";
+    }
+
     foreach ($studentIds as $studentId) {
         $studentId = trim((string)$studentId);
         if ($studentId === '') {
@@ -294,6 +301,37 @@ function approvalApplyStudentTransfer(PDO $db, array $payload): void
                 ':student_id' => $studentId,
                 ':faculty_id' => $toAdvisorId,
             ]);
+        }
+
+        // ส่งการแจ้งเตือนไปยังบัญชีนักศึกษา
+        try {
+            $stmtUser = $db->prepare("SELECT user_id FROM users WHERE username = ? LIMIT 1");
+            $stmtUser->execute([$studentId]);
+            $studentUserId = $stmtUser->fetchColumn();
+
+            if ($studentUserId) {
+                $title = "แจ้งการโอนย้ายอาจารย์ที่ปรึกษา";
+                $message = "คุณได้รับการโอนย้ายอาจารย์ที่ปรึกษาคนใหม่เป็น: {$newAdvisorName} เรียบร้อยแล้ว สามารถตรวจสอบข้อมูลได้ที่หน้าใบแสดงผลการเรียน";
+                $payloadJson = json_encode([
+                    'action' => 'view_transcript',
+                    'target' => 'transcript',
+                    'advisor_type' => 'advisor',
+                    'advisor_name' => $newAdvisorName
+                ], JSON_UNESCAPED_UNICODE);
+
+                $stmtNotif = $db->prepare("
+                    INSERT INTO notifications (user_id, sender_user_id, title, message, payload_json, type, channel, is_read, created_at)
+                    VALUES (:user_id, NULL, :title, :message, :payload_json, 'success', 'in-app', 0, NOW())
+                ");
+                $stmtNotif->execute([
+                    ':user_id' => $studentUserId,
+                    ':title' => $title,
+                    ':message' => $message,
+                    ':payload_json' => $payloadJson
+                ]);
+            }
+        } catch (Throwable $e) {
+            error_log("approvalApplyStudentTransfer notif error: " . $e->getMessage());
         }
     }
 }

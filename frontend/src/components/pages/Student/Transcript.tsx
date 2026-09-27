@@ -4,7 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { GraduationCap, TrendingUp, BookOpen, Calendar, Printer, Loader2 } from "lucide-react";
+import { GraduationCap, TrendingUp, BookOpen, Calendar, Printer, Loader2, Users, UserCheck, Stethoscope, Mail } from "lucide-react";
 import api from "@/lib/axios";
 
 interface CourseGrade {
@@ -23,6 +23,10 @@ interface StudentProfile {
   faculty: string;
   major: string;
   current_year: string;
+  advisor_name?: string | null;
+  advisor_email?: string | null;
+  practical_advisor_name?: string | null;
+  practical_advisor_email?: string | null;
 }
 
 const gradeColors: Record<string, string> = {
@@ -190,6 +194,78 @@ const Transcript = () => {
             </Card>
           </div>
         </div>
+
+        {/* Current Advisors Card */}
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Users className="h-4 w-4 text-primary" />
+                  อาจารย์ผู้ดูแลคนปัจจุบัน
+                </CardTitle>
+                <CardDescription className="text-xs mt-0.5">
+                  อาจารย์ที่ปรึกษาและอาจารย์ปฏิบัติที่ได้รับมอบหมาย
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {/* อาจารย์ที่ปรึกษา */}
+              <div className="flex items-start gap-3.5 p-3.5 rounded-xl border bg-muted/20 hover:bg-muted/30 transition-colors">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                  <UserCheck className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-muted-foreground">อาจารย์ที่ปรึกษา</span>
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-blue-200 text-blue-700 bg-blue-50/50 dark:bg-blue-950/40 dark:text-blue-300">
+                      คนปัจจุบัน
+                    </Badge>
+                  </div>
+                  <p className="text-sm font-semibold text-foreground truncate mt-1">
+                    {studentInfo?.advisor_name || "ยังไม่มีข้อมูลอาจารย์ที่ปรึกษา"}
+                  </p>
+                  {studentInfo?.advisor_email ? (
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1">
+                      <Mail className="h-3 w-3 shrink-0" />
+                      <span className="truncate">{studentInfo.advisor_email}</span>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground mt-1">บทบาท: ดูแลให้คำปรึกษาแผนการเรียน</p>
+                  )}
+                </div>
+              </div>
+
+              {/* อาจารย์ปฏิบัติ */}
+              <div className="flex items-start gap-3.5 p-3.5 rounded-xl border bg-muted/20 hover:bg-muted/30 transition-colors">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                  <Stethoscope className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-muted-foreground">อาจารย์ปฏิบัติ</span>
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-emerald-200 text-emerald-700 bg-emerald-50/50 dark:bg-emerald-950/40 dark:text-emerald-300">
+                      คนปัจจุบัน
+                    </Badge>
+                  </div>
+                  <p className="text-sm font-semibold text-foreground truncate mt-1">
+                    {studentInfo?.practical_advisor_name || "ยังไม่มีข้อมูลอาจารย์ปฏิบัติ"}
+                  </p>
+                  {studentInfo?.practical_advisor_email ? (
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1">
+                      <Mail className="h-3 w-3 shrink-0" />
+                      <span className="truncate">{studentInfo.practical_advisor_email}</span>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground mt-1">บทบาท: ดูแลการฝึกปฏิบัติงานและการประเมินทักษะ</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Grades Table */}
         <Card>
