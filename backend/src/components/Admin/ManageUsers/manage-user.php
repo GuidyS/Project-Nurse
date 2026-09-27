@@ -2,6 +2,9 @@
 if (session_status() === PHP_SESSION_NONE) { session_start(); }
 require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../config/audit_helper.php';
+require_once __DIR__ . '/user_status_helpers.php';
+require_once __DIR__ . '/../../../config/academic_helper.php';
+require_once __DIR__ . '/../../../config/name_validation.php';
 header('Access-Control-Allow-Origin: ' . (in_array($_SERVER['HTTP_ORIGIN'] ?? '', ['http://localhost:5173', 'http://127.0.0.1:5173'], true) ? ($_SERVER['HTTP_ORIGIN'] ?? '') : 'http://localhost:5173'));
 header('Vary: Origin');
 header("Access-Control-Allow-Credentials: true");
@@ -425,6 +428,17 @@ try {
             $s_stmt = $db->prepare("SELECT * FROM student WHERE student_id = :sid");
             $s_stmt->execute([':sid' => $u_info['username']]);
             $data['details'] = $s_stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+
+            // ปีที่รับเข้าศึกษา/ชั้นปี ใช้ค่าที่ระบบคำนวณให้ (แอดมินแก้ไม่ได้)
+            $academicInfo = calculateRealtimeAcademicInfo(
+                $u_info['username'],
+                $data['details']['admission_year'] ?? null,
+                $db
+            );
+            $data['details']['admission_year'] = (string)$academicInfo['entry_year'];
+            $data['details']['year_level'] = $academicInfo['year_level'];
+            $data['details']['academic_year'] = $academicInfo['academic_year'];
+
             $data['uploaded_documents'] = listStudentUploadedDocuments($db, (string)$u_info['username']);
         } else {
             $f_stmt = $db->prepare("SELECT * FROM faculty WHERE faculty_id = :fid");
@@ -432,6 +446,10 @@ try {
             $data['details'] = $f_stmt->fetch(PDO::FETCH_ASSOC) ?: [];
             $data['uploaded_documents'] = listFacultyUploadedDocuments($db, $data['details'], (string)$u_info['username']);
         }
+
+        // ตัวเลือกสถานะให้หน้าเว็บใช้ (ไม่ต้อง hard-code ซ้ำ)
+        $data['status_options'] = $u_info['role_id'] == 3 ? studentStatusOptions() : facultyStatusOptions();
+        $data['status_reasons'] = studentStatusReasons();
 
         echo json_encode(["status" => "success", "data" => $data], JSON_UNESCAPED_UNICODE);
         exit();
@@ -641,30 +659,34 @@ try {
                 }
             }
 
-            $sql = "UPDATE student SET 
-                        title = :title, first_name_th = :first_name_th, last_name_th = :last_name_th,
-                        first_name_en = :first_name_en, last_name_en = :last_name_en, gender = :gender, 
-                        birth_date = :birth_date, email = :email, phone = :phone, year_level = :year_level, 
-                        gpa = :gpa, hometown_province = :hometown_province, height = :height, 
-                        weight = :weight, bmi = :bmi, home_phone = :home_phone, home_address = :home_address,
-                        status = :status, graduation_date = :graduation_date, dropout_date = :dropout_date,
-                        dropout_reason = :dropout_reason, admission_year = :admission_year
+            // ผู้ดูแลระบบแก้ข้อมูลนักศึกษาได้เฉพาะ "สถานะ" (และเหตุผลของสถานะ) เท่านั้น
+            // ข้อมูลอื่นทั้งหมดนักศึกษากรอกเอง หรือระบบคำนวณให้
+            userStatusEnsureSchema($db);
+            $statusInput = normalizeUserStatusInput(
+                'student',
+                $details['status'] ?? null,
+                array_key_exists('dropout_reason', $input['details'] ?? []) ? $input['details']['dropout_reason'] : ($currentDetails['dropout_reason'] ?? null),
+                $currentDetails['status'] ?? null
+            );
+
+            // เปลี่ยนเป็นพักการเรียน/ลาออก แล้วยังไม่มีวันที่ ให้บันทึกวันที่วันนี้
+            $dropoutDate = !empty($details['dropout_date']) ? $details['dropout_date'] : null;
+            if (studentStatusNeedsReason($statusInput['status']) && $dropoutDate === null) {
+                $dropoutDate = date('Y-m-d');
+            }
+            if (!studentStatusNeedsReason($statusInput['status'])) {
+                $dropoutDate = null;
+            }
+
+            $sql = "UPDATE student SET
+                        status = :status, dropout_date = :dropout_date, dropout_reason = :dropout_reason
                     WHERE student_id = :sid";
             $stmt = $db->prepare($sql);
             $stmt->execute([
-                ':title' => $details['title'] ?? null, ':first_name_th' => $details['first_name_th'] ?? null, 
-                ':last_name_th' => $details['last_name_th'] ?? null, ':first_name_en' => $details['first_name_en'] ?? null, 
-                ':last_name_en' => $details['last_name_en'] ?? null, ':gender' => $details['gender'] ?? null, 
-                ':birth_date' => !empty($details['birth_date']) ? $details['birth_date'] : null, 
-                ':email' => $details['email'] ?? null, ':phone' => $details['phone'] ?? null, 
-                ':year_level' => $details['year_level'] ?? null, ':gpa' => $details['gpa'] ?? null, 
-                ':hometown_province' => $details['hometown_province'] ?? null, ':height' => $details['height'] ?? null, 
-                ':weight' => $details['weight'] ?? null, ':bmi' => $details['bmi'] ?? null, 
-                ':home_phone' => $details['home_phone'] ?? null, ':home_address' => $details['home_address'] ?? null,
-                ':status' => $details['status'] ?? null, ':graduation_date' => !empty($details['graduation_date']) ? $details['graduation_date'] : null, 
-                ':dropout_date' => !empty($details['dropout_date']) ? $details['dropout_date'] : null, 
-                ':dropout_reason' => $details['dropout_reason'] ?? null,
-                ':admission_year' => $details['admission_year'] ?? null, ':sid' => $u_info['username']
+                ':status' => $statusInput['status'],
+                ':dropout_date' => $dropoutDate,
+                ':dropout_reason' => $statusInput['reason'],
+                ':sid' => $u_info['username']
             ]);
         } else {
             $currentStmt = $db->prepare("SELECT * FROM faculty WHERE faculty_id = :fid");
@@ -701,7 +723,19 @@ try {
                 );
             }
 
-            $sql = "UPDATE faculty SET 
+            // ชื่อภาษาไทย/อังกฤษต้องตรงกับภาษาของช่อง
+            nameAssertLanguages($input['details'] ?? []);
+
+            // สถานะการทำงาน: คงอยู่ / ลาออก / เกษียณ
+            userStatusEnsureSchema($db);
+            $facultyStatus = normalizeUserStatusInput(
+                'faculty',
+                $details['status'] ?? null,
+                null,
+                $currentDetails['status'] ?? null
+            );
+
+            $sql = "UPDATE faculty SET
                         title = :title, first_name_th = :first_name_th, last_name_th = :last_name_th,
                         first_name_en = :first_name_en, last_name_en = :last_name_en, gender = :gender, 
                         birth_date = :birth_date, email = :email, phone = :phone, current_address = :current_address,
@@ -724,7 +758,7 @@ try {
                 ':academic_position_date' => !empty($details['academic_position_date']) ? $details['academic_position_date'] : null, 
                 ':profile_picture' => $details['profile_picture'] ?? null, ':nursing_council_file' => $details['nursing_council_file'] ?? null,
                 ':license_file' => $details['license_file'] ?? null, ':teaching_cert_file' => $details['teaching_cert_file'] ?? null,
-                ':status' => $details['status'] ?? null, ':fid' => $u_info['username']
+                ':status' => $facultyStatus['status'], ':fid' => $u_info['username']
             ]);
         }
 

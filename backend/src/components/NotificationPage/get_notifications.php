@@ -46,6 +46,14 @@ try {
         error_log('project reminder: ' . $e->getMessage());
     }
 
+    // ลบข้อมูลนักศึกษาที่เข้าศึกษาเกินกำหนด (ปีละครั้ง และเฉพาะเมื่อแอดมินเปิดใช้งานไว้)
+    try {
+        require_once __DIR__ . '/../Admin/AcademicSettings/student_purge_helpers.php';
+        studentPurgeRunIfDue($pdo);
+    } catch (Throwable $e) {
+        error_log('student purge: ' . $e->getMessage());
+    }
+
     $sql = "SELECT
                 n.notification_id AS id,
                 n.title,

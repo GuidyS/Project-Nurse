@@ -33,7 +33,7 @@ try {
     if ((int)$user['role_id'] === 1) {
         // Admin: เห็นนักศึกษาทุกคน
         $stmt2 = $db->prepare("
-            SELECT student_id, CONCAT(first_name_th, ' ', last_name_th) AS full_name, status,
+            SELECT student_id, title, CONCAT(first_name_th, ' ', last_name_th) AS full_name, status,
                    year_level, admission_year
             FROM student
             ORDER BY student_id
@@ -44,7 +44,7 @@ try {
         $advisorType = assignStudentsResolveType('advisor');
         [$typeSql, $typeParams] = assignStudentsTypeCondition($advisorType, 'sam');
         $stmt2 = $db->prepare("
-            SELECT DISTINCT s.student_id, CONCAT(s.first_name_th, ' ', s.last_name_th) AS full_name, s.status,
+            SELECT DISTINCT s.student_id, s.title, CONCAT(s.first_name_th, ' ', s.last_name_th) AS full_name, s.status,
                    s.year_level, s.admission_year
             FROM student_advisor_mapping sam
             JOIN student s ON s.student_id = sam.student_id

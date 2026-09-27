@@ -84,7 +84,7 @@ try {
     }
 
     // 🌟 FIX: บังคับคำนวณปีการศึกษาให้ตรงกับหน้า Get เสมอ เพื่อป้องกันคะแนนกระจายไปอยู่คนละปี
-    $info = calculateRealtimeAcademicInfo($targetStudentId);
+    $info = calculateRealtimeAcademicInfo($targetStudentId, null, $db);
     $academicYear = $info['academic_year'];
 
     $db->beginTransaction();

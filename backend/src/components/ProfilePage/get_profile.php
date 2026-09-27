@@ -3,6 +3,8 @@ if (session_status() == PHP_SESSION_NONE) { session_start(); }
 require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../Teacher/LicenseReminder/license_reminder_helpers.php';
 require_once __DIR__ . '/../../config/audit_helper.php';
+require_once __DIR__ . '/../../config/academic_helper.php';
+require_once __DIR__ . '/../../config/name_validation.php';
 
 if (!isset($_SESSION['user_id'])) {
     http_response_code(401);
@@ -70,34 +72,8 @@ function buildCurrentAuthPayload(PDO $db, int $userId): array {
     ];
 }
 
-// Helper คำนวณชั้นปีและปีการศึกษา Real-time ตัดรอบวันที่ 10 สิงหาคม (เฉพาะ Student)
-function calculateRealtimeAcademicInfo($studentId, $entryYearCandidate = null): array {
-    $now = new DateTime();
-    $currentYearBE = (int)$now->format('Y') + 543;
-    $cutOffDate = new DateTime($now->format('Y') . '-08-10 00:00:00');
-    $academicYear = ($now >= $cutOffDate) ? $currentYearBE : ($currentYearBE - 1);
-    
-    $cleanId = trim((string)$studentId);
-    $entryYear = 0;
-    
-    if (strlen($cleanId) >= 2 && is_numeric(substr($cleanId, 0, 2))) {
-        $entryYear = 2500 + (int)substr($cleanId, 0, 2);
-    } elseif (!empty($entryYearCandidate) && is_numeric($entryYearCandidate) && (int)$entryYearCandidate >= 2500) {
-        $entryYear = (int)$entryYearCandidate;
-    } else {
-        $entryYear = $academicYear;
-    }
-
-    $yearLevel = $academicYear - $entryYear + 1;
-    if ($yearLevel < 1) $yearLevel = 1;
-    if ($yearLevel > 8) $yearLevel = 8;
-
-    return [
-        'academic_year' => $academicYear,
-        'year_level'    => $yearLevel,
-        'entry_year'    => $entryYear
-    ];
-}
+// ใช้ Helper กลาง (backend/src/config/academic_helper.php) เพื่อให้วันตัดรอบเลื่อนชั้นปี
+// ที่แอดมินตั้งค่าไว้มีผลกับทุกหน้าเหมือนกัน
 
 /**
  * Expand stored faculty file values (plain path, Drive URL, or JSON array of paths).
@@ -677,10 +653,11 @@ try {
             $stmt->execute(['id' => $u_info['username']]);
             $profile = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
 
-            // คำนวณปีการศึกษาและชั้นปี Real-time ตัดรอบ 10 สิงหาคม
+            // คำนวณปีการศึกษาและชั้นปี Real-time ตามวันตัดรอบที่แอดมินตั้งไว้
             $academicInfo = calculateRealtimeAcademicInfo(
                 $u_info['username'],
-                $profile['admission_year'] ?? null
+                $profile['admission_year'] ?? null,
+                $db
             );
 
             // บังคับอัปเดตข้อมูลปีและชั้นปีเป็นค่า Real-time
@@ -765,6 +742,15 @@ try {
         // เฉพาะ Role Student (role_id = 3)
         // ==========================================
         if ((int)$u_info['role_id'] === 3) {
+            // ชื่อภาษาไทย/อังกฤษต้องตรงกับภาษาของช่อง
+            try {
+                nameAssertLanguages(is_array($input) ? $input : []);
+            } catch (InvalidArgumentException $e) {
+                http_response_code(400);
+                echo json_encode(["status" => "error", "message" => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+                exit();
+            }
+
             $parentAddress = !empty($input['parent_address']) ? trim((string)$input['parent_address']) : (!empty($input['father_address']) ? trim((string)$input['father_address']) : null);
             
             // ดักจับและแปลงตัวเลขให้ถูกต้อง ป้องกัน Database Type Error
@@ -865,6 +851,14 @@ try {
                     echo json_encode(["status" => "error", "message" => "วันหมดอายุใบประกอบวิชาชีพไม่ถูกต้อง"], JSON_UNESCAPED_UNICODE);
                     exit;
                 }
+            }
+
+            try {
+                nameAssertLanguages(is_array($input) ? $input : []);
+            } catch (InvalidArgumentException $e) {
+                http_response_code(400);
+                echo json_encode(["status" => "error", "message" => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+                exit();
             }
 
             $sql = "UPDATE faculty SET first_name_en = ?, last_name_en = ?, gender = ?, birth_date = ?, email = ?, phone = ?, current_address = ?, nursing_council_no = ?, license_expiry = ? WHERE faculty_id = ?";

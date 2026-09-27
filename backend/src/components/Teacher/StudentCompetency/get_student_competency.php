@@ -81,7 +81,7 @@ try {
     $fullName = $student ? trim(($student['first_name_th'] ?? '') . ' ' . ($student['last_name_th'] ?? '')) : $targetStudentId;
  
     // คำนวณปีการศึกษาและชั้นปี Real-time
-    $info = calculateRealtimeAcademicInfo($targetStudentId, $student['admission_year'] ?? null);
+    $info = calculateRealtimeAcademicInfo($targetStudentId, $student['admission_year'] ?? null, $db);
     $academicYear = $info['academic_year'];
     $yearLevel = isset($_GET['year_level']) && (int)$_GET['year_level'] > 0
         ? (int)$_GET['year_level']

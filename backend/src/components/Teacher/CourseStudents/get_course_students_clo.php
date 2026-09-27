@@ -56,6 +56,7 @@ try {
         $stmt_subject = $db->prepare($sql_subject);
         $stmt_subject->execute($my_subject_codes);
         $courses = activeCurriculumApplyNames($db, $stmt_subject->fetchAll(PDO::FETCH_ASSOC), 'code', 'name');
+        $courses = activeCurriculumApplyPassScore($db, $courses, 'code'); // เกณฑ์ผ่านจากหน้าจัดการหลักสูตร
 
         echo json_encode(["status" => "success", "data" => ["courses" => $courses, "students" => [], "clo_headers" => []]], JSON_UNESCAPED_UNICODE);
         exit();
@@ -70,6 +71,13 @@ try {
     if (!$subject_code) {
         echo json_encode(["status" => "error", "message" => "ไม่พบรายวิชานี้"], JSON_UNESCAPED_UNICODE);
         exit();
+    }
+
+    // เกณฑ์ผ่านของรายวิชา ตั้งค่าที่หน้า "จัดการหลักสูตร" (ไม่กำหนด = ใช้ค่าเริ่มต้นของระบบ)
+    $passScores = activeCurriculumPassScores($db);
+    $passScore = $passScores[(string)$subject_code] ?? null;
+    if ($passScore === null) {
+        $passScore = COURSE_DEFAULT_PASS_SCORE;
     }
 
     // หัวตาราง CLO มาจากที่กำหนดไว้ในหน้า "จัดการ CLO รายวิชา"
@@ -118,8 +126,8 @@ try {
             "clo_scores" => (object)$cloScores,
             "sub_scores" => (object)$subScores,
             "overall" => $overall,
-            // เกณฑ์ผ่านของคณะคือร้อยละ 70
-            "status" => $overall === null ? 'pending' : ($overall >= 70 ? 'passed' : 'failed'),
+            // ผ่าน/ไม่ผ่าน ตามเกณฑ์ผ่านของรายวิชานั้น
+            "status" => $overall === null ? 'pending' : ($overall >= $passScore ? 'passed' : 'failed'),
         ];
     }
 
@@ -129,6 +137,7 @@ try {
             "courses" => [],
             "subject_code" => $subject_code,
             "clo_headers" => $clo_headers,
+            "pass_score" => (float)$passScore,
             "students" => $students,
         ],
     ], JSON_UNESCAPED_UNICODE);

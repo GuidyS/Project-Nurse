@@ -45,7 +45,12 @@ interface Course {
   section: string;
   cloCount: number;
   instructor?: string;
+  /** เกณฑ์ผ่านจากหน้า "จัดการหลักสูตร" (null = ใช้ค่าเริ่มต้นของระบบ) */
+  pass_score?: number | string | null;
 }
+
+/** เกณฑ์ผ่านเริ่มต้น เมื่อหลักสูตรไม่ได้กำหนดไว้ */
+const DEFAULT_PASS_SCORE = 70;
 
 interface SubPlo {
   code: string;
@@ -110,7 +115,9 @@ const CoursesPage = () => {
           semester: course.term_label || "-",
           section: course.section || "1",
           cloCount: Number(course.cloCount || 0),
-          instructor: course.instructor
+          instructor: course.instructor,
+          // เกณฑ์ผ่านจากหน้า "จัดการหลักสูตร" (null = ใช้ค่าเริ่มต้นของระบบ)
+          pass_score: course.pass_score ?? null
         }));
         setCourses(mappedCourses);
       } else {
@@ -385,10 +392,16 @@ const CoursesPage = () => {
       s.name.includes(searchQuery) || s.studentId.includes(searchQuery)
   );
 
-  /** สีของคะแนน: ≥70 ผ่านตามเกณฑ์คณะ */
+  /** เกณฑ์ผ่านของวิชาที่เปิดอยู่ — ตั้งค่าที่หน้า "จัดการหลักสูตร" */
+  const passScore =
+    selectedCourse?.pass_score === null || selectedCourse?.pass_score === undefined || selectedCourse?.pass_score === ""
+      ? DEFAULT_PASS_SCORE
+      : Number(selectedCourse.pass_score);
+
+  /** สีของคะแนน: ผ่าน/ไม่ผ่านตามเกณฑ์ของรายวิชา */
   const scoreClass = (value: number | null) => {
     if (value === null) return "text-muted-foreground";
-    if (value >= 70) return "text-success font-semibold";
+    if (value >= passScore) return "text-success font-semibold";
     return "text-destructive font-semibold";
   };
 
@@ -505,7 +518,8 @@ const CoursesPage = () => {
               {viewOnly ? "รายชื่อนักศึกษา" : "บันทึก/แก้ไขผลการเรียน"} - {selectedCourse?.code} {selectedCourse?.name}
             </DialogTitle>
             <DialogDescription>
-              กลุ่ม {selectedCourse?.section} ภาคเรียน {selectedCourse?.semester}
+              กลุ่ม {selectedCourse?.section} ภาคเรียน {selectedCourse?.semester} · เกณฑ์ผ่าน {passScore} คะแนน
+              {(selectedCourse?.pass_score === null || selectedCourse?.pass_score === undefined) && " (ค่าเริ่มต้น — กำหนดได้ที่หน้าจัดการหลักสูตร)"}
             </DialogDescription>
           </DialogHeader>
 
@@ -612,7 +626,10 @@ const CoursesPage = () => {
       <Dialog open={isScoringOpen} onOpenChange={(open) => { if (!open) closeScoreDialog(); }}>
         <DialogContent className="app-dialog-5xl max-h-[92vh] overflow-hidden flex flex-col">
           <DialogHeader>
-            <DialogTitle>ให้คะแนน CLO — {selectedCourse?.code} {selectedCourse?.name}</DialogTitle>
+            <DialogTitle>
+              ให้คะแนน CLO — {selectedCourse?.code} {selectedCourse?.name}
+              <span className="ml-2 text-sm font-normal text-muted-foreground">เกณฑ์ผ่าน {passScore} คะแนน</span>
+            </DialogTitle>
             <DialogDescription>
               เลือก CLO ที่ต้องการให้คะแนน กรอกได้ทุกคนในหน้าเดียว สลับ CLO ได้โดยคะแนนที่กรอกไว้จะไม่หาย
               แล้วกด "บันทึกทั้งหมด" ครั้งเดียวเมื่อกรอกครบ

@@ -284,10 +284,61 @@ function licenseReminderProcess(PDO $db, ?string $onlyFacultyId = null): array
             $summary['notified']++;
         }
 
+        // แจ้งผู้ดูแลระบบด้วย เพื่อให้เห็นภาพรวมว่าใบประกอบวิชาชีพของใครใกล้หมดอายุบ้าง
+        $summary['admin_notified'] = ($summary['admin_notified'] ?? 0)
+            + licenseReminderNotifyAdmins($db, $row, $content, $stage, $expiry, $daysLeft);
+
         licenseReminderDeliverEmail($db, $reminder, $row, $content, $summary);
     }
 
     return $summary;
+}
+
+/** แจ้งเตือนผู้ดูแลระบบว่าใบประกอบวิชาชีพของอาจารย์ท่านนี้ใกล้หมดอายุ (in-app เท่านั้น) */
+function licenseReminderNotifyAdmins(
+    PDO $db,
+    array $row,
+    array $content,
+    int $stage,
+    DateTimeImmutable $expiry,
+    int $daysLeft
+): int {
+    try {
+        $admins = $db->query("SELECT user_id FROM users WHERE role_id = 1 AND status = 'active'")
+                     ->fetchAll(PDO::FETCH_COLUMN) ?: [];
+        // ถ้าเจ้าของใบอนุญาตเป็นแอดมินเอง ไม่ต้องส่งซ้ำ (ได้แจ้งเตือนของตัวเองไปแล้ว)
+        $admins = array_values(array_filter(
+            array_map('intval', $admins),
+            static fn(int $id): bool => $id > 0 && $id !== (int)($row['user_id'] ?? 0)
+        ));
+        if (empty($admins)) {
+            return 0;
+        }
+
+        $expiryText = licenseReminderThaiDate($expiry);
+        $title = "ใบประกอบวิชาชีพของอาจารย์จะหมดอายุในอีก {$stage} เดือน";
+        $message = "{$content['name']} (รหัส {$row['faculty_id']}) ใบอนุญาตประกอบวิชาชีพจะหมดอายุวันที่ {$expiryText} "
+                 . "(อีก {$daysLeft} วัน)";
+        $payload = json_encode([
+            'kind' => 'license_expiry_admin',
+            'faculty_id' => (string)$row['faculty_id'],
+            'stage_months' => $stage,
+            'license_expiry' => $row['license_expiry'],
+            'days_left' => $daysLeft,
+        ], JSON_UNESCAPED_UNICODE);
+
+        $stmt = $db->prepare("
+            INSERT INTO notifications (user_id, sender_user_id, title, message, payload_json, type, channel, is_read)
+            VALUES (?, NULL, ?, ?, ?, 'warning', 'in-app', 0)
+        ");
+        foreach ($admins as $adminId) {
+            $stmt->execute([$adminId, $title, $message, $payload]);
+        }
+        return count($admins);
+    } catch (Throwable $e) {
+        error_log('license reminder admin notify: ' . $e->getMessage());
+        return 0;
+    }
 }
 
 function licenseReminderRecordRun(PDO $db, array $summary): void

@@ -68,6 +68,19 @@ function curriculumCyclesEnsureSchema(PDO $db): void
     if (!activeCurriculumColumnExists($db, 'curriculum_cycle', 'is_active')) {
         $db->exec("ALTER TABLE curriculum_cycle ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 0 AFTER end_year");
     }
+
+    // ชื่อวิชาภาษาอังกฤษ + ประเภทวิชา (ให้ฟิลด์ตรงกับหน้าส่งออกข้อมูลรายวิชา)
+    if (!activeCurriculumColumnExists($db, 'curriculum_cycle_subject', 'subject_name_en')) {
+        $db->exec("ALTER TABLE curriculum_cycle_subject ADD COLUMN subject_name_en VARCHAR(255) DEFAULT NULL AFTER subject_name");
+    }
+    if (!activeCurriculumColumnExists($db, 'curriculum_cycle_subject', 'subject_type')) {
+        $db->exec("ALTER TABLE curriculum_cycle_subject ADD COLUMN subject_type VARCHAR(100) DEFAULT NULL AFTER credit_desc");
+    }
+
+    // เกณฑ์ผ่านของรายวิชา (คะแนน 0-100) — หน้าให้คะแนนของอาจารย์ใช้ค่านี้ตัดสินผ่าน/ไม่ผ่าน
+    if (!activeCurriculumColumnExists($db, 'curriculum_cycle_subject', 'pass_score')) {
+        $db->exec("ALTER TABLE curriculum_cycle_subject ADD COLUMN pass_score DECIMAL(5,2) DEFAULT NULL AFTER subject_type");
+    }
 }
 
 function curriculumCyclesReadJson(): array
@@ -130,11 +143,38 @@ function curriculumCyclesNormalizeSubject(array $row): array
 
     [$credit, $creditDesc] = curriculumCyclesParseCredit($row['credit'] ?? '');
 
+    // ไม่บังคับกรอก — ค่าว่างเก็บเป็น NULL
+    $nameEn = trim((string)($row['subject_name_en'] ?? ''));
+    if (mb_strlen($nameEn) > 255) {
+        throw new InvalidArgumentException("ชื่อวิชาภาษาอังกฤษยาวเกิน 255 ตัวอักษร");
+    }
+    $type = trim((string)($row['subject_type'] ?? ''));
+    if (mb_strlen($type) > 100) {
+        throw new InvalidArgumentException("ประเภทวิชายาวเกิน 100 ตัวอักษร");
+    }
+
+    // เกณฑ์ผ่าน: ไม่บังคับกรอก ถ้ากรอกต้องเป็นตัวเลข 0 - 100
+    $passRaw = trim((string)($row['pass_score'] ?? ''));
+    $passScore = null;
+    if ($passRaw !== '') {
+        if (!is_numeric($passRaw)) {
+            throw new InvalidArgumentException("เกณฑ์ผ่านต้องเป็นตัวเลข เช่น 50 หรือ 60");
+        }
+        $passValue = (float)$passRaw;
+        if ($passValue < 0 || $passValue > 100) {
+            throw new InvalidArgumentException("เกณฑ์ผ่านต้องอยู่ระหว่าง 0 - 100 คะแนน");
+        }
+        $passScore = round($passValue, 2);
+    }
+
     return [
         'subject_code' => $code,
         'subject_name' => $name,
+        'subject_name_en' => $nameEn !== '' ? $nameEn : null,
         'credit' => $credit,
         'credit_desc' => $creditDesc,
+        'subject_type' => $type !== '' ? $type : null,
+        'pass_score' => $passScore,
     ];
 }
 

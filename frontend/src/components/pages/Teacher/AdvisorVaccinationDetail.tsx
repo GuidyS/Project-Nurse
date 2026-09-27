@@ -2,20 +2,14 @@ import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { ShieldAlert, Loader2, ChevronLeft, Search, ExternalLink } from "lucide-react";
+import { ShieldAlert, Loader2, ChevronLeft, ExternalLink } from "lucide-react";
 import api from "@/lib/axios";
-
-interface StudentListItem {
-  student_id: string;
-  full_name: string;
-  status: string;
-}
+import type { AdvisorDetailPanelProps } from "./advisorStudent";
 
 interface DoseItem {
   id: string;
@@ -38,100 +32,80 @@ interface VaccineGroup {
 
 const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8080").replace(/\/$/, "");
 
-export default function AdvisorVaccinationView() {
+// แผง "ข้อมูลวัคซีน" ของนักศึกษา 1 คน (โหมดดูอย่างเดียว)
+export default function AdvisorVaccinationDetail({ student, onBack }: AdvisorDetailPanelProps) {
   const { toast } = useToast();
-  const [view, setView] = useState<"list" | "detail">("list");
-  const [students, setStudents] = useState<StudentListItem[]>([]);
-  const [search, setSearch] = useState("");
-  const [isLoadingList, setIsLoadingList] = useState(true);
-
-  const [selectedStudent, setSelectedStudent] = useState<StudentListItem | null>(null);
   const [groups, setGroups] = useState<VaccineGroup[]>([]);
-  const [isLoadingDetail, setIsLoadingDetail] = useState(false);
-
-  // ดึงรายชื่อนักศึกษาในความดูแล
-  const fetchStudentList = async () => {
-    try {
-      setIsLoadingList(true);
-      const res = await api.get("/index.php?page=advisor-student-list");
-      if (res.data.status === "success") {
-        setStudents(res.data.data);
-      }
-    } catch (error) {
-      toast({ title: "ข้อผิดพลาด", description: "โหลดรายชื่อนักศึกษาไม่สำเร็จ", variant: "destructive" });
-    } finally {
-      setIsLoadingList(false);
-    }
-  };
+  const [isLoadingDetail, setIsLoadingDetail] = useState(true);
 
   useEffect(() => {
-    fetchStudentList();
-  }, []);
+    let cancelled = false;
 
-  // ดึงข้อมูลประวัติวัคซีนของนักศึกษาที่เลือก
-  const handleSelectStudent = async (student: StudentListItem) => {
-    setSelectedStudent(student);
-    setView("detail");
-    setIsLoadingDetail(true);
-    try {
-      const res = await api.get(
-        `/index.php?page=view-student-vaccinations&student_id=${encodeURIComponent(student.student_id)}`
-      );
-      if (res.data.status === "success") {
-        const rawRows: any[] = res.data.data;
-        const groupMap = new Map<string, VaccineGroup>();
+    const fetchDetail = async () => {
+      setIsLoadingDetail(true);
+      try {
+        const res = await api.get(
+          `/index.php?page=view-student-vaccinations&student_id=${encodeURIComponent(String(student.student_id))}`
+        );
+        if (cancelled) return;
 
-        rawRows.forEach((row) => {
-          const key = `seq_${row.sequence_no}_${row.vaccine_name}`;
-          if (!groupMap.has(key)) {
-            groupMap.set(key, {
-              id: `group-${row.sequence_no}-${Date.now()}`,
-              sequence_no: Number(row.sequence_no),
-              vaccine_name: row.vaccine_name,
-              immunity_status: (row.immunity_status as any) || "",
-              evidence_attached: Boolean(Number(row.evidence_attached)),
-              evidence_file_path: row.evidence_file_path || "",
-              advisor_name: row.advisor_name || "",
-              remark: row.remark || "",
-              doses: []
+        if (res.data.status === "success") {
+          const rawRows: any[] = res.data.data;
+          const groupMap = new Map<string, VaccineGroup>();
+
+          rawRows.forEach((row) => {
+            const key = `seq_${row.sequence_no}_${row.vaccine_name}`;
+            if (!groupMap.has(key)) {
+              groupMap.set(key, {
+                id: `group-${row.sequence_no}-${Date.now()}`,
+                sequence_no: Number(row.sequence_no),
+                vaccine_name: row.vaccine_name,
+                immunity_status: (row.immunity_status as any) || "",
+                evidence_attached: Boolean(Number(row.evidence_attached)),
+                evidence_file_path: row.evidence_file_path || "",
+                advisor_name: row.advisor_name || "",
+                remark: row.remark || "",
+                doses: []
+              });
+            }
+
+            const isYear = row.vaccine_name.includes("ไข้หวัดใหญ่");
+            groupMap.get(key)!.doses.push({
+              id: `dose-${row.sequence_no}-${row.dose_no}-${Math.random()}`,
+              dose_no: Number(row.dose_no) || 1,
+              label_type: isYear ? "year" : "dose",
+              received_date: row.received_date || ""
             });
-          }
-
-          const isYear = row.vaccine_name.includes("ไข้หวัดใหญ่");
-          groupMap.get(key)!.doses.push({
-            id: `dose-${row.sequence_no}-${row.dose_no}-${Math.random()}`,
-            dose_no: Number(row.dose_no) || 1,
-            label_type: isYear ? "year" : "dose",
-            received_date: row.received_date || ""
           });
-        });
 
-        const loaded = Array.from(groupMap.values());
-        loaded.forEach((g) => g.doses.sort((a, b) => a.dose_no - b.dose_no));
-        setGroups(loaded);
-      } else {
-        toast({ title: "ข้อผิดพลาด", description: res.data.message || "ไม่สามารถดูข้อมูลนักศึกษาคนนี้ได้", variant: "destructive" });
-        setView("list");
+          const loaded = Array.from(groupMap.values());
+          loaded.forEach((g) => g.doses.sort((a, b) => a.dose_no - b.dose_no));
+          setGroups(loaded);
+        } else {
+          toast({ title: "ข้อผิดพลาด", description: res.data.message || "ไม่สามารถดูข้อมูลนักศึกษาคนนี้ได้", variant: "destructive" });
+          onBack();
+        }
+      } catch (error) {
+        if (cancelled) return;
+        toast({ title: "ข้อผิดพลาด", description: "โหลดข้อมูลวัคซีนไม่สำเร็จ", variant: "destructive" });
+        onBack();
+      } finally {
+        if (!cancelled) setIsLoadingDetail(false);
       }
-    } catch (error) {
-      toast({ title: "ข้อผิดพลาด", description: "โหลดข้อมูลวัคซีนไม่สำเร็จ", variant: "destructive" });
-      setView("list");
-    } finally {
-      setIsLoadingDetail(false);
-    }
-  };
+    };
 
-  const handleBack = () => {
-    setView("list");
-    setSelectedStudent(null);
-    setGroups([]);
-  };
+    fetchDetail();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [student.student_id]);
 
   // คำนวณ Label แยกตามประเภท (เข็ม หรือ ปี)
   const getDoseLabel = (doses: DoseItem[], currentIndex: number) => {
     const currentItem = doses[currentIndex];
     const subList = doses.slice(0, currentIndex + 1);
-    
+
     if (currentItem.label_type === "year") {
       const yearCount = subList.filter(d => d.label_type === "year").length;
       return `ปี ${yearCount}`;
@@ -141,89 +115,11 @@ export default function AdvisorVaccinationView() {
     }
   };
 
-  const filteredStudents = students.filter(
-    (s) => s.full_name.includes(search) || s.student_id.includes(search)
-  );
-
-  // ==========================================
-  // VIEW 1: หน้ารายชื่อนักศึกษาในความดูแล
-  // ==========================================
-  if (view === "list") {
-    return (
-      <div className="p-6 space-y-6 animate-fade-in max-w-7xl mx-auto">
-        <div className="app-page-header">
-          <div className="min-w-0">
-            <h1 className="app-page-title">นักศึกษาในความดูแล</h1>
-            <p className="app-page-description">ข้อมูลภาวะสุขภาพและวัคซีนของนักศึกษา (โหมดดูข้อมูล)</p>
-          </div>
-        </div>
-
-        <div className="relative max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="ค้นหาชื่อหรือรหัสนักศึกษา"
-            className="pl-9"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-
-        <Card>
-          <CardContent className="p-0">
-            {isLoadingList ? (
-              <div className="py-16 flex justify-center">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-40">รหัสนักศึกษา</TableHead>
-                    <TableHead>ชื่อ-นามสกุล</TableHead>
-                    <TableHead className="w-32">สถานะ</TableHead>
-                    <TableHead className="w-32 text-right">ดำเนินการ</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredStudents.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-                        ไม่พบข้อมูลนักศึกษาในความดูแล
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredStudents.map((s) => (
-                      <TableRow key={s.student_id}>
-                        <TableCell className="font-medium">{s.student_id}</TableCell>
-                        <TableCell>{s.full_name}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{s.status}</Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button size="sm" variant="outline" onClick={() => handleSelectStudent(s)}>
-                            ดูข้อมูล
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  // ==========================================
-  // VIEW 2: หน้ารายละเอียด (ตาราง Read-Only)
-  // ==========================================
   return (
     <div className="space-y-6 max-w-7xl mx-auto p-6 animate-fade-in">
-      <div className="app-page-header">
-        <div className="flex min-w-0 items-start gap-3">
-          <Button variant="outline" size="icon" onClick={handleBack} className="shrink-0">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="icon" onClick={onBack} className="shrink-0">
             <ChevronLeft className="h-5 w-5" />
           </Button>
           <div>
@@ -233,8 +129,8 @@ export default function AdvisorVaccinationView() {
                 ส่วนที่ 3 ข้อมูลภาวะสุขภาพและการได้รับวัคซีนป้องกันโรค
               </h1>
             </div>
-            <p className="app-page-description">
-              ข้อมูลของ {selectedStudent?.full_name} (รหัสนักศึกษา: {selectedStudent?.student_id}) — <b>โหมดดูอย่างเดียว</b>
+            <p className="text-sm text-muted-foreground mt-1">
+              ข้อมูลของ {student.full_name} (รหัสนักศึกษา: {student.student_id}) — <b>โหมดดูอย่างเดียว</b>
             </p>
           </div>
         </div>
@@ -287,27 +183,27 @@ export default function AdvisorVaccinationView() {
 
                         <div className="space-y-2 pl-1 text-xs pointer-events-none">
                           <div className="flex items-center space-x-2">
-                            <Checkbox 
-                              id={`uninf-${group.id}`} 
-                              checked={group.immunity_status === "none_uninfected"} 
+                            <Checkbox
+                              id={`uninf-${group.id}`}
+                              checked={group.immunity_status === "none_uninfected"}
                               disabled
                             />
                             <Label htmlFor={`uninf-${group.id}`} className="text-muted-foreground">ไม่มีภูมิ ไม่เคยติดเชื้อ</Label>
                           </div>
 
                           <div className="flex items-center space-x-2">
-                            <Checkbox 
-                              id={`inf-${group.id}`} 
-                              checked={group.immunity_status === "none_infected"} 
+                            <Checkbox
+                              id={`inf-${group.id}`}
+                              checked={group.immunity_status === "none_infected"}
                               disabled
                             />
                             <Label htmlFor={`inf-${group.id}`} className="text-muted-foreground">ไม่มีภูมิ แต่เคยติดเชื้อ</Label>
                           </div>
 
                           <div className="flex items-center space-x-2">
-                            <Checkbox 
-                              id={`has-${group.id}`} 
-                              checked={group.immunity_status === "has_immunity"} 
+                            <Checkbox
+                              id={`has-${group.id}`}
+                              checked={group.immunity_status === "has_immunity"}
                               disabled
                             />
                             <Label htmlFor={`has-${group.id}`} className="text-muted-foreground">มีภูมิคุ้มกันโรค</Label>
@@ -315,9 +211,9 @@ export default function AdvisorVaccinationView() {
 
                           <div className="space-y-2 pl-6 pt-1 border-t border-border/40">
                             <div className="flex items-center space-x-2">
-                              <Checkbox 
-                                id={`doc-${group.id}`} 
-                                checked={group.evidence_attached} 
+                              <Checkbox
+                                id={`doc-${group.id}`}
+                                checked={group.evidence_attached}
                                 disabled
                               />
                               <Label htmlFor={`doc-${group.id}`} className="text-xs text-muted-foreground font-medium">

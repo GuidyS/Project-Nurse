@@ -13,7 +13,6 @@ import LoginPage from "@/components/pages/Auth/LoginPage";
 import RegisterPage from "@/components/pages/Auth/RegisterPage";
 import Transcript from "@/components/pages/Student/Transcript";
 import Portfolio from "@/components/pages/Student/Portfolio";
-import CLOManagement from "@/components/pages/Teacher/CLOManagement";
 import PLOYLOReport from "@/components/pages/Teacher/PLOYLOReport";
 import FiveYearSummary from "@/components/pages/Teacher/FiveYearSummary";
 import CourseReports from "@/components/pages/Teacher/CourseReports";
@@ -45,10 +44,8 @@ import Retention from "@/components/pages/Teacher/Retention";
 import PracticalPage from '@/components/pages/Teacher/PracticalPage';
 import FacultyDimensionPage from '@/components/pages/Teacher/FacultyDimensionPage';
 import StudentVaccinationPage from "@/components/pages/Student/StudentVaccinationPage";
-import AdvisorVaccinationView from "@/components/pages/Teacher/AdvisorVaccinationView";
 import StudentHealthRecordsPage from "@/components/pages/Student/StudentHealthRecordsPage";
 import AdvisorHealthRecordsView from "@/components/pages/Teacher/AdvisorHealthRecordsView";
-import AdvisorCompetencyView from "@/components/pages/Teacher/AdvisorCompetencyView";
 import CompetencyItemsManagement from "@/components/pages/Admin/CompetencyItemsManagement";
 import StudentCompetencyView from "@/components/pages/Student/StudentCompetencyView"; 
 import CurriculumCycles from "@/components/pages/Admin/CurriculumCycles";
@@ -246,13 +243,12 @@ const Index = () => {
 
     // 5. 🔒 หมวดสิทธิ์อาจารย์และคณะกรรมการ (Teacher - Role 2) หรือ Admin
     const teacherPages = [
-      "courses", "five-year-summary", "clo-management", "clos",
+      "courses", "five-year-summary", "clos",
       "plo-ylo-report", "course-report", "course-students", "documents", "assign-instructors", "clo-map",
       "evidence", "grades", "performance", "practical-students",
-      "program-reports", "schedule-tasks", "advise-notes", "advises",
-      "students-info", "transfer-requests", "my-research", "research-summary",
-      "advisor-vaccination-view", "advisor-health-records-view",
-      "advisor-competency-view"
+      "program-reports", "schedule-tasks", "advise-notes", "advisor-notifications", "advises",
+      "students", "students-info", "transfer-requests", "my-research", "research-summary",
+      "advisor-health-records-view"
     ];
     
     if (teacherPages.includes(activeItem)) {
@@ -261,7 +257,6 @@ const Index = () => {
       switch (activeItem) {
         case "courses": return <CoursesPage />;                                     //*
         case "five-year-summary": return <FiveYearSummary />;                       //*
-        case "clo-management": return <CLOManagement />;                            //*
         case "clos": return <CLOPage />; // แก้ไขให้ใช้ CLOPage หน้าเดียว                //*
         case "plo-ylo-report": return <PLOYLOReport />;                                  //*
         case "course-report": return <CourseReports />;                             //*
@@ -280,9 +275,8 @@ const Index = () => {
         case "students-info": return <StudentsInfo />;                              /* รายชื่อเด็กในที่ปรึกษาของอจ. */
         case "transfer-requests": return <TransferRequests />;                      //*
         case "research-summary": return <ResearchSummary />;
-        case "advisor-vaccination-view": return <AdvisorVaccinationView />;  
+        // หน้ารวม: ข้อมูลวัคซีน / ข้อมูลสุขภาพ / ประเมินสมรรถนะหลัก อยู่ในหน้าเดียว
         case "advisor-health-records-view": return <AdvisorHealthRecordsView />;
-        case "advisor-competency-view": return <AdvisorCompetencyView />;
       }
     }
 

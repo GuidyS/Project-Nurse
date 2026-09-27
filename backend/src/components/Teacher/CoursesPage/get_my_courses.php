@@ -70,6 +70,8 @@ try {
     $stmt = $db->prepare($sql);
     $stmt->execute($my_subject_codes);
     $courses = activeCurriculumApplyNames($db, $stmt->fetchAll(PDO::FETCH_ASSOC), 'code', 'name');
+    // เกณฑ์ผ่านของรายวิชา ตั้งค่าที่หน้า "จัดการหลักสูตร" (null = ใช้ค่าเริ่มต้นของระบบ)
+    $courses = activeCurriculumApplyPassScore($db, $courses, 'code');
 
     foreach ($courses as &$course) {
         $course['cloCount'] = $cloCounts[$course['code']] ?? 0;

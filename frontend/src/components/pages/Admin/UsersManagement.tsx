@@ -9,12 +9,14 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Search, Edit, Trash2, MoreHorizontal, Upload, Users as UsersIcon } from "lucide-react";
+import { Loader2, Search, Edit, Trash2, MoreHorizontal, Upload, Users as UsersIcon, CalendarClock, Info } from "lucide-react";
+import { onlyEnglish, onlyThai } from "@/lib/nameInput";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import api from "@/lib/axios";
 import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ImportDataDialog, type ImportDataTypeOption } from "@/components/shared/ImportDataDialog";
+import { AcademicSettingsDialog, formatCutoff, type AcademicSettings } from "./AcademicSettingsDialog";
 
 interface User {
   id: string;
@@ -27,6 +29,36 @@ interface User {
 }
 
 type RoleTab = "teacher" | "student" | "admin" | "unassigned";
+
+// สถานะที่แอดมินเลือกได้ (ต้องตรงกับ backend/src/components/Admin/ManageUsers/user_status_helpers.php)
+const STUDENT_STATUS_OPTIONS = [
+  { value: "Active", label: "คงอยู่" },
+  { value: "OnLeave", label: "พักการเรียน" },
+  { value: "Resigned", label: "ลาออก" },
+];
+const STUDENT_STATUS_NEEDS_REASON = ["OnLeave", "Resigned"];
+const STUDENT_STATUS_REASONS = ["ปัญหาการเงิน", "ย้ายที่เรียน", "ปัญหาสุขภาพ", "โดนรีไทร์"];
+const FACULTY_STATUS_OPTIONS = [
+  { value: "Active", label: "คงอยู่" },
+  { value: "Resigned", label: "ลาออก" },
+  { value: "Retired", label: "เกษียณ" },
+];
+
+// ช่องที่แอดมินดูได้อย่างเดียว (นักศึกษากรอกเอง หรือระบบคำนวณให้)
+const ReadOnlyField = ({ label, value, note }: { label: string; value?: string | number | null; note?: string }) => (
+  <div className="space-y-2">
+    <Label className="text-muted-foreground">{label}</Label>
+    <Input value={value === null || value === undefined || value === "" ? "-" : String(value)} disabled className="bg-muted/40" />
+    {note && <p className="text-xs text-muted-foreground">{note}</p>}
+  </div>
+);
+
+const calculateBmi = (height?: string | number, weight?: string | number) => {
+  const h = parseFloat(String(height ?? ""));
+  const w = parseFloat(String(weight ?? ""));
+  if (!h || !w) return "";
+  return (w / (h / 100) ** 2).toFixed(2);
+};
 
 const roleLabels: Record<string, string> = {
   admin: "ผู้ดูแลระบบ",
@@ -106,7 +138,14 @@ export default function UsersManagement() {
     portfolio_id?: number | null;
   } | null>(null);
   const [isDeleteDocOpen, setIsDeleteDocOpen] = useState(false);
+  const [isAcademicSettingsOpen, setIsAcademicSettingsOpen] = useState(false);
+  const [academicSettings, setAcademicSettings] = useState<AcademicSettings | null>(null);
   const { toast } = useToast();
+
+  // ใช้บอกในฟอร์มว่าระบบเลื่อนชั้นปีให้วันไหน
+  const promotionLabel = academicSettings
+    ? formatCutoff(academicSettings.cutoff_month, academicSettings.cutoff_day)
+    : "ที่ตั้งไว้";
 
   // ดึงข้อมูลผู้ใช้จาก API
   const fetchUsers = async () => {
@@ -120,6 +159,10 @@ export default function UsersManagement() {
 
   useEffect(() => {
     fetchUsers();
+    // วันเลื่อนชั้นปีที่ตั้งไว้ ใช้บอกในฟอร์มแก้ไขนักศึกษา
+    api.get("/index.php?page=get-academic-settings")
+      .then((res) => setAcademicSettings(res.data?.data ?? null))
+      .catch(() => setAcademicSettings(null));
   }, []);
 
   // 🎯 ดึงข้อมูลเข้าฟอร์มแก้ไข
@@ -381,6 +424,10 @@ export default function UsersManagement() {
             <p className="app-page-description">สร้างบัญชีจากข้อมูลอาจารย์/นักศึกษา แก้ไข ลบ และมอบบทบาท</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" className="gap-2" onClick={() => setIsAcademicSettingsOpen(true)}>
+              <CalendarClock className="h-4 w-4" />
+              ตั้งค่าปีการศึกษา
+            </Button>
             <Button variant="outline" className="gap-2" onClick={() => setIsImportOpen(true)}>
               <Upload className="h-4 w-4" />
               Import ข้อมูล
@@ -508,11 +555,11 @@ export default function UsersManagement() {
             {/* 💥 กรณีแก้ไขอาจารย์ (Teacher / Admin) */}
             {(editingUserRole === 1 || editingUserRole === 2) && (
               <>
-                <div className="space-y-2"><Label>คำนำหน้า</Label><Input value={detailForm.title || ""} onChange={e => setDetailForm({...detailForm, title: e.target.value})} /></div>
-                <div className="space-y-2"><Label>ชื่อภาษาไทย</Label><Input value={detailForm.first_name_th || ""} onChange={e => setDetailForm({...detailForm, first_name_th: e.target.value})} /></div>
-                <div className="space-y-2"><Label>นามสกุลภาษาไทย</Label><Input value={detailForm.last_name_th || ""} onChange={e => setDetailForm({...detailForm, last_name_th: e.target.value})} /></div>
-                <div className="space-y-2"><Label>ชื่อภาษาอังกฤษ</Label><Input value={detailForm.first_name_en || ""} onChange={e => setDetailForm({...detailForm, first_name_en: e.target.value})} /></div>
-                <div className="space-y-2"><Label>นามสกุลภาษาอังกฤษ</Label><Input value={detailForm.last_name_en || ""} onChange={e => setDetailForm({...detailForm, last_name_en: e.target.value})} /></div>
+                <div className="col-span-2 space-y-2 sm:max-w-[50%] sm:pr-2"><Label>คำนำหน้า</Label><Input value={detailForm.title || ""} onChange={e => setDetailForm({...detailForm, title: onlyThai(e.target.value)})} /></div>
+                <div className="space-y-2"><Label>ชื่อภาษาไทย</Label><Input value={detailForm.first_name_th || ""} onChange={e => setDetailForm({...detailForm, first_name_th: onlyThai(e.target.value)})} placeholder="ภาษาไทยเท่านั้น" /></div>
+                <div className="space-y-2"><Label>นามสกุลภาษาไทย</Label><Input value={detailForm.last_name_th || ""} onChange={e => setDetailForm({...detailForm, last_name_th: onlyThai(e.target.value)})} placeholder="ภาษาไทยเท่านั้น" /></div>
+                <div className="space-y-2"><Label>ชื่อภาษาอังกฤษ</Label><Input value={detailForm.first_name_en || ""} onChange={e => setDetailForm({...detailForm, first_name_en: onlyEnglish(e.target.value)})} placeholder="English only" /></div>
+                <div className="space-y-2"><Label>นามสกุลภาษาอังกฤษ</Label><Input value={detailForm.last_name_en || ""} onChange={e => setDetailForm({...detailForm, last_name_en: onlyEnglish(e.target.value)})} placeholder="English only" /></div>
                 <div className="space-y-2"><Label>เพศ</Label><Input value={detailForm.gender || ""} onChange={e => setDetailForm({...detailForm, gender: e.target.value})} /></div>
                 <div className="space-y-2"><Label>ว/ด/ป เกิด</Label><Input type="date" value={detailForm.birth_date || ""} onChange={e => setDetailForm({...detailForm, birth_date: e.target.value})} /></div>
                 <div className="space-y-2"><Label>อีเมล</Label><Input type="email" value={detailForm.email || ""} onChange={e => setDetailForm({...detailForm, email: e.target.value})} /></div>
@@ -523,7 +570,20 @@ export default function UsersManagement() {
                 <div className="space-y-2"><Label>วันที่เริ่มปฏิบัติงาน</Label><Input type="date" value={detailForm.start_work_date || ""} onChange={e => setDetailForm({...detailForm, start_work_date: e.target.value})} /></div>
                 <div className="space-y-2"><Label>วันที่รับตำแหน่งทางวิชาการ</Label><Input type="date" value={detailForm.academic_position_date || ""} onChange={e => setDetailForm({...detailForm, academic_position_date: e.target.value})} /></div>
                 <div className="space-y-2"><Label>ไฟล์รูปโปรไฟล์ (URL/ชื่อไฟล์)</Label><Input value={detailForm.profile_picture || ""} onChange={e => setDetailForm({...detailForm, profile_picture: e.target.value})} /></div>
-                <div className="space-y-2"><Label>สถานะการทำงาน</Label><Input value={detailForm.status || ""} onChange={e => setDetailForm({...detailForm, status: e.target.value})} placeholder="Active/Retired" /></div>
+                <div className="space-y-2">
+                  <Label>สถานะการทำงาน</Label>
+                  <Select
+                    value={FACULTY_STATUS_OPTIONS.some(o => o.value === detailForm.status) ? detailForm.status : "Active"}
+                    onValueChange={(value) => setDetailForm({ ...detailForm, status: value })}
+                  >
+                    <SelectTrigger><SelectValue placeholder="เลือกสถานะ" /></SelectTrigger>
+                    <SelectContent>
+                      {FACULTY_STATUS_OPTIONS.map(o => (
+                        <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <PdfUploadSection description="เอกสารจะถูกบันทึกตามประเภทที่เลือก และแสดงในหน้าโปรไฟล์ของอาจารย์/บุคลากร" />
               </>
             )}
@@ -531,28 +591,83 @@ export default function UsersManagement() {
             {/* 💥 กรณีแก้ไขนักศึกษา (Student) */}
             {editingUserRole === 3 && (
               <>
-                <div className="space-y-2"><Label>คำนำหน้า</Label><Input value={detailForm.title || ""} onChange={e => setDetailForm({...detailForm, title: e.target.value})} /></div>
-                <div className="space-y-2"><Label>ชื่อภาษาไทย</Label><Input value={detailForm.first_name_th || ""} onChange={e => setDetailForm({...detailForm, first_name_th: e.target.value})} /></div>
-                <div className="space-y-2"><Label>นามสกุลภาษาไทย</Label><Input value={detailForm.last_name_th || ""} onChange={e => setDetailForm({...detailForm, last_name_th: e.target.value})} /></div>
-                <div className="space-y-2"><Label>ชื่อภาษาอังกฤษ</Label><Input value={detailForm.first_name_en || ""} onChange={e => setDetailForm({...detailForm, first_name_en: e.target.value})} /></div>
-                <div className="space-y-2"><Label>นามสกุลภาษาอังกฤษ</Label><Input value={detailForm.last_name_en || ""} onChange={e => setDetailForm({...detailForm, last_name_en: e.target.value})} /></div>
-                <div className="space-y-2"><Label>ปีที่รับเข้าศึกษา</Label><Input value={detailForm.admission_year || ""} onChange={e => setDetailForm({...detailForm, admission_year: e.target.value})} /></div>
-                <div className="space-y-2"><Label>ชั้นปี</Label><Input type="number" value={detailForm.year_level || ""} onChange={e => setDetailForm({...detailForm, year_level: e.target.value})} /></div>
-                <div className="space-y-2"><Label>เพศ</Label><Input value={detailForm.gender || ""} onChange={e => setDetailForm({...detailForm, gender: e.target.value})} /></div>
-                <div className="space-y-2"><Label>ว/ด/ป เกิด</Label><Input type="date" value={detailForm.birth_date || ""} onChange={e => setDetailForm({...detailForm, birth_date: e.target.value})} /></div>
-                <div className="space-y-2"><Label>อีเมล</Label><Input type="email" value={detailForm.email || ""} onChange={e => setDetailForm({...detailForm, email: e.target.value})} /></div>
-                <div className="space-y-2"><Label>เบอร์โทรศัพท์</Label><Input value={detailForm.phone || ""} onChange={e => setDetailForm({...detailForm, phone: e.target.value})} /></div>
-                <div className="space-y-2"><Label>โทรศัพท์บ้าน</Label><Input value={detailForm.home_phone || ""} onChange={e => setDetailForm({...detailForm, home_phone: e.target.value})} /></div>
-                <div className="space-y-2"><Label>เกรดเฉลี่ย (GPA)</Label><Input type="number" step="0.01" value={detailForm.gpa || ""} onChange={e => setDetailForm({...detailForm, gpa: e.target.value})} /></div>
-                <div className="space-y-2"><Label>ภูมิลำเนา (จังหวัด)</Label><Input value={detailForm.hometown_province || ""} onChange={e => setDetailForm({...detailForm, hometown_province: e.target.value})} /></div>
-                <div className="space-y-2"><Label>ส่วนสูง (ซม.)</Label><Input type="number" value={detailForm.height || ""} onChange={e => setDetailForm({...detailForm, height: e.target.value})} /></div>
-                <div className="space-y-2"><Label>น้ำหนัก (กก.)</Label><Input type="number" value={detailForm.weight || ""} onChange={e => setDetailForm({...detailForm, weight: e.target.value})} /></div>
-                <div className="space-y-2"><Label>BMI</Label><Input type="number" step="0.01" value={detailForm.bmi || ""} onChange={e => setDetailForm({...detailForm, bmi: e.target.value})} /></div>
-                <div className="col-span-2 space-y-2"><Label>ที่อยู่ตามทะเบียนบ้าน</Label><Textarea value={detailForm.home_address || ""} onChange={e => setDetailForm({...detailForm, home_address: e.target.value})} /></div>
-                <div className="space-y-2"><Label>สถานะ</Label><Input value={detailForm.status || ""} onChange={e => setDetailForm({...detailForm, status: e.target.value})} /></div>
-                <div className="space-y-2"><Label>วันที่จบการศึกษา</Label><Input type="date" value={detailForm.graduation_date || ""} onChange={e => setDetailForm({...detailForm, graduation_date: e.target.value})} /></div>
-                <div className="space-y-2"><Label>วันที่พ้นสภาพ</Label><Input type="date" value={detailForm.dropout_date || ""} onChange={e => setDetailForm({...detailForm, dropout_date: e.target.value})} /></div>
-                <div className="col-span-2 space-y-2"><Label>เหตุผลที่พ้นสภาพ</Label><Input value={detailForm.dropout_reason || ""} onChange={e => setDetailForm({...detailForm, dropout_reason: e.target.value})} /></div>
+                <div className="col-span-2 flex items-start gap-2 rounded-md border border-primary/30 bg-primary/5 p-3 text-sm">
+                  <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                  <span>ข้อมูลของนักศึกษาแก้ไขได้เฉพาะเจ้าของบัญชีในหน้า "ข้อมูลส่วนตัว" ผู้ดูแลระบบเปลี่ยนได้เฉพาะสถานะเท่านั้น</span>
+                </div>
+
+                <ReadOnlyField label="คำนำหน้า" value={detailForm.title} />
+                <div className="hidden sm:block" />
+                <ReadOnlyField label="ชื่อภาษาไทย" value={detailForm.first_name_th} />
+                <ReadOnlyField label="นามสกุลภาษาไทย" value={detailForm.last_name_th} />
+                <ReadOnlyField label="ชื่อภาษาอังกฤษ" value={detailForm.first_name_en} />
+                <ReadOnlyField label="นามสกุลภาษาอังกฤษ" value={detailForm.last_name_en} />
+                <ReadOnlyField label="เพศ" value={detailForm.gender} />
+                <ReadOnlyField label="ว/ด/ป เกิด" value={detailForm.birth_date} />
+                <ReadOnlyField label="อีเมล" value={detailForm.email} />
+                <ReadOnlyField label="เบอร์โทรศัพท์" value={detailForm.phone} />
+
+                <ReadOnlyField label="ปีที่รับเข้าศึกษา" value={detailForm.admission_year} note="กำหนดจากรหัสนักศึกษา แก้ไขไม่ได้" />
+                <ReadOnlyField
+                  label="ชั้นปี"
+                  value={detailForm.year_level}
+                  note={`ระบบเลื่อนชั้นปีให้อัตโนมัติทุกวันที่ ${promotionLabel}`}
+                />
+
+                <ReadOnlyField label="เบอร์โทรศัพท์บิดา" value={detailForm.father_phone} note="นักศึกษากรอกเอง" />
+                <ReadOnlyField label="เบอร์โทรศัพท์มารดา" value={detailForm.mother_phone} note="นักศึกษากรอกเอง" />
+
+                <ReadOnlyField label="ส่วนสูง (ซม.)" value={detailForm.height} note="นักศึกษากรอกเอง" />
+                <ReadOnlyField label="น้ำหนัก (กก.)" value={detailForm.weight} note="นักศึกษากรอกเอง" />
+                <ReadOnlyField label="BMI" value={detailForm.bmi || calculateBmi(detailForm.height, detailForm.weight)} note="คำนวณจากส่วนสูงและน้ำหนัก" />
+
+                <div className="col-span-2 space-y-2">
+                  <Label className="text-muted-foreground">ที่อยู่ปัจจุบัน</Label>
+                  <Textarea value={detailForm.home_address || ""} disabled className="bg-muted/40" />
+                  <p className="text-xs text-muted-foreground">นักศึกษากรอกเองในหน้าข้อมูลส่วนตัว</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>สถานะ</Label>
+                  <Select
+                    value={STUDENT_STATUS_OPTIONS.some(o => o.value === detailForm.status) ? detailForm.status : "Active"}
+                    onValueChange={(value) =>
+                      setDetailForm({
+                        ...detailForm,
+                        status: value,
+                        dropout_reason: value === "Active" ? "" : detailForm.dropout_reason,
+                      })
+                    }
+                  >
+                    <SelectTrigger><SelectValue placeholder="เลือกสถานะ" /></SelectTrigger>
+                    <SelectContent>
+                      {STUDENT_STATUS_OPTIONS.map(o => (
+                        <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {STUDENT_STATUS_NEEDS_REASON.includes(detailForm.status) && (
+                  <div className="space-y-2">
+                    <Label>เหตุผล</Label>
+                    <Select
+                      value={STUDENT_STATUS_REASONS.includes(detailForm.dropout_reason) ? detailForm.dropout_reason : ""}
+                      onValueChange={(value) => setDetailForm({ ...detailForm, dropout_reason: value })}
+                    >
+                      <SelectTrigger><SelectValue placeholder="เลือกเหตุผล" /></SelectTrigger>
+                      <SelectContent>
+                        {STUDENT_STATUS_REASONS.map(reason => (
+                          <SelectItem key={reason} value={reason}>{reason}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {STUDENT_STATUS_NEEDS_REASON.includes(detailForm.status) && detailForm.dropout_date && (
+                  <ReadOnlyField label="วันที่เปลี่ยนสถานะ" value={detailForm.dropout_date} note="ระบบบันทึกให้อัตโนมัติ" />
+                )}
                 <PdfUploadSection description="ไฟล์จะถูกบันทึกเป็นรายการ Portfolio ของนักศึกษา และแสดงในหน้าโปรไฟล์" />
               </>
             )}
@@ -563,6 +678,13 @@ export default function UsersManagement() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AcademicSettingsDialog
+        open={isAcademicSettingsOpen}
+        onOpenChange={setIsAcademicSettingsOpen}
+        onSaved={setAcademicSettings}
+        onPurged={fetchUsers}
+      />
 
       <ImportDataDialog
         open={isImportOpen}
