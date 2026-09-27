@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
-import { ClipboardCheck, Loader2, ChevronLeft, Users, Search, Save } from "lucide-react";
+import { ClipboardCheck, Loader2, ChevronLeft, Search, Save } from "lucide-react";
 import api from "@/lib/axios";
 
 interface StudentListItem {
@@ -146,11 +146,8 @@ export default function AdvisorCompetencyView() {
       <div className="p-6 space-y-6 animate-fade-in max-w-7xl mx-auto">
         <div className="app-page-header">
           <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <Users className="h-6 w-6 text-primary" />
             <h1 className="app-page-title">ประเมินสมรรถนะหลักนักศึกษา</h1>
-          </div>
-          <p className="app-page-description">เลือกนักศึกษาในความดูแลเพื่อประเมินสมรรถนะหลักตามชั้นปี</p>
+            <p className="app-page-description">เลือกนักศึกษาในความดูแลเพื่อประเมินสมรรถนะหลักตามชั้นปี</p>
           </div>
         </div>
 

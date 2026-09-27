@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Activity, Loader2, ChevronLeft, Users, Search } from "lucide-react";
+import { Activity, Loader2, ChevronLeft, Search } from "lucide-react";
 import api from "@/lib/axios";
 
 interface StudentListItem {
@@ -84,11 +84,8 @@ export default function AdvisorHealthRecordsView() {
       <div className="p-6 space-y-6 animate-fade-in max-w-7xl mx-auto">
         <div className="app-page-header">
           <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <Users className="h-6 w-6 text-primary" />
             <h1 className="app-page-title">ภาวะสุขภาพนักศึกษาในความดูแล</h1>
-          </div>
-          <p className="app-page-description">ตรวจสอบภาวะสุขภาพ ส่วนสูง น้ำหนัก และ BMI (ดูอย่างเดียว)</p>
+            <p className="app-page-description">ตรวจสอบภาวะสุขภาพ ส่วนสูง น้ำหนัก และ BMI (ดูอย่างเดียว)</p>
           </div>
         </div>
 

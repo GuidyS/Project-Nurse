@@ -1,6 +1,6 @@
 import { useState, useEffect, Fragment } from "react";
 import api from "@/lib/axios";
-import { Search, Download, Eye, Mail, MoreVertical, Target, CheckCircle2, Lock, User, GraduationCap, Send, Loader2 } from "lucide-react";
+import { Search, Eye, Mail, MoreVertical, Target, CheckCircle2, Lock, User, GraduationCap, Send, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -183,36 +183,6 @@ const StudentsInfo = () => {
           matchesSearch(s.email)
       )
     : students;
-
-  const handleExport = () => {
-    try {
-      const headers = ['รหัสนักศึกษา', 'ชื่อ-นามสกุล', 'ชั้นปี', 'เกรดเฉลี่ย', 'สถานะ', 'อีเมล'];
-      const csvRows = [headers.join(',')];
-      
-      filteredStudents.forEach(student => {
-        csvRows.push([
-          student.studentId,
-          student.name,
-          student.year,
-          student.gpa,
-          student.status,
-          student.email
-        ].join(','));
-      });
-      
-      const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + csvRows.join('\n');
-      const encodedUri = encodeURI(csvContent);
-      
-      const link = document.createElement("a");
-      link.setAttribute("href", encodedUri);
-      link.setAttribute("download", `รายชื่อนักศึกษา.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    } catch (error) {
-      console.error('Error exporting data:', error);
-    }
-  };
 
   const getStatusBadge = (status: string) => {
     if (status === "ปกติ" || status === "normal" || status === "active") {
@@ -447,9 +417,11 @@ const StudentsInfo = () => {
 
       {/* Search & Filter */}
       <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative w-full max-w-sm">
+        <div className="relative w-full max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
+            type="search"
+            aria-label="ค้นหาชื่อหรือรหัสนักศึกษา"
             placeholder="ค้นหาชื่อหรือรหัสนักศึกษา..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -474,16 +446,9 @@ const StudentsInfo = () => {
             {filteredStudents.map((student) => (
               <TableRow key={student.id} className="cursor-pointer hover:bg-muted/50" onClick={() => openStudentDetail(student)}>
                 <TableCell>
-                  <div className="flex items-center gap-3">
-                    <Avatar className="h-9 w-9">
-                      <AvatarFallback className="bg-muted text-muted-foreground text-sm">
-                        {student.name.charAt(0)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="font-medium text-foreground">{student.name}</p>
-                      <p className="text-xs text-muted-foreground">{student.email}</p>
-                    </div>
+                  <div>
+                    <p className="font-medium text-foreground">{student.name}</p>
+                    <p className="text-xs text-muted-foreground">{student.email}</p>
                   </div>
                 </TableCell>
                 <TableCell className="text-muted-foreground">{student.studentId}</TableCell>

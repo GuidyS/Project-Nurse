@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { ShieldAlert, Loader2, ChevronLeft, Users, Search, ExternalLink } from "lucide-react";
+import { ShieldAlert, Loader2, ChevronLeft, Search, ExternalLink } from "lucide-react";
 import api from "@/lib/axios";
 
 interface StudentListItem {
@@ -153,11 +153,8 @@ export default function AdvisorVaccinationView() {
       <div className="p-6 space-y-6 animate-fade-in max-w-7xl mx-auto">
         <div className="app-page-header">
           <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <Users className="h-6 w-6 text-primary" />
             <h1 className="app-page-title">นักศึกษาในความดูแล</h1>
-          </div>
-          <p className="app-page-description">ข้อมูลภาวะสุขภาพและวัคซีนของนักศึกษา (โหมดดูข้อมูล)</p>
+            <p className="app-page-description">ข้อมูลภาวะสุขภาพและวัคซีนของนักศึกษา (โหมดดูข้อมูล)</p>
           </div>
         </div>
 

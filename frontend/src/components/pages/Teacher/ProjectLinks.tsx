@@ -133,17 +133,18 @@ export default function ProjectLinks() {
   };
 
   return (
-    <>
-      <div className="app-page-header mb-6">
+    <div className="app-page animate-fade-in">
+      <div className="app-page-header">
         <div>
           <h1 className="app-page-title">เชื่อมโยงผลลัพธ์โครงการ</h1>
           <p className="app-page-description">จัดการความเชื่อมโยงโครงการกับ PLO, YLO และ CLO</p>
         </div>
       </div>
-      <div className="grid gap-6 md:grid-cols-3">
+
+      <div className="grid items-start gap-5 xl:grid-cols-[minmax(260px,320px)_minmax(0,1fr)]">
         {/* เมนูเลือกโครงการฝั่งซ้าย */}
-        <div className="md:col-span-1 space-y-4">
-          <Card>
+        <div className="space-y-5">
+          <Card className="app-section-card overflow-hidden">
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <TrendingUp className="h-5 w-5" />
@@ -151,15 +152,16 @@ export default function ProjectLinks() {
               </CardTitle>
               <CardDescription>คลิกเลือกโครงการที่ต้องการจัดพิกัดเป้าหมาย</CardDescription>
             </CardHeader>
-            <CardContent className="p-2">
+            <CardContent className="p-3 pt-0">
               <div className="space-y-1">
                 {projects.map((project) => (
                   <button
+                    type="button"
                     key={project.id}
                     onClick={() => setSelectedProjectId(project.id.toString())}
-                    className={`w-full text-left px-4 py-3 rounded-lg text-sm transition-colors font-medium ${
+                    className={`w-full rounded-md px-3 py-2.5 text-left text-sm font-medium transition-colors ${
                       selectedProjectId === project.id.toString()
-                        ? 'bg-primary/15 text-primary'
+                        ? 'bg-primary/10 text-primary'
                         : 'hover:bg-muted text-foreground'
                     }`}
                   >
@@ -172,7 +174,7 @@ export default function ProjectLinks() {
 
           {/* การแสดงผลสรุปที่เชื่อมโยง */}
           {selectedProjectId && (
-            <Card>
+            <Card className="app-section-card">
               <CardHeader>
                 <CardTitle className="text-sm font-semibold">สรุปผลลัพธ์ที่เชื่อมโยง</CardTitle>
               </CardHeader>
@@ -213,10 +215,10 @@ export default function ProjectLinks() {
         </div>
 
         {/* ตารางแสดง Checkbox สำหรับจัดเก็บพิกัดเป้าหมาย */}
-        <div className="md:col-span-2">
-          <Card className="h-full flex flex-col">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0">
-              <div className="flex-1 mr-4">
+        <div className="min-w-0">
+          <Card className="app-section-card flex min-h-[32rem] flex-col overflow-hidden">
+            <CardHeader className="flex flex-col gap-4 space-y-0 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0 flex-1">
                 <CardTitle className="text-xl flex items-center gap-2">
                   <Link className="h-5 w-5" />
                   เมทริกซ์การเชื่อมโยงเป้าหมาย
@@ -225,12 +227,12 @@ export default function ProjectLinks() {
                   {currentProjectName || 'กรุณาเลือกโครงการด้านซ้าย'}
                 </CardDescription>
               </div>
-              <Button onClick={handleSave} disabled={!selectedProjectId || isSaving}>
+              <Button className="w-full shrink-0 sm:w-auto" onClick={handleSave} disabled={!selectedProjectId || isSaving}>
                 <Save className="mr-2 h-4 w-4" />
                 {isSaving ? 'กำลังบันทึก...' : 'บันทึกพิกัด'}
               </Button>
             </CardHeader>
-            <CardContent className="flex-1 overflow-auto">
+            <CardContent className="min-w-0 flex-1 overflow-auto">
               {selectedProjectId ? (
                 <Table>
                   <TableHeader>
@@ -316,6 +318,6 @@ export default function ProjectLinks() {
           </Card>
         </div>
       </div>
-    </>
+    </div>
   );
 }
