@@ -90,6 +90,13 @@
             case 'manage-user':
                 require_once 'components/Admin/ManageUsers/manage-user.php';
                 break;
+
+            // ตั้งค่าปีการศึกษา / ลบข้อมูลนักศึกษาที่เกินกำหนด (เฉพาะผู้ดูแลระบบ)
+            case 'get-academic-settings':
+            case 'save-academic-settings':
+            case 'run-student-purge':
+                require_once 'components/Admin/AcademicSettings/academic_settings_api.php';
+                break;
             case 'generate-user-accounts':
                 require_once 'components/Admin/ManageUsers/generate-user-accounts.php';
                 break;
@@ -234,7 +241,7 @@
                 require_once 'components/Teacher/AssignInstructors/save_assign_instructor.php';
                 break;
 
-            // AdvisorVaccinationView
+            // หน้ารวมข้อมูลนักศึกษาในความดูแล (วัคซีน/สุขภาพ/ประเมิน)
             case 'advisor-student-list':
                 require_once 'components/Teacher/AdvisorStudentList/advisor_student_list.php';
                 break;
@@ -247,13 +254,6 @@
                 require_once 'components/Teacher/ViewStudentHealthRecords/view_student_health_records.php';
                 break;
 
-            // CLOManagement
-            case 'get-clo-management':
-                require_once 'components/Teacher/CLOManagement/get_clo_management.php';
-                break;
-            case 'save-clo-management':
-                require_once 'components/Teacher/CLOManagement/save_clo_management.php';
-                break;
 
             // CLOMap
             case 'get-clo-map':

@@ -36,6 +36,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useState, useEffect, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
+import { onlyEnglish, onlyThai } from "@/lib/nameInput";
 
 // Helper สำหรับคำนวณปีการศึกษาและชั้นปี Real-time (ตัดรอบ 10 สิงหาคม)
 export const calculateAcademicInfo = (studentIdOrEntryYear: string | number) => {
@@ -143,7 +144,14 @@ export default function ProfilePage() {
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
-    setFormData((prev: any) => ({ ...prev, [name]: value }));
+    // ช่องชื่อ-นามสกุล บังคับภาษาให้ตรงกับช่อง (ไทย/อังกฤษ)
+    let nextValue = value;
+    if (["title", "first_name_th", "last_name_th"].includes(name)) {
+      nextValue = onlyThai(value);
+    } else if (["first_name_en", "last_name_en"].includes(name)) {
+      nextValue = onlyEnglish(value);
+    }
+    setFormData((prev: any) => ({ ...prev, [name]: nextValue }));
   };
 
   // ดักกรองให้รับเฉพาะตัวเลข 0-9

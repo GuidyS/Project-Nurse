@@ -10,6 +10,9 @@
  * ยังไม่มีหลักสูตรในระบบเลย → ฟังก์ชันคืน null และหน้าเหล่านั้นทำงานแบบเดิม (รายวิชาทั้งหมดจากตาราง subject)
  */
 
+/** เกณฑ์ผ่านเริ่มต้นของระบบ ใช้เมื่อหลักสูตรไม่ได้กำหนดเกณฑ์ผ่านของรายวิชาไว้ */
+const COURSE_DEFAULT_PASS_SCORE = 70;
+
 function activeCurriculumColumnExists(PDO $db, string $table, string $column): bool
 {
     $stmt = $db->prepare("
@@ -84,11 +87,13 @@ function activeCurriculumSubjects(PDO $db): ?array
     // ภาคเรียน/ปีการศึกษา: ตาราง subject ก่อน แล้วถอยไปใช้ค่าที่เก็บในรายวิชาของหลักสูตร (วิชาที่ไม่มีในตาราง subject)
     $subjectYear = activeCurriculumColumnExists($db, 'subject', 'academic_year') ? 's.academic_year' : 'NULL';
     $cycleHasTerm = activeCurriculumColumnExists($db, 'curriculum_cycle_subject', 'semester');
+    $passSelect = activeCurriculumColumnExists($db, 'curriculum_cycle_subject', 'pass_score') ? 'cs.pass_score' : 'NULL';
     $semesterSelect = $cycleHasTerm ? 'COALESCE(s.semester, cs.semester)' : 's.semester';
     $yearSelect = $cycleHasTerm ? "COALESCE({$subjectYear}, cs.academic_year)" : $subjectYear;
 
     $stmt = $db->prepare("
         SELECT cs.subject_code, cs.subject_name, cs.credit, cs.credit_desc, s.subject_id,
+               {$passSelect} AS pass_score,
                {$semesterSelect} AS semester, {$yearSelect} AS academic_year
         FROM curriculum_cycle_subject cs
         LEFT JOIN subject s ON s.subject_code = cs.subject_code
@@ -104,6 +109,7 @@ function activeCurriculumSubjects(PDO $db): ?array
             'credit' => (int)$row['credit'],
             'credit_desc' => $row['credit_desc'],
             'subject_id' => $row['subject_id'] === null ? null : (int)$row['subject_id'],
+            'pass_score' => $row['pass_score'] === null ? null : (float)$row['pass_score'],
             'semester' => $row['semester'] === null ? null : (int)$row['semester'],
             'academic_year' => $row['academic_year'] === null ? null : (int)$row['academic_year'],
         ];
@@ -158,6 +164,32 @@ function activeCurriculumApplyNames(PDO $db, array $rows, string $codeKey, strin
         if (isset($names[$code])) {
             $row[$nameKey] = $names[$code];
         }
+    }
+    unset($row);
+    return $rows;
+}
+
+/** รหัสวิชา => เกณฑ์ผ่าน (null = ไม่ได้กำหนด) ของหลักสูตรที่ใช้งาน */
+function activeCurriculumPassScores(PDO $db): array
+{
+    $subjects = activeCurriculumSubjects($db);
+    if ($subjects === null) {
+        return [];
+    }
+    $map = [];
+    foreach ($subjects as $subject) {
+        $map[$subject['subject_code']] = $subject['pass_score'];
+    }
+    return $map;
+}
+
+/** ใส่ค่า pass_score ให้แต่ละแถวตามรหัสวิชา (ใช้ในหน้ารายวิชา/ให้คะแนนของอาจารย์) */
+function activeCurriculumApplyPassScore(PDO $db, array $rows, string $codeKey = 'code'): array
+{
+    $map = activeCurriculumPassScores($db);
+    foreach ($rows as &$row) {
+        $code = (string)($row[$codeKey] ?? '');
+        $row['pass_score'] = $map[$code] ?? null;
     }
     unset($row);
     return $rows;

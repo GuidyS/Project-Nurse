@@ -27,6 +27,8 @@ export default function CourseStudents() {
   const [students, setStudents] = useState<any[]>([]);
   /** หัวตาราง CLO — เป็น object {clo_id, clo_code, sub_plos, ...} จาก get-course-students-clo */
   const [cloHeaders, setCloHeaders] = useState<any[]>([]);
+  // เกณฑ์ผ่านของรายวิชา ตั้งค่าที่หน้า "จัดการหลักสูตร" (ค่าเริ่มต้นของระบบคือ 70)
+  const [passScore, setPassScore] = useState<number>(70);
   
   const [isLoadingCourses, setIsLoadingCourses] = useState(true);
   const [isLoadingStudents, setIsLoadingStudents] = useState(false);
@@ -65,6 +67,7 @@ export default function CourseStudents() {
           const payload = res.data.data || {};
           setStudents(Array.isArray(payload.students) ? payload.students : []);
           setCloHeaders(Array.isArray(payload.clo_headers) ? payload.clo_headers : []);
+          setPassScore(Number(payload.pass_score ?? 70));
         }
       } catch (error) {
         toast({ title: 'ข้อผิดพลาด', description: 'ไม่สามารถโหลดข้อมูลคะแนน CLO ได้', variant: 'destructive' });
@@ -174,7 +177,7 @@ export default function CourseStudents() {
                               {score === null || score === undefined ? (
                                 <span className="text-muted-foreground">-</span>
                               ) : (
-                                <span className={score >= 70 ? 'text-success font-medium' : 'text-destructive font-medium'}>
+                                <span className={score >= passScore ? 'text-success font-medium' : 'text-destructive font-medium'}>
                                   {score}
                                 </span>
                               )}

@@ -3,6 +3,7 @@ if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../config/audit_helper.php';
 require_once __DIR__ . '/assign_students_helpers.php';
+require_once __DIR__ . '/../../../config/notification_helpers.php';
 
 header('Access-Control-Allow-Origin: ' . (in_array($_SERVER['HTTP_ORIGIN'] ?? '', ['http://localhost:5173', 'http://127.0.0.1:5173'], true) ? ($_SERVER['HTTP_ORIGIN'] ?? '') : 'http://localhost:5173'));
 header('Vary: Origin');
@@ -121,6 +122,54 @@ try {
         $logMsg .= " [เพิ่มสิทธิ์ตำแหน่ง{$type['label']}]";
     }
     logAudit($db, $_SESSION['user_id'] ?? null, 'update', 'assign_students', $logMsg);
+
+    // แจ้งเตือนอาจารย์ว่าได้รับมอบหมายนักศึกษาคนไหนบ้าง (แจ้งเตือนพังต้องไม่ทำให้บันทึกล้มเหลว)
+    try {
+        $advisorUserId = notifyUserIdByFacultyId($db, $facultyId);
+        if ($advisorUserId !== null) {
+            if (empty($studentIds)) {
+                notifyUsers(
+                    $db,
+                    [$advisorUserId],
+                    "ยกเลิกการมอบหมายนักศึกษา ({$type['label']})",
+                    "ผู้ดูแลระบบยกเลิกรายชื่อนักศึกษาในความดูแลของท่านทั้งหมดสำหรับบทบาท{$type['label']} ปีการศึกษา {$academicYear}",
+                    'warning',
+                    'in-app',
+                    (int)$_SESSION['user_id'],
+                    ['advisor_type' => $type['key'], 'student_ids' => []]
+                );
+            } else {
+                $ph = implode(',', array_fill(0, count($studentIds), '?'));
+                $nameStmt = $db->prepare("
+                    SELECT student_id, CONCAT(IFNULL(title,''), ' ', first_name_th, ' ', last_name_th) AS full_name
+                    FROM student WHERE student_id IN ($ph) ORDER BY student_id
+                ");
+                $nameStmt->execute($studentIds);
+                $students = $nameStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+                $lines = array_map(
+                    static fn(array $s): string => $s['student_id'] . ' ' . trim((string)$s['full_name']),
+                    $students
+                );
+                $shown = array_slice($lines, 0, 15);
+                $more = count($lines) - count($shown);
+                $listText = implode("\n", $shown) . ($more > 0 ? "\nและอีก {$more} คน" : '');
+
+                notifyUsers(
+                    $db,
+                    [$advisorUserId],
+                    "ได้รับมอบหมายนักศึกษา " . count($studentIds) . " คน ({$type['label']})",
+                    "ผู้ดูแลระบบมอบหมายนักศึกษาในความดูแลของท่าน ปีการศึกษา {$academicYear}\n" . $listText,
+                    'info',
+                    'in-app',
+                    (int)$_SESSION['user_id'],
+                    ['advisor_type' => $type['key'], 'student_ids' => $studentIds, 'academic_year' => $academicYear]
+                );
+            }
+        }
+    } catch (Throwable $e) {
+        error_log('assign students notify: ' . $e->getMessage());
+    }
 
     $message = "บันทึกสำเร็จ — มอบหมายนักศึกษา " . count($studentIds) . " คนให้{$type['label']}";
     if ($movedCount > 0) {

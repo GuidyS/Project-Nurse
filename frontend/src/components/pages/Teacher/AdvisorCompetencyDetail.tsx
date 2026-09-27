@@ -1,19 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
-import { ClipboardCheck, Loader2, ChevronLeft, Users, Search, Save } from "lucide-react";
+import { ClipboardCheck, Loader2, ChevronLeft, Save } from "lucide-react";
 import api from "@/lib/axios";
-
-interface StudentListItem {
-  student_id: string;
-  full_name: string;
-  status: string;
-}
+import type { AdvisorDetailPanelProps } from "./advisorStudent";
 
 interface CompetencyItemRow {
   id: number;
@@ -30,14 +22,9 @@ interface PloGroup {
   items: CompetencyItemRow[];
 }
 
-export default function AdvisorCompetencyView() {
+// แผง "ประเมิน" สมรรถนะหลักของนักศึกษา 1 คน
+export default function AdvisorCompetencyDetail({ student, onBack }: AdvisorDetailPanelProps) {
   const { toast } = useToast();
-  const [view, setView] = useState<"list" | "detail">("list");
-  const [students, setStudents] = useState<StudentListItem[]>([]);
-  const [search, setSearch] = useState("");
-  const [isLoadingList, setIsLoadingList] = useState(true);
-
-  const [selectedStudent, setSelectedStudent] = useState<StudentListItem | null>(null);
   // ✅ FIX: เก็บเป็น groups ตามที่ backend จัดมา ไม่ flatten เป็น array เดียว
   // เดิม flatten แล้ว sort ด้วย sequence_no ทั้งฟอร์ม ทำให้ถ้ามีเลขซ้ำข้าม PLO
   // (เช่นตอนที่ Admin เพิ่มรายการแล้วเลขชนกัน) การจัดกลุ่มพังทันที
@@ -45,51 +32,44 @@ export default function AdvisorCompetencyView() {
   const [groups, setGroups] = useState<PloGroup[]>([]);
   const [yearLevel, setYearLevel] = useState<number | null>(null);
   const [curriculumYear, setCurriculumYear] = useState<number | null>(null);
-  const [isLoadingDetail, setIsLoadingDetail] = useState(false);
+  const [isLoadingDetail, setIsLoadingDetail] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  const fetchStudentList = async () => {
-    try {
-      setIsLoadingList(true);
-      const res = await api.get("/index.php?page=advisor-student-list");
-      if (res.data.status === "success") {
-        setStudents(res.data.data);
-      }
-    } catch (error) {
-      toast({ title: "ข้อผิดพลาด", description: "โหลดรายชื่อนักศึกษาไม่สำเร็จ", variant: "destructive" });
-    } finally {
-      setIsLoadingList(false);
-    }
-  };
-
   useEffect(() => {
-    fetchStudentList();
-  }, []);
+    let cancelled = false;
 
-  const handleSelectStudent = async (student: StudentListItem) => {
-    setSelectedStudent(student);
-    setView("detail");
-    setIsLoadingDetail(true);
-    try {
-      const res = await api.get(
-        `/index.php?page=student-competency&student_id=${encodeURIComponent(student.student_id)}`
-      );
-      if (res.data.status === "success") {
-        // ใช้ groups ตรงๆ ตามที่ backend ส่งมา (เรียง PLO ตาม sort_order, เรียง item ในแต่ละ PLO ตาม sequence_no อยู่แล้ว)
-        setGroups(res.data.data.groups || []);
-        setYearLevel(res.data.data.year_level);
-        setCurriculumYear(res.data.data.framework?.curriculum_year || null);
-      } else {
-        toast({ title: "ข้อผิดพลาด", description: res.data.message || "โหลดข้อมูลไม่สำเร็จ", variant: "destructive" });
-        setView("list");
+    const fetchDetail = async () => {
+      setIsLoadingDetail(true);
+      try {
+        const res = await api.get(
+          `/index.php?page=student-competency&student_id=${encodeURIComponent(String(student.student_id))}`
+        );
+        if (cancelled) return;
+
+        if (res.data.status === "success") {
+          // ใช้ groups ตรงๆ ตามที่ backend ส่งมา (เรียง PLO ตาม sort_order, เรียง item ในแต่ละ PLO ตาม sequence_no อยู่แล้ว)
+          setGroups(res.data.data.groups || []);
+          setYearLevel(res.data.data.year_level);
+          setCurriculumYear(res.data.data.framework?.curriculum_year || null);
+        } else {
+          toast({ title: "ข้อผิดพลาด", description: res.data.message || "โหลดข้อมูลไม่สำเร็จ", variant: "destructive" });
+          onBack();
+        }
+      } catch (error) {
+        if (cancelled) return;
+        toast({ title: "ข้อผิดพลาด", description: "โหลดรายการประเมินไม่สำเร็จ", variant: "destructive" });
+        onBack();
+      } finally {
+        if (!cancelled) setIsLoadingDetail(false);
       }
-    } catch (error) {
-      toast({ title: "ข้อผิดพลาด", description: "โหลดรายการประเมินไม่สำเร็จ", variant: "destructive" });
-      setView("list");
-    } finally {
-      setIsLoadingDetail(false);
-    }
-  };
+    };
+
+    fetchDetail();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [student.student_id]);
 
   const handleScoreChange = (itemId: number, score: number) => {
     setGroups((prev) =>
@@ -100,15 +80,7 @@ export default function AdvisorCompetencyView() {
     );
   };
 
-  const handleBack = () => {
-    setView("list");
-    setSelectedStudent(null);
-    setGroups([]);
-  };
-
   const handleSave = async () => {
-    if (!selectedStudent) return;
-
     const scores = groups
       .flatMap((g) => g.items)
       .filter((it) => it.is_scorable && it.score)
@@ -122,7 +94,7 @@ export default function AdvisorCompetencyView() {
     setIsSaving(true);
     try {
       const res = await api.post("/index.php?page=save-student-competency", {
-        student_id: selectedStudent.student_id,
+        student_id: student.student_id,
         scores,
       });
       if (res.data.status === "success") {
@@ -137,69 +109,11 @@ export default function AdvisorCompetencyView() {
     }
   };
 
-  const filteredStudents = students.filter(
-    (s) => s.full_name.includes(search) || s.student_id.includes(search)
-  );
-
-  if (view === "list") {
-    return (
-      <div className="p-6 space-y-6 animate-fade-in max-w-7xl mx-auto">
-        <div>
-          <div className="flex items-center gap-2">
-            <Users className="h-6 w-6 text-primary" />
-            <h1 className="text-2xl font-bold text-foreground">ประเมินสมรรถนะหลักนักศึกษา</h1>
-          </div>
-          <p className="text-sm text-muted-foreground mt-1">เลือกนักศึกษาในความดูแลเพื่อประเมินสมรรถนะหลักตามชั้นปี</p>
-        </div>
-
-        <div className="relative max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="ค้นหาชื่อหรือรหัสนักศึกษา" className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
-        </div>
-
-        <Card>
-          <CardContent className="p-0">
-            {isLoadingList ? (
-              <div className="py-16 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-40">รหัสนักศึกษา</TableHead>
-                    <TableHead>ชื่อ-นามสกุล</TableHead>
-                    <TableHead className="w-32">สถานะ</TableHead>
-                    <TableHead className="w-32 text-right">ดำเนินการ</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredStudents.length === 0 ? (
-                    <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">ไม่พบนักศึกษา</TableCell></TableRow>
-                  ) : (
-                    filteredStudents.map((s) => (
-                      <TableRow key={s.student_id}>
-                        <TableCell className="font-medium">{s.student_id}</TableCell>
-                        <TableCell>{s.full_name}</TableCell>
-                        <TableCell><Badge variant="outline">{s.status}</Badge></TableCell>
-                        <TableCell className="text-right">
-                          <Button size="sm" variant="outline" onClick={() => handleSelectStudent(s)}>ประเมิน</Button>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div className="p-6 space-y-6 animate-fade-in max-w-6xl mx-auto">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={handleBack}>
+          <Button variant="ghost" size="icon" onClick={onBack}>
             <ChevronLeft className="h-5 w-5" />
           </Button>
           <div>
@@ -210,7 +124,7 @@ export default function AdvisorCompetencyView() {
               </h1>
             </div>
             <p className="text-sm text-muted-foreground mt-0.5">
-              นักศึกษา: <span className="text-foreground font-medium">{selectedStudent?.full_name}</span> (รหัส {selectedStudent?.student_id})
+              นักศึกษา: <span className="text-foreground font-medium">{student.full_name}</span> (รหัส {student.student_id})
             </p>
           </div>
         </div>
@@ -222,7 +136,7 @@ export default function AdvisorCompetencyView() {
 
       <div className="bg-muted/40 p-3 rounded-md text-xs text-muted-foreground leading-relaxed border border-border/60">
         <span className="font-semibold text-foreground">คำชี้แจง: </span>
-        ใส่เครื่องหมายเลือกระดับคะแนนที่ตรงกับระดับความคิดเห็นของท่าน โดย 
+        ใส่เครื่องหมายเลือกระดับคะแนนที่ตรงกับระดับความคิดเห็นของท่าน โดย
         <span className="font-medium text-foreground"> 5 = เห็นด้วยมากที่สุด, 4 = เห็นด้วยมาก, 3 = เห็นด้วยปานกลาง, 2 = เห็นด้วยน้อย, 1 = เห็นด้วยน้อยที่สุด</span>
       </div>
 

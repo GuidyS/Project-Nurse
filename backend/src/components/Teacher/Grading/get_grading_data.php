@@ -54,6 +54,7 @@ try {
         $stmt_subject = $db->prepare($sql_subject);
         $stmt_subject->execute($my_subject_codes);
         $courses = activeCurriculumApplyNames($db, $stmt_subject->fetchAll(PDO::FETCH_ASSOC), 'code', 'name');
+        $courses = activeCurriculumApplyPassScore($db, $courses, 'code'); // เกณฑ์ผ่านจากหน้าจัดการหลักสูตร
 
         echo json_encode(["status" => "success", "data" => ["courses" => $courses, "students" => []]]);
         exit();
