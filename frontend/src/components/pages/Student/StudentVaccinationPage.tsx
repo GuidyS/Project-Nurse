@@ -7,7 +7,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { ShieldAlert, Save, Loader2, Plus, Trash2, PlusCircle, Calendar, Upload, FileCheck, ExternalLink, X } from "lucide-react";
+import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
+import { Save, Loader2, Trash2, PlusCircle, Calendar, Upload, FileCheck, ExternalLink, X } from "lucide-react";
 import api from "@/lib/axios";
 
 interface DoseItem {
@@ -28,6 +29,10 @@ interface VaccineGroup {
   remark: string;
   doses: DoseItem[];
 }
+
+type PendingDelete =
+  | { type: "group"; groupId: string }
+  | { type: "dose"; groupId: string; doseId: string };
 
 const DEFAULT_GROUPS: VaccineGroup[] = [
   {
@@ -82,6 +87,7 @@ export default function StudentVaccinationPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [groups, setGroups] = useState<VaccineGroup[]>(DEFAULT_GROUPS);
+  const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
   
   const tableRef = useRef<HTMLDivElement>(null);
 
@@ -150,12 +156,6 @@ export default function StudentVaccinationPage() {
     
     setGroups([...groups, newGroup]);
     
-    toast({ 
-      title: "✅ เพิ่มรายการใหม่สำเร็จ", 
-      description: `แถววัคซีนลำดับที่ ${nextSeq} ถูกเพิ่มต่อท้ายตารางแล้ว`,
-      className: "bg-green-500 text-white border-none",
-    });
-
     setTimeout(() => {
       if (tableRef.current) {
         tableRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -163,11 +163,8 @@ export default function StudentVaccinationPage() {
     }, 150);
   };
 
-  //  เพิ่มการยืนยันก่อนลบทั้งแถว
   const handleDeleteGroup = (id: string) => {
-    if (window.confirm("คุณแน่ใจหรือไม่ว่าต้องการลบรายการวัคซีนนี้? ข้อมูลที่ยังไม่ได้บันทึกจะหายไป")) {
-      setGroups(groups.filter(g => g.id !== id));
-    }
+    setPendingDelete({ type: "group", groupId: id });
   };
 
   const handleAddDose = (groupId: string) => {
@@ -194,19 +191,27 @@ export default function StudentVaccinationPage() {
     }));
   };
 
-  //  เพิ่มการยืนยันก่อนลบรายเข็ม/ปี
   const handleDeleteSpecificDose = (groupId: string, doseId: string) => {
-    if (window.confirm("คุณแน่ใจหรือไม่ว่าต้องการลบเข็ม/ปี นี้?")) {
-      setGroups(groups.map(g => {
-        if (g.id === groupId) {
-          return {
-            ...g,
-            doses: g.doses.filter(d => d.id !== doseId)
-          };
-        }
-        return g;
+    setPendingDelete({ type: "dose", groupId, doseId });
+  };
+
+  const confirmDelete = () => {
+    if (!pendingDelete) return;
+
+    if (pendingDelete.type === "group") {
+      setGroups(currentGroups => currentGroups.filter(group => group.id !== pendingDelete.groupId));
+    } else {
+      setGroups(currentGroups => currentGroups.map(group => {
+        if (group.id !== pendingDelete.groupId) return group;
+
+        return {
+          ...group,
+          doses: group.doses.filter(dose => dose.id !== pendingDelete.doseId),
+        };
       }));
     }
+
+    setPendingDelete(null);
   };
 
   const handleDoseDateChange = (groupId: string, doseId: string, date: string) => {
@@ -310,21 +315,18 @@ export default function StudentVaccinationPage() {
     <div className="space-y-6 max-w-7xl mx-auto p-6 animate-fade-in">
       <div className="app-page-header">
         <div>
-          <div className="flex items-center gap-2">
-            <ShieldAlert className="h-6 w-6 text-primary" />
-            <h1 className="app-page-title">ส่วนที่ 3 ข้อมูลภาวะสุขภาพและการได้รับวัคซีนป้องกันโรค</h1>
-          </div>
+          <h1 className="app-page-title">ส่วนที่ 3 ข้อมูลภาวะสุขภาพและการได้รับวัคซีนป้องกันโรค</h1>
           <p className="app-page-description">
             1. ประวัติการได้รับภูมิคุ้มกันโรค (อาจารย์ที่ปรึกษาตรวจสอบจากใบรายงานผลตรวจสุขภาพแรกเข้าได้)
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button 
             variant="outline" 
             onClick={handleAddGroup} 
-            className="gap-1.5 font-bold border-2 border-primary text-primary hover:bg-primary hover:text-primary-foreground shadow-sm transition-all"
+            className="font-semibold border-primary text-primary hover:bg-primary/10 hover:text-primary"
           >
-            <Plus className="h-4 w-4 stroke-[3px]" /> เพิ่มวัคซีน/โรคใหม่
+            เพิ่มวัคซีน/โรคใหม่
           </Button>
           <Button onClick={handleSave} disabled={saving} className="gap-2 shrink-0 shadow-sm">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
@@ -539,11 +541,12 @@ export default function StudentVaccinationPage() {
                         type="button"
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 text-destructive hover:bg-destructive/10 transition-colors"
+                        className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
                         onClick={() => handleDeleteGroup(group.id)}
                         title="ลบแถวนี้"
                       >
                         <Trash2 className="h-4 w-4" />
+                        <span className="sr-only">ลบแถวนี้</span>
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -561,6 +564,18 @@ export default function StudentVaccinationPage() {
           </div>
         </CardContent>
       </Card>
+
+      <ConfirmActionDialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => !open && setPendingDelete(null)}
+        title={pendingDelete?.type === "dose" ? "ยืนยันการลบเข็ม/ปี" : "ยืนยันการลบรายการวัคซีน"}
+        description={
+          pendingDelete?.type === "dose"
+            ? "คุณแน่ใจหรือไม่ว่าต้องการลบเข็ม/ปีนี้ การลบจะไม่สามารถย้อนกลับได้"
+            : "คุณแน่ใจหรือไม่ว่าต้องการลบรายการวัคซีนนี้ ข้อมูลที่ยังไม่ได้บันทึกจะหายไป"
+        }
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }
