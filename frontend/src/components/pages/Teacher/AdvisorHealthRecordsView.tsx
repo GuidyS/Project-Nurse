@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Activity, Loader2, ChevronLeft, Users, Search } from "lucide-react";
+import { Activity, Loader2, ChevronLeft, Search } from "lucide-react";
 import api from "@/lib/axios";
 
 interface StudentListItem {
@@ -82,12 +82,11 @@ export default function AdvisorHealthRecordsView() {
   if (view === "list") {
     return (
       <div className="p-6 space-y-6 animate-fade-in max-w-7xl mx-auto">
-        <div>
-          <div className="flex items-center gap-2">
-            <Users className="h-6 w-6 text-primary" />
-            <h1 className="text-2xl font-bold text-foreground">ภาวะสุขภาพนักศึกษาในความดูแล</h1>
+        <div className="app-page-header">
+          <div className="min-w-0">
+            <h1 className="app-page-title">ภาวะสุขภาพนักศึกษาในความดูแล</h1>
+            <p className="app-page-description">ตรวจสอบภาวะสุขภาพ ส่วนสูง น้ำหนัก และ BMI (ดูอย่างเดียว)</p>
           </div>
-          <p className="text-sm text-muted-foreground mt-1">ตรวจสอบภาวะสุขภาพ ส่วนสูง น้ำหนัก และ BMI (ดูอย่างเดียว)</p>
         </div>
 
         <div className="relative max-w-sm">
@@ -150,16 +149,16 @@ export default function AdvisorHealthRecordsView() {
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto p-6 animate-fade-in">
-      <div className="flex items-center gap-3">
+      <div className="app-page-header app-page-header-back">
         <Button variant="outline" size="icon" onClick={() => setView("list")} className="shrink-0">
           <ChevronLeft className="h-5 w-5" />
         </Button>
         <div>
           <div className="flex items-center gap-2">
             <Activity className="h-6 w-6 text-primary" />
-            <h1 className="text-2xl font-bold tracking-tight">2. ภาวะสุขภาพ</h1>
+            <h1 className="app-page-title">2. ภาวะสุขภาพ</h1>
           </div>
-          <p className="text-sm text-muted-foreground mt-1">
+          <p className="app-page-description">
             ข้อมูลของ {selectedStudent?.full_name} (รหัสนักศึกษา: {selectedStudent?.student_id}) — <b>โหมดดูอย่างเดียว</b>
           </p>
         </div>

@@ -10,6 +10,7 @@ import { FileText, Upload, Download, Search, Eye, Trash2, Loader2 } from 'lucide
 import { useState, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
+import { useAcademicYear } from "@/hooks/use-academic-year";
 
 type DocumentItem = {
   id: string;
@@ -22,7 +23,17 @@ type DocumentItem = {
   downloadUrl?: string;
 };
 
+const getStatusBadge = (status: string) => {
+  switch (status) {
+    case 'approved': return <Badge className="bg-green-500">อนุมัติแล้ว</Badge>;
+    case 'pending': return <Badge className="bg-yellow-500">รอตรวจสอบ</Badge>;
+    case 'rejected': return <Badge variant="destructive">ถูกปฏิเสธ</Badge>;
+    default: return <Badge variant="secondary">{status}</Badge>;
+  }
+};
+
 export default function Documents() {
+  const currentAcademicYear = useAcademicYear();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
@@ -41,7 +52,7 @@ export default function Documents() {
     semester: string;
     google_drive_link: string;
   }>({
-    name: '', type: '', course: '', academic_year: '2567', semester: '1', google_drive_link: ''
+    name: '', type: '', course: '', academic_year: '', semester: '1', google_drive_link: ''
   });
 
   // 🌟 ดึงข้อมูลจาก API เมื่อเปิดหน้าเว็บ
@@ -86,6 +97,11 @@ export default function Documents() {
 
   // 🌟 ฟังก์ชันส่งข้อมูลอัปโหลดไปบันทึก
   const handleUpload = async () => {
+    const year = Number(newDocument.academic_year);
+    if (!/^\d{4}$/.test(newDocument.academic_year) || year < 2500 || year > 2700) {
+      toast({ title: "กรุณาระบุปีการศึกษา พ.ศ. 2500–2700", variant: "destructive" });
+      return;
+    }
     if (!newDocument.name || !newDocument.type || !newDocument.course || !newDocument.google_drive_link) {
       toast({ title: "แจ้งเตือน", description: "กรุณากรอกข้อมูลและแนบลิงก์ให้ครบถ้วน", variant: "destructive" });
       return;
@@ -107,7 +123,7 @@ export default function Documents() {
       if (response.data.status === 'success') {
         toast({ title: "สำเร็จ", description: "บันทึกข้อมูลเอกสารเรียบร้อยแล้ว" });
         setIsDialogOpen(false);
-        setNewDocument({ name: '', type: '', course: '', academic_year: '2567', semester: '1', google_drive_link: '' });
+        setNewDocument({ name: '', type: '', course: '', academic_year: '', semester: '1', google_drive_link: '' });
         fetchDocuments(); // รีเฟรชข้อมูล
       } else {
         toast({ title: "ข้อผิดพลาด", description: response.data.message || "ไม่สามารถอัปโหลดได้", variant: "destructive" });
@@ -141,12 +157,15 @@ export default function Documents() {
   return (
     <>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="app-page-header">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">คลังเอกสาร มคอ.</h1>
-            <p className="text-muted-foreground">จัดการเอกสาร มคอ.</p>
+            <h1 className="app-page-title">อัปโหลดเอกสาร</h1>
+            <p className="app-page-description">จัดการเอกสารรายวิชาต่างๆ</p>
           </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <Dialog open={isDialogOpen} onOpenChange={(open) => {
+            if (open) setNewDocument((draft) => ({ ...draft, academic_year: draft.academic_year || String(currentAcademicYear) }));
+            setIsDialogOpen(open);
+          }}>
             <DialogTrigger asChild>
               <Button>
                 <Upload className="mr-2 h-4 w-4" />

@@ -29,6 +29,14 @@
 
     switch ($page) {
 
+            case 'academic-calendar':
+                require_once 'components/AcademicCalendar/get_academic_calendar.php';
+                break;
+
+            case 'export-years':
+                require_once 'components/Admin/ExportData/get_export_years.php';
+                break;
+
             // Auth
             case 'register':
                 require_once 'components/Auth/register.php';
@@ -375,6 +383,9 @@
                 break;
 
             // ResearchSummary
+            case 'save-research-summary':
+                require_once 'components/Teacher/ResearchSummary/save_research_summary.php';
+                break;
             case 'get-research-summary':
                 require_once 'components/Teacher/ResearchSummary/get_research_summary.php';
                 break;

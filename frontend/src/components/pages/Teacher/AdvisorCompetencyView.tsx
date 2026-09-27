@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
-import { ClipboardCheck, Loader2, ChevronLeft, Users, Search, Save } from "lucide-react";
+import { ClipboardCheck, Loader2, ChevronLeft, Search, Save } from "lucide-react";
 import api from "@/lib/axios";
 
 interface StudentListItem {
@@ -144,12 +144,11 @@ export default function AdvisorCompetencyView() {
   if (view === "list") {
     return (
       <div className="p-6 space-y-6 animate-fade-in max-w-7xl mx-auto">
-        <div>
-          <div className="flex items-center gap-2">
-            <Users className="h-6 w-6 text-primary" />
-            <h1 className="text-2xl font-bold text-foreground">ประเมินสมรรถนะหลักนักศึกษา</h1>
+        <div className="app-page-header">
+          <div className="min-w-0">
+            <h1 className="app-page-title">ประเมินสมรรถนะหลักนักศึกษา</h1>
+            <p className="app-page-description">เลือกนักศึกษาในความดูแลเพื่อประเมินสมรรถนะหลักตามชั้นปี</p>
           </div>
-          <p className="text-sm text-muted-foreground mt-1">เลือกนักศึกษาในความดูแลเพื่อประเมินสมรรถนะหลักตามชั้นปี</p>
         </div>
 
         <div className="relative max-w-sm">
@@ -197,19 +196,19 @@ export default function AdvisorCompetencyView() {
 
   return (
     <div className="p-6 space-y-6 animate-fade-in max-w-6xl mx-auto">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-3">
+      <div className="app-page-header">
+        <div className="flex min-w-0 items-start gap-3">
           <Button variant="ghost" size="icon" onClick={handleBack}>
             <ChevronLeft className="h-5 w-5" />
           </Button>
           <div>
             <div className="flex items-center gap-2">
               <ClipboardCheck className="h-6 w-6 text-primary" />
-              <h1 className="text-xl font-bold text-foreground">
+              <h1 className="app-page-title">
                 การประเมินสมรรถนะหลักของนักศึกษาชั้นปีที่ {yearLevel || "—"} {curriculumYear && `(หลักสูตรปรับปรุง ${curriculumYear})`}
               </h1>
             </div>
-            <p className="text-sm text-muted-foreground mt-0.5">
+            <p className="app-page-description">
               นักศึกษา: <span className="text-foreground font-medium">{selectedStudent?.full_name}</span> (รหัส {selectedStudent?.student_id})
             </p>
           </div>

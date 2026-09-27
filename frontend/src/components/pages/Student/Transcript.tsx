@@ -98,10 +98,10 @@ const Transcript = () => {
 
   return (
       <div className="space-y-6 animate-fade-in">
-        <div className="flex items-center justify-between">
+        <div className="app-page-header">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight leading-snug">ใบแสดงผลการเรียน</h1>
-            <p className="text-muted-foreground">ดูและส่งออกรายงานผลการศึกษาอย่างเป็นทางการของคุณ</p>
+            <h1 className="app-page-title">ใบแสดงผลการเรียน</h1>
+            <p className="app-page-description">ดูและส่งออกรายงานผลการศึกษาอย่างเป็นทางการของคุณ</p>
           </div>
         </div>
 

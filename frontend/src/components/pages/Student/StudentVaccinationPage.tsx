@@ -308,13 +308,13 @@ export default function StudentVaccinationPage() {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto p-6 animate-fade-in">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="app-page-header">
         <div>
           <div className="flex items-center gap-2">
             <ShieldAlert className="h-6 w-6 text-primary" />
-            <h1 className="text-2xl font-bold tracking-tight">ส่วนที่ 3 ข้อมูลภาวะสุขภาพและการได้รับวัคซีนป้องกันโรค</h1>
+            <h1 className="app-page-title">ส่วนที่ 3 ข้อมูลภาวะสุขภาพและการได้รับวัคซีนป้องกันโรค</h1>
           </div>
-          <p className="text-sm text-muted-foreground mt-1">
+          <p className="app-page-description">
             1. ประวัติการได้รับภูมิคุ้มกันโรค (อาจารย์ที่ปรึกษาตรวจสอบจากใบรายงานผลตรวจสุขภาพแรกเข้าได้)
           </p>
         </div>

@@ -96,10 +96,10 @@ export default function Performance() {
 
   return (
     <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="app-page-header">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight leading-snug">ประเมิน Performance</h1>
-            <p className="text-muted-foreground">บันทึกและประเมินผลการปฏิบัติงานของนักศึกษา</p>
+            <h1 className="app-page-title">ประเมิน Performance</h1>
+            <p className="app-page-description">บันทึกและประเมินผลการปฏิบัติงานของนักศึกษา</p>
           </div>
 
           <div className="flex items-center gap-3">

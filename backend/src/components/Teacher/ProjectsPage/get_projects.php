@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../ProjectShared/project_helpers.php';
 require_once __DIR__ . '/../MyProjects/my_project_member_helpers.php';
+require_once __DIR__ . '/../../../config/academic_calendar.php';
 
 $db = project_db();
 project_require_auth($db, ['PROJECT_VIEW']);
@@ -229,7 +230,9 @@ try {
     }
     unset($project);
 
-    project_json(["status" => "success", "data" => $projects]);
+    // PROJECT_VIEW already authorizes this catalogue; search must not hide historical filter options.
+    $availableYears = $db->query('SELECT DISTINCT academic_year FROM project WHERE academic_year IS NOT NULL')->fetchAll(PDO::FETCH_COLUMN);
+    project_json(["status" => "success", "data" => $projects, "academicYears" => academicYearOptions($availableYears)]);
 } catch (Exception $e) {
     project_json(["status" => "error", "message" => $e->getMessage()], 500);
 }

@@ -8,6 +8,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
 import { Download, FileSpreadsheet, FileText, Users, BookOpen, FolderKanban, GraduationCap, Calendar, Library } from "lucide-react";
 import api from "@/lib/axios";
+import { useAcademicYearSelection } from "@/hooks/use-academic-year";
+import { academicYearOptions } from "@/lib/academicYear";
 
 type ExportField = { key: string; label: string };
 
@@ -77,13 +79,6 @@ const exportCategories: {
   },
 ];
 
-// ปีการศึกษาปัจจุบัน (พ.ศ.) — ปีการศึกษาเริ่มเดือนมิถุนายน ช่วง ม.ค.–พ.ค. ยังนับเป็นปีการศึกษาก่อนหน้า
-const getCurrentAcademicYear = (now = new Date()) =>
-  now.getFullYear() + 543 - (now.getMonth() < 5 ? 1 : 0);
-
-// ปีการศึกษาปัจจุบันย้อนหลังรวม 5 ปี (เช่น 2569 → 2569–2565) เลื่อนตามปีจริงโดยไม่ต้องแก้โค้ด
-const currentAcademicYear = getCurrentAcademicYear();
-const academicYears = Array.from({ length: 5 }, (_, i) => String(currentAcademicYear - i));
 const semesters = ["ทั้งหมด", "ภาคเรียนที่ 1", "ภาคเรียนที่ 2", "ภาคฤดูร้อน"];
 
 // อาจารย์ / รายวิชา ส่งออกทั้งหมด ไม่มีตัวกรองปีการศึกษา/ภาคเรียน
@@ -99,11 +94,25 @@ export default function ExportData() {
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedFields, setSelectedFields] = useState<string[]>([]);
   const [format, setFormat] = useState("xlsx");
-  const [academicYear, setAcademicYear] = useState(academicYears[0]);
+  const { currentYear, academicYear, setAcademicYear } = useAcademicYearSelection();
+  const [availableYears, setAvailableYears] = useState<Record<string, number[]>>({});
+  const academicYears = academicYearOptions([...(availableYears[selectedCategory] ?? []), academicYear], currentYear);
   const [semester, setSemester] = useState("ทั้งหมด");
   // undefined = กำลังโหลด, null = ยังไม่มีหลักสูตรในระบบ
   const [activeCurriculum, setActiveCurriculum] = useState<ActiveCurriculum | null | undefined>(undefined);
   const { toast } = useToast();
+
+  useEffect(() => {
+    const controller = new AbortController();
+    api.get("/index.php?page=export-years", { signal: controller.signal })
+      .then((response) => {
+        if (!controller.signal.aborted && response.data?.status === "success") setAvailableYears(response.data.data);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) toast({ title: "โหลดรายการปีไม่สำเร็จ", variant: "destructive" });
+      });
+    return () => controller.abort();
+  }, [toast]);
 
   const currentCategory = exportCategories.find((c) => c.value === selectedCategory);
   const showFilters = !categoriesWithoutFilters.includes(selectedCategory);
@@ -260,7 +269,7 @@ export default function ExportData() {
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <Label className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4" /> ปีการศึกษา
+                    <Calendar className="h-4 w-4" /> {selectedCategory === "students" ? "ปีที่เข้าศึกษา" : "ปีการศึกษา"}
                   </Label>
                   <Select value={academicYear} onValueChange={setAcademicYear}>
                     <SelectTrigger>

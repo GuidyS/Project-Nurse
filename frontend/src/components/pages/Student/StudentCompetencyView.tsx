@@ -68,15 +68,15 @@ export default function StudentCompetencyView() {
   return (
     <div className="p-6 space-y-6 animate-fade-in max-w-6xl mx-auto">
       {/* Header Info */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
+      <div className="app-page-header">
         <div>
           <div className="flex items-center gap-2">
             <ClipboardCheck className="h-6 w-6 text-primary" />
-            <h1 className="text-xl font-bold text-foreground">
+            <h1 className="app-page-title">
               ผลการประเมินสมรรถนะหลักของนักศึกษาชั้นปีที่ {yearLevel || "—"} {curriculumYear && `(หลักสูตรปรับปรุง ${curriculumYear})`}
             </h1>
           </div>
-          <p className="text-sm text-muted-foreground mt-0.5">
+          <p className="app-page-description">
             นักศึกษา: <span className="text-foreground font-medium">{studentName}</span> (รหัส {studentId}) {academicYear && `• ปีการศึกษา ${academicYear}`}
           </p>
         </div>

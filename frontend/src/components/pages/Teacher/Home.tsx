@@ -98,12 +98,14 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-5xl px-6 py-12">
-        <div className="text-center mb-10">
+        <div className="app-page-header mb-10">
+          <div className="min-w-0">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
             <GraduationCap className="h-9 w-9" />
           </div>
-          <h1 className="text-3xl font-bold text-foreground">Faculty Management System</h1>
-          <p className="mt-2 text-muted-foreground">ระบบบริหารจัดการคณะ — เลือก Role เพื่อเข้าสู่ระบบ</p>
+          <h1 className="app-page-title">Faculty Management System</h1>
+          <p className="app-page-description">ระบบบริหารจัดการคณะ — เลือก Role เพื่อเข้าสู่ระบบ</p>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">

@@ -205,20 +205,63 @@
 }
 
 @layer components {
+  input:is([type="search"], [placeholder^="ค้น"]) {
+    @apply rounded-lg border-border bg-card shadow-sm transition-colors hover:border-primary/30 focus-visible:border-primary/50 focus-visible:ring-primary/20 focus-visible:ring-offset-0;
+  }
+
+  input[type="search"]::-webkit-search-cancel-button {
+    cursor: pointer;
+  }
+
   .app-page {
     @apply mx-auto w-full max-w-7xl space-y-5;
+  }
+
+  .app-page-content {
+    @apply w-full;
+  }
+
+  .app-page-content > :is(div, section, article):not(.min-h-screen) {
+    margin-block: 0 !important;
+    margin-inline: auto !important;
+    padding: 0 !important;
   }
 
   .app-page-header {
     @apply flex flex-col gap-4 rounded-md border border-primary/10 bg-card px-5 py-5 shadow-sm sm:px-6 lg:flex-row lg:items-center lg:justify-between;
   }
 
+  .app-page-content > :is(div, section, article):not(.min-h-screen) > :first-child:not(.app-page-header):not([class~="bg-card"]):where(:has(> h1), :has(> div > h1), :has(> div > div > h1)) {
+    @apply rounded-md border border-primary/10 bg-card px-5 py-5 shadow-sm sm:px-6;
+  }
+
+  .app-page-header > div {
+    min-width: 0;
+  }
+
+  .app-page-header.app-page-header-back {
+    @apply flex-row items-start justify-start;
+  }
+
+  .app-page-header svg {
+    flex-shrink: 0;
+  }
+
   .app-page-title {
-    @apply text-2xl font-bold leading-tight tracking-normal text-foreground sm:text-[1.7rem];
+    @apply text-3xl font-bold leading-tight tracking-normal text-foreground;
+    overflow-wrap: anywhere;
+  }
+
+  :is(
+    .app-page-header,
+    .app-page-content > :is(div, section, article):not(.min-h-screen) > :first-child:not([class~="bg-card"]):where(:has(> h1), :has(> div > h1), :has(> div > div > h1))
+  ) h1 {
+    @apply text-3xl font-bold leading-tight tracking-normal text-foreground;
   }
 
   .app-page-description {
     @apply mt-1 max-w-3xl text-sm leading-6 text-muted-foreground;
+    overflow-wrap: anywhere;
   }
 
   .app-section-card {

@@ -159,7 +159,7 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
           <div className="relative h-28 w-28 shrink-0 overflow-hidden rounded-full shadow-md border-4 border-[#8a2be2]/10">
             <img src="/Nurse_logo.png" alt="Logo" className="object-cover w-full h-full" />
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight text-card-foreground">เข้าสู่ระบบ</h1>
+          <h1 className="app-page-title">เข้าสู่ระบบ</h1>
         </div>
         <form onSubmit={handleLogin} className="space-y-6">
 

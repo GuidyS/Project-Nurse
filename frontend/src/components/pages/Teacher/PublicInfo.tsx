@@ -42,9 +42,11 @@ export default function PublicInfo() {
   return (
     <>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">ข้อมูลสาธารณะ</h1>
-          <p className="text-muted-foreground">ข้อมูลทั่วไปของคณะและมหาวิทยาลัย</p>
+        <div className="app-page-header">
+          <div className="min-w-0">
+          <h1 className="app-page-title">ข้อมูลสาธารณะ</h1>
+          <p className="app-page-description">ข้อมูลทั่วไปของคณะและมหาวิทยาลัย</p>
+          </div>
         </div>
 
         {/* Faculty Info Card */}

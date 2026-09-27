@@ -104,9 +104,11 @@ export default function PracticalStudents() {
   return (
     <>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">นักศึกษาฝึกปฏิบัติ</h1>
-          <p className="text-muted-foreground">จัดการนักศึกษาฝึกปฏิบัติที่อยู่ในความดูแล (สัดส่วน 1:8)</p>
+        <div className="app-page-header">
+          <div className="min-w-0">
+          <h1 className="app-page-title">นักศึกษาฝึกปฏิบัติ</h1>
+          <p className="app-page-description">จัดการนักศึกษาฝึกปฏิบัติที่อยู่ในความดูแล (สัดส่วน 1:8)</p>
+          </div>
         </div>
 
         {error && (

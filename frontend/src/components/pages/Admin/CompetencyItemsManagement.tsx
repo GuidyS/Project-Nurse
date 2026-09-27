@@ -7,7 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Plus, Pencil, Trash2, ListChecks, Save, X, AlertCircle } from "lucide-react";
+import { Loader2, Plus, Pencil, Trash2, Save, X, AlertCircle } from "lucide-react";
 import api from "@/lib/axios";
 
 interface Framework {
@@ -174,8 +174,7 @@ export default function CompetencyItemsManagement() {
 
   return (
     <div className="app-page max-w-5xl animate-fade-in">
-      <div className="app-page-header flex-row items-center justify-start">
-        <ListChecks className="h-6 w-6 text-primary" />
+      <div className="app-page-header">
         <div>
           <h1 className="app-page-title">จัดการรายการประเมินสมรรถนะหลัก</h1>
           <p className="app-page-description">สร้าง/แก้ไข/ลบรายการประเมินตามหัวข้อ PLO แต่ละหลักสูตรและชั้นปี (ระบบจัดลำดับให้อัตโนมัติ)</p>

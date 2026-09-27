@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Edit, Trash2, Save, BookOpen, Target, Loader2, Settings2, Plus, AlertCircle, Library } from "lucide-react";
+import { Edit, Trash2, Save, BookOpen, Loader2, Settings2, Plus, AlertCircle, Library } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -728,12 +728,9 @@ export default function CLOPage() {
 
         <div className="md:col-span-3 space-y-4">
           {selectedCourse ? (
-            <div className="bg-card rounded-xl shadow-card p-6 border-t-4 border-t-primary">
+            <div className="bg-card rounded-xl shadow-card p-6">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-lg font-bold flex items-center gap-2">
-                  <Target className="h-5 w-5 text-primary" />
-                  รายการ CLO
-                </h2>
+                <h2 className="text-lg font-bold">รายการ CLO</h2>
               </div>
 
               <div className="bg-muted/30 p-4 rounded-lg mb-6 border border-border">

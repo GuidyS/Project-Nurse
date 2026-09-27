@@ -82,9 +82,11 @@ export default function CourseStudents() {
   return (
     <>
       <div className="space-y-6 animate-fade-in">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight leading-snug">ผลสัมฤทธิ์ CLO รายบุคคล</h1>
-          <p className="text-muted-foreground">ติดตามและประเมินคะแนน Course Learning Outcomes ของนักศึกษา</p>
+        <div className="app-page-header">
+          <div className="min-w-0">
+          <h1 className="app-page-title">ผลสัมฤทธิ์ CLO รายบุคคล</h1>
+          <p className="app-page-description">ติดตามและประเมินคะแนน Course Learning Outcomes ของนักศึกษา</p>
+          </div>
         </div>
 
         {/* Course Selection Dropdown */}
