@@ -66,7 +66,7 @@ export default function StudentCompetencyView() {
   const isFullyAssessed = totalScorable > 0 && totalAssessed === totalScorable;
 
   return (
-    <div className="p-6 space-y-6 animate-fade-in max-w-6xl mx-auto">
+    <div className="space-y-6 max-w-7xl mx-auto p-6 animate-fade-in">
       {/* Header Info */}
       <div className="app-page-header">
         <div>

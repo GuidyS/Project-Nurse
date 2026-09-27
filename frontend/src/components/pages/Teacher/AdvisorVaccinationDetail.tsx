@@ -117,16 +117,14 @@ export default function AdvisorVaccinationDetail({ student, onBack }: AdvisorDet
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto p-6 animate-fade-in">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="icon" onClick={onBack} className="shrink-0">
+          <Button variant="ghost" size="icon" onClick={onBack} className="shrink-0">
             <ChevronLeft className="h-5 w-5" />
           </Button>
           <div>
             <div className="flex items-center gap-2">
-              <ShieldAlert className="h-6 w-6 text-primary" />
               <h1 className="app-page-title">
-                ส่วนที่ 3 ข้อมูลภาวะสุขภาพและการได้รับวัคซีนป้องกันโรค
+                ข้อมูลภาวะสุขภาพและการได้รับวัคซีนป้องกันโรค
               </h1>
             </div>
             <p className="text-sm text-muted-foreground mt-1">
@@ -134,7 +132,6 @@ export default function AdvisorVaccinationDetail({ student, onBack }: AdvisorDet
             </p>
           </div>
         </div>
-      </div>
 
       <Card>
         <CardContent className="p-0">

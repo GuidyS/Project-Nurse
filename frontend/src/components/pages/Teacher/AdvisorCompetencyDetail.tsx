@@ -110,25 +110,22 @@ export default function AdvisorCompetencyDetail({ student, onBack }: AdvisorDeta
   };
 
   return (
-    <div className="p-6 space-y-6 animate-fade-in max-w-6xl mx-auto">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={onBack}>
-            <ChevronLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <div className="flex items-center gap-2">
-              <ClipboardCheck className="h-6 w-6 text-primary" />
-              <h1 className="app-page-title">
-                การประเมินสมรรถนะหลักของนักศึกษาชั้นปีที่ {yearLevel || "—"} {curriculumYear && `(หลักสูตรปรับปรุง ${curriculumYear})`}
-              </h1>
-            </div>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              นักศึกษา: <span className="text-foreground font-medium">{student.full_name}</span> (รหัส {student.student_id})
-            </p>
+    <div className="space-y-6 max-w-7xl mx-auto p-6 animate-fade-in">
+      <div className="flex items-center gap-3">
+        <Button variant="ghost" size="icon" onClick={onBack}>
+          <ChevronLeft className="h-5 w-5" />
+        </Button>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <h1 className="app-page-title">
+              การประเมินสมรรถนะหลักของนักศึกษาชั้นปีที่ {yearLevel || "—"} {curriculumYear && `(หลักสูตรปรับปรุง ${curriculumYear})`}
+            </h1>
           </div>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            นักศึกษา: <span className="text-foreground font-medium">{student.full_name}</span> (รหัส {student.student_id})
+          </p>
         </div>
-        <Button onClick={handleSave} disabled={isSaving || isLoadingDetail} className="gap-2">
+        <Button onClick={handleSave} disabled={isSaving || isLoadingDetail} className="ml-auto shrink-0 gap-2">
           {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           บันทึกผลการประเมิน
         </Button>

@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
-import { FileText, Upload, Download, Search, Eye, Trash2, Loader2 } from 'lucide-react';
+import { Upload, Download, Search, Eye, Trash2, Loader2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
@@ -21,15 +21,6 @@ type DocumentItem = {
   uploadedAt: string;
   fileUrl?: string;
   downloadUrl?: string;
-};
-
-const getStatusBadge = (status: string) => {
-  switch (status) {
-    case 'approved': return <Badge className="bg-green-500">อนุมัติแล้ว</Badge>;
-    case 'pending': return <Badge className="bg-yellow-500">รอตรวจสอบ</Badge>;
-    case 'rejected': return <Badge variant="destructive">ถูกปฏิเสธ</Badge>;
-    default: return <Badge variant="secondary">{status}</Badge>;
-  }
 };
 
 export default function Documents() {
