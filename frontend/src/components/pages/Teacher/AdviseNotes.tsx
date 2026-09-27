@@ -7,10 +7,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MessageSquare, Plus, Search, Calendar, FileText, Loader2 } from 'lucide-react';
+import { MessageSquare, Plus, Search, Calendar, FileText, Loader2, ChevronLeft } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import api from '@/lib/axios';
 import { useToast } from '@/hooks/use-toast';
+import { navigateToPage } from '@/lib/projectNavigation';
 
 const getTypeBadge = (type: string) => {
   switch (type) {
@@ -45,6 +46,10 @@ export default function AdviseNotes() {
     type: 'academic',
     summary: '',
   });
+
+  const handleBack = () => {
+    navigateToPage('advises');
+  };
 
   // ดึงประวัติบันทึก + สถิติ
   const fetchNotes = async (withSpinner = true) => {
@@ -108,14 +113,17 @@ export default function AdviseNotes() {
   return (
     <>
       <div className="space-y-6">
-        <div className="app-page-header">
-          <div>
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={handleBack} className="shrink-0">
+            <ChevronLeft className="h-5 w-5" />
+          </Button>
+          <div className="min-w-0 flex-1">
             <h1 className="app-page-title">บันทึกการให้คำปรึกษา</h1>
             <p className="app-page-description">บันทึกการให้คำปรึกษานักศึกษา</p>
           </div>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button>
+              <Button className="ml-auto shrink-0">
                 <Plus className="mr-2 h-4 w-4" />
                 เพิ่มบันทึก
               </Button>

@@ -65,15 +65,14 @@ function AdvisorHealthDetail({ student, onBack }: AdvisorDetailPanelProps) {
   }, [student.student_id]);
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto p-6 animate-fade-in">
+    <div className="space-y-6 max-w-7xl mx-auto p-6 animate-fade-in">
       <div className="flex items-center gap-3">
-        <Button variant="outline" size="icon" onClick={onBack} className="shrink-0">
+        <Button variant="ghost" size="icon" onClick={onBack} className="shrink-0">
           <ChevronLeft className="h-5 w-5" />
         </Button>
         <div>
           <div className="flex items-center gap-2">
-            <Activity className="h-6 w-6 text-primary" />
-            <h1 className="app-page-title">2. ภาวะสุขภาพ</h1>
+            <h1 className="app-page-title">ภาวะสุขภาพ</h1>
           </div>
           <p className="text-sm text-muted-foreground mt-1">
             ข้อมูลของ {student.full_name} (รหัสนักศึกษา: {student.student_id}) — <b>โหมดดูอย่างเดียว</b>
@@ -201,7 +200,6 @@ export default function AdvisorHealthRecordsView() {
     <div className="p-6 space-y-6 animate-fade-in max-w-7xl mx-auto">
       <div>
         <div className="flex items-center gap-2">
-          <Users className="h-6 w-6 text-primary" />
           <h1 className="text-2xl font-bold text-foreground">นักศึกษาในความดูแล</h1>
         </div>
         <p className="text-sm text-muted-foreground mt-1">

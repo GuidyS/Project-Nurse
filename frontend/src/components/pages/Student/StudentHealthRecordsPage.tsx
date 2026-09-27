@@ -201,10 +201,10 @@ export default function StudentHealthRecordsPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto p-6 animate-fade-in">
+    <div className="space-y-6 max-w-7xl mx-auto p-6 animate-fade-in">
       <div className="app-page-header">
         <div>
-          <h1 className="app-page-title">2. ภาวะสุขภาพ</h1>
+          <h1 className="app-page-title">ภาวะสุขภาพ</h1>
           <p className="app-page-description">
             ข้อมูลภาวะสุขภาพโดยรวม ส่วนสูง น้ำหนัก และดัชนีมวลกาย (BMI) ของนักศึกษาในแต่ละชั้นปี
           </p>

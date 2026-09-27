@@ -106,7 +106,6 @@ const sidebarIconOverrides: Record<string, string> = {
   "transcript": "ScrollText",
   "portfolio": "FolderOpen",
   "clos": "NotebookText",
-  "clo-management": "ListTree",
   "course-report": "FileChartColumn",
   "program-reports": "ChartSpline",
   "my-courses": "BookMarked",
@@ -124,9 +123,7 @@ const sidebarIconOverrides: Record<string, string> = {
   "student-vaccinations": "Syringe",
   "student-health-records": "HeartPulse",
   "student-competency-view": "Medal",
-  "advisor-vaccination-view": "ShieldPlus",
   "advisor-health-records-view": "Stethoscope",
-  "advisor-competency-view": "BadgeCheck",
   "competency-items-management": "ListChecks",
   "curriculum-cycles": "Library",
 };
