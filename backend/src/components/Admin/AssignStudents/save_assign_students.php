@@ -111,6 +111,38 @@ try {
         $positionGranted = assignStudentsGrantPosition($db, $facultyId, $type['position_id']);
     }
 
+    // ส่งการแจ้งเตือนไปยังบัญชีนักศึกษาที่ได้รับการมอบหมาย
+    try {
+        $typeLabel = $type['label']; // 'อาจารย์ที่ปรึกษา' หรือ 'อาจารย์ปฏิบัติ'
+        $notifTitle = "แจ้งการมอบหมาย{$typeLabel}คนปัจจุบัน";
+        $notifMsg = "คุณได้รับการมอบหมาย {$typeLabel}: {$facultyName} ประจำปีการศึกษา {$academicYear} สามารถตรวจสอบข้อมูลได้ที่หน้าใบแสดงผลการเรียน";
+        $notifPayload = json_encode([
+            'action' => 'view_transcript',
+            'target' => 'transcript',
+            'advisor_type' => $type['key'],
+            'advisor_name' => $facultyName
+        ], JSON_UNESCAPED_UNICODE);
+
+        $notifStmt = $db->prepare("
+            INSERT INTO notifications (user_id, sender_user_id, title, message, payload_json, type, channel, is_read, created_at)
+            SELECT u.user_id, :sender_id, :title, :message, :payload_json, 'info', 'in-app', 0, NOW()
+            FROM users u
+            WHERE u.username = :student_id
+        ");
+
+        foreach ($studentIds as $sid) {
+            $notifStmt->execute([
+                ':sender_id' => $_SESSION['user_id'] ?? null,
+                ':title' => $notifTitle,
+                ':message' => $notifMsg,
+                ':payload_json' => $notifPayload,
+                ':student_id' => $sid
+            ]);
+        }
+    } catch (Throwable $ne) {
+        error_log("assign_students notification error: " . $ne->getMessage());
+    }
+
     $db->commit();
 
     // บันทึก Audit Log สำหรับการมอบหมายนักศึกษา

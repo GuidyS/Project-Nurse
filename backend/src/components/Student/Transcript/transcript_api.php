@@ -33,14 +33,50 @@ try {
     $db = new Connect();
     $student_session_id = trim((string)$student_raw_id);
 
-    // 1. ดึงข้อมูลส่วนตัวจากตาราง student
-    $sql_profile = "SELECT student_id AS student_code, 
-                           CONCAT(IFNULL(title,''), first_name_th, ' ', last_name_th) AS student_name,
+    // 1. ดึงข้อมูลส่วนตัวจากตาราง student พร้อมอาจารย์ที่ปรึกษาและอาจารย์ปฏิบัติคนปัจจุบัน
+    $sql_profile = "SELECT s.student_id AS student_code, 
+                           CONCAT(IFNULL(s.title,''), s.first_name_th, ' ', s.last_name_th) AS student_name,
                            'พยาบาลศาสตร์' AS faculty,
                            'หลักสูตรพยาบาลศาสตรบัณฑิต' AS major,
-                           IFNULL(year_level, 1) AS current_year
-                    FROM student 
-                    WHERE student_id = :student_id LIMIT 1";
+                           IFNULL(s.year_level, 1) AS current_year,
+                           (
+                               SELECT TRIM(CONCAT(IFNULL(f.title,''), ' ', f.first_name_th, ' ', f.last_name_th))
+                               FROM student_advisor_mapping sam
+                               JOIN faculty f ON sam.faculty_id = f.faculty_id
+                               WHERE sam.student_id = s.student_id
+                                 AND (sam.advisor_type != 'practical' OR sam.advisor_type IS NULL)
+                               ORDER BY sam.academic_year DESC, sam.mapping_id DESC
+                               LIMIT 1
+                           ) AS advisor_name,
+                           (
+                               SELECT f.email
+                               FROM student_advisor_mapping sam
+                               JOIN faculty f ON sam.faculty_id = f.faculty_id
+                               WHERE sam.student_id = s.student_id
+                                 AND (sam.advisor_type != 'practical' OR sam.advisor_type IS NULL)
+                               ORDER BY sam.academic_year DESC, sam.mapping_id DESC
+                               LIMIT 1
+                           ) AS advisor_email,
+                           (
+                               SELECT TRIM(CONCAT(IFNULL(f.title,''), ' ', f.first_name_th, ' ', f.last_name_th))
+                               FROM student_advisor_mapping sam
+                               JOIN faculty f ON sam.faculty_id = f.faculty_id
+                               WHERE sam.student_id = s.student_id
+                                 AND sam.advisor_type = 'practical'
+                               ORDER BY sam.academic_year DESC, sam.mapping_id DESC
+                               LIMIT 1
+                           ) AS practical_advisor_name,
+                           (
+                               SELECT f.email
+                               FROM student_advisor_mapping sam
+                               JOIN faculty f ON sam.faculty_id = f.faculty_id
+                               WHERE sam.student_id = s.student_id
+                                 AND sam.advisor_type = 'practical'
+                               ORDER BY sam.academic_year DESC, sam.mapping_id DESC
+                               LIMIT 1
+                           ) AS practical_advisor_email
+                    FROM student s 
+                    WHERE s.student_id = :student_id LIMIT 1";
                     
     $stmt_profile = $db->prepare($sql_profile);
     $stmt_profile->execute([':student_id' => $student_session_id]);
