@@ -68,7 +68,6 @@ const previewMenuSectionsByRole: Record<string, any[]> = {
     {
       sectionTitle: "Teacher",
       items: [
-        { title: "รายวิชาของฉัน", url: "my-courses", icon: "BookOpen" },
         { title: "จัดการรายวิชา", url: "courses", icon: "Library" },
         { title: "CLO", url: "clos", icon: "Target" },
         { title: "นักศึกษาที่รับผิดชอบ", url: "students-info", icon: "Users" },
@@ -101,6 +100,30 @@ const getPreviewMenuSections = (user: any) => {
 };
 
 const sidebarIconOverrides: Record<string, string> = {
+  "users-management": "UserRoundCog",
+  "reports": "ChartNoAxesCombined",
+  "profile": "CircleUserRound",
+  "transcript": "ScrollText",
+  "portfolio": "FolderOpen",
+  "clos": "NotebookText",
+  "course-report": "FileChartColumn",
+  "program-reports": "ChartSpline",
+  "my-courses": "BookMarked",
+  "courses": "ClipboardPenLine",
+  "course-students": "ChartNoAxesColumnIncreasing",
+  "students": "GraduationCap",
+  "assign-instructors": "UserRoundCheck",
+  "assign-students": "UserRoundPlus",
+  "project-docs": "Files",
+  "project-reports": "ChartColumnBig",
+  "practical-students": "ClipboardCheck",
+  "evidence": "FileBadge2",
+  "performance": "Gauge",
+  "advisor-notifications": "MessageSquareWarning",
+  "student-vaccinations": "Syringe",
+  "student-health-records": "HeartPulse",
+  "student-competency-view": "Medal",
+  "advisor-health-records-view": "Stethoscope",
   "competency-items-management": "ListChecks",
   "curriculum-cycles": "Library",
 };
@@ -352,7 +375,7 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
           {bottomMenuItems
             .filter(item => hasPermission(item.permission))
             .map((item) => {
-              const Icon = getIcon(item.icon);
+              const Icon = getIcon(sidebarIconOverrides[item.url] || item.icon);
               const isActive = activeItem === item.url;
               const isNotification = item.url === "notifications";
 

@@ -5,6 +5,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/../../../config/academic_calendar.php';
 require_once __DIR__ . '/../../../config/audit_helper.php'; // นำเข้า Audit Helper
 
 $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
@@ -16,7 +17,12 @@ try {
         $courseCode = $input['course'];
         $name = $input['name'];
         $type = $input['type']; // e.g. 'มคอ.3'
-        $academicYear = $input['academic_year'] ?? date('Y') + 543;
+        $academicYear = $input['academic_year'] ?? currentAcademicYear();
+        if (!is_scalar($academicYear) || !preg_match('/^\d{4}$/', (string)$academicYear) || (int)$academicYear < 2500 || (int)$academicYear > 2700) {
+            http_response_code(422);
+            echo json_encode(['status' => 'error', 'message' => 'ปีการศึกษาต้องเป็น พ.ศ. 2500–2700'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
         $semester = $input['semester'] ?? 1;
         $googleDriveLink = trim($input['google_drive_link']);
 
@@ -29,11 +35,26 @@ try {
             $stmt->execute([':code' => $courseCode]);
             $subjectName = $stmt->fetchColumn() ?: '';
         }
+
+        $teacherName = $_SESSION['username'] ?? '';
+        if (!empty($_SESSION['user_id'])) {
+            $teacherStmt = $pdo->prepare("
+                SELECT TRIM(CONCAT(COALESCE(title, ''), COALESCE(first_name_th, ''), ' ', COALESCE(last_name_th, ''))) AS full_name
+                FROM faculty
+                WHERE user_id = :user_id
+                LIMIT 1
+            ");
+            $teacherStmt->execute([':user_id' => $_SESSION['user_id']]);
+            $resolvedTeacherName = trim((string) ($teacherStmt->fetchColumn() ?: ''));
+            if ($resolvedTeacherName !== '') {
+                $teacherName = $resolvedTeacherName;
+            }
+        }
         
         $insertSql = "INSERT INTO tqf_documents 
-            (subject_code, subject_name, tqf_type, academic_year, semester, approval_status, responsible_teacher, file_name, file_path) 
+            (subject_code, subject_name, tqf_type, academic_year, semester, responsible_teacher, file_name, file_path) 
             VALUES 
-            (:sc, :sn, :type, :year, :sem, 'รอหัวหน้าภาคฯ', :teacher, :fn, :fp)";
+            (:sc, :sn, :type, :year, :sem, :teacher, :fn, :fp)";
         
         $insertStmt = $pdo->prepare($insertSql);
         $insertStmt->execute([
@@ -42,21 +63,12 @@ try {
             ':type' => $type,
             ':year' => $academicYear,
             ':sem' => $semester,
-            ':teacher' => $_SESSION['username'] ?? '',
+            ':teacher' => $teacherName,
             ':fn' => $name,
             ':fp' => $googleDriveLink
         ]);
 
         $tqfId = $pdo->lastInsertId();
-        $requestSql = "INSERT INTO approval_requests 
-            (request_type, requester_user_id, target_ref_type, target_ref_id, title, status)
-            VALUES ('document_approve', :user, 'tqf_document', :ref_id, :title, 'pending')";
-        $reqStmt = $pdo->prepare($requestSql);
-        $reqStmt->execute([
-            ':user' => $_SESSION['user_id'] ?? 1,
-            ':ref_id' => $tqfId,
-            ':title' => "อนุมัติเอกสาร TQF: $name ($courseCode)"
-        ]);
 
         // บันทึก Log เมื่ออัปโหลดเอกสาร มคอ. ใหม่
         logAudit(

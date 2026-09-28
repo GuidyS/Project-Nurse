@@ -1,4 +1,4 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -6,32 +6,25 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
-import { FileText, Upload, Download, Search, Eye, Trash2, Loader2 } from 'lucide-react';
+import { Upload, Download, Search, Eye, Trash2, Loader2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
+import { useAcademicYear } from "@/hooks/use-academic-year";
 
 type DocumentItem = {
   id: string;
   name: string;
   type: string;
   course: string;
+  academic_year: string;
   uploadedAt: string;
-  status: string;
   fileUrl?: string;
   downloadUrl?: string;
 };
 
-const getStatusBadge = (status: string) => {
-  switch (status) {
-    case 'approved': return <Badge className="bg-green-500">อนุมัติแล้ว</Badge>;
-    case 'pending': return <Badge className="bg-yellow-500">รอตรวจสอบ</Badge>;
-    case 'rejected': return <Badge variant="destructive">ถูกปฏิเสธ</Badge>;
-    default: return <Badge variant="secondary">{status}</Badge>;
-  }
-};
-
 export default function Documents() {
+  const currentAcademicYear = useAcademicYear();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
@@ -50,7 +43,7 @@ export default function Documents() {
     semester: string;
     google_drive_link: string;
   }>({
-    name: '', type: '', course: '', academic_year: '2567', semester: '1', google_drive_link: ''
+    name: '', type: '', course: '', academic_year: '', semester: '1', google_drive_link: ''
   });
 
   // 🌟 ดึงข้อมูลจาก API เมื่อเปิดหน้าเว็บ
@@ -95,6 +88,11 @@ export default function Documents() {
 
   // 🌟 ฟังก์ชันส่งข้อมูลอัปโหลดไปบันทึก
   const handleUpload = async () => {
+    const year = Number(newDocument.academic_year);
+    if (!/^\d{4}$/.test(newDocument.academic_year) || year < 2500 || year > 2700) {
+      toast({ title: "กรุณาระบุปีการศึกษา พ.ศ. 2500–2700", variant: "destructive" });
+      return;
+    }
     if (!newDocument.name || !newDocument.type || !newDocument.course || !newDocument.google_drive_link) {
       toast({ title: "แจ้งเตือน", description: "กรุณากรอกข้อมูลและแนบลิงก์ให้ครบถ้วน", variant: "destructive" });
       return;
@@ -116,7 +114,7 @@ export default function Documents() {
       if (response.data.status === 'success') {
         toast({ title: "สำเร็จ", description: "บันทึกข้อมูลเอกสารเรียบร้อยแล้ว" });
         setIsDialogOpen(false);
-        setNewDocument({ name: '', type: '', course: '', academic_year: '2567', semester: '1', google_drive_link: '' });
+        setNewDocument({ name: '', type: '', course: '', academic_year: '', semester: '1', google_drive_link: '' });
         fetchDocuments(); // รีเฟรชข้อมูล
       } else {
         toast({ title: "ข้อผิดพลาด", description: response.data.message || "ไม่สามารถอัปโหลดได้", variant: "destructive" });
@@ -150,12 +148,15 @@ export default function Documents() {
   return (
     <>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="app-page-header">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">อัปโหลดเอกสาร</h1>
-            <p className="text-muted-foreground">จัดการเอกสารรายวิชาต่างๆ</p>
+            <h1 className="app-page-title">อัปโหลดเอกสาร</h1>
+            <p className="app-page-description">จัดการเอกสารรายวิชาต่างๆ</p>
           </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <Dialog open={isDialogOpen} onOpenChange={(open) => {
+            if (open) setNewDocument((draft) => ({ ...draft, academic_year: draft.academic_year || String(currentAcademicYear) }));
+            setIsDialogOpen(open);
+          }}>
             <DialogTrigger asChild>
               <Button>
                 <Upload className="mr-2 h-4 w-4" />
@@ -249,60 +250,12 @@ export default function Documents() {
           </Dialog>
         </div>
 
-        {/* Stats */}
-        <div className="grid gap-4 md:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">เอกสารทั้งหมด</CardTitle>
-              <FileText className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{documents.length}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">อนุมัติแล้ว</CardTitle>
-              <FileText className="h-4 w-4 text-green-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">
-                {safeDocuments.filter(d => d.status === 'approved').length}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">รอตรวจสอบ</CardTitle>
-              <FileText className="h-4 w-4 text-yellow-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-yellow-600">
-                {safeDocuments.filter(d => d.status === 'pending').length}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">TQF</CardTitle>
-              <FileText className="h-4 w-4 text-primary" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {documents.filter(d => d.type.includes('TQF')).length}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
         {/* Table */}
         <Card>
           <CardHeader>
-            <CardTitle>รายการเอกสาร</CardTitle>
-            <CardDescription>เอกสารรายวิชาทั้งหมด</CardDescription>
+            <CardTitle className="flex items-center justify-between">รายการเอกสาร
+              <Badge variant="outline">เอกสารทั้งหมด {documents.length}</Badge>
+            </CardTitle>
             <div className="flex items-center gap-2 pt-4">
               <Search className="h-4 w-4 text-muted-foreground" />
               <Input
@@ -321,8 +274,8 @@ export default function Documents() {
                   <TableHead>ชื่อเอกสาร</TableHead>
                   <TableHead>ประเภท</TableHead>
                   <TableHead>รายวิชา</TableHead>
+                  <TableHead>ปีการศึกษา</TableHead>
                   <TableHead>วันที่อัปโหลด</TableHead>
-                  <TableHead>สถานะ</TableHead>
                   <TableHead>การดำเนินการ</TableHead>
                 </TableRow>
               </TableHeader>
@@ -334,8 +287,8 @@ export default function Documents() {
                       <TableCell className="font-medium">{doc.name}</TableCell>
                       <TableCell><Badge variant="outline">{doc.type}</Badge></TableCell>
                       <TableCell>{doc.course}</TableCell>
+                      <TableCell>{doc.academic_year}</TableCell>
                       <TableCell>{doc.uploadedAt}</TableCell>
-                      <TableCell>{getStatusBadge(doc.status)}</TableCell>
                       <TableCell>
                         <div className="flex gap-2">
                           <Button 
@@ -371,7 +324,7 @@ export default function Documents() {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">ไม่พบข้อมูลเอกสารที่คุณค้นหา</TableCell>
+                    <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">ไม่พบข้อมูลเอกสารที่คุณค้นหา</TableCell>
                   </TableRow>
                 )}
               </TableBody>

@@ -104,10 +104,10 @@ export default function DeanDashboard() {
     <>
       <div className="space-y-6 animate-fade-in">
         {/* Header */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="app-page-header">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">แดชบอร์ดคณบดี</h1>
-            <p className="text-muted-foreground">ภาพรวมผลการดำเนินงานและภาระงานอาจารย์ระดับคณะ</p>
+            <h1 className="app-page-title">แดชบอร์ดคณบดี</h1>
+            <p className="app-page-description">ภาพรวมผลการดำเนินงานและภาระงานอาจารย์ระดับคณะ</p>
           </div>
           <ExportButton reportName="Dashboard-KPI-Report" />
         </div>

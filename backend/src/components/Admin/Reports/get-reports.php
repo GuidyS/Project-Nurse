@@ -1,5 +1,8 @@
 <?php
 require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/../../middlewares/auth_middleware.php';
+require_once __DIR__ . '/../../../config/academic_calendar.php';
+require_once __DIR__ . '/../Approvals/approval-schema.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     http_response_code(405);
@@ -10,7 +13,12 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     exit;
 }
 
-$academicYear = $_GET['year'] ?? '2568';
+$academicYear = $_GET['year'] ?? (string)currentAcademicYear();
+if (!is_string($academicYear) || !preg_match('/^\d{4}$/', $academicYear) || (int)$academicYear < 2500 || (int)$academicYear > 2700) {
+    http_response_code(422);
+    echo json_encode(['status' => 'error', 'message' => 'ปีการศึกษาไม่ถูกต้อง'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
 $strategyFilter = $_GET['strategy'] ?? 'ทั้งหมด';
 $responsibleFilter = $_GET['responsible'] ?? 'ทั้งหมด';
 $searchTerm = trim($_GET['search'] ?? '');
@@ -315,7 +323,7 @@ function buildAvailableFilters(array $allRows, string $academicYear): array
     $responsiblePeople = array_values(array_unique(array_filter(array_map(fn($row) => $row['responsiblePerson'] ?? '', $yearRows))));
 
     return [
-        'academicYears' => array_values(array_unique(array_map(fn($row) => $row['academicYear'], $allRows))),
+        'academicYears' => array_map('strval', academicYearOptions(array_map(fn($row) => $row['academicYear'], $allRows))),
         'strategies' => array_values(array_filter($strategies)),
         'responsiblePeople' => $responsiblePeople,
     ];
@@ -323,6 +331,7 @@ function buildAvailableFilters(array $allRows, string $academicYear): array
 
 try {
     $db = new Connect();
+    approvalRequireAdmin($db);
     $allRows = fetchAnnualReportRows($db);
     $filteredRows = filterRows($allRows, $academicYear, $strategyFilter, $responsibleFilter, $searchTerm);
     $rowsWithComputedFields = withComputedFields($filteredRows);

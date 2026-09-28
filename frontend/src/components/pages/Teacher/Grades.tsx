@@ -114,10 +114,10 @@ export default function Grades() {
   return (
     <>
       <div className="space-y-6 animate-fade-in">
-        <div>
+        <div className="app-page-header">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight leading-snug">บันทึกเกรด</h1>
-            <p className="text-muted-foreground">บันทึกและแก้ไขผลการเรียนวิชาที่สอน</p>
+            <h1 className="app-page-title">บันทึกเกรด</h1>
+            <p className="app-page-description">บันทึกและแก้ไขผลการเรียนวิชาที่สอน</p>
           </div>
         </div>
 

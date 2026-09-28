@@ -411,10 +411,10 @@ const CoursesPage = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="app-page-header">
         <div>
-          <h1 className="text-3xl font-bold text-foreground leading-snug">รายวิชาที่สอน</h1>
-          <p className="text-muted-foreground mt-1">จัดการรายวิชาและบันทึกผลการเรียน</p>
+          <h1 className="app-page-title">รายวิชาที่สอน</h1>
+          <p className="app-page-description">จัดการรายวิชาและบันทึกผลการเรียน</p>
         </div>
       </div>
 
@@ -500,12 +500,6 @@ const CoursesPage = () => {
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem className="gap-2" onClick={() => openGradeDialog(course, false)}>
                         <Edit className="h-4 w-4" /> บันทึก/แก้ไขผลการเรียน
-                      </DropdownMenuItem>
-                      <DropdownMenuItem className="gap-2" onClick={() => openGradeDialog(course, true)}>
-                        <Eye className="h-4 w-4" /> ดูรายชื่อนักศึกษา
-                      </DropdownMenuItem>
-                      <DropdownMenuItem className="gap-2">
-                        <Plus className="h-4 w-4" /> มอบหมาย Course Instructor
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>

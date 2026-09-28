@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { useAcademicYearSelection } from "@/hooks/use-academic-year";
+import { academicYearOptions } from "@/lib/academicYear";
 import {
   BookOpenCheck,
   ChevronRight,
@@ -214,7 +216,7 @@ function FacultyDimensionContent({ dimension }: { dimension: FacultyDimension })
   const config = dimensionConfig[dimension];
   const Icon = config.icon;
   const [data, setData] = useState<WorkloadData | null>(null);
-  const [selectedYear, setSelectedYear] = useState<number | null>(null);
+  const { currentYear, academicYear: selectedYear, setAcademicYear: setSelectedYear } = useAcademicYearSelection();
   const [selectedFaculty, setSelectedFaculty] = useState<FacultyWorkload | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -238,7 +240,6 @@ function FacultyDimensionContent({ dimension }: { dimension: FacultyDimension })
         if (!mounted) return;
         const nextData = response.data.data as WorkloadData;
         setData(nextData);
-        setSelectedYear((current) => current ?? nextData.academic_year);
         setSelectedFaculty((current) =>
           current ? nextData.faculty.find((item) => item.faculty_id === current.faculty_id) || null : null,
         );
@@ -299,23 +300,23 @@ function FacultyDimensionContent({ dimension }: { dimension: FacultyDimension })
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div className="app-page-header">
         <div className="flex items-start gap-3">
           <div className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-md ${config.iconTone}`}>
             <Icon className="h-5 w-5" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-foreground">{config.title}</h1>
-            <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{config.description}</p>
+            <h1 className="app-page-title">{config.title}</h1>
+            <p className="app-page-description">{config.description}</p>
           </div>
         </div>
         <div className="flex gap-2">
-          <Select value={String(selectedYear)} onValueChange={(value) => setSelectedYear(Number(value))}>
+          <Select value={String(selectedYear)} onValueChange={setSelectedYear}>
             <SelectTrigger className="w-[170px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {data.available_years.map((year) => (
+              {academicYearOptions(data.available_years, currentYear).map((year) => (
                 <SelectItem key={year} value={String(year)}>ปีการศึกษา {year}</SelectItem>
               ))}
             </SelectContent>

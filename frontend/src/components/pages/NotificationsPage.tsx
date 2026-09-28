@@ -5,9 +5,11 @@ import {
   Check,
   CheckCheck,
   Clock,
+  ExternalLink,
   Mail,
   Send,
   Trash2,
+  UserCheck,
   Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -36,11 +38,13 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
 import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
+import { navigateToPage } from "@/lib/projectNavigation";
 
 interface Notification {
   id: number;
   title: string;
   message: string;
+  payloadJson?: string | null;
   type: "info" | "warning" | "success" | "request";
   channel: "in-app" | "email" | "both";
   direction: "received" | "sent";
@@ -64,6 +68,10 @@ const NotificationsPage = () => {
   const canSendNotifications = Number(currentUser.role_id) !== 3;
   const roleId = Number(currentUser.role_id);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [advisorInfo, setAdvisorInfo] = useState<{
+    advisor_name?: string | null;
+    practical_advisor_name?: string | null;
+  } | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [recipients, setRecipients] = useState<Recipient[]>([]);
   const [selectedRecipients, setSelectedRecipients] = useState<number[]>([]);
@@ -154,6 +162,9 @@ const NotificationsPage = () => {
       const data = Array.isArray(response.data)
         ? response.data
         : response.data?.data;
+      if (response.data?.advisors) {
+        setAdvisorInfo(response.data.advisors);
+      }
       setNotifications(
         Array.isArray(data)
           ? data.map((notification) => ({
@@ -576,6 +587,49 @@ const NotificationsPage = () => {
         </div>
       </div>
 
+      {/* 🎓 แถบข้อมูลอาจารย์ผู้ดูแลสำหรับนักศึกษา */}
+      {roleId === 3 && advisorInfo && (
+        <div className="rounded-xl border border-blue-200/80 bg-gradient-to-r from-blue-50/90 via-indigo-50/50 to-card p-4 shadow-sm dark:border-blue-900/50 dark:from-blue-950/30 dark:via-indigo-950/20 dark:to-card">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3.5">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                <UserCheck className="h-5 w-5" />
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <h4 className="text-sm font-semibold text-foreground">
+                    อาจารย์ผู้ดูแลคนปัจจุบันของคุณ
+                  </h4>
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-blue-200 text-blue-700 bg-blue-50/60 dark:bg-blue-950/50 dark:text-blue-300">
+                    คนปัจจุบัน
+                  </Badge>
+                </div>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1.5">
+                    <strong className="text-foreground font-medium">อาจารย์ที่ปรึกษา:</strong>{" "}
+                    <span className="text-foreground">{advisorInfo.advisor_name || "ยังไม่มีข้อมูล"}</span>
+                  </span>
+                  <span className="text-muted-foreground/40">•</span>
+                  <span className="flex items-center gap-1.5">
+                    <strong className="text-foreground font-medium">อาจารย์ปฏิบัติ:</strong>{" "}
+                    <span className="text-foreground">{advisorInfo.practical_advisor_name || "ยังไม่มีข้อมูล"}</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 shrink-0 self-start sm:self-center border-blue-200 text-blue-700 hover:bg-blue-50 hover:text-blue-800 dark:border-blue-800 dark:text-blue-300"
+              onClick={() => navigateToPage("transcript")}
+            >
+              ดูในใบแสดงผลการเรียน
+              <ExternalLink className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </div>
+      )}
+
       <Tabs defaultValue="all" className="space-y-4">
         <TabsList>
           <TabsTrigger value="all">ทั้งหมด</TabsTrigger>
@@ -626,6 +680,25 @@ const NotificationsPage = () => {
                     <p className="text-sm text-muted-foreground mt-1">
                       {notification.message}
                     </p>
+                    {(notification.payloadJson?.includes("view_transcript") || 
+                      notification.title.includes("อาจารย์ที่ปรึกษา") || 
+                      notification.title.includes("อาจารย์ปฏิบัติ") || 
+                      notification.title.includes("อาจารย์ผู้ดูแล")) && (
+                      <div className="mt-2.5">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="h-7 text-xs gap-1.5 text-primary hover:bg-primary/10 border border-primary/20"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigateToPage("transcript");
+                          }}
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                          เปิดดูในใบแสดงผลการเรียน
+                        </Button>
+                      </div>
+                    )}
                     <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1">
                         <Clock className="h-3 w-3" />
@@ -719,6 +792,24 @@ const NotificationsPage = () => {
                     : `ผู้ส่ง: ${selectedNotification.sender || 'ระบบ'}`}
                 </span>
               </div>
+
+              {(selectedNotification.payloadJson?.includes("view_transcript") ||
+                selectedNotification.title.includes("อาจารย์ที่ปรึกษา") ||
+                selectedNotification.title.includes("อาจารย์ปฏิบัติ") ||
+                selectedNotification.title.includes("อาจารย์ผู้ดูแล")) && (
+                <div className="pt-2">
+                  <Button
+                    className="w-full gap-2"
+                    onClick={() => {
+                      setIsDetailDialogOpen(false);
+                      navigateToPage("transcript");
+                    }}
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    ดูรายละเอียดอาจารย์ในใบแสดงผลการเรียน
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </DialogContent>

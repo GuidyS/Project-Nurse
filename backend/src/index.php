@@ -29,6 +29,14 @@
 
     switch ($page) {
 
+            case 'academic-calendar':
+                require_once 'components/AcademicCalendar/get_academic_calendar.php';
+                break;
+
+            case 'export-years':
+                require_once 'components/Admin/ExportData/get_export_years.php';
+                break;
+
             // Auth
             case 'register':
                 require_once 'components/Auth/register.php';
@@ -200,13 +208,6 @@
                 require_once 'components/Teacher/AdviseNotes/get_advise_students.php';
                 break;
 
-            // AdvisorNotifications (การแจ้งเตือนของอาจารย์)
-            case 'get-advisor-notifications':
-                require_once 'components/Teacher/AdvisorNotifications/get_notifications.php';
-                break;
-            case 'update-notification-read':
-                require_once 'components/Teacher/AdvisorNotifications/update_notification_read.php';
-                break;
            // StudentCompetency (ฝั่งอาจารย์)
             case 'student-competency':
             case 'get-student-competency':
@@ -382,6 +383,9 @@
                 break;
 
             // ResearchSummary
+            case 'save-research-summary':
+                require_once 'components/Teacher/ResearchSummary/save_research_summary.php';
+                break;
             case 'get-research-summary':
                 require_once 'components/Teacher/ResearchSummary/get_research_summary.php';
                 break;
@@ -403,11 +407,6 @@
             // PLOYLOReport
             case 'get-plo-ylo-report':
                 require_once 'components/Teacher/PLOYLOReport/get_plo_ylo_report.php';
-                break;
-
-            // MyCourses
-            case 'get-teacher-courses-overview':
-                require_once 'components/Teacher/MyCourses/get_teacher_courses_overview.php';
                 break;
 
             // Performance
@@ -485,11 +484,6 @@
                 break;
             case 'delete-schedule-task':
                 require_once 'components/Teacher/ScheduleTasks/delete_schedule_task.php';
-                break;
-
-            // Students
-            case 'get-teacher-students':
-                require_once 'components/Teacher/Students/get_students.php';
                 break;
 
             // TransferRequests

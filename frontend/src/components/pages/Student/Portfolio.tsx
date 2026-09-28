@@ -276,10 +276,10 @@ const Portfolio = () => {
   return (
     <>
       <div className="p-6 space-y-6 animate-fade-in">
-        <div className="flex items-center justify-between">
+        <div className="app-page-header">
           <div>
-            <h1 className="text-2xl font-bold text-foreground leading-snug">แฟ้มสะสมผลงาน</h1>
-            <p className="text-muted-foreground">จัดการ Portfolio และใบประกาศนียบัตรของคุณ</p>
+            <h1 className="app-page-title">แฟ้มสะสมผลงาน</h1>
+            <p className="app-page-description">จัดการ Portfolio และใบประกาศนียบัตรของคุณ</p>
           </div>
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>

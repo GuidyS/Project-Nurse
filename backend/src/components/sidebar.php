@@ -34,7 +34,7 @@ $positionSectionMap = [
 // 2. SQL Query ดึงเมนูตามระบบสิทธิ์
 $sql = "SELECT m.* FROM system_sidebar_menus m 
         WHERE m.is_active = 1
-        AND m.url NOT IN ('import-data', 'project-docs')
+        AND m.url NOT IN ('import-data', 'project-docs', 'my-courses', 'students', 'advisor-notifications', 'advise-notes')
         AND (m.permission_required IN (
             SELECT p.permission_name FROM permissions p
             JOIN position_permission pp ON p.permission_id = pp.permission_id
@@ -54,7 +54,12 @@ $sql = "SELECT m.* FROM system_sidebar_menus m
                   WHERE up2.user_id = :student_user_id_no_position
               )
         ) OR m.permission_required IS NULL)
-        ORDER BY m.menu_id ASC";
+        ORDER BY
+            CASE
+                WHEN m.section_title = 'การจัดการเรียนการสอน' AND m.url = 'courses' THEN 0
+                ELSE 1
+            END,
+            m.menu_id ASC";
 
 $stmt = $db->prepare($sql);
 $stmt->execute([

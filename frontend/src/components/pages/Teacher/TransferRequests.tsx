@@ -245,10 +245,10 @@ export default function TransferRequests() {
   return (
     <>
       <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="app-page-header">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">ร้องขอรับมอบนักศึกษา</h1>
-            <p className="text-muted-foreground">จัดการคำขอรับมอบนักศึกษาระหว่างอาจารย์ที่ปรึกษา</p>
+            <h1 className="app-page-title">ร้องขอรับมอบนักศึกษา</h1>
+            <p className="app-page-description">จัดการคำขอรับมอบนักศึกษาระหว่างอาจารย์ที่ปรึกษา</p>
           </div>
           <Button onClick={handleOpenCreateDialog}>
             <Plus className="mr-2 h-4 w-4" />

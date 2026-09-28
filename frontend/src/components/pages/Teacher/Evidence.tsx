@@ -216,10 +216,10 @@ export default function Evidence() {
   return (
     <>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="app-page-header">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight leading-snug">หลักฐานการปฏิบัติงาน</h1>
-            <p className="text-muted-foreground">จัดการหลักฐานการปฏิบัติงานของนักศึกษา</p>
+            <h1 className="app-page-title">หลักฐานการปฏิบัติงาน</h1>
+            <p className="app-page-description">จัดการหลักฐานการปฏิบัติงานของนักศึกษา</p>
           </div>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>

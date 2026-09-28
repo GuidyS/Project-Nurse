@@ -1,8 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
-import { Download, Edit, Eye, FileText, FolderKanban, Users, Calendar, DollarSign, Loader2, Plus } from 'lucide-react';
+import { Download, Edit, Eye, FileText, FolderKanban, Users, User, Calendar, Loader2, Plus } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -57,8 +56,8 @@ interface Project {
   project_type?: ProjectType | null;
   type: string;
   status: string;
-  budget: number;
-  spent: number;
+  budget: number | null;
+  spent: number | null;
   members: number;
   deadline: string;
   academic_year?: number | null;
@@ -92,6 +91,9 @@ const projectTypeTabs: { value: ProjectTypeFilter; label: string }[] = [
 ];
 
 const normalizeProjectType = (value?: ProjectType | null): ProjectType => value || 'other';
+
+const formatProjectBudget = (amount: number | null) =>
+  amount == null ? 'ยังไม่ระบุ' : `${amount.toLocaleString('th-TH', { maximumFractionDigits: 2 })} บาท`;
 
 interface CreateProjectForm {
   project_name_th: string;
@@ -577,7 +579,7 @@ export default function MyProjects() {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid gap-4 md:grid-cols-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
                     <div className="flex items-center gap-2">
                       <Users className="h-4 w-4 text-muted-foreground" />
                       <span className="text-sm">{project.members} คน</span>
@@ -586,11 +588,17 @@ export default function MyProjects() {
                       <Calendar className="h-4 w-4 text-muted-foreground" />
                       <span className="text-sm">กำหนดส่ง: {project.deadline}</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <DollarSign className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm">ใช้จ่าย: ฿{project.spent.toLocaleString()} / ฿{project.budget.toLocaleString()}</span>
-                    </div>
                   </div>
+                  <dl className="grid gap-4 rounded-lg bg-muted/40 p-4 sm:grid-cols-2">
+                    <div className="min-w-0 space-y-1">
+                      <dt className="text-sm text-muted-foreground">งบเสนอ</dt>
+                      <dd className="break-words text-base font-semibold tabular-nums">{formatProjectBudget(project.budget)}</dd>
+                    </div>
+                    <div className="min-w-0 space-y-1">
+                      <dt className="text-sm text-muted-foreground">ใช้จริง</dt>
+                      <dd className="break-words text-base font-semibold tabular-nums">{formatProjectBudget(project.spent)}</dd>
+                    </div>
+                  </dl>
                   {project.member_faculties && project.member_faculties.length > 0 && (
                     <div className="space-y-2">
                       <p className="text-sm font-medium">รายชื่อสมาชิก</p>
@@ -602,7 +610,7 @@ export default function MyProjects() {
                             className="max-w-full gap-1 rounded-md px-2 py-1"
                             title={`${member.name} - ${member.role}`}
                           >
-                            <Users className="h-3 w-3 shrink-0" />
+                            <User aria-hidden="true" className="h-3 w-3 shrink-0" />
                             <span className="max-w-[220px] truncate">{member.name}</span>
                             <span className="text-muted-foreground">({member.role})</span>
                           </Badge>

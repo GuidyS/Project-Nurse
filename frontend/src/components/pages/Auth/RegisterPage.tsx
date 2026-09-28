@@ -96,9 +96,9 @@ const RegisterPage = ({ onBackToLogin }: RegisterPageProps) => {
             className="object-cover w-full h-full scale-110"
           />
         </div>
-        <div className="space-y-2">
-          <h2 className="text-2xl font-semibold tracking-tight text-card-foreground">ลงทะเบียนเข้าสู่ระบบ</h2>
-          <p className="text-sm text-muted-foreground">
+        <div>
+          <h1 className="app-page-title">ลงทะเบียนเข้าสู่ระบบ</h1>
+          <p className="app-page-description">
             กรอกรหัสประจำตัวและรหัสผ่านเพื่อลงทะเบียน
           </p>
         </div>

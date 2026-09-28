@@ -25,12 +25,6 @@ try {
 
     $all_documents = [];
     foreach ($docs as $doc) {
-        // แมป status
-        $status = 'pending';
-        if ($doc['approval_status'] === 'อนุมัติแล้ว') {
-            $status = 'approved';
-        }
-
         // กำหนด URL ของไฟล์
         $fileUrl = '';
         if (!empty($doc['file_path'])) {
@@ -46,8 +40,8 @@ try {
             'name' => $doc['file_name'],
             'type' => $doc['tqf_type'],
             'course' => $doc['subject_code'],
+            'academic_year' => $doc['academic_year'],
             'uploadedAt' => substr($doc['created_at'], 0, 10),
-            'status' => $status,
             'fileUrl' => $fileUrl,
             'downloadUrl' => 'http://localhost:8080/index.php?page=download-document&id=' . $doc['id']
         ];

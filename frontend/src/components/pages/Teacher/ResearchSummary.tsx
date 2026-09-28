@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { getAcademicYear, academicYearOptions, academicNow } from "@/lib/academicYear";
+import { useAcademicYear } from "@/hooks/use-academic-year";
 import {
   BarChart3,
   CalendarDays,
@@ -7,6 +9,7 @@ import {
   Microscope,
   MinusCircle,
   PlusCircle,
+  Pencil,
   Search,
   ShieldCheck,
   Users,
@@ -17,6 +20,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -40,6 +45,7 @@ interface PublicationAuthor {
 
 interface Publication {
   id: number;
+  revision: string;
   title: string;
   journal: string;
   publication_date: string;
@@ -56,12 +62,7 @@ interface ResearchSummaryResponse {
     years: number[];
     faculty: Faculty[];
     publications: Publication[];
-    journals: string[];
-    rules: {
-      academic_year: string;
-      calendar_year: string;
-      kpi_roles: AuthorRole[];
-    };
+    can_manage: boolean;
   };
 }
 
@@ -77,95 +78,14 @@ const typeLabel: Record<PublicationType, string> = {
   textbook: "ตำรา",
 };
 
-const fallbackResearchData = {
-  years: [2566, 2567, 2568, 2569, 2570],
-  faculty: [
-    { faculty_id: 1001, name: "ผศ.ดร.พิชาภรณ์ จันทนกุล", note: "รับผิดชอบหลักสูตร" },
-    { faculty_id: 1002, name: "ผศ.ดร.วัฒนีย์ ปานจินดา", note: "รับผิดชอบหลักสูตร" },
-    { faculty_id: 1003, name: "ผศ.ดร.สุสารี ประคินกิจ", note: "รับผิดชอบหลักสูตร" },
-    { faculty_id: 1004, name: "ดร.สุวรรณา เชียงขุนทด", note: "" },
-    { faculty_id: 1005, name: "ผศ.ดร.ชนิดา มัททวางกูร", note: "" },
-    { faculty_id: 1006, name: "อาจารย์สุกฤตา ตะการีย์", note: "" },
-    { faculty_id: 1007, name: "อาจารย์รัฐกานต์ ขำเขียว", note: "" },
-    { faculty_id: 1008, name: "อาจารย์ชัยสิทธิ์ ทันศึก", note: "" },
-  ],
-  publications: [
-    {
-      id: 1,
-      title: "ผลลัพธ์การใช้นวัตกรรมนุ่มนิ่มอโรม่าคลายเครียดในนักศึกษาพยาบาลชั้นปีที่ 1-4 มหาวิทยาลัยสยาม",
-      journal: "วารสารพยาบาลศาสตร์ มหาวิทยาลัยสยาม",
-      publication_date: "2023-03-15",
-      buddhist_year: 2566,
-      publication_type: "research" as PublicationType,
-      database_level: "TCI 2",
-      authors: [
-        { faculty_id: 1006, name: "อาจารย์สุกฤตา ตะการีย์", role: "corresponding" as AuthorRole },
-        { faculty_id: 1001, name: "ผศ.ดร.พิชาภรณ์ จันทนกุล", role: "co_author" as AuthorRole },
-      ],
-    },
-    {
-      id: 2,
-      title: "การรับรู้ทักษะการเรียนรู้ ความมั่นใจ การประยุกต์ใช้ความรู้และความพึงพอใจของนักศึกษาพยาบาลต่อการฝึกปฏิบัติออนไลน์",
-      journal: "วารสารพยาบาลศาสตร์ มหาวิทยาลัยสยาม",
-      publication_date: "2023-09-10",
-      buddhist_year: 2566,
-      publication_type: "research" as PublicationType,
-      database_level: "TCI 2",
-      authors: [{ faculty_id: 1004, name: "ดร.สุวรรณา เชียงขุนทด", role: "first_author" as AuthorRole }],
-    },
-    {
-      id: 3,
-      title: "ปัจจัยที่มีความสัมพันธ์กับความวิตกกังวลในการรับวัคซีนป้องกันโควิด 19",
-      journal: "วารสารวิจัยสุขภาพและการพยาบาล",
-      publication_date: "2024-03-20",
-      buddhist_year: 2567,
-      publication_type: "research" as PublicationType,
-      database_level: "TCI 1",
-      authors: [
-        { faculty_id: 1006, name: "อาจารย์สุกฤตา ตะการีย์", role: "first_author" as AuthorRole },
-        { faculty_id: 1003, name: "ผศ.ดร.สุสารี ประคินกิจ", role: "co_author" as AuthorRole },
-      ],
-    },
-    {
-      id: 4,
-      title: "บทความวิชาการด้านการพยาบาลระยะคลอด ฉบับปรับปรุง",
-      journal: "ตำราการพยาบาล",
-      publication_date: "2026-05-05",
-      buddhist_year: 2569,
-      publication_type: "textbook" as PublicationType,
-      database_level: "ตำรา",
-      authors: [{ faculty_id: 1005, name: "ผศ.ดร.ชนิดา มัททวางกูร", role: "co_author" as AuthorRole }],
-    },
-    {
-      id: 5,
-      title: "แนวทางการพัฒนาระบบสุขภาพชุมชนโดยอาจารย์พยาบาล",
-      journal: "วารสารวิจัยสุขภาพและการพยาบาล",
-      publication_date: "2026-02-11",
-      buddhist_year: 2569,
-      publication_type: "research" as PublicationType,
-      database_level: "TCI 1",
-      authors: [{ faculty_id: 1008, name: "อาจารย์ชัยสิทธิ์ ทันศึก", role: "corresponding" as AuthorRole }],
-    },
-  ],
-  journals: ["วารสารพยาบาลศาสตร์ มหาวิทยาลัยสยาม", "วารสารวิจัยสุขภาพและการพยาบาล", "ตำราการพยาบาล"],
-};
-
 const getBuddhistYear = (dateValue: string, mode: YearMode) => {
-  const date = new Date(`${dateValue}T00:00:00`);
+  const date = new Date(`${dateValue}T00:00:00+07:00`);
   if (Number.isNaN(date.getTime())) return 0;
-  const christianYear = date.getFullYear();
+  const christianYear = Number(dateValue.slice(0, 4));
   if (mode === "academic") {
-    return date.getMonth() >= 7 ? christianYear + 544 : christianYear + 543;
+    return getAcademicYear(date);
   }
   return christianYear + 543;
-};
-
-const dateForBuddhistYear = (year: number, mode: YearMode) => {
-  const christianYear = year - 543;
-  if (mode === "academic") {
-    return `${christianYear - 1}-08-01`;
-  }
-  return `${christianYear}-01-01`;
 };
 
 const authorCountsForYear = (publications: Publication[], facultyId: number, year: number, mode: YearMode) => {
@@ -191,34 +111,33 @@ const authorCountsForYear = (publications: Publication[], facultyId: number, yea
 const formatCell = (counts: { kpi: number; coAuthor: number; academic: number }) => {
   const parts = [];
   if (counts.kpi) parts.push({ value: counts.kpi, className: "font-semibold text-red-600" });
-  if (counts.coAuthor) parts.push({ value: counts.coAuthor, className: "font-semibold text-zinc-100" });
+  if (counts.coAuthor) parts.push({ value: counts.coAuthor, className: "font-semibold text-black" });
   if (counts.academic) parts.push({ value: counts.academic, className: "font-semibold text-sky-600" });
   return parts;
 };
 
 export default function ResearchSummary() {
+  const currentAcademicYear = useAcademicYear();
   const [yearMode, setYearMode] = useState<YearMode>("calendar");
-  const [years, setYears] = useState<number[]>([]);
+  const [availableYears, setYears] = useState<number[]>([]);
   const [faculty, setFaculty] = useState<Faculty[]>([]);
   const [publications, setPublications] = useState<Publication[]>([]);
-  const [journals, setJournals] = useState<string[]>([]);
+  const currentYear = yearMode === "academic" ? currentAcademicYear : Number(new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Bangkok", year: "numeric" }).format(academicNow())) + 543;
+  const years = useMemo(() => academicYearOptions([
+    ...availableYears,
+    ...publications.map((publication) => getBuddhistYear(publication.publication_date, yearMode)),
+  ], currentYear).map(Number).reverse(), [availableYears, publications, yearMode, currentYear]);
   const [search, setSearch] = useState("");
-  const [selectedJournal, setSelectedJournal] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const canManageResearch = useMemo(() => {
-    try {
-      const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
-      const permissions = Array.isArray(currentUser?.permissions) ? currentUser.permissions : [];
-      const roleId = Number(currentUser?.role_id || 0);
-      const positionId = Number(currentUser?.position_id || 0);
-
-      return roleId === 2 && positionId !== 1 && (positionId === 9 || permissions.includes("RESEARCH_RECORD_MANAGE"));
-    } catch {
-      return false;
-    }
-  }, []);
+  const [canManageResearch, setCanManageResearch] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState('');
+  const [saveFailed, setSaveFailed] = useState(false);
+  const savingRef = useRef(false);
+  const [editingPublication, setEditingPublication] = useState<Publication | null>(null);
+  const [editError, setEditError] = useState('');
 
   useEffect(() => {
     let mounted = true;
@@ -235,8 +154,7 @@ export default function ResearchSummary() {
         setYears(response.data.data.years);
         setFaculty(response.data.data.faculty);
         setPublications(response.data.data.publications);
-        setJournals(response.data.data.journals);
-        setSelectedJournal(response.data.data.journals[0] || "");
+        setCanManageResearch(response.data.data.can_manage);
       } catch (err: unknown) {
         if (!mounted) return;
         const status = (err as { response?: { status?: number } })?.response?.status;
@@ -245,12 +163,7 @@ export default function ResearchSummary() {
           return;
         }
 
-        console.warn("Using local research preview data:", err);
-        setYears(fallbackResearchData.years);
-        setFaculty(fallbackResearchData.faculty);
-        setPublications(fallbackResearchData.publications);
-        setJournals(fallbackResearchData.journals);
-        setSelectedJournal(fallbackResearchData.journals[0] || "");
+        setError("ไม่สามารถโหลดข้อมูลงานวิจัยได้ กรุณาลองใหม่");
       } finally {
         if (mounted) setIsLoading(false);
       }
@@ -322,61 +235,55 @@ export default function ResearchSummary() {
     );
   }, [publications, search]);
 
-  const addQuickCellPublication = (
-    person: Faculty,
-    year: number,
-    kind: "kpi" | "co_author" | "academic"
-  ) => {
-    const isAcademic = kind === "academic";
-    const nextPublication: Publication = {
-      id: Date.now() + Math.floor(Math.random() * 1000),
-      title: `บันทึกผลงาน${isAcademic ? "วิชาการ/ตำรา" : "วิจัย"} ${person.name} ปี ${year}`,
-      journal: selectedJournal || journals[0] || "รอเลือกวารสาร",
-      publication_date: dateForBuddhistYear(year, yearMode),
-      buddhist_year: year,
-      publication_type: isAcademic ? "academic" : "research",
-      database_level: isAcademic ? "วิชาการ/ตำรา" : "รอตรวจสอบ",
-      authors: [
-        {
-          faculty_id: person.faculty_id,
-          name: person.name,
-          role: kind === "co_author" ? "co_author" : "first_author",
-        },
-      ],
-    };
-
-    setPublications((current) => [nextPublication, ...current]);
+  const saveChange = async (payload: Record<string, string | number>) => {
+    if (savingRef.current || saveFailed || !canManageResearch) return false;
+    savingRef.current = true;
+    setIsSaving(true);
+    setSaveFailed(false);
+    setEditError('');
+    setSaveMessage('กำลังบันทึก...');
+    try {
+      const response = await api.post<ResearchSummaryResponse>('/index.php?page=save-research-summary', payload);
+      if (response.data.status !== 'success' || !response.data.data) {
+        throw new Error('Save failed');
+      }
+      setPublications(response.data.data.publications);
+      setFaculty(response.data.data.faculty);
+      setYears(response.data.data.years);
+      setCanManageResearch(response.data.data.can_manage);
+      setSaveMessage(payload.action === 'update' ? 'บันทึกการแก้ไขแล้ว' : 'บันทึกอัตโนมัติแล้ว');
+      return true;
+    } catch (err: unknown) {
+      const response = (err as { response?: { status?: number; data?: { message?: string } } }).response;
+      if (payload.action === 'update' && response?.status === 422) {
+        setEditError(response.data?.message || 'กรุณาตรวจสอบข้อมูล');
+        setSaveMessage('ยังไม่ได้บันทึกการแก้ไข');
+        return false;
+      }
+      setSaveFailed(true);
+      setSaveMessage('ยืนยันการบันทึกไม่สำเร็จ กรุณาโหลดข้อมูลใหม่เพื่อตรวจสอบก่อนทำรายการต่อ');
+      return false;
+    } finally {
+      savingRef.current = false;
+      setIsSaving(false);
+    }
   };
 
-  const removeQuickCellPublication = (
-    person: Faculty,
-    year: number,
-    kind: "kpi" | "co_author" | "academic"
-  ) => {
-    setPublications((current) => {
-      const targetIndex = current.findIndex((publication) => {
-        if (getBuddhistYear(publication.publication_date, yearMode) !== year) return false;
+  const addQuickCellPublication = (person: Faculty, year: number, kind: 'kpi' | 'co_author' | 'academic') => {
+    void saveChange({ action: 'add', faculty_id: person.faculty_id, year, year_mode: yearMode, kind });
+  };
 
-        const author = publication.authors.find((item) => item.faculty_id === person.faculty_id);
-        if (!author) return false;
-
-        const isAcademic = publication.publication_type === "academic" || publication.publication_type === "textbook";
-        if (kind === "academic") return isAcademic;
-        if (isAcademic) return false;
-        if (kind === "kpi") return author.role === "first_author" || author.role === "corresponding";
-        return author.role === "co_author";
-      });
-
-      if (targetIndex < 0) return current;
-
-      return current.flatMap((publication, index) => {
-        if (index !== targetIndex) return [publication];
-
-        const nextAuthors = publication.authors.filter((author) => author.faculty_id !== person.faculty_id);
-        if (nextAuthors.length === 0) return [];
-        return [{ ...publication, authors: nextAuthors }];
-      });
+  const removeQuickCellPublication = (person: Faculty, year: number, kind: 'kpi' | 'co_author' | 'academic') => {
+    const target = publications.find((publication) => {
+      if (getBuddhistYear(publication.publication_date, yearMode) !== year) return false;
+      const author = publication.authors.find((item) => item.faculty_id === person.faculty_id);
+      if (!author) return false;
+      const academic = publication.publication_type === 'academic' || publication.publication_type === 'textbook';
+      if (kind === 'academic') return academic;
+      if (academic) return false;
+      return kind === 'kpi' ? author.role !== 'co_author' : author.role === 'co_author';
     });
+    if (target) void saveChange({ action: 'remove', faculty_id: person.faculty_id, publication_id: target.id });
   };
 
   if (isLoading) {
@@ -399,10 +306,62 @@ export default function ResearchSummary() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">สรุปผลงานวิจัย 5 ปี</h1>
-          <p className="text-muted-foreground">บันทึกและตรวจสอบผลงานวิจัยสำหรับอาจารย์งานวิจัย</p>
+      <Dialog open={editingPublication !== null} onOpenChange={(open) => { if (!open && !isSaving) setEditingPublication(null); }}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>แก้ไขรายละเอียดผลงาน</DialogTitle>
+            <DialogDescription>แก้ไขข้อมูลแล้วกดบันทึก วันที่และประเภทผลงานจะใช้คำนวณตารางและ KPI ใหม่</DialogDescription>
+          </DialogHeader>
+          {editingPublication && (
+            <form className="space-y-4" onSubmit={async (event) => {
+              event.preventDefault();
+              const saved = await saveChange({
+                action: 'update', publication_id: editingPublication.id,
+                faculty_id: editingPublication.authors[0].faculty_id,
+                revision: editingPublication.revision, title: editingPublication.title,
+                publication_date: editingPublication.publication_date,
+                publication_type: editingPublication.publication_type,
+                journal: editingPublication.journal, database_level: editingPublication.database_level,
+              });
+              if (saved) setEditingPublication(null);
+            }}>
+              <fieldset disabled={isSaving || saveFailed} className="space-y-4">
+                <div className="space-y-2"><Label htmlFor="research-title">ชื่อผลงาน</Label>
+                  <Input id="research-title" required maxLength={255} value={editingPublication.title} onChange={(e) => setEditingPublication({ ...editingPublication, title: e.target.value })} />
+                </div>
+                <div className="space-y-2"><Label htmlFor="research-date">วันที่ตีพิมพ์</Label>
+                  <Input id="research-date" type="date" required min="1957-01-01" max="2157-12-31" value={editingPublication.publication_date} onChange={(e) => setEditingPublication({ ...editingPublication, publication_date: e.target.value })} />
+                </div>
+                <div className="space-y-2"><Label htmlFor="research-type">ประเภทผลงาน</Label>
+                  <select id="research-type" className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={editingPublication.publication_type} onChange={(e) => setEditingPublication({ ...editingPublication, publication_type: e.target.value as PublicationType })}>
+                    {Object.entries(typeLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-2"><Label htmlFor="research-journal">วารสาร / แหล่งตีพิมพ์</Label>
+                  <Input id="research-journal" maxLength={255} value={editingPublication.journal} onChange={(e) => setEditingPublication({ ...editingPublication, journal: e.target.value })} />
+                </div>
+                <div className="space-y-2"><Label htmlFor="research-category">หมวดหมู่</Label>
+                  <Input id="research-category" maxLength={100} value={editingPublication.database_level} onChange={(e) => setEditingPublication({ ...editingPublication, database_level: e.target.value })} />
+                </div>
+              </fieldset>
+              {saveFailed && <p role="alert" className="text-sm text-destructive">{saveMessage}</p>}
+              {editError && <p role="alert" className="text-sm text-destructive">{editError}</p>}
+              <DialogFooter>
+                <Button type="button" variant="outline" disabled={isSaving} onClick={() => setEditingPublication(null)}>ยกเลิก</Button>
+                {saveFailed ? <Button type="button" onClick={() => window.location.reload()}>โหลดข้อมูลใหม่</Button> : <Button type="submit" disabled={isSaving}>{isSaving ? 'กำลังบันทึก...' : 'บันทึกการแก้ไข'}</Button>}
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+      {saveMessage && <div role="status" aria-live="polite" className={cn('text-sm', saveFailed ? 'text-destructive' : 'text-muted-foreground')}>
+        {saveMessage}
+        {saveFailed && <Button variant="outline" className="ml-2" onClick={() => window.location.reload()}>โหลดข้อมูลใหม่</Button>}
+      </div>}
+      <div className="app-page-header">
+        <div className="space-y-2">
+          <h1 className="app-page-title">สรุปผลงานวิจัย 5 ปี</h1>
+          <p className="app-page-description">บันทึกและตรวจสอบผลงานวิจัยสำหรับอาจารย์งานวิจัย</p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
           <Tabs value={yearMode} onValueChange={(value) => setYearMode(value as YearMode)}>
@@ -411,10 +370,6 @@ export default function ResearchSummary() {
               <TabsTrigger value="academic">ปีการศึกษา</TabsTrigger>
             </TabsList>
           </Tabs>
-          <div className="relative min-w-64">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="ค้นหาอาจารย์ / บทความ" className="pl-9" />
-          </div>
         </div>
       </div>
 
@@ -435,7 +390,7 @@ export default function ResearchSummary() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{summary.coAuthor}</div>
+            <div className="text-2xl font-bold text-black">{summary.coAuthor}</div>
             <p className="text-xs text-muted-foreground">นับภาระงาน ไม่นับ KPI</p>
           </CardContent>
         </Card>
@@ -468,7 +423,7 @@ export default function ResearchSummary() {
             แนวโน้มผลงานตามรอบปี
           </CardTitle>
           <CardDescription>
-            {yearMode === "calendar" ? "ปีปฏิทิน: 1 มกราคม - 31 ธันวาคม" : "ปีการศึกษา: 1 สิงหาคม - 31 กรกฎาคม"}
+            {yearMode === "calendar" ? "ปีปฏิทิน: 1 มกราคม - 31 ธันวาคม" : "ปีการศึกษา: 1 เมษายน - 31 มีนาคม"}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -488,59 +443,7 @@ export default function ResearchSummary() {
       </Card>
 
       <Card>
-        <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <CardTitle>Flow การบันทึกผลงานวิจัย</CardTitle>
-            <CardDescription>ให้อาจารย์งานวิจัยแก้ไขข้อมูลได้ ส่วนคณบดีเปิดดูได้อย่างเดียว</CardDescription>
-          </div>
-          <Badge variant={canManageResearch ? "default" : "outline"} className={canManageResearch ? "bg-emerald-600" : ""}>
-            {canManageResearch ? "โหมดแก้ไข" : "อ่านอย่างเดียว"}
-          </Badge>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-3 md:grid-cols-4">
-            {[
-              {
-                icon: ShieldCheck,
-                title: "กำหนดสิทธิ์",
-                detail: "อาจารย์งานวิจัยจัดการข้อมูลวารสารและผลงาน",
-              },
-              {
-                icon: CalendarDays,
-                title: "เลือกรอบปี",
-                detail: "สลับปีปฏิทินหรือปีการศึกษาก่อนตรวจนับ",
-              },
-              {
-                icon: PlusCircle,
-                title: "เพิ่ม/ลดจากตาราง",
-                detail: "กดช่องปีของอาจารย์เพื่อปรับจำนวนตามประเภทสี",
-              },
-              {
-                icon: CheckCircle2,
-                title: "สรุปอัตโนมัติ",
-                detail: "ช่อง KPI รวมรับเฉพาะผลงานสีแดงเท่านั้น",
-              },
-            ].map((step, index) => {
-              const Icon = step.icon;
-              return (
-                <div key={step.title} className="rounded-md border bg-muted/30 p-4">
-                  <div className="mb-3 flex items-center gap-2">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10 text-primary">
-                      <Icon className="h-4 w-4" />
-                    </span>
-                    <span className="text-xs font-semibold text-muted-foreground">STEP {index + 1}</span>
-                  </div>
-                  <div className="font-semibold">{step.title}</div>
-                  <p className="mt-1 text-sm leading-6 text-muted-foreground">{step.detail}</p>
-                </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <CardHeader className="space-y-4">
           <div>
             <CardTitle>ตารางจำนวนผลงานวิจัยและวิชาการตีพิมพ์ของอาจารย์</CardTitle>
             <CardDescription>
@@ -549,10 +452,22 @@ export default function ResearchSummary() {
                 : "รูปแบบใกล้เคียง D74: ช่องรวมเฉพาะผลงานสีแดง First/Corresponding"}
             </CardDescription>
           </div>
-          <div className="flex flex-wrap gap-2 text-xs">
-            <Badge className="bg-red-600">แดง: นับ KPI</Badge>
-            <Badge variant="outline" className="border-zinc-500 bg-zinc-900 text-zinc-50">ดำ: ชื่อร่วม</Badge>
-            <Badge className="bg-sky-600">ฟ้า: วิชาการ/ตำรา</Badge>
+          <div className="flex flex-col gap-3 border-t pt-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="relative w-full min-w-0 lg:max-w-sm lg:flex-1">
+              <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                aria-label="ค้นหาอาจารย์หรือบทความ"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="ค้นหาอาจารย์ / บทความ"
+                className="h-10 bg-background pl-9"
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-xs lg:shrink-0 lg:justify-end" aria-label="ประเภทผลงาน">
+              <Badge className="bg-red-600">แดง: นับ KPI</Badge>
+              <Badge variant="outline" className="border-zinc-500 bg-zinc-900 text-zinc-50">ดำ: ชื่อร่วม</Badge>
+              <Badge className="bg-sky-600">ฟ้า: วิชาการ/ตำรา</Badge>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -564,10 +479,11 @@ export default function ResearchSummary() {
                   <TableHead className="min-w-64">ชื่อ - นามสกุล</TableHead>
                   {years.map((year) => <TableHead key={year} className="text-center">จำนวน<br />{year}</TableHead>)}
                   <TableHead className="text-center text-red-600">เฉพาะ KPI</TableHead>
-                  <TableHead>หมายเหตุ</TableHead>
+                  <TableHead>คำนำหน้า / ตำแหน่งวิชาการ</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
+                {filteredFaculty.length === 0 && <TableRow><TableCell colSpan={years.length + 4} className="text-center text-muted-foreground">ไม่พบอาจารย์</TableCell></TableRow>}
                 {filteredFaculty.map((person, index) => {
                   const totalKpi = years.reduce((acc, year) => acc + authorCountsForYear(publications, person.faculty_id, year, yearMode).kpi, 0);
                   return (
@@ -612,8 +528,9 @@ export default function ResearchSummary() {
                                           type="button"
                                           variant="outline"
                                           size="icon"
-                                          disabled={counts.kpi === 0}
+                                          disabled={isSaving || saveFailed || counts.kpi === 0}
                                           className="h-8 w-8 border-red-400/60 text-red-500 hover:bg-red-500/10 hover:text-red-400 disabled:opacity-40"
+                                          aria-label="ลดผลงานและบันทึกอัตโนมัติ"
                                           onClick={() => removeQuickCellPublication(person, year, "kpi")}
                                         >
                                           <MinusCircle className="h-4 w-4" />
@@ -623,6 +540,8 @@ export default function ResearchSummary() {
                                           variant="outline"
                                           size="icon"
                                           className="h-8 w-8 border-red-400/60 text-red-500 hover:bg-red-500/10 hover:text-red-400"
+                                          disabled={isSaving || saveFailed}
+                                          aria-label="เพิ่มผลงานและบันทึกอัตโนมัติ"
                                           onClick={() => addQuickCellPublication(person, year, "kpi")}
                                         >
                                           <PlusCircle className="h-4 w-4" />
@@ -634,8 +553,9 @@ export default function ResearchSummary() {
                                           type="button"
                                           variant="outline"
                                           size="icon"
-                                          disabled={counts.coAuthor === 0}
+                                          disabled={isSaving || saveFailed || counts.coAuthor === 0}
                                           className="h-8 w-8 disabled:opacity-40"
+                                          aria-label="ลดผลงานและบันทึกอัตโนมัติ"
                                           onClick={() => removeQuickCellPublication(person, year, "co_author")}
                                         >
                                           <MinusCircle className="h-4 w-4" />
@@ -645,6 +565,8 @@ export default function ResearchSummary() {
                                           variant="outline"
                                           size="icon"
                                           className="h-8 w-8"
+                                          disabled={isSaving || saveFailed}
+                                          aria-label="เพิ่มผลงานและบันทึกอัตโนมัติ"
                                           onClick={() => addQuickCellPublication(person, year, "co_author")}
                                         >
                                           <PlusCircle className="h-4 w-4" />
@@ -656,8 +578,9 @@ export default function ResearchSummary() {
                                           type="button"
                                           variant="outline"
                                           size="icon"
-                                          disabled={counts.academic === 0}
+                                          disabled={isSaving || saveFailed || counts.academic === 0}
                                           className="h-8 w-8 border-sky-400/60 text-sky-500 hover:bg-sky-500/10 hover:text-sky-400 disabled:opacity-40"
+                                          aria-label="ลดผลงานและบันทึกอัตโนมัติ"
                                           onClick={() => removeQuickCellPublication(person, year, "academic")}
                                         >
                                           <MinusCircle className="h-4 w-4" />
@@ -667,6 +590,8 @@ export default function ResearchSummary() {
                                           variant="outline"
                                           size="icon"
                                           className="h-8 w-8 border-sky-400/60 text-sky-500 hover:bg-sky-500/10 hover:text-sky-400"
+                                          disabled={isSaving || saveFailed}
+                                          aria-label="เพิ่มผลงานและบันทึกอัตโนมัติ"
                                           onClick={() => addQuickCellPublication(person, year, "academic")}
                                         >
                                           <PlusCircle className="h-4 w-4" />
@@ -704,10 +629,13 @@ export default function ResearchSummary() {
       <Card>
         <CardHeader>
           <CardTitle>รายการผลงานที่บันทึก</CardTitle>
-          <CardDescription>ข้อมูลต้นทางที่ระบบใช้คำนวณตัวเลขในตาราง</CardDescription>
+          <CardDescription>
+            ข้อมูลที่บันทึกในฐานข้อมูลและใช้คำนวณตัวเลขในตาราง รายการที่เพิ่มด้วยปุ่ม + เป็นบันทึกจำนวนผลงาน โดยใช้วันเริ่มต้นของปีที่เลือกเป็นวันที่อ้างอิง
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
+            {visiblePublications.length === 0 && <p className="text-sm text-muted-foreground">ยังไม่มีผลงานที่ตรงกับเงื่อนไข</p>}
             {visiblePublications.map((publication) => {
               const isAcademic = publication.publication_type === "academic" || publication.publication_type === "textbook";
               return (
@@ -716,7 +644,7 @@ export default function ResearchSummary() {
                     <div className="space-y-1">
                       <div className="font-medium leading-relaxed">{publication.title}</div>
                       <div className="text-sm text-muted-foreground">
-                        {publication.journal} · {publication.database_level} · {publication.publication_date}
+                        {[publication.journal, publication.database_level, publication.publication_date].filter(Boolean).join(" · ") || "ยังไม่ระบุรายละเอียดการตีพิมพ์"}
                       </div>
                       <div className="flex flex-wrap gap-2 pt-1">
                         {publication.authors.map((author) => (
@@ -733,7 +661,12 @@ export default function ResearchSummary() {
                         ))}
                       </div>
                     </div>
-                    <Badge variant="secondary">{typeLabel[publication.publication_type]}</Badge>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <Badge variant="secondary">{typeLabel[publication.publication_type]}</Badge>
+                      {canManageResearch && <Button type="button" size="sm" variant="outline" disabled={isSaving || saveFailed || publication.authors.length === 0} onClick={() => { setEditError(''); setEditingPublication({ ...publication }); }}>
+                        <Pencil className="mr-1 h-4 w-4" />แก้ไข
+                      </Button>}
+                    </div>
                   </div>
                 </div>
               );

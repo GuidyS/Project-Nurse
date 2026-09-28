@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { useAcademicYearSelection } from "@/hooks/use-academic-year";
+import { academicYearOptions } from "@/lib/academicYear";
 import {
   BookOpenCheck,
   ChevronRight,
@@ -229,7 +231,7 @@ function ProjectRecordList({ records, emptyLabel }: { records: ProjectRecord[]; 
 
 export default function FacultyWorkloadDashboard() {
   const [data, setData] = useState<WorkloadData | null>(null);
-  const [selectedYear, setSelectedYear] = useState<number | null>(null);
+  const { currentYear, academicYear: selectedYear, setAcademicYear: setSelectedYear } = useAcademicYearSelection();
   const [selectedFaculty, setSelectedFaculty] = useState<FacultyWorkload | null>(null);
   const [search, setSearch] = useState("");
   const [researchStatus, setResearchStatus] = useState("all");
@@ -255,7 +257,6 @@ export default function FacultyWorkloadDashboard() {
         if (!mounted) return;
         const nextData = response.data.data as WorkloadData;
         setData(nextData);
-        setSelectedYear((current) => current ?? nextData.academic_year);
         setSelectedFaculty((current) =>
           current ? nextData.faculty.find((item) => item.faculty_id === current.faculty_id) || null : null,
         );
@@ -326,12 +327,12 @@ export default function FacultyWorkloadDashboard() {
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
-          <Select value={String(selectedYear)} onValueChange={(value) => setSelectedYear(Number(value))}>
+          <Select value={String(selectedYear)} onValueChange={setSelectedYear}>
             <SelectTrigger className="w-full sm:w-[170px]">
               <SelectValue placeholder="ปีการศึกษา" />
             </SelectTrigger>
             <SelectContent>
-              {data.available_years.map((year) => (
+              {academicYearOptions(data.available_years, currentYear).map((year) => (
                 <SelectItem key={year} value={String(year)}>ปีการศึกษา {year}</SelectItem>
               ))}
             </SelectContent>

@@ -1,6 +1,7 @@
 <?php
 if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/../../../config/academic_calendar.php';
 require_once __DIR__ . '/../../../config/audit_helper.php';
 require_once __DIR__ . '/assign_students_helpers.php';
 require_once __DIR__ . '/../../../config/notification_helpers.php';
@@ -101,7 +102,7 @@ try {
 
     $insert = $db->prepare("INSERT INTO student_advisor_mapping (student_id, faculty_id, advisor_type, academic_year)
                             VALUES (?, ?, ?, ?)");
-    $academicYear = (int)date('Y') + 543;
+    $academicYear = currentAcademicYear();
     foreach ($studentIds as $sid) {
         $insert->execute([$sid, $facultyId, $type['key'], $academicYear]);
     }
@@ -109,6 +110,38 @@ try {
     $positionGranted = false;
     if (!empty($studentIds)) {
         $positionGranted = assignStudentsGrantPosition($db, $facultyId, $type['position_id']);
+    }
+
+    // ส่งการแจ้งเตือนไปยังบัญชีนักศึกษาที่ได้รับการมอบหมาย
+    try {
+        $typeLabel = $type['label']; // 'อาจารย์ที่ปรึกษา' หรือ 'อาจารย์ปฏิบัติ'
+        $notifTitle = "แจ้งการมอบหมาย{$typeLabel}คนปัจจุบัน";
+        $notifMsg = "คุณได้รับการมอบหมาย {$typeLabel}: {$facultyName} ประจำปีการศึกษา {$academicYear} สามารถตรวจสอบข้อมูลได้ที่หน้าใบแสดงผลการเรียน";
+        $notifPayload = json_encode([
+            'action' => 'view_transcript',
+            'target' => 'transcript',
+            'advisor_type' => $type['key'],
+            'advisor_name' => $facultyName
+        ], JSON_UNESCAPED_UNICODE);
+
+        $notifStmt = $db->prepare("
+            INSERT INTO notifications (user_id, sender_user_id, title, message, payload_json, type, channel, is_read, created_at)
+            SELECT u.user_id, :sender_id, :title, :message, :payload_json, 'info', 'in-app', 0, NOW()
+            FROM users u
+            WHERE u.username = :student_id
+        ");
+
+        foreach ($studentIds as $sid) {
+            $notifStmt->execute([
+                ':sender_id' => $_SESSION['user_id'] ?? null,
+                ':title' => $notifTitle,
+                ':message' => $notifMsg,
+                ':payload_json' => $notifPayload,
+                ':student_id' => $sid
+            ]);
+        }
+    } catch (Throwable $ne) {
+        error_log("assign_students notification error: " . $ne->getMessage());
     }
 
     $db->commit();

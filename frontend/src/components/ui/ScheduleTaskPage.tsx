@@ -262,10 +262,10 @@ export default function ScheduleTaskPage({
       <DialogContent className="app-dialog-6xl">
         <div className="space-y-6">
           {/* Header */}
-          <div className="flex items-center justify-between">
+          <div className="app-page-header">
             <div>
-              <h1 className="text-2xl font-bold text-foreground">Schedule Task</h1>
-              <p className="text-muted-foreground">มอบหมายงานให้นักศึกษาฝึกปฏิบัติ</p>
+              <h1 className="app-page-title">Schedule Task</h1>
+              <p className="app-page-description">มอบหมายงานให้นักศึกษาฝึกปฏิบัติ</p>
             </div>
             <Button onClick={openCreate} className="gap-2">
               <Plus className="w-4 h-4" /> สร้างงานใหม่

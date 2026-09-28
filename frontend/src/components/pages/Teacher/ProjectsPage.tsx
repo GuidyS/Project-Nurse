@@ -1,4 +1,7 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useAcademicYear } from "@/hooks/use-academic-year";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { getCurrentAcademicYear } from "@/lib/academicYear";
 import { Plus, Search, Filter, Eye, Edit, MoreVertical, Upload, Link2, Trash2, Loader2, UserCheck, Users } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -191,7 +194,7 @@ const createInitialFormData = (): ProjectFormData => ({
   project_type: "other",
   responsible_faculty_id: "",
   member_faculty_ids: [],
-  academic_year: String(new Date().getFullYear() + 543),
+  academic_year: String(getCurrentAcademicYear()),
   start_date: "",
   end_date: "",
   status: "pending",
@@ -318,9 +321,13 @@ const parseBudgetNote = (raw?: string | null) => {
 };
 
 const ProjectsPage = () => {
+  const currentAcademicYear = useAcademicYear();
+  const projectRequest = useRef<AbortController | null>(null);
   const { toast } = useToast();
   const [projects, setProjects] = useState<Project[]>([]);
+  const [availableAcademicYears, setAvailableAcademicYears] = useState<number[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearch = useDebouncedValue(searchQuery);
   const [projectTypeFilter, setProjectTypeFilter] = useState<ProjectTypeFilter>("all");
   const [statusFilter, setStatusFilter] = useState<ProjectStatusFilter>("all");
   const [academicYearFilter, setAcademicYearFilter] = useState("all");
@@ -362,14 +369,21 @@ const ProjectsPage = () => {
   };
 
   const fetchProjects = useCallback(async () => {
+    projectRequest.current?.abort();
+    const controller = new AbortController();
+    projectRequest.current = controller;
     try {
       setIsLoading(true);
       const res = await api.get("/index.php?page=get-project", {
-        params: { search: searchQuery },
+        params: { search: debouncedSearch },
+        signal: controller.signal,
       });
+      if (controller.signal.aborted) return;
+      if (res.data.status !== "success") throw new Error("โหลดโครงการไม่สำเร็จ");
       if (res.data.status === "success") {
         const nextProjects = Array.isArray(res.data.data) ? res.data.data : [];
         setProjects(nextProjects);
+        setAvailableAcademicYears(Array.isArray(res.data.academicYears) ? res.data.academicYears : []);
         setViewProject((prev) => (
           prev ? nextProjects.find((project: Project) => project.project_id === prev.project_id) || prev : prev
         ));
@@ -378,22 +392,21 @@ const ProjectsPage = () => {
         ));
       }
     } catch {
+      if (controller.signal.aborted) return;
       toast({
         title: "ข้อผิดพลาด",
         description: "ไม่สามารถดึงข้อมูลโครงการได้",
         variant: "destructive",
       });
     } finally {
-      setIsLoading(false);
+      if (!controller.signal.aborted) setIsLoading(false);
     }
-  }, [searchQuery, toast]);
+  }, [debouncedSearch, toast]);
 
   useEffect(() => {
-    const delayDebounceFn = setTimeout(() => {
-      fetchProjects();
-    }, 500);
-    return () => clearTimeout(delayDebounceFn);
-  }, [fetchProjects]);
+    if (searchQuery === debouncedSearch) fetchProjects();
+    return () => projectRequest.current?.abort();
+  }, [searchQuery, debouncedSearch, fetchProjects]);
 
   useEffect(() => {
     if (!canManageProjects) return;
@@ -635,7 +648,7 @@ const ProjectsPage = () => {
       project_type: normalizeProjectType(project.project_type),
       responsible_faculty_id: project.responsible_faculty_id ? String(project.responsible_faculty_id) : "",
       member_faculty_ids: projectMemberFacultyIds(project),
-      academic_year: project.academic_year?.toString() || project.fiscal_year?.toString() || String(new Date().getFullYear() + 543),
+      academic_year: project.academic_year?.toString() || project.fiscal_year?.toString() || "",
       start_date: project.start_date || "",
       end_date: project.end_date || "",
       status: normalizeStatus(project.status),
@@ -853,8 +866,8 @@ const ProjectsPage = () => {
       .filter((year): year is number => year !== null && Number.isFinite(Number(year)))
       .map(Number);
 
-    return Array.from(new Set(years)).sort((a, b) => b - a);
-  }, [projects]);
+    return Array.from(new Set([...years, ...availableAcademicYears.map(Number), currentAcademicYear, ...(academicYearFilter === "all" ? [] : [Number(academicYearFilter)])])).sort((a, b) => b - a);
+  }, [projects, availableAcademicYears, currentAcademicYear, academicYearFilter]);
   const filteredProjects = useMemo(() => {
     return projects.filter((project) => {
       const matchesType =
@@ -984,7 +997,10 @@ const ProjectsPage = () => {
         </TabsList>
       </Tabs>
 
-      {isLoading ? (
+      <div role="status" aria-live="polite" className="min-h-6 text-sm text-muted-foreground">
+        {isLoading || searchQuery !== debouncedSearch ? "กำลังอัปเดตผลลัพธ์…" : ""}
+      </div>
+      {isLoading && projects.length === 0 ? (
         <div className="flex justify-center items-center py-20">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>

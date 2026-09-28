@@ -46,18 +46,76 @@ try {
         error_log('project reminder: ' . $e->getMessage());
     }
 
-    // ลบข้อมูลนักศึกษาที่เข้าศึกษาเกินกำหนด (ปีละครั้ง และเฉพาะเมื่อแอดมินเปิดใช้งานไว้)
-    try {
-        require_once __DIR__ . '/../Admin/AcademicSettings/student_purge_helpers.php';
-        studentPurgeRunIfDue($pdo);
-    } catch (Throwable $e) {
-        error_log('student purge: ' . $e->getMessage());
+    // ตรวจสอบบทบาทผู้ใช้ และดึงข้อมูลอาจารย์ที่ปรึกษา/อาจารย์ปฏิบัติ หากเป็นนักศึกษา
+    $studentAdvisorInfo = null;
+    $userStmt = $pdo->prepare("SELECT username, role_id FROM users WHERE user_id = :user_id LIMIT 1");
+    $userStmt->execute([':user_id' => $user_id]);
+    $currentUser = $userStmt->fetch(PDO::FETCH_ASSOC);
+
+    if ($currentUser && (int)$currentUser['role_id'] === 3) {
+        $studentId = $currentUser['username'];
+        $advStmt = $pdo->prepare("
+            SELECT 
+                (
+                    SELECT TRIM(CONCAT(IFNULL(f.title,''), ' ', f.first_name_th, ' ', f.last_name_th))
+                    FROM student_advisor_mapping sam
+                    JOIN faculty f ON sam.faculty_id = f.faculty_id
+                    WHERE sam.student_id = :sid1
+                      AND (sam.advisor_type != 'practical' OR sam.advisor_type IS NULL)
+                    ORDER BY sam.academic_year DESC, sam.mapping_id DESC
+                    LIMIT 1
+                ) AS advisor_name,
+                (
+                    SELECT TRIM(CONCAT(IFNULL(f.title,''), ' ', f.first_name_th, ' ', f.last_name_th))
+                    FROM student_advisor_mapping sam
+                    JOIN faculty f ON sam.faculty_id = f.faculty_id
+                    WHERE sam.student_id = :sid2
+                      AND sam.advisor_type = 'practical'
+                    ORDER BY sam.academic_year DESC, sam.mapping_id DESC
+                    LIMIT 1
+                ) AS practical_advisor_name
+        ");
+        $advStmt->execute([':sid1' => $studentId, ':sid2' => $studentId]);
+        $studentAdvisorInfo = $advStmt->fetch(PDO::FETCH_ASSOC) ?: null;
+
+        // หากมีข้อมูลอาจารย์ แต่ยังไม่เคยมีแจ้งเตือนเรื่องอาจารย์เลย ให้สร้างแจ้งเตือนเริ่มต้น 1 รายการ
+        if ($studentAdvisorInfo && (!empty($studentAdvisorInfo['advisor_name']) || !empty($studentAdvisorInfo['practical_advisor_name']))) {
+            $checkNotif = $pdo->prepare("
+                SELECT COUNT(*) FROM notifications
+                WHERE user_id = :uid AND (title LIKE '%อาจารย์ที่ปรึกษา%' OR title LIKE '%อาจารย์ปฏิบัติ%' OR title LIKE '%อาจารย์ผู้ดูแล%')
+            ");
+            $checkNotif->execute([':uid' => $user_id]);
+            if ((int)$checkNotif->fetchColumn() === 0) {
+                $advText = !empty($studentAdvisorInfo['advisor_name']) ? $studentAdvisorInfo['advisor_name'] : 'ยังไม่มีการมอบหมาย';
+                $pracText = !empty($studentAdvisorInfo['practical_advisor_name']) ? $studentAdvisorInfo['practical_advisor_name'] : 'ยังไม่มีการมอบหมาย';
+                $initTitle = "แจ้งข้อมูลอาจารย์ผู้ดูแลคนปัจจุบัน";
+                $initMsg = "อาจารย์ที่ปรึกษา: {$advText} | อาจารย์ปฏิบัติ: {$pracText} (คลิกเพื่อดูรายละเอียดในใบแสดงผลการเรียน)";
+                $initPayload = json_encode([
+                    'action' => 'view_transcript',
+                    'target' => 'transcript',
+                    'advisor_name' => $advText,
+                    'practical_advisor_name' => $pracText
+                ], JSON_UNESCAPED_UNICODE);
+
+                $initNotif = $pdo->prepare("
+                    INSERT INTO notifications (user_id, sender_user_id, title, message, payload_json, type, channel, is_read, created_at)
+                    VALUES (:uid, NULL, :title, :msg, :payload, 'info', 'in-app', 0, NOW())
+                ");
+                $initNotif->execute([
+                    ':uid' => $user_id,
+                    ':title' => $initTitle,
+                    ':msg' => $initMsg,
+                    ':payload' => $initPayload
+                ]);
+            }
+        }
     }
 
     $sql = "SELECT
                 n.notification_id AS id,
                 n.title,
                 n.message,
+                n.payload_json AS payloadJson,
                 n.type,
                 n.channel,
                 CASE
@@ -117,7 +175,11 @@ try {
         $row['createdAt'] = date('d/m/Y H:i', strtotime($row['createdAt']));
     }
 
-    echo json_encode(["status" => "success", "data" => $notifications]);
+    echo json_encode([
+        "status" => "success", 
+        "data" => $notifications,
+        "advisors" => $studentAdvisorInfo
+    ], JSON_UNESCAPED_UNICODE);
 } catch (Exception $e) {
     http_response_code(500);
     echo json_encode(["status" => "error", "message" => $e->getMessage()]);

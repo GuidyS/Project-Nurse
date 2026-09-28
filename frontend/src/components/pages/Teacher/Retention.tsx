@@ -74,15 +74,15 @@ export default function Retention() {
 
   return (
     <div className="p-6 space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between">
+      <div className="app-page-header">
         <div>
-          <h1 className="text-2xl font-bold text-foreground  leading-snug">อัตราการคงอยู่ของนักศึกษา</h1>
-          <p className="text-muted-foreground">วิเคราะห์สัดส่วนนักศึกษาคงอยู่และสาเหตุการออกกลางคัน</p>
+          <h1 className="app-page-title">อัตราการคงอยู่ของนักศึกษา</h1>
+          <p className="app-page-description">วิเคราะห์สัดส่วนนักศึกษาคงอยู่และสาเหตุการออกกลางคัน</p>
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Calendar className="h-4 w-4" />
-            <span>ปีการศึกษา 2568</span>
+            <span>ข้อมูลนักศึกษาทุกปีที่เข้าศึกษา</span>
           </div>
           <ExportButton reportName="Retention-Report" />
         </div>

@@ -46,8 +46,8 @@ try {
                 WHEN p.responsible_faculty_id IS NULL THEN COALESCE(pfm.members, 0)
                 ELSE COALESCE(pfm.members, 0) + 1
             END AS members,
-            COALESCE(pb.budget, 0) AS budget,
-            COALESCE(pb.spent, 0) AS spent,
+            pb.budget AS budget,
+            pb.spent AS spent,
             COALESCE(pl.progress, 0) AS progress
         FROM project p
         LEFT JOIN (
@@ -58,8 +58,8 @@ try {
         LEFT JOIN (
             SELECT
                 project_id,
-                SUM(COALESCE(budget_allocated, 0)) AS budget,
-                SUM(COALESCE(budget_spent, 0)) AS spent
+                SUM(budget_allocated) AS budget,
+                SUM(budget_spent) AS spent
             FROM project_budget_years
             GROUP BY project_id
         ) pb ON pb.project_id = p.project_id
@@ -219,8 +219,8 @@ try {
             "type" => my_project_type_label($projectType),
             "status" => strtolower((string) ($project['status'] ?? 'pending')),
             "progress" => (int) round((float) ($project['progress'] ?? 0)),
-            "budget" => (float) ($project['budget'] ?? 0),
-            "spent" => (float) ($project['spent'] ?? 0),
+            "budget" => $project['budget'] !== null ? (float) $project['budget'] : null,
+            "spent" => $project['spent'] !== null ? (float) $project['spent'] : null,
             "members" => count($members),
             "deadline" => $project['end_date'] ?: "-",
             "academic_year" => $project['academic_year'] !== null ? (int) $project['academic_year'] : null,

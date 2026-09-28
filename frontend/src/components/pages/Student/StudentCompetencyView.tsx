@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { ClipboardCheck, Loader2, CheckCircle2, CircleDashed, AlertCircle } from "lucide-react";
+import { Loader2, AlertCircle } from "lucide-react";
 import api from "@/lib/axios";
 
 interface CompetencyItemRow {
@@ -66,17 +66,14 @@ export default function StudentCompetencyView() {
   const isFullyAssessed = totalScorable > 0 && totalAssessed === totalScorable;
 
   return (
-    <div className="p-6 space-y-6 animate-fade-in max-w-6xl mx-auto">
+    <div className="space-y-6 max-w-7xl mx-auto p-6 animate-fade-in">
       {/* Header Info */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
+      <div className="app-page-header">
         <div>
-          <div className="flex items-center gap-2">
-            <ClipboardCheck className="h-6 w-6 text-primary" />
-            <h1 className="text-xl font-bold text-foreground">
-              ผลการประเมินสมรรถนะหลักของนักศึกษาชั้นปีที่ {yearLevel || "—"} {curriculumYear && `(หลักสูตรปรับปรุง ${curriculumYear})`}
-            </h1>
-          </div>
-          <p className="text-sm text-muted-foreground mt-0.5">
+          <h1 className="app-page-title">
+            ผลการประเมินสมรรถนะหลักของนักศึกษาชั้นปีที่ {yearLevel || "—"} {curriculumYear && `(หลักสูตรปรับปรุง ${curriculumYear})`}
+          </h1>
+          <p className="app-page-description">
             นักศึกษา: <span className="text-foreground font-medium">{studentName}</span> (รหัส {studentId}) {academicYear && `• ปีการศึกษา ${academicYear}`}
           </p>
         </div>
@@ -84,12 +81,12 @@ export default function StudentCompetencyView() {
         {/* Badge สถานะ */}
         <div>
           {isFullyAssessed ? (
-            <Badge className="bg-emerald-600/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 gap-1.5 py-1.5 px-3">
-              <CheckCircle2 className="h-4 w-4" /> ได้รับการประเมินครบถ้วน
+            <Badge className="bg-emerald-600/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 py-1.5 px-3 whitespace-nowrap">
+              ได้รับการประเมินครบถ้วน
             </Badge>
           ) : (
-            <Badge variant="secondary" className="gap-1.5 py-1.5 px-3">
-              <CircleDashed className="h-4 w-4 text-muted-foreground" /> ประเมินแล้ว {totalAssessed}/{totalScorable} รายการ
+            <Badge variant="secondary" className="py-1.5 px-3 whitespace-nowrap">
+              ประเมินแล้ว {totalAssessed}/{totalScorable} รายการ
             </Badge>
           )}
         </div>

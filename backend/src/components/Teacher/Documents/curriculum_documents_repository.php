@@ -95,7 +95,6 @@ function curriculum_documents_row_to_api(array $row): array
         'course' => (string) $row['subject_code'],
         'uploadedAt' => (string) $row['uploaded_at'],
         'size' => (string) ($row['file_size_label'] ?? ''),
-        'status' => (string) ($row['status'] ?? 'pending'),
         'linked' => true,
         'legacy' => ($row['source'] ?? '') === 'mapping_json_backfill',
         'source' => 'curriculum_documents',
@@ -105,7 +104,7 @@ function curriculum_documents_row_to_api(array $row): array
 function curriculum_documents_list(PDO $db, int $frameworkId): array
 {
     $stmt = $db->prepare("
-        SELECT document_uid, name, document_type, subject_code, uploaded_at, file_size_label, status, source
+        SELECT document_uid, name, document_type, subject_code, uploaded_at, file_size_label, source
         FROM curriculum_documents
         WHERE framework_id = :framework_id
         ORDER BY uploaded_at DESC, id DESC
@@ -132,9 +131,9 @@ function curriculum_documents_create(PDO $db, int $frameworkId, array $payload, 
     $documentUid = 'doc_' . date('YmdHis') . '_' . random_int(1000, 9999);
     $stmt = $db->prepare("
         INSERT INTO curriculum_documents
-            (framework_id, subject_code, document_uid, name, document_type, uploaded_at, file_size_label, status, source, created_by)
+            (framework_id, subject_code, document_uid, name, document_type, uploaded_at, file_size_label, source, created_by)
         VALUES
-            (:framework_id, :subject_code, :document_uid, :name, :document_type, :uploaded_at, :file_size_label, :status, 'relational', :created_by)
+            (:framework_id, :subject_code, :document_uid, :name, :document_type, :uploaded_at, :file_size_label, 'relational', :created_by)
     ");
     $stmt->execute([
         ':framework_id' => $frameworkId,
@@ -144,7 +143,6 @@ function curriculum_documents_create(PDO $db, int $frameworkId, array $payload, 
         ':document_type' => $type,
         ':uploaded_at' => date('Y-m-d'),
         ':file_size_label' => trim((string) ($payload['size'] ?? '1.2 MB')),
-        ':status' => 'pending',
         ':created_by' => $userId,
     ]);
 
