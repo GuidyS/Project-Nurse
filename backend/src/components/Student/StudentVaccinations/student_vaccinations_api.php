@@ -33,7 +33,7 @@ try {
     $student_id = $user['username'];
     $method = $_SERVER['REQUEST_METHOD'];
 
-    // 🔍 [GET] ดึงข้อมูลวัคซีนพร้อม JOIN ดึงชื่ออาจารย์ที่ปรึกษา
+    //  [GET] ดึงข้อมูลวัคซีน (พร้อมแปลง path ไฟล์ให้เป็น Array รองรับหลายรูป)
     if ($method === 'GET') {
         $query = "
             SELECT v.*, 
@@ -47,19 +47,28 @@ try {
         $stmt->execute([':sid' => $student_id]);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
+        foreach ($rows as &$row) {
+            $path = $row['evidence_file_path'];
+            if (empty($path)) {
+                $row['existing_images'] = [];
+            } else {
+                $decoded = json_decode($path, true);
+                if (is_array($decoded)) {
+                    $row['existing_images'] = $decoded;
+                } else {
+                    $row['existing_images'] = [$path]; // รองรับข้อมูลเก่าที่เป็น string เดี่ยวๆ
+                }
+            }
+        }
+
         echo json_encode(["status" => "success", "data" => $rows], JSON_UNESCAPED_UNICODE);
         exit;
     }
 
-    // 💾 [POST] บันทึกข้อมูล
+    //  [POST] บันทึกข้อมูลและอัปโหลดไฟล์หลายไฟล์
     if ($method === 'POST') {
         $dataRaw = $_POST['vaccinations'] ?? '[]';
         $vaccinations = json_decode($dataRaw, true);
-
-        if (!is_array($vaccinations) || empty($vaccinations)) {
-            $input = json_decode(file_get_contents("php://input"), true);
-            $vaccinations = $input['vaccinations'] ?? [];
-        }
 
         if (empty($vaccinations) || !is_array($vaccinations)) {
             http_response_code(400);
@@ -73,19 +82,62 @@ try {
         }
 
         $groupEvidencePaths = [];
+        
+        //  ดึงไฟล์เก่าที่ผู้ใช้ยังต้องการเก็บไว้
         foreach ($vaccinations as $item) {
             $groupId = $item['group_id'] ?? ($item['sequence_no'] ?? null);
-            if ($groupId === null || isset($groupEvidencePaths[$groupId])) continue;
+            if ($groupId !== null && !isset($groupEvidencePaths[$groupId])) {
+                $groupEvidencePaths[$groupId] = $item['existing_images'] ?? [];
+            }
+        }
 
-            $fileKey = "evidence_file_" . $groupId;
-            if (isset($_FILES[$fileKey]) && $_FILES[$fileKey]['error'] === UPLOAD_ERR_OK) {
-                $fileInfo = $_FILES[$fileKey];
-                $ext = strtolower(pathinfo($fileInfo['name'], PATHINFO_EXTENSION));
-                if (in_array($ext, ALLOWED_EVIDENCE_EXT, true) && $fileInfo['size'] <= MAX_EVIDENCE_SIZE) {
-                    $newFileName = 'vaccine_' . preg_replace('/[^a-zA-Z0-9_]/', '', (string)$groupId) . '_' . time() . '_' . uniqid() . '.' . $ext;
-                    $targetFile = $uploadDir . $newFileName;
-                    if (move_uploaded_file($fileInfo['tmp_name'], $targetFile)) {
-                        $groupEvidencePaths[$groupId] = 'uploads/vaccine_evidence/' . $student_id . '/' . $newFileName;
+        //  จัดการไฟล์เก่าที่ถูกผู้ใช้ลบทิ้ง (ลบไฟล์จริงในเซิร์ฟเวอร์)
+        $oldStmt = $db->prepare("SELECT evidence_file_path FROM student_vaccinations WHERE student_id = :sid");
+        $oldStmt->execute([':sid' => $student_id]);
+        $oldRows = $oldStmt->fetchAll(PDO::FETCH_ASSOC);
+        $allOldFiles = [];
+        foreach ($oldRows as $r) {
+            if (!empty($r['evidence_file_path'])) {
+                $decoded = json_decode($r['evidence_file_path'], true);
+                if (is_array($decoded)) {
+                    $allOldFiles = array_merge($allOldFiles, $decoded);
+                } else {
+                    $allOldFiles[] = $r['evidence_file_path'];
+                }
+            }
+        }
+        $allOldFiles = array_unique($allOldFiles);
+        $allNewKeptFiles = [];
+        foreach ($groupEvidencePaths as $files) {
+            $allNewKeptFiles = array_merge($allNewKeptFiles, $files);
+        }
+        $filesToDelete = array_diff($allOldFiles, $allNewKeptFiles);
+        foreach ($filesToDelete as $delPath) {
+             $fullPath = __DIR__ . '/../../../' . $delPath;
+             if (file_exists($fullPath) && is_file($fullPath)) {
+                 unlink($fullPath);
+             }
+        }
+
+        //  อัปโหลดไฟล์ใหม่ (รองรับ multiple files)
+        foreach ($_FILES as $key => $fileArray) {
+            if (preg_match('/^images_(.+)$/', $key, $matches)) {
+                $groupId = $matches[1];
+                if (!isset($groupEvidencePaths[$groupId])) {
+                    $groupEvidencePaths[$groupId] = [];
+                }
+                
+                $fileCount = count($fileArray['name']);
+                for ($i = 0; $i < $fileCount; $i++) {
+                    if ($fileArray['error'][$i] === UPLOAD_ERR_OK) {
+                        $ext = strtolower(pathinfo($fileArray['name'][$i], PATHINFO_EXTENSION));
+                        if (in_array($ext, ALLOWED_EVIDENCE_EXT, true) && $fileArray['size'][$i] <= MAX_EVIDENCE_SIZE) {
+                            $newFileName = 'vaccine_' . preg_replace('/[^a-zA-Z0-9_]/', '', $groupId) . '_' . time() . '_' . uniqid() . '.' . $ext;
+                            $targetFile = $uploadDir . $newFileName;
+                            if (move_uploaded_file($fileArray['tmp_name'][$i], $targetFile)) {
+                                $groupEvidencePaths[$groupId][] = 'uploads/vaccine_evidence/' . $student_id . '/' . $newFileName;
+                            }
+                        }
                     }
                 }
             }
@@ -95,8 +147,8 @@ try {
         $facultyList = $facultyStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
         $db->beginTransaction();
-
         try {
+            // ลบข้อมูลเดิมแล้ว Insert ใหม่ทั้งหมด (วิธีอัปเดตแบบล้างกระดานของเดิม)
             $deleteStmt = $db->prepare("DELETE FROM student_vaccinations WHERE student_id = :sid");
             $deleteStmt->execute([':sid' => $student_id]);
 
@@ -116,7 +168,9 @@ try {
             foreach ($vaccinations as $item) {
                 $groupId = $item['group_id'] ?? ($item['sequence_no'] ?? null);
                 $receivedDate = !empty($item['received_date']) ? $item['received_date'] : null;
-                $evidencePath = $groupEvidencePaths[$groupId] ?? ($item['evidence_file_path'] ?: null);
+                
+                // แปลง Array ของรูปกลับเป็น JSON String 
+                $evidencePathJson = !empty($groupEvidencePaths[$groupId]) ? json_encode($groupEvidencePaths[$groupId], JSON_UNESCAPED_UNICODE) : null;
 
                 $advisorNameInput = trim($item['advisor_name'] ?? '');
                 $matchedAdvisorId = null;
@@ -146,8 +200,8 @@ try {
                     ':dose'          => max(1, (int)($item['dose_no'] ?? 1)),
                     ':immunity'      => $item['immunity_status'] ?? null,
                     ':rdate'         => $receivedDate,
-                    ':evidence'      => !empty($item['evidence_attached']) ? 1 : 0,
-                    ':evidence_path' => $evidencePath,
+                    ':evidence'      => !empty($groupEvidencePaths[$groupId]) ? 1 : 0,
+                    ':evidence_path' => $evidencePathJson,
                     ':advisor_id'    => $matchedAdvisorId,
                     ':signed_at'     => $signedAt,
                     ':remark'        => $item['remark'] ?? null,
@@ -155,9 +209,7 @@ try {
             }
 
             $db->commit();
-
-            // บันทึก Audit Log เมื่อข้อมูลวัคซีนถูก commit สำเร็จ
-            logAudit($db, $_SESSION['user_id'] ?? null, 'update', 'student_vaccinations', "บันทึกประวัติการรับวัคซีนนักศึกษา รหัส: {$student_id}");
+            logAudit($db, $_SESSION['user_id'] ?? null, 'update', 'student_vaccinations', "บันทึกและอัปเดตประวัติ/หลักฐานการรับวัคซีนนักศึกษา รหัส: {$student_id}");
 
         } catch (Throwable $e) {
             $db->rollBack();
