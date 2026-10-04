@@ -83,7 +83,7 @@ try {
         exit;
     }
 
-    //  FIX: บังคับคำนวณปีการศึกษาให้ตรงกับหน้า Get เสมอ เพื่อป้องกันคะแนนกระจายไปอยู่คนละปี
+    // คำนวณปีการศึกษาแบบ Real-time
     $info = calculateRealtimeAcademicInfo($targetStudentId);
     $academicYear = $info['academic_year'];
 
@@ -104,9 +104,11 @@ try {
     $savedCount = 0;
     foreach ($scores as $s) {
         $itemId = (int)($s['competency_item_id'] ?? $s['id'] ?? 0);
-        $score = isset($s['score']) ? (int)$s['score'] : null;
+        // แก้ไข: รองรับค่าคะแนน 0 (ไม่บรรลุ) และ 1 (บรรลุ)
+        $score = isset($s['score']) && $s['score'] !== '' ? (int)$s['score'] : null;
 
-        if ($itemId > 0 && $score !== null && $score >= 1 && $score <= 5) {
+        // เช็กว่าคะแนนส่งมาเป็น 0 หรือ 1
+        if ($itemId > 0 && $score !== null && in_array($score, [0, 1], true)) {
             $stmt->execute([
                 ':sid'      => $targetStudentId,
                 ':item_id'  => $itemId,
@@ -125,7 +127,7 @@ try {
         $userId,
         'update',
         'student_competency',
-        "อาจารย์ประเมินสมรรถนะนักศึกษา รหัส: {$targetStudentId} จำนวน {$savedCount} ข้อ (ปีการศึกษา {$academicYear})"
+        "อาจารย์ประเมินสมรรถนะนักศึกษา (บรรลุ/ไม่บรรลุ) รหัส: {$targetStudentId} จำนวน {$savedCount} ข้อ (ปีการศึกษา {$academicYear})"
     );
 
     echo json_encode([
