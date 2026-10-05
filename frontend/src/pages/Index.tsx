@@ -56,6 +56,7 @@ import AdvisorCompetencyView from "@/components/pages/Teacher/AdvisorCompetencyV
 import CompetencyItemsManagement from "@/components/pages/Admin/CompetencyItemsManagement";
 import StudentCompetencyView from "@/components/pages/Student/StudentCompetencyView"; 
 import CurriculumCycles from "@/components/pages/Admin/CurriculumCycles";
+import PracticeLocationsPage from "@/components/pages/Teacher/PracticeLocationsPage";
 import { getPageFromUrl, navigateToPage } from "@/lib/projectNavigation";
 
 type LoginUserPayload = Record<string, unknown> & {
@@ -129,7 +130,7 @@ const Index = () => {
   );
 
   const renderPage = () => {
-    // 1. ดึงข้อมูลสิทธิ์ปัจจุบันเสมอ เมื่อมีการเรนเดอร์หน้าใหม่
+    //  ดึงข้อมูลสิทธิ์ปัจจุบันเสมอ เมื่อมีการเรนเดอร์หน้าใหม่
     const savedUser = localStorage.getItem('user');
     const userObj = savedUser ? JSON.parse(savedUser) : null;
     const roleId = userObj ? Number(userObj.role_id) : 0;
@@ -146,7 +147,7 @@ const Index = () => {
       activeItem === "research-summary" &&
       getPageFromUrl() === "research-summary";
 
-    // 2. หมวดทั่วไปที่ทุกคนเข้าถึงได้ (Public / All Roles)
+    //  หมวดทั่วไปที่ทุกคนเข้าถึงได้ (Public / All Roles)
     if (activeItem === "login") {
       return (
         <LoginPage 
@@ -186,7 +187,7 @@ const Index = () => {
     // (หน้าโครงการที่เหลือเป็นของแอดมินอย่างเดียว — คุมสิทธิ์จริงที่ backend อีกชั้น)
     if (activeItem === "my-projects") return <MyProjects />;
 
-    // 3. 🔒 หมวดสิทธิ์ผู้ดูแลระบบ (Admin - Role 1)
+    //  หมวดสิทธิ์ผู้ดูแลระบบ (Admin - Role 1)
     const adminPages = ["approvals", "audit-log", "export-data", "import-data", "reports", "roles-management", "users-management", "competency-items-management"];
     if (adminPages.includes(activeItem)) {
       if (roleId !== 1 && !(roleId == 2 && positionId == 1)) return <UnauthorizedView />;
@@ -202,19 +203,19 @@ const Index = () => {
       }
     }
 
-    // 3.1 🔒 มอบหมายนักศึกษาให้อาจารย์ — แอดมินเท่านั้น (คณบดีก็เข้าไม่ได้)
+    //  มอบหมายนักศึกษาให้อาจารย์ — แอดมินเท่านั้น (คณบดีก็เข้าไม่ได้)
     if (activeItem === "assign-students") {
       if (roleId !== 1) return <UnauthorizedView />;
       return <AssignStudents />;
     }
 
-    // 3.1.1 🔒 จัดการหลักสูตรรอบ 5 ปี — แอดมินเท่านั้น
+    // จัดการหลักสูตรรอบ 5 ปี — แอดมินเท่านั้น
     if (activeItem === "curriculum-cycles") {
       if (roleId !== 1) return <UnauthorizedView />;
       return <CurriculumCycles />;
     }
 
-    // 3.2 🔒 หมวดโครงการ — แอดมินจัดการคนเดียวทั้งหมด
+    //  หมวดโครงการ — แอดมินจัดการคนเดียวทั้งหมด
     // (ยกเว้น "โครงการของฉัน" ที่เปิดให้ทุก Role ไปแล้วด้านบน)
     const projectAdminPages = ["projectspage", "project-links", "project-reports"];
     if (projectAdminPages.includes(activeItem)) {
@@ -231,7 +232,7 @@ const Index = () => {
       }
     }
 
-    // 4. 🔒 หมวดสิทธิ์คณบดี (Role 2 + Position 1) หรือ Admin
+    //  หมวดสิทธิ์คณบดี (Role 2 + Position 1) หรือ Admin
     const deanPages = [
       "dean-dashboard", "retention", "dean-teaching-workload", "dean-research-workload",
       "dean-academic-service-workload", "dean-culture-workload"
@@ -248,7 +249,7 @@ const Index = () => {
       }
     }
 
-    // 5. 🔒 หมวดสิทธิ์อาจารย์และคณะกรรมการ (Teacher - Role 2) หรือ Admin
+    //  หมวดสิทธิ์อาจารย์และคณะกรรมการ (Teacher - Role 2) หรือ Admin
     const teacherPages = [
       "courses", "five-year-summary", "clo-management", "clos",
       "plo-ylo-report", "course-report", "course-students", "documents", "assign-instructors", "clo-map",
@@ -256,7 +257,8 @@ const Index = () => {
       "program-reports", "schedule-tasks", "advise-notes", "advisor-notifications", "advises",
       "students", "students-info", "transfer-requests", "my-research", "research-summary", "project-assessments",
       "advisor-vaccination-view", "advisor-health-records-view",
-      "advisor-competency-view"
+      "advisor-competency-view",
+      "practice-locations" //  ลงทะเบียนหน้าใหม่ไว้ตรงนี้
     ];
     
     if (teacherPages.includes(activeItem)) {
@@ -291,10 +293,11 @@ const Index = () => {
         case "advisor-vaccination-view": return <AdvisorVaccinationView />;  
         case "advisor-health-records-view": return <AdvisorHealthRecordsView />;
         case "advisor-competency-view": return <AdvisorCompetencyView />;
+        case "practice-locations": return <PracticeLocationsPage />; // ✅ กำหนด Component สำหรับหน้าแหล่งฝึกภาคปฏิบัติ
       }
     }
 
-    // 6. 🔒 หมวดสิทธิ์นักศึกษา (Student - Role 3) หรือ Admin
+    //  หมวดสิทธิ์นักศึกษา (Student - Role 3) หรือ Admin
     const studentPages = ["transcript", "portfolio", "student-vaccinations", "student-health-records", "student-competency-view"];
     if (studentPages.includes(activeItem)) {
       if (roleId !== 1 && roleId !== 3) return <UnauthorizedView />;

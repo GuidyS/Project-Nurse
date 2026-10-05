@@ -31,6 +31,11 @@ $positionSectionMap = [
     9 => 'งานวิจัย',
 ];
 
+// ดึง Role ID ขึ้นมาก่อนเพื่อเช็คสิทธิ์แทรกเมนู (1 = Admin, 2 = Teacher)
+$roleStmt = $db->prepare("SELECT role_id FROM users WHERE user_id = :user_id LIMIT 1");
+$roleStmt->execute([':user_id' => $user_id]);
+$roleId = (int)($roleStmt->fetchColumn() ?: 0);
+
 // 2. SQL Query ดึงเมนูตามระบบสิทธิ์
 $sql = "SELECT m.* FROM system_sidebar_menus m 
         WHERE m.is_active = 1
@@ -64,6 +69,16 @@ $stmt->execute([
 ]);
 $menu_items = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+// ✅ แทรกเมนู "แหล่งฝึกภาคปฏิบัติ" เข้าไปในหมวดหมู่ "งานปฏิบัติการ" (แสดงเฉพาะ Teacher และ Admin)
+if ($roleId === 1 || $roleId === 2) {
+    $menu_items[] = [
+        'section_title' => 'งานปฏิบัติการ',
+        'title' => 'แหล่งฝึกภาคปฏิบัติ',
+        'url' => 'practice-locations',
+        'icon' => 'MapPin'
+    ];
+}
+
 $sections = [];
 foreach ($menu_items as $item) {
     $sectionName = $item['section_title'] ?? 'เมนูหลัก';
@@ -93,10 +108,6 @@ $posStmt = $db->prepare("
 ");
 $posStmt->execute([':user_id' => $user_id]);
 $userPositions = $posStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-
-$roleStmt = $db->prepare("SELECT role_id FROM users WHERE user_id = :user_id LIMIT 1");
-$roleStmt->execute([':user_id' => $user_id]);
-$roleId = (int)($roleStmt->fetchColumn() ?: 0);
 
 if (empty($userPositions) && $roleId === 3) {
     $userPositions[] = ['position_id' => 8, 'is_primary' => 1];

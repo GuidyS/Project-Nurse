@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
+   import PracticeLocationsPage from "@/components/pages/Teacher/PracticeLocationsPage";
 import { useEffect, useState } from "react";
 import api from "@/lib/axios";
 
@@ -71,8 +72,6 @@ const SessionGateway = ({ children }: { children: React.ReactNode }) => {
       return;
     }
 
-    // 💡 เช็คก้าวแรก: ถ้าในคอมพิวเตอร์ไม่มีข้อมูล 'user' อยู่เลย แปลว่ายังไม่ได้ล็อกอินแน่ๆ 
-    // ไม่ต้องยิง API ไปกวนเซิร์ฟเวอร์ ให้ผ่านไปหน้าล็อกอินได้เลย ป้องกันลูปนรก!
     const savedUser = localStorage.getItem("user");
     if (!savedUser) {
       setHasSession(false);
@@ -80,7 +79,6 @@ const SessionGateway = ({ children }: { children: React.ReactNode }) => {
       return;
     }
 
-    // ถ้าเคยมีประวัติบันทึกไว้ ค่อยยิงไปพิสูจน์ตั๋วกับ Docker หลังบ้าน
     api.get("/index.php?page=profile")
       .then((res) => {
         if (res.data.status === "success") {
@@ -101,7 +99,6 @@ const SessionGateway = ({ children }: { children: React.ReactNode }) => {
         }
       })
       .catch(() => {
-        // ตั๋วผี/หมดอายุขัย ล้างข้อมูลทิ้ง
         localStorage.removeItem("user");
         localStorage.removeItem("permissions");
         setHasSession(false);
@@ -150,6 +147,17 @@ const App = () => {
                 </SessionGateway>
               } 
             />
+            
+            {/* ✅ เพิ่ม Route สำหรับหน้าแหล่งฝึกภาคปฏิบัติ เพื่อให้ Sidebar พามาถูกหน้า */}
+            <Route 
+              path="/practice-locations" 
+              element={
+                <SessionGateway>
+                  <PracticeLocationsPage />
+                </SessionGateway>
+              } 
+            />
+
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

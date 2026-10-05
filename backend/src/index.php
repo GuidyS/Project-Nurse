@@ -422,6 +422,10 @@
             case 'get-practical-students':
                 require_once 'components/Teacher/PracticalStudents/get_practical_students.php';
                 break;  
+                
+           case 'practice-locations':
+                require_once 'components/Teacher/Practice/practice_locations_api.php';
+                break;
                               
             // MyProjects
             case 'get-my-projects':
