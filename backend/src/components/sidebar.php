@@ -31,10 +31,15 @@ $positionSectionMap = [
     9 => 'งานวิจัย',
 ];
 
+// ดึง Role ID ขึ้นมาก่อนเพื่อเช็คสิทธิ์แทรกเมนู (1 = Admin, 2 = Teacher)
+$roleStmt = $db->prepare("SELECT role_id FROM users WHERE user_id = :user_id LIMIT 1");
+$roleStmt->execute([':user_id' => $user_id]);
+$roleId = (int)($roleStmt->fetchColumn() ?: 0);
+
 // 2. SQL Query ดึงเมนูตามระบบสิทธิ์
 $sql = "SELECT m.* FROM system_sidebar_menus m 
         WHERE m.is_active = 1
-        AND m.url NOT IN ('import-data', 'project-docs', 'my-courses', 'students', 'advisor-notifications', 'advise-notes')
+        AND m.url NOT IN ('import-data', 'project-docs', 'project-links', 'my-courses', 'students', 'advisor-notifications', 'advise-notes')
         AND (m.permission_required IN (
             SELECT p.permission_name FROM permissions p
             JOIN position_permission pp ON p.permission_id = pp.permission_id

@@ -1,7 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Download, Edit, Eye, FileText, FolderKanban, Users, User, Calendar, Loader2, Plus } from 'lucide-react';
+import { Download, Edit, Eye, FileText, FolderKanban, Users, User, Calendar, Loader2, Plus, Globe2, Image } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -40,32 +40,45 @@ interface ProjectDocument {
 
 interface ProjectFacultyMember {
   faculty_id: number;
+  id?: number;
   name: string;
+  type?: string;
   role: string;
 }
 
-type ProjectType = 'academic_service' | 'culture' | 'other';
+type ProjectType = 'academic_service' | 'culture' | 'other' | 'teaching' | 'research' | 'quality_assurance';
 type ProjectTypeFilter = 'all' | ProjectType;
+type ProjectAttachmentType = 'google_drive' | 'website_url' | 'file';
 
 interface Project {
   id: string;
+  project_id?: number;
   name: string;
   project_name_th?: string;
   project_name_en?: string;
   description?: string;
   project_type?: ProjectType | null;
+  responsible_faculty_id?: number | string | null;
+  responsible_name?: string | null;
   type: string;
   status: string;
   budget: number | null;
   spent: number | null;
+  budget_allocated?: number | string | null;
+  budget_spent?: number | string | null;
+  project_budget_years_id?: number | null;
+  fiscal_year?: number | null;
+  budget_note?: string | null;
   members: number;
   deadline: string;
   academic_year?: number | null;
   start_date?: string | null;
   end_date?: string | null;
   documents?: ProjectDocument[];
+  plos?: string[];
   member_faculty_ids?: number[];
   member_faculties?: ProjectFacultyMember[];
+  member_details?: ProjectFacultyMember[];
   can_edit?: boolean;
 }
 
@@ -77,9 +90,20 @@ interface FacultyOption {
 
 type ProjectStatus = 'pending' | 'active' | 'completed' | 'cancelled';
 
+const GoogleDriveIcon = ({ className = 'h-4 w-4' }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" className={className}>
+    <path fill="#0F9D58" d="M8.3 3h7.4l7.4 12.8h-7.4L8.3 3Z" />
+    <path fill="#F4B400" d="M.9 15.8 8.3 3l3.7 6.4-3.7 6.4H.9Z" />
+    <path fill="#4285F4" d="M8.3 15.8h14.8L19.4 22H4.6l3.7-6.2Z" />
+  </svg>
+);
+
 const projectTypeLabels: Record<ProjectType, string> = {
   academic_service: 'บริการวิชาการ',
   culture: 'ทำนุบำรุงศิลปวัฒนธรรม',
+  teaching: 'การเรียนการสอน',
+  research: 'วิจัย',
+  quality_assurance: 'การประกันคุณภาพ',
   other: 'อื่น ๆ / ยังไม่จำแนก',
 };
 
@@ -87,6 +111,9 @@ const projectTypeTabs: { value: ProjectTypeFilter; label: string }[] = [
   { value: 'all', label: 'ทั้งหมด' },
   { value: 'academic_service', label: projectTypeLabels.academic_service },
   { value: 'culture', label: projectTypeLabels.culture },
+  { value: 'teaching', label: projectTypeLabels.teaching },
+  { value: 'research', label: projectTypeLabels.research },
+  { value: 'quality_assurance', label: projectTypeLabels.quality_assurance },
   { value: 'other', label: projectTypeLabels.other },
 ];
 
@@ -94,6 +121,32 @@ const normalizeProjectType = (value?: ProjectType | null): ProjectType => value 
 
 const formatProjectBudget = (amount: number | null) =>
   amount == null ? 'ยังไม่ระบุ' : `${amount.toLocaleString('th-TH', { maximumFractionDigits: 2 })} บาท`;
+
+const formatCurrency = (value?: string | number | null) => {
+  const amount = Number(value || 0);
+  return amount.toLocaleString('th-TH', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  });
+};
+
+const formatDate = (value?: string | null) => {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString('th-TH', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+};
+
+const statusLabels: Record<ProjectStatus, string> = {
+  pending: 'รออนุมัติ',
+  active: 'กำลังดำเนินการ',
+  completed: 'เสร็จสิ้น',
+  cancelled: 'ไม่อนุมัติ/ยกเลิก',
+};
 
 interface CreateProjectForm {
   project_name_th: string;
@@ -142,7 +195,19 @@ const getApiErrorMessage = (error: unknown, fallback: string) => {
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
 const PROJECT_ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
-const getFileUrl = (filePath: string) => `${API_BASE_URL}/${filePath.replace(/^\/+/, '')}`;
+const isExternalDocumentUrl = (document: ProjectDocument) => /^https?:\/\//i.test(document.file_path || '');
+const getFileUrl = (filePath: string) =>
+  /^https?:\/\//i.test(filePath) ? filePath : `${API_BASE_URL}/${filePath.replace(/^\/+/, '')}`;
+
+const getAttachmentUrlType = (value: string): Exclude<ProjectAttachmentType, 'file'> => {
+  try {
+    const url = new URL(value.trim());
+    const host = url.hostname.toLowerCase();
+    return host === 'drive.google.com' || host === 'docs.google.com' ? 'google_drive' : 'website_url';
+  } catch {
+    return 'website_url';
+  }
+};
 
 const uploadMyProjectAttachment = async (projectId: number | string, file: File) => {
   const uploadData = new FormData();
@@ -166,7 +231,68 @@ const formatFileSize = (size: number | null) => {
   return `${(size / 1024 / 1024).toFixed(2)} MB`;
 };
 
-const getDocumentDisplayName = (document: ProjectDocument) => document.file_name || document.name;
+const getDocumentAttachmentType = (document: ProjectDocument): ProjectAttachmentType => {
+  if (!isExternalDocumentUrl(document)) return 'file';
+  const label = (document.file_name || '').toLowerCase();
+  if (label.includes('website')) return 'website_url';
+  return getAttachmentUrlType(document.file_path || '');
+};
+
+const getDocumentDisplayName = (document: ProjectDocument) => {
+  const attachmentType = getDocumentAttachmentType(document);
+  if (attachmentType === 'google_drive') return 'Google Drive';
+  if (attachmentType === 'website_url') return 'Website URL';
+  return document.file_name || document.name;
+};
+
+const getDocumentOpenLabel = (document: ProjectDocument) => {
+  const attachmentType = getDocumentAttachmentType(document);
+  if (attachmentType === 'google_drive') return 'Google Drive';
+  if (attachmentType === 'website_url') return 'เว็บไซต์';
+  return 'ไฟล์';
+};
+
+const DocumentAttachmentIcon = ({ document, className = 'h-4 w-4' }: { document: ProjectDocument; className?: string }) => {
+  const attachmentType = getDocumentAttachmentType(document);
+  if (attachmentType === 'google_drive') return <GoogleDriveIcon className={className} />;
+  if (attachmentType === 'website_url') return <Globe2 className={className} />;
+  return <Image className={className} />;
+};
+
+const projectDocuments = (project?: Project | null) => (Array.isArray(project?.documents) ? project.documents : []);
+const projectPlos = (project?: Project | null) => (Array.isArray(project?.plos) ? project.plos : []);
+
+const normalizeStatus = (value?: string | null): ProjectStatus => {
+  if (value === 'pending' || value === 'active' || value === 'completed' || value === 'cancelled') return value;
+  return 'active';
+};
+
+const projectBudgetAllocated = (project: Project) => project.budget_allocated ?? project.budget ?? 0;
+const projectBudgetSpent = (project: Project) => project.budget_spent ?? project.spent ?? 0;
+const projectBudgetNote = (project: Project) => project.budget_note || '';
+
+const getProjectKey = (project: Project) => project.project_id ?? Number(project.id || 0);
+
+const projectResponsibleName = (project: Project) => {
+  const responsibleName = (project.responsible_name || '').trim();
+  if (responsibleName) return responsibleName;
+
+  const responsibleId = Number(project.responsible_faculty_id || 0);
+  const responsibleMember = (project.member_details || project.member_faculties || []).find((member) => {
+    const memberId = Number(member.id || member.faculty_id || 0);
+    return responsibleId > 0 && memberId === responsibleId;
+  });
+
+  return responsibleMember?.name || '-';
+};
+
+const projectFacultyMembers = (project: Project) => {
+  const responsibleId = Number(project.responsible_faculty_id || 0);
+  return (project.member_details || project.member_faculties || []).filter((member) => {
+    const memberId = Number(member.id || member.faculty_id || 0);
+    return responsibleId <= 0 || memberId !== responsibleId;
+  });
+};
 
 export default function MyProjects() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -180,6 +306,8 @@ export default function MyProjects() {
   const [facultyOptions, setFacultyOptions] = useState<FacultyOption[]>([]);
   const [selectedFacultyIds, setSelectedFacultyIds] = useState<number[]>([]);
   const [memberSearch, setMemberSearch] = useState('');
+  const [viewProject, setViewProject] = useState<Project | null>(null);
+  const [isViewOpen, setIsViewOpen] = useState(false);
   const { toast } = useToast();
 
   const fetchMyProjects = useCallback(async () => {
@@ -262,6 +390,11 @@ export default function MyProjects() {
     setIsCreateOpen(true);
   };
 
+  const openViewDialog = (project: Project) => {
+    setViewProject(project);
+    setIsViewOpen(true);
+  };
+
   const toggleFacultyMember = (facultyId: number) => {
     setSelectedFacultyIds((prev) =>
       prev.includes(facultyId)
@@ -337,6 +470,39 @@ export default function MyProjects() {
             </div>
           );
         })}
+      </div>
+    );
+  };
+
+  const renderDetailDocumentList = (documents: ProjectDocument[]) => {
+    if (documents.length === 0) {
+      return (
+        <div className="rounded-lg border border-dashed p-4 text-center text-muted-foreground">
+          ยังไม่มีเอกสารแนบสำหรับโครงการนี้
+        </div>
+      );
+    }
+
+    return (
+      <div className="grid gap-3 sm:grid-cols-5">
+        {documents.map((documentItem) => (
+          <button
+            key={documentItem.id}
+            type="button"
+            className="flex flex-col items-center gap-2 rounded-md bg-background px-2 py-3 text-center transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={!documentItem.file_path}
+            onClick={() => openDocument(documentItem)}
+            title={getDocumentOpenLabel(documentItem)}
+            aria-label={`เปิดเอกสาร ${documentItem.name || getDocumentDisplayName(documentItem)}`}
+          >
+            <DocumentAttachmentIcon document={documentItem} className="h-14 w-14 shrink-0" />
+            <div className="min-w-0 w-full">
+              <p className="max-w-[7rem] truncate text-center text-[13px] font-semibold text-foreground">{documentItem.name}</p>
+              <p className="truncate text-xs text-muted-foreground">{formatDate(documentItem.date)}</p>
+              <p className="truncate text-xs text-muted-foreground">{getDocumentDisplayName(documentItem)}</p>
+            </div>
+          </button>
+        ))}
       </div>
     );
   };
@@ -564,18 +730,27 @@ export default function MyProjects() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {filteredProjects.map((project) => (
               <Card key={project.id}>
                 <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
                       <CardTitle className="flex gap-3">{project.name}
                         {getStatusBadge(project.status)}
                       </CardTitle>
                       <CardDescription className="mt-1">ประเภท: {project.type}</CardDescription>
                     </div>
-
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="shrink-0 gap-2"
+                      onClick={() => openViewDialog(project)}
+                    >
+                      <Eye className="h-4 w-4" />
+                      ดูรายละเอียด
+                    </Button>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -624,6 +799,127 @@ export default function MyProjects() {
           </div>
         )}
       </div>
+
+      <Dialog
+        open={isViewOpen}
+        onOpenChange={(open) => {
+          setIsViewOpen(open);
+          if (!open) setViewProject(null);
+        }}
+      >
+        <DialogContent className="app-dialog-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>รายละเอียดโครงการ</DialogTitle>
+            <DialogDescription>ข้อมูลโครงการที่บันทึกในระบบ</DialogDescription>
+          </DialogHeader>
+          {viewProject && (
+            <div className="space-y-4 py-2 text-sm">
+              {(() => {
+                const facultyMembers = projectFacultyMembers(viewProject);
+
+                return (
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="space-y-1 rounded-lg border bg-muted/30 p-3">
+                      <p className="text-muted-foreground">ผู้ดำเนินโครงการ</p>
+                      <p className="font-medium text-foreground">{projectResponsibleName(viewProject)}</p>
+                    </div>
+                    <div className="space-y-2 rounded-lg border bg-muted/30 p-3">
+                      <p className="text-muted-foreground">ผู้ร่วมโครงการ</p>
+                      {facultyMembers.length === 0 ? (
+                        <p className="font-medium text-foreground">-</p>
+                      ) : (
+                        <div className="flex flex-wrap gap-2">
+                          {facultyMembers.map((member) => (
+                            <Badge key={`${getProjectKey(viewProject)}-${member.id || member.faculty_id}`} variant="secondary">
+                              {member.name}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+              <div className="space-y-1">
+                <p className="text-muted-foreground">ประเภทโครงการ</p>
+                <Badge variant="outline">{projectTypeLabels[normalizeProjectType(viewProject.project_type)]}</Badge>
+              </div>
+              <div className="space-y-2">
+                <p className="text-muted-foreground">PLO ที่เชื่อมกับโครงการ</p>
+                {projectPlos(viewProject).length === 0 ? (
+                  <p className="font-medium text-foreground">-</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {projectPlos(viewProject).map((plo) => (
+                      <Badge key={`${getProjectKey(viewProject)}-detail-${plo}`} variant="secondary">
+                        {plo}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="space-y-1">
+                <p className="text-muted-foreground">ชื่อโครงการ (ภาษาไทย)</p>
+                <p className="font-medium text-foreground whitespace-pre-wrap">{viewProject.project_name_th || viewProject.name}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-muted-foreground">ชื่อโครงการ (ภาษาอังกฤษ)</p>
+                <p className="font-medium text-foreground whitespace-pre-wrap">
+                  {viewProject.project_name_en || '-'}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-muted-foreground">คำอธิบาย</p>
+                <p className="font-medium text-foreground whitespace-pre-wrap rounded-lg border bg-muted/30 p-3">
+                  {viewProject.description || 'ไม่มีคำอธิบายโครงการ'}
+                </p>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1 rounded-lg border bg-muted/30 p-3">
+                  <p className="text-muted-foreground">ปีการศึกษา</p>
+                  <p className="font-medium text-foreground">{viewProject.academic_year || viewProject.fiscal_year || '-'}</p>
+                </div>
+                <div className="space-y-1 rounded-lg border bg-muted/30 p-3">
+                  <p className="text-muted-foreground">สถานะ</p>
+                  <p className="font-medium text-foreground">{statusLabels[normalizeStatus(viewProject.status)]}</p>
+                </div>
+                <div className="space-y-1 rounded-lg border bg-muted/30 p-3">
+                  <p className="text-muted-foreground">วันที่เริ่มต้น</p>
+                  <p className="font-medium text-foreground">{formatDate(viewProject.start_date)}</p>
+                </div>
+                <div className="space-y-1 rounded-lg border bg-muted/30 p-3">
+                  <p className="text-muted-foreground">วันที่สิ้นสุด</p>
+                  <p className="font-medium text-foreground">{formatDate(viewProject.end_date)}</p>
+                </div>
+                <div className="space-y-1 rounded-lg border bg-muted/30 p-3">
+                  <p className="text-muted-foreground">งบเสนอ</p>
+                  <p className="font-medium text-foreground">{formatCurrency(projectBudgetAllocated(viewProject))} บาท</p>
+                </div>
+                <div className="space-y-1 rounded-lg border bg-muted/30 p-3">
+                  <p className="text-muted-foreground">งบใช้จริง</p>
+                  <p className="font-medium text-foreground">{formatCurrency(projectBudgetSpent(viewProject))} บาท</p>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <p className="text-muted-foreground">แหล่งงบ/หมายเหตุ</p>
+                <p className="font-medium text-foreground whitespace-pre-wrap rounded-lg border bg-muted/30 p-3">
+                  {projectBudgetNote(viewProject) || '-'}
+                </p>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-foreground text-base font-bold">เอกสารที่อัปโหลด</p>
+                  <Badge variant="outline">{projectDocuments(viewProject).length} รายการ</Badge>
+                </div>
+                {renderDetailDocumentList(projectDocuments(viewProject))}
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsViewOpen(false)}>ปิด</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={isCreateOpen}

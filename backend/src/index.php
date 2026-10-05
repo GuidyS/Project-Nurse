@@ -421,6 +421,11 @@
             case 'get-practical-students':
                 require_once 'components/Teacher/PracticalStudents/get_practical_students.php';
                 break;  
+
+            // Practical
+           case 'practice-locations':
+                require_once 'components/Teacher/Practice/practice_locations_api.php';
+                break;
                               
             // MyProjects
             case 'get-my-projects':
@@ -451,6 +456,23 @@
                 break;
             case 'update-project':
                 require_once 'components/Teacher/ProjectsPage/update_project.php';
+                break;
+
+            // ProjectDocs
+            case 'get-project-docs':
+                require_once 'components/Teacher/ProjectDocs/get_project_docs.php';
+                break;
+            case 'create-project-doc':
+                require_once 'components/Teacher/ProjectDocs/create_project_doc.php';
+                break;
+            case 'upload-project-file':
+                require_once 'components/Teacher/ProjectDocs/upload_project_file.php';
+                break;
+            case 'update-project-doc':
+                require_once 'components/Teacher/ProjectDocs/update_project_doc.php';
+                break;
+            case 'delete-project-doc':
+                require_once 'components/Teacher/ProjectDocs/delete_project_doc.php';
                 break;
 
             // ProjectLinks

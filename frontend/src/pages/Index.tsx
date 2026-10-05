@@ -49,6 +49,7 @@ import AdvisorHealthRecordsView from "@/components/pages/Teacher/AdvisorHealthRe
 import CompetencyItemsManagement from "@/components/pages/Admin/CompetencyItemsManagement";
 import StudentCompetencyView from "@/components/pages/Student/StudentCompetencyView"; 
 import CurriculumCycles from "@/components/pages/Admin/CurriculumCycles";
+import PracticeLocationsPage from "@/components/pages/Teacher/PracticeLocationsPage";
 import { getPageFromUrl, navigateToPage } from "@/lib/projectNavigation";
 
 type LoginUserPayload = Record<string, unknown> & {
@@ -73,7 +74,7 @@ const getDefaultActiveItem = () => {
         if (positionId === 1) return "dean-dashboard";
         if (positionId === 2) return "courses";
         if (positionId === 3) return "advises";
-        if (positionId === 4) return "practical-students";
+        if (positionId === 4) return "practice-locations";
         if (positionId === 5) return "clos";
         if (positionId === 6) return "my-projects";
         if (positionId === 9) return "research-summary";
@@ -157,7 +158,7 @@ const Index = () => {
                 if (pId === 1) setActiveItem("dean-dashboard");
                 else if (pId === 2) setActiveItem("courses");
                 else if (pId === 3) setActiveItem("advises");
-                else if (pId === 4) setActiveItem("practical-students");
+                else if (pId === 4) setActiveItem("practice-locations");
                 else if (pId === 5) setActiveItem("clos");
                 else if (pId === 6) setActiveItem("my-projects");
                 else if (pId === 9) setActiveItem("research-summary");
@@ -248,7 +249,7 @@ const Index = () => {
       "evidence", "grades", "performance", "practical-students",
       "program-reports", "schedule-tasks", "advise-notes", "advisor-notifications", "advises",
       "students", "students-info", "transfer-requests", "my-research", "research-summary",
-      "advisor-health-records-view"
+      "advisor-health-records-view", "practice-locations"
     ];
     
     if (teacherPages.includes(activeItem)) {
@@ -277,6 +278,7 @@ const Index = () => {
         case "research-summary": return <ResearchSummary />;
         // หน้ารวม: ข้อมูลวัคซีน / ข้อมูลสุขภาพ / ประเมินสมรรถนะหลัก อยู่ในหน้าเดียว
         case "advisor-health-records-view": return <AdvisorHealthRecordsView />;
+        case "practice-locations": return <PracticeLocationsPage />;
       }
     }
 

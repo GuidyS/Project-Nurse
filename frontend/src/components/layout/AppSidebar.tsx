@@ -76,6 +76,7 @@ const previewMenuSectionsByRole: Record<string, any[]> = {
         { title: "เอกสารโครงการ", url: "project-docs", icon: "FileText" },
         { title: "Evidence", url: "evidence", icon: "Archive" },
         { title: "Transfer Requests", url: "transfer-requests", icon: "ArrowRightLeft" },
+        { title: "แหล่งฝึกภาคปฏิบัติ", url: "practice-locations", icon: "MapPin" },
       ],
     },
   ],
