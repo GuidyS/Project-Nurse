@@ -220,7 +220,6 @@ export default function PracticeLocationsPage() {
   const subDistricts = dataWithIndex.filter(d => d.sub_district_hospital && d.sub_district_hospital.trim() !== "");
   const healthCenters = dataWithIndex.filter(d => d.health_center && d.health_center.trim() !== "");
 
-  //  แก้ไขให้นับเฉพาะคำว่า "มี" จริงๆ (ไม่เอา "ไม่มี")
   const summary = {
     hospitalCount: hospitals.length,
     subDistrictCount: subDistricts.length,
@@ -260,11 +259,12 @@ export default function PracticeLocationsPage() {
             <Table className="relative">
               <TableHeader className="bg-muted/50 sticky top-0 z-10 shadow-sm">
                 <TableRow>
-                  <TableHead className="w-16 text-center">ลำดับ</TableHead>
-                  <TableHead>ชื่อ{title}</TableHead>
-                  <TableHead className="w-24 text-center">MOU</TableHead>
-                  <TableHead>วิชาที่ฝึก</TableHead>
-                  <TableHead className="w-16 text-center">จัดการ</TableHead>
+                  {/*  ล็อกความกว้างคอลัมน์ให้เท่ากันทุกตาราง (ใช้ % และ px บังคับ) */}
+                  <TableHead className="w-[80px] text-center">ลำดับ</TableHead>
+                  <TableHead className="w-[35%]">ชื่อ{title}</TableHead>
+                  <TableHead className="w-[120px] text-center">MOU</TableHead>
+                  <TableHead className="w-[35%]">วิชาที่ฝึก</TableHead>
+                  <TableHead className="w-[80px] text-center">จัดการ</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -272,8 +272,6 @@ export default function PracticeLocationsPage() {
                   <TableRow key={idx} className="hover:bg-muted/30">
                     <TableCell className="text-center text-muted-foreground">{idx + 1}</TableCell>
                     <TableCell className="font-medium text-foreground">{row[nameKey]}</TableCell>
-                    
-                    {/*  แก้ไขการตรวจสอบและแสดงผลป้าย MOU ให้ชัดเจน */}
                     <TableCell className="text-center">
                       {row.mou_status ? (
                         String(row.mou_status).trim() === "มี" ? (
@@ -285,7 +283,6 @@ export default function PracticeLocationsPage() {
                         )
                       ) : "-"}
                     </TableCell>
-
                     <TableCell>
                       {row.subject_name ? <Badge variant="secondary" className="font-normal">{row.subject_name}</Badge> : "-"}
                     </TableCell>
@@ -314,8 +311,8 @@ export default function PracticeLocationsPage() {
     <div className="p-6 space-y-6 animate-fade-in max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
+          {/* ✅ เอาไอคอน MapPin ตรงหัวข้อหลักออกแล้วครับ */}
           <div className="flex items-center gap-2">
-            <MapPin className="h-7 w-7 text-primary" />
             <h1 className="text-2xl font-bold text-foreground">แหล่งฝึกภาคปฏิบัติ</h1>
           </div>
           <p className="text-sm text-muted-foreground mt-1">อัปโหลดข้อมูลจากไฟล์ Excel และดูสรุปภาพรวมแหล่งฝึก</p>
