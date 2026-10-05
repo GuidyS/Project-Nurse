@@ -41,37 +41,30 @@ export default function PracticeLocationsPage() {
   const [itemToDelete, setItemToDelete] = useState<number | null>(null);
   const [deleteAllConfirmOpen, setDeleteAllConfirmOpen] = useState(false);
 
-  // เช็คว่ามีข้อมูลใหม่ที่เพิ่งโหลดจาก Excel แต่ยังไม่มี id (ยังไม่ได้บันทึกลง Database) หรือไม่
   const hasUnsavedChanges = data.some(item => item.id === undefined);
 
-  //  ระบบแจ้งเตือนเมื่อพยายามจะออกจากหน้าโดยที่ยังไม่ได้บันทึก
   useEffect(() => {
-    // 1. ดักการกด Refresh (F5) หรือ ปิดแท็บเบราว์เซอร์
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (hasUnsavedChanges) {
         e.preventDefault();
-        e.returnValue = ''; // ต้องใส่เพื่อให้ Browser โชว์กล่องแจ้งเตือน
+        e.returnValue = ''; 
       }
     };
 
-    // 2. ดักการกดเปลี่ยนเมนูที่ Sidebar (ดักจับ Custom Event ของระบบ)
     const handleAppNavigate = (e: Event) => {
       if (hasUnsavedChanges) {
         const confirmLeave = window.confirm("⚠️ คุณมีข้อมูลที่รออัปโหลดและยังไม่ได้บันทึก\n\nต้องการทิ้งข้อมูลและออกจากหน้านี้ใช่หรือไม่?");
         if (!confirmLeave) {
-          e.stopImmediatePropagation(); // หยุดการส่ง Event ไปยัง Index.tsx เพื่อไม่ให้เปลี่ยนหน้า
+          e.stopImmediatePropagation(); 
           e.preventDefault();
         }
       }
     };
 
-    // เปิดการดักจับ Events
     window.addEventListener('beforeunload', handleBeforeUnload);
-    // ใช้ capture: true เพื่อดักจับ Event ให้ได้ก่อนที่มันจะวิ่งไปถึงไฟล์ Index.tsx
     window.addEventListener('app:navigate', handleAppNavigate, { capture: true });
 
     return () => {
-      // คืนค่า Event เมื่อออกจากหน้านี้ไปแล้ว
       window.removeEventListener('beforeunload', handleBeforeUnload);
       window.removeEventListener('app:navigate', handleAppNavigate, { capture: true });
     };
@@ -147,7 +140,7 @@ export default function PracticeLocationsPage() {
       const res = await api.post("/index.php?page=practice-locations", { locations: data });
       if (res.data?.status === "success") {
         toast({ title: "บันทึกสำเร็จ", description: "อัปเดตข้อมูลแหล่งฝึกภาคปฏิบัติเรียบร้อยแล้ว" });
-        fetchData(); // ดึงข้อมูลใหม่ที่มี ID กลับมา (จะทำให้ hasUnsavedChanges กลายเป็น false อัตโนมัติ)
+        fetchData(); 
       } else {
         throw new Error(res.data?.message);
       }
@@ -227,11 +220,12 @@ export default function PracticeLocationsPage() {
   const subDistricts = dataWithIndex.filter(d => d.sub_district_hospital && d.sub_district_hospital.trim() !== "");
   const healthCenters = dataWithIndex.filter(d => d.health_center && d.health_center.trim() !== "");
 
+  //  แก้ไขให้นับเฉพาะคำว่า "มี" จริงๆ (ไม่เอา "ไม่มี")
   const summary = {
     hospitalCount: hospitals.length,
     subDistrictCount: subDistricts.length,
     healthCenterCount: healthCenters.length,
-    mouCount: data.filter(d => d.mou_status && String(d.mou_status).toLowerCase().includes("มี")).length,
+    mouCount: data.filter(d => d.mou_status && String(d.mou_status).trim() === "มี").length,
     subjects: {} as Record<string, number>
   };
 
@@ -278,13 +272,20 @@ export default function PracticeLocationsPage() {
                   <TableRow key={idx} className="hover:bg-muted/30">
                     <TableCell className="text-center text-muted-foreground">{idx + 1}</TableCell>
                     <TableCell className="font-medium text-foreground">{row[nameKey]}</TableCell>
+                    
+                    {/*  แก้ไขการตรวจสอบและแสดงผลป้าย MOU ให้ชัดเจน */}
                     <TableCell className="text-center">
-                      {row.mou_status && String(row.mou_status).toLowerCase().includes("มี") ? (
-                        <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-green-200">มี</Badge>
-                      ) : row.mou_status ? (
-                        <Badge variant="outline" className="text-muted-foreground">{row.mou_status}</Badge>
+                      {row.mou_status ? (
+                        String(row.mou_status).trim() === "มี" ? (
+                          <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-green-200">มี</Badge>
+                        ) : String(row.mou_status).trim() === "ไม่มี" ? (
+                          <Badge className="bg-red-100 text-red-700 hover:bg-red-100 border-red-200">ไม่มี</Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-muted-foreground">{row.mou_status}</Badge>
+                        )
                       ) : "-"}
                     </TableCell>
+
                     <TableCell>
                       {row.subject_name ? <Badge variant="secondary" className="font-normal">{row.subject_name}</Badge> : "-"}
                     </TableCell>
