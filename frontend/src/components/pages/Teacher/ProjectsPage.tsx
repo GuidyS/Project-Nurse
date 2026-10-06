@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 import { useAcademicYear } from "@/hooks/use-academic-year";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { getCurrentAcademicYear } from "@/lib/academicYear";
-import { Plus, Search, Filter, Eye, Edit, MoreVertical, Upload, Link2, Trash2, Loader2, UserCheck, Users, Globe2, Image } from "lucide-react";
+import { Plus, Filter, Eye, Edit, MoreVertical, Upload, Link2, Trash2, Loader2, UserCheck, Users, Globe2, Image } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -30,8 +30,10 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
 import { navigateToProject } from "@/lib/projectNavigation";
-import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
+import { ConfirmActionDialog } from "@/components/shared/ConfirmActionDialog";
 import { ImportDataDialog, type ImportDataTypeOption } from "@/components/shared/ImportDataDialog";
+import { PageHeader } from "@/components/shared/PageHeader";
+import { SearchInput } from "@/components/shared/SearchInput";
 
 type ProjectType = "academic_service" | "culture" | "other" | "teaching" | "research" | "quality_assurance";
 type ProjectTypeFilter = "all" | ProjectType;
@@ -1211,13 +1213,10 @@ const ProjectsPage = () => {
 
   return (
     <div className="app-page animate-fade-in">
-      <div className="app-page-header">
-        <div>
-          <h1 className="app-page-title">จัดการโครงการ</h1>
-          <p className="app-page-description">สร้าง แก้ไข และติดตามความคืบหน้าโครงการภาควิชา</p>
-        </div>
-        {canManageProjects && (
-          <div className="flex flex-wrap gap-2">
+      <PageHeader
+        title="จัดการโครงการ"
+        description="สร้าง แก้ไข และติดตามความคืบหน้าโครงการภาควิชา"
+        actions={canManageProjects ? <>
             <Button variant="outline" className="gap-2" onClick={() => setIsImportOpen(true)}>
               <Upload className="h-4 w-4" />
               Import ข้อมูล
@@ -1226,9 +1225,8 @@ const ProjectsPage = () => {
               <Plus className="h-4 w-4" />
               สร้างโครงการใหม่
             </Button>
-          </div>
-        )}
-      </div>
+        </> : null}
+      />
 
       {canManageProjects && (
         <ImportDataDialog
@@ -1242,15 +1240,13 @@ const ProjectsPage = () => {
       )}
 
       <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
+        <SearchInput
             placeholder="ค้นหาโครงการด้วยชื่อภาษาไทย หรือ ภาษาอังกฤษ..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10"
-          />
-        </div>
+          wrapperClassName="flex-1"
+        />
         <Popover>
           <PopoverTrigger asChild>
             <Button variant="outline" className="gap-2">
@@ -1356,7 +1352,7 @@ const ProjectsPage = () => {
                         {statusLabels[status]}
                       </Badge>
                     </div>
-                    <h3 className="font-semibold text-foreground line-clamp-2">{project.project_name_th}</h3>
+                    <h3 className="text-lg font-semibold text-foreground line-clamp-2">{project.project_name_th}</h3>
                     {project.project_name_en && (
                       <p className="text-xs text-muted-foreground mt-1 truncate">{project.project_name_en}</p>
                     )}

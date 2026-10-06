@@ -7,9 +7,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
 import { CheckCircle, XCircle, Clock, FileText, Loader2 } from "lucide-react";
-import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
+import { ConfirmActionDialog } from "@/components/shared/ConfirmActionDialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { PageHeader } from "@/components/shared/PageHeader";
+import { StatCard, StatsGrid } from "@/components/shared/StatCard";
+import { TableStateRow } from "@/components/shared/TableStateRow";
 
 type ApprovalStatus = "pending" | "approved" | "rejected";
 
@@ -178,22 +181,17 @@ export default function Approvals() {
   const renderRows = (rows: ApprovalRequest[], showActions: boolean) => {
     if (isLoading) {
       return (
-        <TableRow>
-          <TableCell colSpan={5} className="h-28 text-center text-muted-foreground">
-            <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />
-            กำลังโหลดคำขออนุมัติ...
-          </TableCell>
-        </TableRow>
+        <TableStateRow colSpan={5} className="h-28" loading>
+          กำลังโหลดคำขออนุมัติ...
+        </TableStateRow>
       );
     }
 
     if (rows.length === 0) {
       return (
-        <TableRow>
-          <TableCell colSpan={5} className="h-28 text-center text-muted-foreground">
-            ไม่พบคำขออนุมัติ
-          </TableCell>
-        </TableRow>
+        <TableStateRow colSpan={5} className="h-28">
+          ไม่พบคำขออนุมัติ
+        </TableStateRow>
       );
     }
 
@@ -312,51 +310,37 @@ export default function Approvals() {
   return (
     <>
     <div className="app-page">
-      <div className="app-page-header">
-        <div>
-          <h1 className="app-page-title">อนุมัติคำขอ</h1>
-          <p className="app-page-description">ดำเนินการตามคำขอจากอาจารย์และผู้ใช้งานในระบบ</p>
-        </div>
-      </div>
+      <PageHeader
+        title="อนุมัติคำขอ"
+        description="ดำเนินการตามคำขอจากอาจารย์และผู้ใช้งานในระบบ"
+      />
 
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">รอดำเนินการ</CardTitle>
-            <Clock className="h-4 w-4 text-yellow-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">{pendingApprovals.length}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">อนุมัติแล้ว</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{approvedCount}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">ปฏิเสธ</CardTitle>
-            <XCircle className="h-4 w-4 text-destructive" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-destructive">{rejectedCount}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">ทั้งหมด</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{approvals.length}</div>
-          </CardContent>
-        </Card>
-      </div>
+      <StatsGrid>
+        <StatCard
+          title="รอดำเนินการ"
+          iconNode={<Clock className="h-4 w-4 text-yellow-500" />}
+          value={<>{pendingApprovals.length}</>}
+          valueClassName="text-yellow-600"
+        />
+        <StatCard
+          title="อนุมัติแล้ว"
+          iconNode={<CheckCircle className="h-4 w-4 text-green-500" />}
+          value={<>{approvedCount}</>}
+          valueClassName="text-green-600"
+        />
+        <StatCard
+          title="ปฏิเสธ"
+          iconNode={<XCircle className="h-4 w-4 text-destructive" />}
+          value={<>{rejectedCount}</>}
+          valueClassName="text-destructive"
+        />
+        <StatCard
+          title="ทั้งหมด"
+          iconNode={<FileText className="h-4 w-4 text-muted-foreground" />}
+          value={<>{approvals.length}</>}
+          valueClassName=""
+        />
+      </StatsGrid>
 
       <Tabs defaultValue="pending" className="space-y-4">
         <TabsList>

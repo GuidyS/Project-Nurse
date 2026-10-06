@@ -290,14 +290,6 @@
                 require_once 'components/Teacher/CLOPage/migrate_mapping_json_to_tables.php';
                 break;
 
-            // CoursesReports
-            case 'get-course-report':
-                require_once 'components/Teacher/CourseReports/get_course_report.php';
-                break;
-            case 'get-report-filters':
-                require_once 'components/Teacher/CourseReports/get_report_filters.php';
-                break;
-
             // CoursesPage
             case 'get-my-courses':
                 require_once 'components/Teacher/CoursesPage/get_my_courses.php';
@@ -404,11 +396,6 @@
                 require_once 'components/Research/delete_research.php';
                 break;
 
-            // PLOYLOReport
-            case 'get-plo-ylo-report':
-                require_once 'components/Teacher/PLOYLOReport/get_plo_ylo_report.php';
-                break;
-
             // Performance
             case 'get-performance':
                 require_once 'components/Teacher/Performance/get_performance.php';
@@ -506,17 +493,6 @@
                 break;
             case 'delete-schedule-task':
                 require_once 'components/Teacher/ScheduleTasks/delete_schedule_task.php';
-                break;
-
-            // TransferRequests
-            case 'create-transfer-request':
-                require_once 'components/Teacher/TransferRequests/create_transfer_request.php';
-                break;
-            case 'get-transfer-requests':
-                require_once 'components/Teacher/TransferRequests/get_transfer_requests.php';
-                break;
-            case 'update-transfer-status':
-                require_once 'components/Teacher/TransferRequests/update_transfer_status.php';
                 break;
 
             /* -------- Student -------- */

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { type ReactNode, useState, useEffect, useCallback } from "react";
 import { Edit, Trash2, Save, BookOpen, Loader2, Settings2, Plus, AlertCircle, Library } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
 import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
@@ -77,6 +78,61 @@ const YLO_OPTIONS = [
   { value: "YLO3", label: "YLO3 — ชั้นปีที่ 3" },
   { value: "YLO4", label: "YLO4 — ชั้นปีที่ 4" },
 ];
+
+const tooltipText = (value?: string | null): string | undefined => {
+  const text = value?.trim();
+  return text ? text : undefined;
+};
+
+function DescriptionTooltip({
+  content,
+  children,
+}: {
+  content?: string | null;
+  children: ReactNode;
+}) {
+  const text = tooltipText(content);
+  if (!text) return <>{children}</>;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{children}</TooltipTrigger>
+      <TooltipContent className="max-w-xs whitespace-normal break-words">
+        <p>{text}</p>
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+function TooltipBadge({
+  tooltip,
+  className,
+  variant,
+  children,
+}: {
+  tooltip?: string | null;
+  className?: string;
+  variant?: "default" | "secondary" | "destructive" | "outline";
+  children: ReactNode;
+}) {
+  const hasTooltip = !!tooltipText(tooltip);
+
+  return (
+    <DescriptionTooltip content={tooltip}>
+      <span
+        className="inline-flex rounded-full focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+        tabIndex={hasTooltip ? 0 : undefined}
+      >
+        <Badge variant={variant} className={className}>
+          {children}
+        </Badge>
+      </span>
+    </DescriptionTooltip>
+  );
+}
+
+const yloLabel = (yloId?: string | null): string | undefined =>
+  YLO_OPTIONS.find((ylo) => ylo.value === yloId)?.label;
 
 // เรียงรหัส Sub PLO ตามตัวเลข (1.2 ก่อน 1.10 และ 2.1) — ไม่ให้รายการใหม่ไปต่อท้ายแบบไม่เรียง
 const subCodeOrder = (code: string): number => {
@@ -165,26 +221,34 @@ function CloSubPloFields({
           <div className="grid gap-2 sm:grid-cols-2">
             {groupKeys.map((plo) => {
               const enabled = allowed.has(plo);
+              const ploTooltip = formData.ylo_id ? yloMatrix[formData.ylo_id]?.[plo]?.description : undefined;
               return (
                 <div
                   key={plo}
                   className={`rounded-md border p-2 ${enabled ? "border-border" : "border-border/40 opacity-50"}`}
                 >
-                  <p className="text-xs font-semibold mb-1">{plo}</p>
+                  <DescriptionTooltip content={ploTooltip}>
+                    <p
+                      className="mb-1 w-fit rounded-sm text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                      tabIndex={tooltipText(ploTooltip) ? 0 : undefined}
+                    >
+                      {plo}
+                    </p>
+                  </DescriptionTooltip>
                   <div className="flex flex-wrap gap-x-4 gap-y-1">
                     {groups[plo].map((sub) => (
-                      <label
-                        key={sub.code}
-                        className={`flex items-center gap-1.5 text-sm ${enabled ? "cursor-pointer" : "cursor-not-allowed"}`}
-                        title={sub.description}
-                      >
-                        <Checkbox
-                          checked={formData.sub_plos.includes(sub.code)}
-                          onCheckedChange={(checked) => toggleSub(sub.code, !!checked)}
-                          disabled={!enabled}
-                        />
-                        <span>{sub.code}</span>
-                      </label>
+                      <DescriptionTooltip key={sub.code} content={sub.description}>
+                        <label
+                          className={`flex items-center gap-1.5 text-sm ${enabled ? "cursor-pointer" : "cursor-not-allowed"}`}
+                        >
+                          <Checkbox
+                            checked={formData.sub_plos.includes(sub.code)}
+                            onCheckedChange={(checked) => toggleSub(sub.code, !!checked)}
+                            disabled={!enabled}
+                          />
+                          <span>{sub.code}</span>
+                        </label>
+                      </DescriptionTooltip>
                     ))}
                   </div>
                 </div>
@@ -562,6 +626,12 @@ export default function CLOPage() {
     });
   };
 
+  const getPloTooltip = (yloId: string | null, plo: string): string | undefined =>
+    tooltipText((yloId ? yloMatrix[yloId]?.[plo]?.description : undefined) || ploCatalog.find((p) => p.id === plo)?.name);
+
+  const getSubPloTooltip = (code: string): string | undefined =>
+    tooltipText(subPloCatalog.find((sub) => sub.code === code)?.description);
+
   const handleAdd = async () => {
     if (!addFormData.description) {
       toast({ title: "แจ้งเตือน", description: "กรุณากรอกคำอธิบาย CLO", variant: "destructive" });
@@ -797,24 +867,31 @@ export default function CLOPage() {
                       <div className="flex justify-between items-start gap-4">
                         <div className="space-y-2 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
-                            <Badge className="bg-primary/10 text-primary">
+                            <TooltipBadge className="bg-primary/10 text-primary" tooltip={clo.description}>
                               {clo.clo_code || `CLO ${index + 1}`}
-                            </Badge>
-                            {clo.ylo_id && <Badge variant="secondary">{clo.ylo_id}</Badge>}
+                            </TooltipBadge>
+                            {clo.ylo_id && (
+                              <TooltipBadge variant="secondary" tooltip={yloLabel(clo.ylo_id)}>
+                                {clo.ylo_id}
+                              </TooltipBadge>
+                            )}
                             {sortPloCodes(clo.mapped_plos || []).map((plo) => (
-                              <Badge key={plo} variant="outline">{plo}</Badge>
+                              <TooltipBadge key={plo} variant="outline" tooltip={getPloTooltip(clo.ylo_id, plo)}>
+                                {plo}
+                              </TooltipBadge>
                             ))}
                           </div>
                           {(clo.sub_plos || []).length > 0 && (
                             <div className="flex flex-wrap items-center gap-2">
                               {sortSubCodes(clo.sub_plos || []).map((sub) => (
-                                <Badge
+                                <TooltipBadge
                                   key={sub}
                                   variant="outline"
                                   className="border-amber-500/60 text-amber-600 dark:text-amber-400"
+                                  tooltip={getSubPloTooltip(sub)}
                                 >
                                   Sub {sub}
-                                </Badge>
+                                </TooltipBadge>
                               ))}
                             </div>
                           )}

@@ -22,7 +22,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { FileDropInput } from '@/components/ui/FileDropInput';
+import { FileDropInput } from '@/components/shared/FileDropInput';
+import { PageHeader } from '@/components/shared/PageHeader';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
@@ -657,13 +658,11 @@ export default function MyProjects() {
   return (
     <>
       <div className="app-page">
-        <div className="app-page-header">
-          <div>
-            <h1 className="app-page-title">โครงการของฉัน</h1>
-            <p className="app-page-description">โครงการที่คุณเป็นผู้รับผิดชอบหรือเป็นสมาชิก</p>
-          </div>
-          <Badge variant="outline">อ่านอย่างเดียว</Badge>
-        </div>
+        <PageHeader
+          title="โครงการของฉัน"
+          description="โครงการที่คุณเป็นผู้รับผิดชอบหรือเป็นสมาชิก"
+          actions={<Badge variant="outline">อ่านอย่างเดียว</Badge>}
+        />
 
         <Tabs value={projectTypeFilter} onValueChange={(value) => setProjectTypeFilter(value as ProjectTypeFilter)}>
           <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">

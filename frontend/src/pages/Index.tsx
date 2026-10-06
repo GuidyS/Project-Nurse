@@ -13,9 +13,7 @@ import LoginPage from "@/components/pages/Auth/LoginPage";
 import RegisterPage from "@/components/pages/Auth/RegisterPage";
 import Transcript from "@/components/pages/Student/Transcript";
 import Portfolio from "@/components/pages/Student/Portfolio";
-import PLOYLOReport from "@/components/pages/Teacher/PLOYLOReport";
 import FiveYearSummary from "@/components/pages/Teacher/FiveYearSummary";
-import CourseReports from "@/components/pages/Teacher/CourseReports";
 import Documents from "@/components/pages/Teacher/Documents";
 import AdviseNotes from "@/components/pages/Teacher/AdviseNotes";
 import Advises from "@/components/pages/Teacher/Advises";
@@ -25,11 +23,9 @@ import Evidence from "@/components/pages/Teacher/Evidence";
 import Grades from "@/components/pages/Teacher/Grades";
 import MyProjects from "@/components/pages/Teacher/MyProjects";
 import Performance from "@/components/pages/Teacher/Performance";
-import TransferRequests from "@/components/pages/Teacher/TransferRequests";
 import ScheduleTasks from "@/components/pages/Teacher/ScheduleTasks";
 import ProjectReports from "@/components/pages/Teacher/ProjectReports";
 import ProjectLinks from "@/components/pages/Teacher/ProjectLinks";
-import ProgramReports from "@/components/pages/Teacher/ProgramReports";
 import Approvals from "@/components/pages/Admin/Approvals";
 import AuditLog from "@/components/pages/Admin/AuditLog";
 import ExportData from "@/components/pages/Admin/ExportData";
@@ -245,10 +241,10 @@ const Index = () => {
     // 5. 🔒 หมวดสิทธิ์อาจารย์และคณะกรรมการ (Teacher - Role 2) หรือ Admin
     const teacherPages = [
       "courses", "five-year-summary", "clos",
-      "plo-ylo-report", "course-report", "course-students", "documents", "assign-instructors", "clo-map",
+      "course-students", "documents", "assign-instructors", "clo-map",
       "evidence", "grades", "performance", "practical-students",
-      "program-reports", "schedule-tasks", "advise-notes", "advisor-notifications", "advises",
-      "students", "students-info", "transfer-requests", "my-research", "research-summary",
+      "schedule-tasks", "advise-notes", "advisor-notifications", "advises",
+      "students", "students-info", "my-research", "research-summary",
       "advisor-health-records-view", "practice-locations"
     ];
     
@@ -259,8 +255,6 @@ const Index = () => {
         case "courses": return <CoursesPage />;                                     //*
         case "five-year-summary": return <FiveYearSummary />;                       //*
         case "clos": return <CLOPage />; // แก้ไขให้ใช้ CLOPage หน้าเดียว                //*
-        case "plo-ylo-report": return <PLOYLOReport />;                                  //*
-        case "course-report": return <CourseReports />;                             //*
         case "course-students": return <CourseStudents />;                          //* /* ผลการประเมิน CLO รายบุคคล */ /* อจ.ติ้กว่าเด็กคนไหนผ่านบ้าง */
         case "documents": return <Documents />;                                     //*
         case "assign-instructors": return <AssignInstructors />;                    //*
@@ -269,12 +263,10 @@ const Index = () => {
         case "grades": return <Grades />;                                           //*
         case "performance": return <Performance />;
         case "practical-students": return <PracticalPage />;                    //* /* ดูรายชื่อนศ.และประเมินผลการฝึกปฏิบัติของเด็กได้*/ /* อจ.ปฏิบัติ */
-        case "program-reports": return <ProgramReports />;                          //*
         case "schedule-tasks": return <ScheduleTasks />;                            //*
         case "advise-notes": return <AdviseNotes />;                                      //*
         case "advises": return <Advises />;
         case "students-info": return <StudentsInfo />;                              /* รายชื่อเด็กในที่ปรึกษาของอจ. */
-        case "transfer-requests": return <TransferRequests />;                      //*
         case "research-summary": return <ResearchSummary />;
         // หน้ารวม: ข้อมูลวัคซีน / ข้อมูลสุขภาพ / ประเมินสมรรถนะหลัก อยู่ในหน้าเดียว
         case "advisor-health-records-view": return <AdvisorHealthRecordsView />;

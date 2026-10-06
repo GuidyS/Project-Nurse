@@ -9,14 +9,17 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Search, Edit, Trash2, MoreHorizontal, Upload, Users as UsersIcon, CalendarClock, Info } from "lucide-react";
+import { Loader2, Edit, Trash2, MoreHorizontal, Upload, Users as UsersIcon, CalendarClock, Info } from "lucide-react";
 import { onlyEnglish, onlyThai } from "@/lib/nameInput";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import api from "@/lib/axios";
-import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
+import { ConfirmActionDialog } from "@/components/shared/ConfirmActionDialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ImportDataDialog, type ImportDataTypeOption } from "@/components/shared/ImportDataDialog";
 import { AcademicSettingsDialog, formatCutoff, type AcademicSettings } from "./AcademicSettingsDialog";
+import { PageHeader } from "@/components/shared/PageHeader";
+import { SearchInput } from "@/components/shared/SearchInput";
+import { TableStateRow } from "@/components/shared/TableStateRow";
 
 interface User {
   id: string;
@@ -418,12 +421,10 @@ export default function UsersManagement() {
   return (
     <>
       <div className="app-page">
-        <div className="app-page-header">
-          <div>
-            <h1 className="app-page-title">จัดการผู้ใช้</h1>
-            <p className="app-page-description">สร้างบัญชีจากข้อมูลอาจารย์/นักศึกษา แก้ไข ลบ และมอบบทบาท</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
+        <PageHeader
+          title="จัดการผู้ใช้"
+          description="สร้างบัญชีจากข้อมูลอาจารย์/นักศึกษา แก้ไข ลบ และมอบบทบาท"
+          actions={<>
             <Button variant="outline" className="gap-2" onClick={() => setIsAcademicSettingsOpen(true)}>
               <CalendarClock className="h-4 w-4" />
               ตั้งค่าปีการศึกษา
@@ -432,8 +433,8 @@ export default function UsersManagement() {
               <Upload className="h-4 w-4" />
               Import ข้อมูล
             </Button>
-          </div>
-        </div>
+          </>}
+        />
 
         <Card className="app-section-card">
           <CardHeader className="space-y-4">
@@ -444,15 +445,13 @@ export default function UsersManagement() {
                   {roleLabels[roleTab]} {tabCount(roleTab)} คน · ทั้งหมด {users.length} คน
                 </CardDescription>
               </div>
-              <div className="relative w-64">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
+              <SearchInput
                   placeholder="ค้นหาผู้ใช้..."
                   className="pl-9"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
+                wrapperClassName="w-64"
+              />
             </div>
             <Tabs value={roleTab} onValueChange={(value) => setRoleTab(value as RoleTab)}>
               <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
@@ -481,11 +480,9 @@ export default function UsersManagement() {
               </TableHeader>
               <TableBody>
                 {filteredUsers.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                      ไม่พบผู้ใช้ในหมวดนี้
-                    </TableCell>
-                  </TableRow>
+                  <TableStateRow colSpan={6}>
+                    ไม่พบผู้ใช้ในหมวดนี้
+                  </TableStateRow>
                 ) : (
                   filteredUsers.map((user) => (
                     <TableRow key={user.id}>

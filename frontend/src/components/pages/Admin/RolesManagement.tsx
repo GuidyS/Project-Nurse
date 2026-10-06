@@ -2,16 +2,18 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Check, Search, UserCog } from "lucide-react";
+import { Check, UserCog } from "lucide-react";
 import { cn } from "@/lib/utils";
 import api from "@/lib/axios";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PageHeader } from "@/components/shared/PageHeader";
+import { SearchInput } from "@/components/shared/SearchInput";
+import { TableStateRow } from "@/components/shared/TableStateRow";
 
 interface UserWithRole {
   id: string;
@@ -196,12 +198,10 @@ export default function RolesManagement() {
   return (
     <>
       <div className="app-page">
-        <div className="app-page-header">
-          <div>
-            <h1 className="app-page-title">จัดการ Role</h1>
-            <p className="app-page-description">มอบหมายและถอด Role ของผู้ใช้ในระบบ</p>
-          </div>
-        </div>
+        <PageHeader
+          title="จัดการ Role"
+          description="มอบหมายและถอด Role ของผู้ใช้ในระบบ"
+        />
 
         <Card className="app-section-card">
           <CardHeader className="space-y-4">
@@ -212,15 +212,13 @@ export default function RolesManagement() {
                   {roleLabels[roleTab]} {tabCount(roleTab)} คน · ทั้งหมด {users.length} คน
                 </CardDescription>
               </div>
-              <div className="relative w-64">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
+              <SearchInput
                   placeholder="ค้นหาผู้ใช้..."
                   className="pl-9"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
+                wrapperClassName="w-64"
+              />
             </div>
             <Tabs value={roleTab} onValueChange={(value) => setRoleTab(value as RoleTab)}>
               <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
@@ -247,11 +245,9 @@ export default function RolesManagement() {
               </TableHeader>
               <TableBody>
                 {filteredUsers.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
-                      ไม่พบผู้ใช้ในหมวดนี้
-                    </TableCell>
-                  </TableRow>
+                  <TableStateRow colSpan={4}>
+                    ไม่พบผู้ใช้ในหมวดนี้
+                  </TableStateRow>
                 ) : (
                   filteredUsers.map((user) => (
                     <TableRow key={user.id}>
