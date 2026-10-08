@@ -716,6 +716,16 @@ try {
             $profile = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
             $profile['pdf_documents'] = buildFacultyDocuments($db, $profile);
 
+            // Fetch Workloads
+            $stmtWL = $db->prepare("SELECT * FROM faculty_teaching_workloads WHERE faculty_id = :id ORDER BY uploaded_at DESC");
+            $stmtWL->execute(['id' => $u_info['username']]);
+            $profile['teaching_workloads'] = $stmtWL->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+            // Fetch Personnel Developments
+            $stmtPD = $db->prepare("SELECT * FROM faculty_personnel_development WHERE faculty_id = :id ORDER BY training_date DESC");
+            $stmtPD->execute(['id' => $u_info['username']]);
+            $profile['personnel_developments'] = $stmtPD->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
             if (!empty($profile['profile_picture'])) {
                 $profile['profile_picture_url'] = resolveFacultyProfilePictureUrl(
                     (string)$profile['profile_picture'],
@@ -861,7 +871,7 @@ try {
                 exit();
             }
 
-            $sql = "UPDATE faculty SET first_name_en = ?, last_name_en = ?, gender = ?, birth_date = ?, email = ?, phone = ?, current_address = ?, nursing_council_no = ?, license_expiry = ? WHERE faculty_id = ?";
+            $sql = "UPDATE faculty SET first_name_en = ?, last_name_en = ?, gender = ?, birth_date = ?, email = ?, phone = ?, current_address = ?, nursing_council_no = ?, license_expiry = ?, start_work_date = ?, contract_date = ?, pts_date = ? WHERE faculty_id = ?";
             $db->prepare($sql)->execute([
                 $input['first_name_en'] ?? null,
                 $input['last_name_en'] ?? null,
@@ -872,6 +882,9 @@ try {
                 $input['current_address'] ?? null,
                 $input['nursing_council_no'] ?? null,
                 $licenseExpiry,
+                !empty($input['start_work_date']) ? $input['start_work_date'] : null,
+                !empty($input['contract_date']) ? $input['contract_date'] : null,
+                !empty($input['pts_date']) ? $input['pts_date'] : null,
                 $u_info['username']
             ]);
 
