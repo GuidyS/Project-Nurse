@@ -1398,7 +1398,10 @@ const ProjectsPage = () => {
                             <Link2 className="h-4 w-4 text-purple-500" /> เชื่อมโยง PLO
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem className="gap-2 text-red-600 focus:bg-red-50" onClick={() => openDeleteConfirm(project.project_id)}>
+                          <DropdownMenuItem
+                            className="gap-2 text-destructive hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive"
+                            onClick={() => openDeleteConfirm(project.project_id)}
+                          >
                             <Trash2 className="h-4 w-4" /> ลบโครงการ
                           </DropdownMenuItem>
                         </>

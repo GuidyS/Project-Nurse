@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Edit, Trash2, MoreHorizontal, Upload, Users as UsersIcon, CalendarClock, Info } from "lucide-react";
+import { Loader2, Edit, Trash2, MoreHorizontal, Upload, Users as UsersIcon, CalendarClock, Info, Eye, EyeOff } from "lucide-react";
 import { onlyEnglish, onlyThai } from "@/lib/nameInput";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import api from "@/lib/axios";
@@ -526,9 +526,15 @@ export default function UsersManagement() {
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem onClick={() => handleEditClick(user.id)} className="gap-2"><Edit className="h-4 w-4" /> แก้ไขข้อมูล</DropdownMenuItem>
                             <DropdownMenuItem onClick={() => openToggleConfirm(user.id)} className="gap-2">
+                              {user.status === "active" ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                               {user.status === "active" ? "ระงับการใช้งาน" : "เปิดใช้งาน"}
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => openDeleteUserConfirm(user.id)} className="gap-2 text-destructive"><Trash2 className="h-4 w-4" /> ลบ</DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => openDeleteUserConfirm(user.id)}
+                              className="gap-2 text-destructive hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" /> ลบ
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
