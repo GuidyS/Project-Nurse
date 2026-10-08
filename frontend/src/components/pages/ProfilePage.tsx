@@ -15,7 +15,11 @@ import {
   Loader2,
   Upload,
   BellRing,
+  Trash2,
+  Download,
 } from "lucide-react";
+
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -342,7 +346,9 @@ export default function ProfilePage() {
                   }
                 />
                 <InfoRow icon={<Calendar className="h-4 w-4 text-primary" />} label="วันที่เริ่มปฏิบัติงาน" value={formatThaiDate(profileData.start_work_date)} />
+                <InfoRow icon={<Calendar className="h-4 w-4 text-primary" />} label="วันที่สัญญาจ้าง" value={formatThaiDate(profileData.contract_date)} />
                 <InfoRow icon={<Calendar className="h-4 w-4 text-primary" />} label="วันที่รับตำแหน่งทางวิชาการ" value={formatThaiDate(profileData.academic_position_date)} />
+                <InfoRow icon={<Calendar className="h-4 w-4 text-primary" />} label="วันที่รับตำแหน่ง พตส" value={formatThaiDate(profileData.pts_date)} />
                 <div className="md:col-span-2">
                   <InfoRow icon={<MapPin className="h-4 w-4 text-primary" />} label="ที่อยู่ปัจจุบัน" value={profileData.current_address} />
                 </div>
@@ -350,6 +356,14 @@ export default function ProfilePage() {
                   <LicenseImageRow url={currentLicenseImageUrl} />
                 </div>
                 <PdfDocumentsSection documents={pdfDocuments} />
+
+                <div className="md:col-span-2 border-t border-border pt-6 mt-2">
+                  <WorkloadsSection workloads={profileData.teaching_workloads || []} onUpdate={fetchProfile} />
+                </div>
+                
+                <div className="md:col-span-2 border-t border-border pt-6 mt-2">
+                  <PersonnelDevelopmentsSection developments={profileData.personnel_developments || []} onUpdate={fetchProfile} />
+                </div>
               </>
             ) : (
               <>
@@ -578,7 +592,7 @@ export default function ProfilePage() {
                 </h4>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="nursing_council_no">เลขที่ใบประกอบวิชาชีพ</Label>
+                    <Label htmlFor="nursing_council_no">เลขที่ใบประกอบวิชาชีพสภาการพยาบาล</Label>
                     <Input
                       id="nursing_council_no"
                       name="nursing_council_no"
@@ -601,6 +615,36 @@ export default function ProfilePage() {
                         <LicenseStatusBadge expiry={formData.license_expiry} showRemaining />
                       </div>
                     )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="start_work_date">วันที่เริ่มปฏิบัติงาน</Label>
+                    <Input
+                      id="start_work_date"
+                      name="start_work_date"
+                      type="date"
+                      value={formData.start_work_date || ""}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="contract_date">วันที่สัญญาจ้าง</Label>
+                    <Input
+                      id="contract_date"
+                      name="contract_date"
+                      type="date"
+                      value={formData.contract_date || ""}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="pts_date">วันที่รับตำแหน่ง พตส</Label>
+                    <Input
+                      id="pts_date"
+                      name="pts_date"
+                      type="date"
+                      value={formData.pts_date || ""}
+                      onChange={handleInputChange}
+                    />
                   </div>
 
                   <div className="space-y-2 col-span-2">
@@ -1064,6 +1108,233 @@ const PdfDocumentsSection = ({ documents }: { documents: any[] }) => {
           );
         })}
       </div>
+    </div>
+  );
+};
+
+const WorkloadsSection = ({ workloads, onUpdate }: { workloads: any[], onUpdate: () => void }) => {
+  const [academicYear, setAcademicYear] = useState("");
+  const [term, setTerm] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const { toast } = useToast();
+
+  const handleUpload = async () => {
+    if (!academicYear || !term || !file) {
+      toast({ title: "กรุณากรอกข้อมูลให้ครบถ้วนและเลือกไฟล์", variant: "destructive" });
+      return;
+    }
+    setUploading(true);
+    const formData = new FormData();
+    formData.append("action", "upload-workload");
+    formData.append("academic_year", academicYear);
+    formData.append("term", term);
+    formData.append("file", file);
+    try {
+      const res = await api.post("/index.php?page=manage-faculty-extras", formData, {
+        headers: { "Content-Type": "multipart/form-data" }
+      });
+      if (res.data.status === "success") {
+        toast({ title: "อัปโหลดเรียบร้อยแล้ว" });
+        setAcademicYear("");
+        setTerm("");
+        setFile(null);
+        onUpdate();
+      } else {
+        toast({ title: res.data.message || "เกิดข้อผิดพลาด", variant: "destructive" });
+      }
+    } catch (e: any) {
+      toast({ title: e.response?.data?.message || "เกิดข้อผิดพลาดในการอัปโหลด", variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("ต้องการลบรายการนี้หรือไม่?")) return;
+    try {
+      const formData = new FormData();
+      formData.append("action", "delete-workload");
+      formData.append("id", id);
+      const res = await api.post("/index.php?page=manage-faculty-extras", formData);
+      if (res.data.status === "success") {
+        toast({ title: "ลบเรียบร้อยแล้ว" });
+        onUpdate();
+      }
+    } catch (e) {
+      toast({ title: "เกิดข้อผิดพลาดในการลบ", variant: "destructive" });
+    }
+  };
+
+  const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8080").replace(/\/$/, "");
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 mb-4">
+        <h3 className="font-semibold text-foreground text-base">ภาระงานสอน</h3>
+      </div>
+      <div className="bg-muted/20 p-4 rounded-xl border border-border space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Input placeholder="ปีการศึกษา เช่น 2566" value={academicYear} onChange={(e) => setAcademicYear(e.target.value)} />
+          <Input placeholder="เทอม เช่น 1" value={term} onChange={(e) => setTerm(e.target.value)} />
+          <Input type="file" accept=".xls,.xlsx,.csv,.pdf,.doc,.docx" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+        </div>
+        <Button onClick={handleUpload} disabled={uploading}>
+          {uploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+          อัปโหลดภาระงานสอน
+        </Button>
+      </div>
+      {workloads && workloads.length > 0 && (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>ปีการศึกษา</TableHead>
+              <TableHead>เทอม</TableHead>
+              <TableHead>วันที่อัปโหลด</TableHead>
+              <TableHead className="text-right">จัดการ</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {workloads.map((w: any) => (
+              <TableRow key={w.id}>
+                <TableCell>{w.academic_year}</TableCell>
+                <TableCell>{w.term}</TableCell>
+                <TableCell>{new Date(w.uploaded_at).toLocaleDateString('th-TH')}</TableCell>
+                <TableCell className="text-right flex justify-end gap-2">
+                  <Button variant="outline" size="sm" asChild>
+                    <a href={`${apiBaseUrl}/${w.file_path}`} target="_blank" rel="noopener noreferrer"><Download className="h-4 w-4" /></a>
+                  </Button>
+                  <Button variant="destructive" size="sm" onClick={() => handleDelete(w.id)}><Trash2 className="h-4 w-4" /></Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
+    </div>
+  );
+};
+
+const PersonnelDevelopmentsSection = ({ developments, onUpdate }: { developments: any[], onUpdate: () => void }) => {
+  const [trainingDate, setTrainingDate] = useState("");
+  const [trainingTopic, setTrainingTopic] = useState("");
+  const [learnings, setLearnings] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const { toast } = useToast();
+
+  const handleUpload = async () => {
+    if (!trainingDate || !trainingTopic) {
+      toast({ title: "กรุณากรอกวันที่และหัวข้อการอบรม", variant: "destructive" });
+      return;
+    }
+    setUploading(true);
+    const formData = new FormData();
+    formData.append("action", "add-development");
+    formData.append("training_date", trainingDate);
+    formData.append("training_topic", trainingTopic);
+    formData.append("learnings", learnings);
+    if (file) formData.append("file", file);
+    try {
+      const res = await api.post("/index.php?page=manage-faculty-extras", formData, {
+        headers: { "Content-Type": "multipart/form-data" }
+      });
+      if (res.data.status === "success") {
+        toast({ title: "บันทึกเรียบร้อยแล้ว" });
+        setTrainingDate("");
+        setTrainingTopic("");
+        setLearnings("");
+        setFile(null);
+        onUpdate();
+      } else {
+        toast({ title: res.data.message || "เกิดข้อผิดพลาด", variant: "destructive" });
+      }
+    } catch (e: any) {
+      toast({ title: e.response?.data?.message || "เกิดข้อผิดพลาดในการบันทึก", variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("ต้องการลบรายการนี้หรือไม่?")) return;
+    try {
+      const formData = new FormData();
+      formData.append("action", "delete-development");
+      formData.append("id", id);
+      const res = await api.post("/index.php?page=manage-faculty-extras", formData);
+      if (res.data.status === "success") {
+        toast({ title: "ลบเรียบร้อยแล้ว" });
+        onUpdate();
+      }
+    } catch (e) {
+      toast({ title: "เกิดข้อผิดพลาดในการลบ", variant: "destructive" });
+    }
+  };
+
+  const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8080").replace(/\/$/, "");
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 mb-4">
+        <h3 className="font-semibold text-foreground text-base">การพัฒนาบุคลากร</h3>
+      </div>
+      <div className="bg-muted/20 p-4 rounded-xl border border-border space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>วันที่อบรม</Label>
+            <Input type="date" value={trainingDate} onChange={(e) => setTrainingDate(e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label>หัวข้ออบรม/พัฒนาบุคลากร</Label>
+            <Input placeholder="กรอกหัวข้อ" value={trainingTopic} onChange={(e) => setTrainingTopic(e.target.value)} />
+          </div>
+          <div className="space-y-2 md:col-span-2">
+            <Label>สิ่งที่ได้จากการอบรม</Label>
+            <Textarea placeholder="กรอกรายละเอียด..." value={learnings} onChange={(e) => setLearnings(e.target.value)} rows={2} />
+          </div>
+          <div className="space-y-2 md:col-span-2">
+            <Label>อัปโหลดรูปเกียรติบัตร (ถ้ามี)</Label>
+            <Input type="file" accept=".jpg,.jpeg,.png,.webp,.pdf" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+          </div>
+        </div>
+        <Button onClick={handleUpload} disabled={uploading}>
+          {uploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+          บันทึกการพัฒนาบุคลากร
+        </Button>
+      </div>
+      {developments && developments.length > 0 && (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[120px]">วันที่</TableHead>
+              <TableHead>หัวข้อ</TableHead>
+              <TableHead>สิ่งที่ได้</TableHead>
+              <TableHead className="text-center">เกียรติบัตร</TableHead>
+              <TableHead className="text-right">จัดการ</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {developments.map((d: any) => (
+              <TableRow key={d.id}>
+                <TableCell>{new Date(d.training_date).toLocaleDateString('th-TH')}</TableCell>
+                <TableCell>{d.training_topic}</TableCell>
+                <TableCell className="max-w-[200px] truncate" title={d.learnings}>{d.learnings || "-"}</TableCell>
+                <TableCell className="text-center">
+                  {d.certificate_file ? (
+                    <a href={`${apiBaseUrl}/${d.certificate_file}`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                      เปิดดู
+                    </a>
+                  ) : "-"}
+                </TableCell>
+                <TableCell className="text-right">
+                  <Button variant="destructive" size="sm" onClick={() => handleDelete(d.id)}><Trash2 className="h-4 w-4" /></Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
     </div>
   );
 };

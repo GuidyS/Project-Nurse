@@ -181,7 +181,7 @@ export default function AssignStudents() {
     <div className="app-page animate-fade-in">
       <div className="app-page-header">
         <div>
-          <h1 className="app-page-title">จัดการนักศึกษา</h1>
+          <h1 className="app-page-title">ระบบอาจารย์ที่ปรึกษา</h1>
           <p className="app-page-description">มอบหมายนักศึกษาในความดูแลให้อาจารย์ที่ปรึกษาและอาจารย์ปฏิบัติ</p>
         </div>
       </div>

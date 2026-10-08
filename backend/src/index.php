@@ -53,6 +53,9 @@
             case 'profile':
                 require_once 'components/ProfilePage/get_profile.php';
                 break;
+            case 'manage-faculty-extras':
+                require_once 'components/ProfilePage/manage_faculty_extras.php';
+                break;
 
             // LicenseReminder (ใบประกอบวิชาชีพ: อัปโหลดรูป + แจ้งเตือนใกล้หมดอายุ)
             case 'upload-license-image':
@@ -195,6 +198,9 @@
                 break;
             case 'send-advisor-message':
                 require_once 'components/Teacher/Advises/send_advisor_message.php';
+                break;
+            case 'save-advisor-status':
+                require_once 'components/Teacher/Advises/save_advisor_status.php';
                 break;
 
             // AdviseNotes

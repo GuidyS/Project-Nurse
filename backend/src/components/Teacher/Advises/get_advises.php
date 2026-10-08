@@ -47,6 +47,8 @@ try {
             CONCAT(IFNULL(s.title,''), s.first_name_th, ' ', s.last_name_th) as name,
             IFNULL(s.year_level, 1) as year,
             IFNULL(s.gpa, 0) as gpa,
+            s.advisor_status as advisor_status_raw,
+            s.advisor_status_details as advisor_status_details,
             (SELECT DATE_FORMAT(MAX(al.created_at), '%Y-%m-%d')
              FROM advice_log al
              WHERE al.student_id = s.student_id AND al.advisor_id = :advisor_uid) as lastContact
@@ -62,12 +64,18 @@ try {
     $stmt->execute([':faculty_id' => $my_faculty_id, ':advisor_uid' => $user_id] + $typeParams);
     $advisees = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // 4. คำนวณสถานะจาก GPA จริง (< 2.00 วิกฤต, < 2.50 ต้องติดตาม)
+    // 4. ใช้สถานะจากฐานข้อมูล (ปกติ = normal, ไม่ปกติ = critical)
     foreach ($advisees as &$student) {
-        $gpa = (float)$student['gpa'];
-        $student['gpa'] = $gpa;
-        $student['status'] = ($gpa > 0 && $gpa < 2.00) ? 'critical' : (($gpa > 0 && $gpa < 2.50) ? 'warning' : 'normal');
-        $student['needsAdvice'] = $student['status'] !== 'normal';
+        $student['gpa'] = (float)$student['gpa'];
+        $raw_status = $student['advisor_status_raw'];
+        if ($raw_status === 'ไม่ปกติ') {
+            $student['status'] = 'critical';
+            $student['needsAdvice'] = true;
+        } else {
+            $student['status'] = 'normal';
+            $student['needsAdvice'] = false;
+        }
+        $student['statusDetails'] = $student['advisor_status_details'] ?? '';
         $student['lastContact'] = $student['lastContact'] ? $student['lastContact'] : '-';
     }
 

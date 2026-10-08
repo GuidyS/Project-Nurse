@@ -3,22 +3,25 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Users, Search, AlertTriangle, CheckCircle, MessageSquare, Loader2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Users, Search, AlertTriangle, CheckCircle, Loader2, Pencil } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import api from '@/lib/axios';
 import { useToast } from '@/hooks/use-toast';
 import { navigateToPage } from '@/lib/projectNavigation';
 
-const getStatusBadge = (status: string) => {
+const getStatusBadge = (status: string, details?: string) => {
   switch (status) {
     case 'normal':
-      return <Badge className="bg-green-500">ปกติ</Badge>;
+      return <Badge className="bg-green-500" title={details}>ปกติ</Badge>;
     case 'warning':
-      return <Badge className="bg-yellow-500">ต้องติดตาม</Badge>;
+      return <Badge className="bg-yellow-500" title={details}>ต้องติดตาม</Badge>;
     case 'critical':
-      return <Badge variant="destructive">วิกฤต</Badge>;
+      return <Badge variant="destructive" title={details}>ไม่ปกติ</Badge>;
     default:
-      return <Badge variant="secondary">{status}</Badge>;
+      return <Badge variant="secondary" title={details}>{status}</Badge>;
   }
 };
 
@@ -28,24 +31,57 @@ export default function Advises() {
   const [advisees, setAdvisees] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchAdvisees = async () => {
-      try {
-        setIsLoading(true);
-        const res = await api.get('/index.php?page=get-advises');
-        if (res.data.status === 'success') {
-          setAdvisees(res.data.data || []);
-        } else {
-          toast({ title: 'ข้อผิดพลาด', description: res.data.message, variant: 'destructive' });
-        }
-      } catch (error) {
-        toast({ title: 'ข้อผิดพลาด', description: 'ไม่สามารถโหลดข้อมูลนักศึกษาได้', variant: 'destructive' });
-      } finally {
-        setIsLoading(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingStudent, setEditingStudent] = useState<any>(null);
+  const [editStatus, setEditStatus] = useState<string>('ปกติ');
+  const [editDetails, setEditDetails] = useState<string>('');
+
+  const fetchAdvisees = async () => {
+    try {
+      setIsLoading(true);
+      const res = await api.get('/index.php?page=get-advises');
+      if (res.data.status === 'success') {
+        setAdvisees(res.data.data || []);
+      } else {
+        toast({ title: 'ข้อผิดพลาด', description: res.data.message, variant: 'destructive' });
       }
-    };
+    } catch (error) {
+      toast({ title: 'ข้อผิดพลาด', description: 'ไม่สามารถโหลดข้อมูลนักศึกษาได้', variant: 'destructive' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchAdvisees();
   }, []);
+
+  const openEditDialog = (student: any) => {
+    setEditingStudent(student);
+    setEditStatus(student.status === 'critical' ? 'ไม่ปกติ' : 'ปกติ');
+    setEditDetails(student.statusDetails || '');
+    setIsEditDialogOpen(true);
+  };
+
+  const handleSaveStatus = async () => {
+    if (!editingStudent) return;
+    try {
+      const res = await api.post('/index.php?page=save-advisor-status', {
+        studentId: editingStudent.studentId,
+        status: editStatus,
+        statusDetails: editStatus === 'ไม่ปกติ' ? editDetails : ''
+      });
+      if (res.data.status === 'success') {
+        toast({ title: 'สำเร็จ', description: 'บันทึกสถานะเรียบร้อยแล้ว' });
+        setIsEditDialogOpen(false);
+        fetchAdvisees();
+      } else {
+        toast({ title: 'ข้อผิดพลาด', description: res.data.message, variant: 'destructive' });
+      }
+    } catch (error: any) {
+      toast({ title: 'ข้อผิดพลาด', description: error.response?.data?.message || 'ไม่สามารถบันทึกสถานะได้', variant: 'destructive' });
+    }
+  };
 
   // String(... ?? '') กันค่า null/ตัวเลข ไม่ให้หน้าจอพังตอนค้นหา
   const filteredAdvisees = advisees.filter(
@@ -66,7 +102,7 @@ export default function Advises() {
       <div className="space-y-6 animate-fade-in">
         <div className="app-page-header">
           <div className="min-w-0">
-          <h1 className="app-page-title">นักศึกษาในที่ปรึกษา</h1>
+          <h1 className="app-page-title">นักศึกษาในความดูแล</h1>
           <p className="app-page-description">จัดการนักศึกษาที่อยู่ในความดูแล (สัดส่วน 1:12)</p>
           </div>
         </div>
@@ -97,7 +133,7 @@ export default function Advises() {
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">สถานะวิกฤต</CardTitle>
+              <CardTitle className="text-sm font-medium">สถานะไม่ปกติ</CardTitle>
               <AlertTriangle className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -151,10 +187,17 @@ export default function Advises() {
                       <TableCell>{student.name}</TableCell>
                       <TableCell className="text-center">ปี {student.year}</TableCell>
                       <TableCell className="text-center font-semibold">{student.gpa.toFixed(2)}</TableCell>
-                      <TableCell className="text-center">{getStatusBadge(student.status)}</TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          {getStatusBadge(student.status, student.statusDetails)}
+                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEditDialog(student)}>
+                            <Pencil className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </TableCell>
                       <TableCell className="text-center text-muted-foreground">{student.lastContact}</TableCell>
                       <TableCell className="text-center">
-                        <Button size="sm" onClick={() => navigateToPage("advise-notes")}>
+                        <Button size="sm" onClick={() => navigateToPage("advise-notes", { studentId: student.studentId })}>
                           บันทึกคำปรึกษา
                         </Button>
                       </TableCell>
@@ -166,6 +209,46 @@ export default function Advises() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>แก้ไขสถานะนักศึกษา</DialogTitle>
+            <DialogDescription>
+              อัปเดตสถานะของ {editingStudent?.name} ({editingStudent?.studentId})
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">สถานะ</label>
+              <Select value={editStatus} onValueChange={setEditStatus}>
+                <SelectTrigger>
+                  <SelectValue placeholder="เลือกสถานะ" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ปกติ">ปกติ</SelectItem>
+                  <SelectItem value="ไม่ปกติ">ไม่ปกติ</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {editStatus === 'ไม่ปกติ' && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">รายละเอียด (ระบุสาเหตุ)</label>
+                <Textarea 
+                  placeholder="กรอกรายละเอียดสาเหตุที่ทำให้สถานะไม่ปกติ..." 
+                  value={editDetails} 
+                  onChange={(e) => setEditDetails(e.target.value)} 
+                  rows={4}
+                />
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>ยกเลิก</Button>
+            <Button onClick={handleSaveStatus}>บันทึก</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
