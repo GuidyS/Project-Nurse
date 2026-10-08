@@ -24,27 +24,47 @@ try {
         if (!$year || !in_array($mode, ['academic', 'calendar'], true) || !in_array($kind, ['kpi', 'co_author', 'academic'], true)) researchFail(422, 'ปีหรือประเภทผลงานไม่ถูกต้อง');
         $date = ($year - 543) . ($mode === 'academic' ? '-04-01' : '-01-01');
         $db->beginTransaction();
-        $stmt = $db->prepare('INSERT INTO faculty_research (faculty_id, title, publication_year, publication_date, article_type, first_author_id, co_author_ids) VALUES (?, ?, ?, ?, ?, ?, ?)');
+        $stmt = $db->prepare('INSERT INTO faculty_research (faculty_id, title, publication_year, publication_date, article_type, work_category, funding_type, funding_amount, irb_approved, intellectual_property_status, first_author_id, co_author_ids) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
         $stmt->execute([$facultyId, 'บันทึกจำนวนผลงาน' . ($kind === 'academic' ? 'วิชาการ/ตำรา' : 'วิจัย') . ' ปี ' . $year,
-            $year, $date, $kind === 'academic' ? 'academic' : 'research', $kind === 'kpi' ? $facultyId : null,
+            $year, $date, $kind === 'academic' ? 'academic' : 'research', 'research', 'none', 0, 0, 'none', $kind === 'kpi' ? $facultyId : null,
             json_encode($kind === 'kpi' ? [] : [$facultyId])]);
         $id = (int)$db->lastInsertId();
     } elseif ($action === 'update') {
         $id = filter_var($input['publication_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
         $fields = [];
-        foreach (['title' => 255, 'journal' => 255, 'database_level' => 100] as $key => $limit) {
+        foreach (['title' => 255, 'journal' => 255, 'database_level' => 100, 'funding_source' => 255, 'award_name' => 255] as $key => $limit) {
             if (!is_string($input[$key] ?? null)) researchFail(422, 'ข้อมูลรายละเอียดผลงานไม่ถูกต้อง');
             $fields[$key] = trim($input[$key]);
             if (mb_strlen($fields[$key], 'UTF-8') > $limit) researchFail(422, 'ข้อความยาวเกินกำหนด');
         }
         $date = $input['publication_date'] ?? '';
         $type = $input['publication_type'] ?? '';
+        $workCategory = $input['work_category'] ?? '';
+        $fundingType = $input['funding_type'] ?? '';
+        $ipStatus = $input['intellectual_property_status'] ?? '';
+        $fundingAmountRaw = $input['funding_amount'] ?? null;
+        $irbApproved = filter_var($input['irb_approved'] ?? null, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
         $revision = $input['revision'] ?? '';
         $parsedDate = is_string($date) ? DateTimeImmutable::createFromFormat('!Y-m-d', $date) : false;
         if (!$id || $fields['title'] === '' || !$parsedDate || $parsedDate->format('Y-m-d') !== $date
             || (int)$parsedDate->format('Y') < 1957 || (int)$parsedDate->format('Y') > 2157
-            || !in_array($type, ['research', 'academic', 'textbook'], true) || !is_string($revision)) {
+            || !in_array($type, ['research', 'academic', 'textbook'], true)
+            || !in_array($workCategory, ['research', 'innovation'], true)
+            || !in_array($fundingType, ['none', 'internal', 'external'], true)
+            || !in_array($ipStatus, ['none', 'applying', 'copyright', 'petty_patent', 'patent'], true)
+            || $irbApproved === null || !is_string($revision)) {
             researchFail(422, 'กรุณาระบุชื่อผลงาน วันที่ และประเภทให้ถูกต้อง');
+        }
+        if (!is_numeric($fundingAmountRaw) || (float)$fundingAmountRaw < 0 || (float)$fundingAmountRaw > 9999999999.99) {
+            researchFail(422, 'จำนวนทุนต้องเป็นตัวเลขตั้งแต่ 0 ขึ้นไป');
+        }
+        $fundingAmount = round((float)$fundingAmountRaw, 2);
+        if ($fundingType !== 'none' && $fields['funding_source'] === '') {
+            researchFail(422, 'กรุณาระบุแหล่งทุน');
+        }
+        if ($fundingType === 'none') {
+            $fields['funding_source'] = '';
+            $fundingAmount = 0;
         }
         $db->beginTransaction();
         $stmt = $db->prepare('SELECT * FROM faculty_research WHERE research_id = ? FOR UPDATE');
@@ -54,8 +74,9 @@ try {
             $db->rollBack();
             researchFail(409, 'รายการนี้เปลี่ยนแปลงแล้ว กรุณาโหลดข้อมูลใหม่ก่อนแก้ไข');
         }
-        $stmt = $db->prepare('UPDATE faculty_research SET title = ?, publication_date = ?, publication_year = ?, article_type = ?, journal_name = ?, category = ? WHERE research_id = ?');
-        $stmt->execute([$fields['title'], $date, (int)$parsedDate->format('Y') + 543, $type, $fields['journal'], $fields['database_level'], $id]);
+        $stmt = $db->prepare('UPDATE faculty_research SET title = ?, publication_date = ?, publication_year = ?, article_type = ?, journal_name = ?, category = ?, work_category = ?, funding_type = ?, funding_source = ?, funding_amount = ?, irb_approved = ?, intellectual_property_status = ?, award_name = ? WHERE research_id = ?');
+        $stmt->execute([$fields['title'], $date, (int)$parsedDate->format('Y') + 543, $type, $fields['journal'], $fields['database_level'],
+            $workCategory, $fundingType, $fields['funding_source'], $fundingAmount, $irbApproved ? 1 : 0, $ipStatus, $fields['award_name'], $id]);
     } else {
         $id = filter_var($input['publication_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
         if (!$id) researchFail(422, 'รายการผลงานไม่ถูกต้อง');
