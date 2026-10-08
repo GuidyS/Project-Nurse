@@ -5,6 +5,7 @@ require_once __DIR__ . '/../../../config/audit_helper.php';
 
 $db = project_db();
 $auth = project_require_auth($db, ['PROJECT_DOCS_MANAGE']);
+project_require_admin_write($auth);
 $input = project_payload();
 
 try {

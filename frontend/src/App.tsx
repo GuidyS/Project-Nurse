@@ -2,7 +2,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import PracticeLocationsPage from "./components/pages/Teacher/PracticeLocationsPage";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import { useEffect, useState } from "react";
@@ -150,6 +151,17 @@ const App = () => {
                 </SessionGateway>
               } 
             />
+
+            {/* ✅ เพิ่ม Route สำหรับหน้าแหล่งฝึกภาคปฏิบัติ เพื่อให้ Sidebar พามาถูกหน้า */}
+            <Route 
+              path="/practice-locations" 
+              element={
+                <SessionGateway>
+                  <PracticeLocationsPage />
+                </SessionGateway>
+              } 
+            />
+
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

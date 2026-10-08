@@ -263,49 +263,6 @@ export function ImportDataDialog({
             </div>
           )}
 
-          <div className="space-y-3">
-            <div>
-              <h3 className="text-sm font-semibold text-foreground">ประวัติการนำเข้าล่าสุด</h3>
-              <p className="text-xs text-muted-foreground">แสดงเฉพาะประเภทข้อมูลของหน้านี้</p>
-            </div>
-            {isHistoryLoading ? (
-              <div className="flex items-center justify-center py-8 text-muted-foreground">
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> กำลังโหลดประวัติ
-              </div>
-            ) : importHistory.length > 0 ? (
-              <div className="space-y-2">
-                {importHistory.map((item) => (
-                  <div key={item.id} className="flex items-center justify-between gap-3 rounded-lg bg-muted/30 p-3">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <FileSpreadsheet className="h-7 w-7 flex-shrink-0 text-primary" />
-                      <div className="min-w-0">
-                        <p className="truncate font-medium">{item.fileName}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {importTypes.find((type) => type.value === item.type)?.label ?? item.type} · {item.recordCount || 0} รายการ
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex-shrink-0 text-right text-xs">
-                      {statusBadge(item.status)}
-                      <p className="mt-1 text-muted-foreground">
-                        {new Date(item.date).toLocaleDateString("th-TH", {
-                          year: "numeric",
-                          month: "short",
-                          day: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="rounded-lg border border-dashed py-8 text-center text-sm text-muted-foreground">
-                ไม่พบประวัติการนำเข้า
-              </p>
-            )}
-          </div>
         </div>
 
         <DialogFooter>
@@ -317,6 +274,50 @@ export function ImportDataDialog({
             Import ข้อมูล
           </Button>
         </DialogFooter>
+
+        <div className="space-y-3">
+          <div>
+            <h3 className="text-sm font-semibold text-foreground">ประวัติการนำเข้าล่าสุด</h3>
+            <p className="text-xs text-muted-foreground">แสดงเฉพาะประเภทข้อมูลของหน้านี้</p>
+          </div>
+          {isHistoryLoading ? (
+            <div className="flex items-center justify-center py-8 text-muted-foreground">
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> กำลังโหลดประวัติ
+            </div>
+          ) : importHistory.length > 0 ? (
+            <div className="space-y-2">
+              {importHistory.map((item) => (
+                <div key={item.id} className="flex items-center justify-between gap-3 rounded-lg bg-muted/30 p-3">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <FileSpreadsheet className="h-7 w-7 flex-shrink-0 text-primary" />
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">{item.fileName}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {importTypes.find((type) => type.value === item.type)?.label ?? item.type} · {item.recordCount || 0} รายการ
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex-shrink-0 text-right text-xs">
+                    {statusBadge(item.status)}
+                    <p className="mt-1 text-muted-foreground">
+                      {new Date(item.date).toLocaleDateString("th-TH", {
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="rounded-lg border border-dashed py-8 text-center text-sm text-muted-foreground">
+              ไม่พบประวัติการนำเข้า
+            </p>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   );

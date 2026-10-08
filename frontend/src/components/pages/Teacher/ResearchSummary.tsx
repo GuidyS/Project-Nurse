@@ -3,6 +3,7 @@ import { getAcademicYear, academicYearOptions, academicNow } from "@/lib/academi
 import { useAcademicYear } from "@/hooks/use-academic-year";
 import {
   BarChart3,
+  Banknote,
   CalendarDays,
   CheckCircle2,
   Loader2,
@@ -30,6 +31,9 @@ import { cn } from "@/lib/utils";
 type AuthorRole = "first_author" | "corresponding" | "co_author";
 type PublicationType = "research" | "academic" | "textbook";
 type YearMode = "calendar" | "academic";
+type WorkCategory = "research" | "innovation";
+type FundingType = "none" | "internal" | "external";
+type IntellectualPropertyStatus = "none" | "applying" | "copyright" | "petty_patent" | "patent";
 
 interface Faculty {
   faculty_id: number;
@@ -52,6 +56,13 @@ interface Publication {
   buddhist_year: number;
   publication_type: PublicationType;
   database_level: string;
+  work_category: WorkCategory;
+  funding_type: FundingType;
+  funding_source: string;
+  funding_amount: number;
+  irb_approved: boolean;
+  intellectual_property_status: IntellectualPropertyStatus;
+  award_name: string;
   authors: PublicationAuthor[];
 }
 
@@ -77,6 +88,31 @@ const typeLabel: Record<PublicationType, string> = {
   academic: "บทความวิชาการ",
   textbook: "ตำรา",
 };
+
+const workCategoryLabel: Record<WorkCategory, string> = {
+  research: "งานวิจัย",
+  innovation: "งานนวัตกรรม",
+};
+
+const fundingTypeLabel: Record<FundingType, string> = {
+  none: "ไม่มีทุน",
+  internal: "ทุนภายใน",
+  external: "ทุนภายนอก",
+};
+
+const intellectualPropertyLabel: Record<IntellectualPropertyStatus, string> = {
+  none: "ไม่มี",
+  applying: "กำลังขอ",
+  copyright: "ลิขสิทธิ์",
+  petty_patent: "อนุสิทธิบัตร",
+  patent: "สิทธิบัตร",
+};
+
+const formatCurrency = (value: number) => new Intl.NumberFormat("th-TH", {
+  style: "currency",
+  currency: "THB",
+  maximumFractionDigits: 2,
+}).format(value);
 
 const getBuddhistYear = (dateValue: string, mode: YearMode) => {
   const date = new Date(`${dateValue}T00:00:00+07:00`);
@@ -128,6 +164,11 @@ export default function ResearchSummary() {
     ...publications.map((publication) => getBuddhistYear(publication.publication_date, yearMode)),
   ], currentYear).map(Number).reverse(), [availableYears, publications, yearMode, currentYear]);
   const [search, setSearch] = useState("");
+  const [workCategoryFilter, setWorkCategoryFilter] = useState<"all" | WorkCategory>("all");
+  const [fundingTypeFilter, setFundingTypeFilter] = useState<"all" | FundingType>("all");
+  const [irbFilter, setIrbFilter] = useState<"all" | "approved" | "not_approved">("all");
+  const [intellectualPropertyFilter, setIntellectualPropertyFilter] = useState<"all" | IntellectualPropertyStatus>("all");
+  const [yearFilter, setYearFilter] = useState<"all" | string>("all");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -224,18 +265,50 @@ export default function ResearchSummary() {
     });
   }, [faculty, publications, years, yearMode]);
 
+  const publicationsMatchingResearchFilters = useMemo(() => publications.filter((publication) => {
+    if (workCategoryFilter !== "all" && publication.work_category !== workCategoryFilter) return false;
+    if (fundingTypeFilter !== "all" && publication.funding_type !== fundingTypeFilter) return false;
+    if (irbFilter === "approved" && !publication.irb_approved) return false;
+    if (irbFilter === "not_approved" && publication.irb_approved) return false;
+    if (intellectualPropertyFilter !== "all" && publication.intellectual_property_status !== intellectualPropertyFilter) return false;
+    return true;
+  }), [publications, workCategoryFilter, fundingTypeFilter, irbFilter, intellectualPropertyFilter]);
+
+  const fundingChartData = useMemo(() => years.map((year) => {
+    const yearPublications = publicationsMatchingResearchFilters.filter(
+      (publication) => getBuddhistYear(publication.publication_date, yearMode) === year
+    );
+    return {
+      year: String(year),
+      "ทุนภายใน": yearPublications.reduce((total, publication) => total + (publication.funding_type === "internal" ? publication.funding_amount : 0), 0),
+      "ทุนภายนอก": yearPublications.reduce((total, publication) => total + (publication.funding_type === "external" ? publication.funding_amount : 0), 0),
+    };
+  }), [publicationsMatchingResearchFilters, years, yearMode]);
+
+  const fundingSummary = useMemo(() => publicationsMatchingResearchFilters.reduce((summary, publication) => {
+    if (yearFilter !== "all" && getBuddhistYear(publication.publication_date, yearMode) !== Number(yearFilter)) return summary;
+    summary.total += publication.funding_amount;
+    if (publication.funding_type === "internal") summary.internal += publication.funding_amount;
+    if (publication.funding_type === "external") summary.external += publication.funding_amount;
+    if (publication.irb_approved) summary.irb += 1;
+    if (publication.work_category === "research") summary.research += 1;
+    if (publication.work_category === "innovation") summary.innovation += 1;
+    return summary;
+  }, { total: 0, internal: 0, external: 0, irb: 0, research: 0, innovation: 0 }), [publicationsMatchingResearchFilters, yearFilter, yearMode]);
+
   const visiblePublications = useMemo(() => {
     const query = search.trim().toLowerCase();
-    if (!query) return publications;
-    return publications.filter(
+    return publicationsMatchingResearchFilters.filter(
       (publication) =>
-        publication.title.toLowerCase().includes(query) ||
-        publication.journal.toLowerCase().includes(query) ||
-        publication.authors.some((author) => author.name.toLowerCase().includes(query))
+        (yearFilter === "all" || getBuddhistYear(publication.publication_date, yearMode) === Number(yearFilter)) &&
+        (!query || publication.title.toLowerCase().includes(query) ||
+          publication.journal.toLowerCase().includes(query) ||
+          publication.funding_source.toLowerCase().includes(query) ||
+          publication.authors.some((author) => author.name.toLowerCase().includes(query)))
     );
-  }, [publications, search]);
+  }, [publicationsMatchingResearchFilters, search, yearFilter, yearMode]);
 
-  const saveChange = async (payload: Record<string, string | number>) => {
+  const saveChange = async (payload: Record<string, string | number | boolean>) => {
     if (savingRef.current || saveFailed || !canManageResearch) return false;
     savingRef.current = true;
     setIsSaving(true);
@@ -322,6 +395,13 @@ export default function ResearchSummary() {
                 publication_date: editingPublication.publication_date,
                 publication_type: editingPublication.publication_type,
                 journal: editingPublication.journal, database_level: editingPublication.database_level,
+                work_category: editingPublication.work_category,
+                funding_type: editingPublication.funding_type,
+                funding_source: editingPublication.funding_source,
+                funding_amount: editingPublication.funding_amount,
+                irb_approved: editingPublication.irb_approved,
+                intellectual_property_status: editingPublication.intellectual_property_status,
+                award_name: editingPublication.award_name,
               });
               if (saved) setEditingPublication(null);
             }}>
@@ -343,6 +423,43 @@ export default function ResearchSummary() {
                 <div className="space-y-2"><Label htmlFor="research-category">หมวดหมู่</Label>
                   <Input id="research-category" maxLength={100} value={editingPublication.database_level} onChange={(e) => setEditingPublication({ ...editingPublication, database_level: e.target.value })} />
                 </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2"><Label htmlFor="research-work-category">หมวดผลงาน</Label>
+                    <select id="research-work-category" className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={editingPublication.work_category} onChange={(e) => setEditingPublication({ ...editingPublication, work_category: e.target.value as WorkCategory })}>
+                      {Object.entries(workCategoryLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-2"><Label htmlFor="research-funding-type">ประเภททุน</Label>
+                    <select id="research-funding-type" className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={editingPublication.funding_type} onChange={(e) => {
+                      const fundingType = e.target.value as FundingType;
+                      setEditingPublication({ ...editingPublication, funding_type: fundingType, ...(fundingType === "none" ? { funding_source: "", funding_amount: 0 } : {}) });
+                    }}>
+                      {Object.entries(fundingTypeLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                    </select>
+                  </div>
+                </div>
+                {editingPublication.funding_type !== "none" && <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2"><Label htmlFor="research-funding-source">แหล่งทุน</Label>
+                    <Input id="research-funding-source" required maxLength={255} value={editingPublication.funding_source} onChange={(e) => setEditingPublication({ ...editingPublication, funding_source: e.target.value })} placeholder="ระบุหน่วยงานผู้ให้ทุน" />
+                  </div>
+                  <div className="space-y-2"><Label htmlFor="research-funding-amount">จำนวนทุน (บาท)</Label>
+                    <Input id="research-funding-amount" required type="number" min="0" max="9999999999.99" step="0.01" value={editingPublication.funding_amount} onChange={(e) => setEditingPublication({ ...editingPublication, funding_amount: Number(e.target.value) })} />
+                  </div>
+                </div>}
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2"><Label htmlFor="research-ip-status">สถานะทรัพย์สินทางปัญญา</Label>
+                    <select id="research-ip-status" className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={editingPublication.intellectual_property_status} onChange={(e) => setEditingPublication({ ...editingPublication, intellectual_property_status: e.target.value as IntellectualPropertyStatus })}>
+                      {Object.entries(intellectualPropertyLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-2"><Label htmlFor="research-award">รางวัลที่ได้รับ</Label>
+                    <Input id="research-award" maxLength={255} value={editingPublication.award_name} onChange={(e) => setEditingPublication({ ...editingPublication, award_name: e.target.value })} placeholder="เว้นว่างได้ หากไม่มีรางวัล" />
+                  </div>
+                </div>
+                <label className="flex items-center gap-3 rounded-md border p-3 text-sm font-medium" htmlFor="research-irb-approved">
+                  <input id="research-irb-approved" type="checkbox" className="h-4 w-4 rounded border-input" checked={editingPublication.irb_approved} onChange={(e) => setEditingPublication({ ...editingPublication, irb_approved: e.target.checked })} />
+                  งานวิจัยนี้ผ่าน IRB แล้ว
+                </label>
               </fieldset>
               {saveFailed && <p role="alert" className="text-sm text-destructive">{saveMessage}</p>}
               {editError && <p role="alert" className="text-sm text-destructive">{editError}</p>}
@@ -372,6 +489,64 @@ export default function ResearchSummary() {
           </Tabs>
         </div>
       </div>
+
+      <Card>
+        <CardHeader className="space-y-4">
+          <div>
+            <CardTitle>ตัวกรองงานวิจัยและนวัตกรรม</CardTitle>
+            <CardDescription>ใช้กรองรายการผลงานและข้อมูลสรุปทุนวิจัยรายปี</CardDescription>
+          </div>
+          <Tabs value={workCategoryFilter} onValueChange={(value) => setWorkCategoryFilter(value as "all" | WorkCategory)}>
+            <TabsList className="grid w-full max-w-md grid-cols-3">
+              <TabsTrigger value="all">ทั้งหมด</TabsTrigger>
+              <TabsTrigger value="research">งานวิจัย</TabsTrigger>
+              <TabsTrigger value="innovation">งานนวัตกรรม</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+            <div className="space-y-2">
+              <Label htmlFor="funding-filter">ประเภททุน</Label>
+              <select id="funding-filter" className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={fundingTypeFilter} onChange={(event) => setFundingTypeFilter(event.target.value as "all" | FundingType)}>
+                <option value="all">ทุกประเภททุน</option>
+                {Object.entries(fundingTypeLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="irb-filter">สถานะ IRB</Label>
+              <select id="irb-filter" className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={irbFilter} onChange={(event) => setIrbFilter(event.target.value as typeof irbFilter)}>
+                <option value="all">ทุกสถานะ IRB</option>
+                <option value="approved">ผ่าน IRB</option>
+                <option value="not_approved">ยังไม่ผ่าน IRB</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="ip-filter">ทรัพย์สินทางปัญญา</Label>
+              <select id="ip-filter" className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={intellectualPropertyFilter} onChange={(event) => setIntellectualPropertyFilter(event.target.value as "all" | IntellectualPropertyStatus)}>
+                <option value="all">ทุกสถานะ</option>
+                {Object.entries(intellectualPropertyLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="research-year-filter">ปี</Label>
+              <select id="research-year-filter" className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={yearFilter} onChange={(event) => setYearFilter(event.target.value)}>
+                <option value="all">ทุกปี</option>
+                {years.map((year) => <option key={year} value={String(year)}>{year}</option>)}
+              </select>
+            </div>
+            <div className="flex items-end">
+              <Button type="button" variant="outline" className="w-full" onClick={() => {
+                setWorkCategoryFilter("all");
+                setFundingTypeFilter("all");
+                setIrbFilter("all");
+                setIntellectualPropertyFilter("all");
+                setYearFilter("all");
+              }}>ล้างตัวกรอง</Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
@@ -437,6 +612,37 @@ export default function ResearchSummary() {
               <Bar dataKey="นับ KPI" fill="#dc2626" radius={[4, 4, 0, 0]} />
               <Bar dataKey="ชื่อร่วม" fill="#27272a" radius={[4, 4, 0, 0]} />
               <Bar dataKey="วิชาการ/ตำรา" fill="#0284c7" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Banknote className="h-5 w-5" />
+            Dashboard สรุปทุนวิจัยรายปี
+          </CardTitle>
+          <CardDescription>ตัวเลขสรุปใช้ทุกตัวกรองที่เลือก ส่วนกราฟคงการเปรียบเทียบรายปีและแยกทุนภายในกับทุนภายนอก</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+            <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">ทุนรวม</p><p className="mt-1 font-semibold">{formatCurrency(fundingSummary.total)}</p></div>
+            <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">ทุนภายใน</p><p className="mt-1 font-semibold">{formatCurrency(fundingSummary.internal)}</p></div>
+            <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">ทุนภายนอก</p><p className="mt-1 font-semibold">{formatCurrency(fundingSummary.external)}</p></div>
+            <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">งานวิจัย</p><p className="mt-1 font-semibold">{fundingSummary.research} ผลงาน</p></div>
+            <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">นวัตกรรม</p><p className="mt-1 font-semibold">{fundingSummary.innovation} ผลงาน</p></div>
+            <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">ผ่าน IRB</p><p className="mt-1 font-semibold">{fundingSummary.irb} ผลงาน</p></div>
+          </div>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={fundingChartData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="year" />
+              <YAxis tickFormatter={(value) => new Intl.NumberFormat("th-TH", { notation: "compact" }).format(Number(value))} />
+              <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+              <Legend />
+              <Bar dataKey="ทุนภายใน" fill="#7c3aed" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="ทุนภายนอก" fill="#0d9488" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </CardContent>
@@ -646,6 +852,17 @@ export default function ResearchSummary() {
                       <div className="text-sm text-muted-foreground">
                         {[publication.journal, publication.database_level, publication.publication_date].filter(Boolean).join(" · ") || "ยังไม่ระบุรายละเอียดการตีพิมพ์"}
                       </div>
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        <Badge variant="secondary">{workCategoryLabel[publication.work_category]}</Badge>
+                        <Badge variant="outline">{fundingTypeLabel[publication.funding_type]}</Badge>
+                        {publication.funding_type !== "none" && <Badge variant="outline">{formatCurrency(publication.funding_amount)}</Badge>}
+                        <Badge variant={publication.irb_approved ? "default" : "outline"}>{publication.irb_approved ? "ผ่าน IRB" : "ยังไม่ผ่าน IRB"}</Badge>
+                        {publication.intellectual_property_status !== "none" && <Badge variant="outline">{intellectualPropertyLabel[publication.intellectual_property_status]}</Badge>}
+                      </div>
+                      {(publication.funding_source || publication.award_name) && <div className="space-y-1 pt-1 text-sm text-muted-foreground">
+                        {publication.funding_source && <p>แหล่งทุน: {publication.funding_source}</p>}
+                        {publication.award_name && <p>รางวัล: {publication.award_name}</p>}
+                      </div>}
                       <div className="flex flex-wrap gap-2 pt-1">
                         {publication.authors.map((author) => (
                           <Badge

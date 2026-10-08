@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Activity, Loader2, ChevronLeft, Search, Users } from "lucide-react";
+import {  Loader2, ChevronLeft, Search } from "lucide-react";
 import api from "@/lib/axios";
 import type { AdvisorDetailPanelProps, StudentListItem } from "./advisorStudent";
 import AdvisorVaccinationDetail from "./AdvisorVaccinationDetail";

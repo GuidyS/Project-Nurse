@@ -2,12 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 import { useAcademicYear } from "@/hooks/use-academic-year";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { getCurrentAcademicYear } from "@/lib/academicYear";
-import { Plus, Search, Filter, Eye, Edit, MoreVertical, Upload, Link2, Trash2, Loader2, UserCheck, Users } from "lucide-react";
+import { Plus, Filter, Eye, Edit, MoreVertical, Upload, Link2, Trash2, Loader2, UserCheck, Users, Globe2, Image } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Progress } from "@/components/ui/progress";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,14 +29,18 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
-import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
+import { navigateToProject } from "@/lib/projectNavigation";
+import { ConfirmActionDialog } from "@/components/shared/ConfirmActionDialog";
 import { ImportDataDialog, type ImportDataTypeOption } from "@/components/shared/ImportDataDialog";
+import { PageHeader } from "@/components/shared/PageHeader";
+import { SearchInput } from "@/components/shared/SearchInput";
 
-type ProjectType = "academic_service" | "culture" | "other";
+type ProjectType = "academic_service" | "culture" | "other" | "teaching" | "research" | "quality_assurance";
 type ProjectTypeFilter = "all" | ProjectType;
 type ProjectStatus = "pending" | "active" | "completed" | "cancelled";
 type ProjectStatusFilter = "all" | ProjectStatus;
 type ProjectDocumentType = "proposal" | "progress" | "financial" | "summary";
+type ProjectAttachmentType = "google_drive" | "website_url" | "file";
 
 interface ProjectMember {
   id: number;
@@ -131,6 +134,9 @@ const GoogleDriveIcon = ({ className = "h-4 w-4" }: { className?: string }) => (
 const projectTypeLabels: Record<ProjectType, string> = {
   academic_service: "บริการวิชาการ",
   culture: "ทำนุบำรุงศิลปวัฒนธรรม",
+  teaching: "การเรียนการสอน",
+  research: "วิจัย",
+  quality_assurance: "การประกันคุณภาพ",
   other: "อื่น ๆ / ยังไม่จำแนก",
 };
 
@@ -145,6 +151,9 @@ const projectTypeTabs: { value: ProjectTypeFilter; label: string }[] = [
   { value: "all", label: "ทั้งหมด" },
   { value: "academic_service", label: projectTypeLabels.academic_service },
   { value: "culture", label: projectTypeLabels.culture },
+  { value: "teaching", label: projectTypeLabels.teaching },
+  { value: "research", label: projectTypeLabels.research },
+  { value: "quality_assurance", label: projectTypeLabels.quality_assurance },
   { value: "other", label: projectTypeLabels.other },
 ];
 
@@ -175,6 +184,8 @@ const projectImportTypes: ImportDataTypeOption[] = [
 ];
 
 const PROJECT_DOCUMENT_DEFAULT_TYPE: ProjectDocumentType = "summary";
+const PROJECT_DOCUMENT_FILE_ACCEPT = ".pdf,.doc,.docx,.png,.jpg,.jpeg";
+const PROJECT_DOCUMENT_MAX_BYTES = 10 * 1024 * 1024;
 
 const createInitialUploadForm = (): ProjectDocumentUploadForm => ({
   name: "",
@@ -231,6 +242,40 @@ const getGoogleDriveLinkError = (value: string) => {
   }
 };
 
+const getHttpsWebsiteLinkError = (value: string) => {
+  try {
+    const url = new URL(value.trim());
+    if (url.protocol !== "https:") {
+      return "กรุณาแนบ URL เว็บไซต์ที่ขึ้นต้นด้วย https://";
+    }
+    return null;
+  } catch {
+    return "กรุณากรอก URL เว็บไซต์ให้ถูกต้อง";
+  }
+};
+
+const getAttachmentUrlType = (value: string): Exclude<ProjectAttachmentType, "file"> => {
+  try {
+    const url = new URL(value.trim());
+    const host = url.hostname.toLowerCase();
+    return host === "drive.google.com" || host === "docs.google.com" ? "google_drive" : "website_url";
+  } catch {
+    return "website_url";
+  }
+};
+
+const getProjectDocumentFileError = (file: File) => {
+  const allowedExtensions = ["pdf", "doc", "docx", "png", "jpg", "jpeg"];
+  const extension = file.name.split(".").pop()?.toLowerCase() || "";
+  if (!allowedExtensions.includes(extension)) {
+    return `ไฟล์ ${file.name} ไม่รองรับ กรุณาแนบเฉพาะ PDF, Word หรือรูปภาพ PNG/JPG`;
+  }
+  if (file.size <= 0 || file.size > PROJECT_DOCUMENT_MAX_BYTES) {
+    return `ไฟล์ ${file.name} ต้องมีขนาดไม่เกิน 10 MB`;
+  }
+  return null;
+};
+
 const formatCurrency = (value?: string | number | null) => {
   const amount = Number(value || 0);
   return amount.toLocaleString("th-TH", {
@@ -258,7 +303,35 @@ const getProjectFileUrl = (filePath?: string | null) => {
 const projectDocuments = (project?: Project | null) => (Array.isArray(project?.documents) ? project.documents : []);
 const projectPlos = (project?: Project | null) => (Array.isArray(project?.plos) ? project.plos : []);
 
-const getDocumentDisplayName = (document: ProjectDocument) => document.file_name || "Google Drive";
+const isExternalDocumentUrl = (document: ProjectDocument) => /^https?:\/\//i.test(document.file_path || "");
+
+const getDocumentAttachmentType = (document: ProjectDocument): ProjectAttachmentType => {
+  if (!isExternalDocumentUrl(document)) return "file";
+  const label = (document.file_name || "").toLowerCase();
+  if (label.includes("website")) return "website_url";
+  return getAttachmentUrlType(document.file_path || "");
+};
+
+const getDocumentDisplayName = (document: ProjectDocument) => {
+  const attachmentType = getDocumentAttachmentType(document);
+  if (attachmentType === "google_drive") return "Google Drive";
+  if (attachmentType === "website_url") return "Website URL";
+  return document.file_name || "ไฟล์เอกสาร";
+};
+
+const getDocumentOpenLabel = (document: ProjectDocument) => {
+  const attachmentType = getDocumentAttachmentType(document);
+  if (attachmentType === "google_drive") return "Google Drive";
+  if (attachmentType === "website_url") return "เว็บไซต์";
+  return "ไฟล์";
+};
+
+const DocumentAttachmentIcon = ({ document, className = "h-4 w-4" }: { document: ProjectDocument; className?: string }) => {
+  const attachmentType = getDocumentAttachmentType(document);
+  if (attachmentType === "google_drive") return <GoogleDriveIcon className={className} />;
+  if (attachmentType === "website_url") return <Globe2 className={className} />;
+  return <Image className={className} />;
+};
 
 const normalizeProjectType = (value?: ProjectType | null): ProjectType => value || "other";
 const normalizeStatus = (value?: ProjectStatus | null): ProjectStatus => value || "active";
@@ -345,12 +418,17 @@ const ProjectsPage = () => {
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [uploadForm, setUploadForm] = useState<ProjectDocumentUploadForm>(() => createInitialUploadForm());
   const [uploadDriveLink, setUploadDriveLink] = useState("");
+  const [uploadWebsiteLink, setUploadWebsiteLink] = useState("");
+  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
   const [createDocumentForm, setCreateDocumentForm] = useState<ProjectDocumentUploadForm>(() => createInitialCreateDocumentForm());
   const [createDocumentDriveLink, setCreateDocumentDriveLink] = useState("");
+  const [createDocumentWebsiteLink, setCreateDocumentWebsiteLink] = useState("");
+  const [createDocumentFiles, setCreateDocumentFiles] = useState<File[]>([]);
   const [isUploadingDocuments, setIsUploadingDocuments] = useState(false);
   const [editingDocument, setEditingDocument] = useState<ProjectDocument | null>(null);
   const [documentEditForm, setDocumentEditForm] = useState<ProjectDocumentUploadForm>(() => createInitialUploadForm());
   const [documentEditDriveLink, setDocumentEditDriveLink] = useState("");
+  const [documentEditFile, setDocumentEditFile] = useState<File | null>(null);
   const [isDocumentEditOpen, setIsDocumentEditOpen] = useState(false);
   const [isSavingDocument, setIsSavingDocument] = useState(false);
   const [pendingDeleteDocument, setPendingDeleteDocument] = useState<ProjectDocument | null>(null);
@@ -362,10 +440,9 @@ const ProjectsPage = () => {
   const currentUser = getCurrentUser();
   const canManageProjects = Number(currentUser?.role_id || 0) === 1;
 
-  const navigateToProjectPage = (page: "project-links", projectId: number) => {
+  const navigateToProjectLinks = (projectId: number) => {
     if (!canManageProjects) return;
-    sessionStorage.setItem("pendingProjectId", String(projectId));
-    window.dispatchEvent(new CustomEvent("app:navigate", { detail: { page } }));
+    navigateToProject("project-links", projectId, "links");
   };
 
   const fetchProjects = useCallback(async () => {
@@ -437,6 +514,8 @@ const ProjectsPage = () => {
   const resetCreateDocumentFields = () => {
     setCreateDocumentForm(createInitialCreateDocumentForm());
     setCreateDocumentDriveLink("");
+    setCreateDocumentWebsiteLink("");
+    setCreateDocumentFiles([]);
   };
 
   const handleProjectModalOpenChange = (open: boolean) => {
@@ -450,6 +529,8 @@ const ProjectsPage = () => {
     setUploadProject(null);
     setUploadForm(createInitialUploadForm());
     setUploadDriveLink("");
+    setUploadWebsiteLink("");
+    setUploadFiles([]);
   };
 
   const handleOpenUploadDialog = (project: Project) => {
@@ -457,6 +538,8 @@ const ProjectsPage = () => {
     setUploadProject(project);
     setUploadForm(createInitialUploadForm());
     setUploadDriveLink("");
+    setUploadWebsiteLink("");
+    setUploadFiles([]);
     setIsUploadOpen(true);
   };
 
@@ -468,12 +551,137 @@ const ProjectsPage = () => {
     }
   };
 
+  const createProjectDocumentLink = async (
+    projectId: number,
+    name: string,
+    date: string,
+    attachmentType: Exclude<ProjectAttachmentType, "file">,
+    attachmentUrl: string
+  ) => {
+    const documentResponse = await api.post("/index.php?page=create-project-doc", {
+      name,
+      project_id: projectId,
+      type: PROJECT_DOCUMENT_DEFAULT_TYPE,
+      date,
+      attachment_type: attachmentType,
+      attachment_url: attachmentUrl,
+    });
+
+    if (documentResponse.data.status !== "success") {
+      throw new Error(documentResponse.data.message || "ไม่สามารถบันทึกเอกสารแนบได้");
+    }
+
+    return documentResponse.data;
+  };
+
+  const uploadProjectDocumentFile = async (projectId: number, name: string, date: string, file: File) => {
+    const uploadData = new FormData();
+    uploadData.append("file", file);
+    uploadData.append("project_id", String(projectId));
+    uploadData.append("name", name);
+    uploadData.append("date", date);
+    uploadData.append("type", PROJECT_DOCUMENT_DEFAULT_TYPE);
+
+    const uploadResponse = await api.post("/index.php?page=upload-project-file", uploadData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+
+    if (uploadResponse.data.status !== "success") {
+      throw new Error(uploadResponse.data.message || "ไม่สามารถอัปโหลดไฟล์แนบได้");
+    }
+
+    return uploadResponse.data;
+  };
+
+  const saveProjectAttachments = async ({
+    projectId,
+    name,
+    date,
+    googleDriveLink,
+    websiteLink,
+    files,
+  }: {
+    projectId: number;
+    name: string;
+    date: string;
+    googleDriveLink: string;
+    websiteLink: string;
+    files: File[];
+  }) => {
+    if (googleDriveLink) {
+      await createProjectDocumentLink(projectId, name, date, "google_drive", googleDriveLink);
+    }
+
+    if (websiteLink) {
+      await createProjectDocumentLink(projectId, name, date, "website_url", websiteLink);
+    }
+
+    for (const file of files) {
+      const fileDocumentName = files.length === 1 && name ? name : file.name;
+      await uploadProjectDocumentFile(projectId, fileDocumentName, date, file);
+    }
+  };
+
   const handleSubmitProjectDocuments = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!canManageProjects || !uploadProject) return;
 
     const trimmedName = uploadForm.name.trim();
     const trimmedDriveLink = uploadDriveLink.trim();
+    if (uploadWebsiteLink !== undefined) {
+      const trimmedWebsiteLink = uploadWebsiteLink.trim();
+      const hasAttachments = Boolean(trimmedDriveLink || trimmedWebsiteLink || uploadFiles.length > 0);
+      if (!hasAttachments || !uploadForm.date || ((trimmedDriveLink || trimmedWebsiteLink) && !trimmedName)) {
+        toast({
+          title: "กรุณากรอกข้อมูลให้ครบ",
+          description: "ต้องระบุวันที่ และแนบอย่างน้อย 1 รายการ หากเป็นลิงก์ต้องระบุชื่อเอกสารด้วย",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const validationError =
+        (trimmedDriveLink ? getGoogleDriveLinkError(trimmedDriveLink) : null) ||
+        (trimmedWebsiteLink ? getHttpsWebsiteLinkError(trimmedWebsiteLink) : null) ||
+        uploadFiles.map(getProjectDocumentFileError).find(Boolean);
+      if (validationError) {
+        toast({
+          title: "เอกสารแนบไม่ถูกต้อง",
+          description: validationError,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setIsUploadingDocuments(true);
+      try {
+        await saveProjectAttachments({
+          projectId: uploadProject.project_id,
+          name: trimmedName,
+          date: uploadForm.date,
+          googleDriveLink: trimmedDriveLink,
+          websiteLink: trimmedWebsiteLink,
+          files: uploadFiles,
+        });
+
+        toast({
+          title: "บันทึกเอกสารแนบสำเร็จ",
+          description: "เพิ่มเอกสารแนบให้โครงการเรียบร้อยแล้ว",
+        });
+        fetchProjects();
+        setIsUploadOpen(false);
+        resetUploadDialog();
+      } catch (error: unknown) {
+        toast({
+          title: "ไม่สามารถบันทึกเอกสารแนบได้",
+          description: getApiErrorMessage(error, "ระบบไม่สามารถบันทึกเอกสารแนบได้"),
+          variant: "destructive",
+        });
+      } finally {
+        setIsUploadingDocuments(false);
+      }
+      return;
+    }
     if (!trimmedName || !uploadForm.date || !trimmedDriveLink) {
       toast({
         title: "กรุณากรอกข้อมูลให้ครบ",
@@ -530,23 +738,77 @@ const ProjectsPage = () => {
     window.open(getProjectFileUrl(projectDocument.file_path), "_blank", "noopener,noreferrer");
   };
 
-  const handleOpenDocumentEdit = (document: ProjectDocument) => {
-    if (!canManageProjects) return;
-    setEditingDocument(document);
-    setDocumentEditForm({
-      name: document.name || document.file_name || "",
-      date: document.date || new Date().toISOString().slice(0, 10),
-    });
-    setDocumentEditDriveLink(document.file_path || "");
-    setIsDocumentEditOpen(true);
-  };
-
   const handleSaveDocumentEdit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!canManageProjects || !editingDocument) return;
 
     const trimmedName = documentEditForm.name.trim();
     const trimmedDriveLink = documentEditDriveLink.trim();
+    if (editingDocument.id > 0) {
+      if (!trimmedName || !documentEditForm.date) {
+        toast({
+          title: "กรุณากรอกข้อมูลให้ครบ",
+          description: "ต้องระบุชื่อเอกสารและวันที่เอกสาร",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const urlAttachmentType = trimmedDriveLink ? getAttachmentUrlType(trimmedDriveLink) : null;
+      const validationError =
+        (trimmedDriveLink
+          ? urlAttachmentType === "google_drive"
+            ? getGoogleDriveLinkError(trimmedDriveLink)
+            : getHttpsWebsiteLinkError(trimmedDriveLink)
+          : null) ||
+        (documentEditFile ? getProjectDocumentFileError(documentEditFile) : null);
+      if (validationError) {
+        toast({
+          title: "เอกสารแนบไม่ถูกต้อง",
+          description: validationError,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const payload = new FormData();
+      payload.append("document_id", String(editingDocument.id));
+      payload.append("name", trimmedName);
+      payload.append("type", PROJECT_DOCUMENT_DEFAULT_TYPE);
+      payload.append("date", documentEditForm.date);
+
+      if (documentEditFile) {
+        payload.append("attachment_type", "file");
+        payload.append("file", documentEditFile);
+      } else if (trimmedDriveLink && urlAttachmentType) {
+        payload.append("attachment_type", urlAttachmentType);
+        payload.append("attachment_url", trimmedDriveLink);
+      }
+
+      try {
+        setIsSavingDocument(true);
+        const res = await api.post("/index.php?page=update-project-doc", payload, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        if (res.data.status === "success") {
+          toast({ title: "บันทึกเอกสารสำเร็จ", description: res.data.message });
+          setIsDocumentEditOpen(false);
+          setEditingDocument(null);
+          setDocumentEditDriveLink("");
+          setDocumentEditFile(null);
+          fetchProjects();
+        }
+      } catch (error: unknown) {
+        toast({
+          title: "ไม่สามารถแก้ไขเอกสารได้",
+          description: getApiErrorMessage(error, "ระบบไม่สามารถบันทึกการแก้ไขเอกสารได้"),
+          variant: "destructive",
+        });
+      } finally {
+        setIsSavingDocument(false);
+      }
+      return;
+    }
     if (!trimmedName || !documentEditForm.date || !trimmedDriveLink) {
       toast({
         title: "กรุณากรอกข้อมูลให้ครบ",
@@ -707,10 +969,38 @@ const ProjectsPage = () => {
     }
 
     if (!editMode) {
+      const nextDocumentName = createDocumentForm.name.trim();
+      const nextDocumentDate = createDocumentForm.date.trim();
+      const nextDriveLink = createDocumentDriveLink.trim();
+      const nextWebsiteLink = createDocumentWebsiteLink.trim();
+      const hasAttachmentValue = Boolean(nextDriveLink || nextWebsiteLink || createDocumentFiles.length > 0);
+      const hasAttachmentInput = Boolean(nextDocumentName || nextDocumentDate || hasAttachmentValue);
+
+      if (hasAttachmentInput) {
+        if (!hasAttachmentValue) {
+          return "กรุณาแนบลิงก์หรือไฟล์เอกสารอย่างน้อย 1 รายการ";
+        }
+
+        if (!nextDocumentDate) {
+          return "กรุณาระบุวันที่เอกสารแนบ";
+        }
+
+        if ((nextDriveLink || nextWebsiteLink) && !nextDocumentName) {
+          return "กรุณาระบุชื่อเอกสารสำหรับลิงก์แนบ";
+        }
+
+        const attachmentError =
+          (nextDriveLink ? getGoogleDriveLinkError(nextDriveLink) : null) ||
+          (nextWebsiteLink ? getHttpsWebsiteLinkError(nextWebsiteLink) : null) ||
+          createDocumentFiles.map(getProjectDocumentFileError).find(Boolean);
+
+        if (attachmentError) return attachmentError;
+      }
+
       const documentName = createDocumentForm.name.trim();
       const documentDate = createDocumentForm.date.trim();
       const documentDriveLink = createDocumentDriveLink.trim();
-      const hasDocumentInput = Boolean(documentName || documentDate || documentDriveLink);
+      const hasDocumentInput = Boolean(documentDriveLink);
 
       if (hasDocumentInput && (!documentName || !documentDate || !documentDriveLink)) {
         return "กรุณากรอกชื่อเอกสาร วันที่เอกสาร และลิงก์ Google Drive ให้ครบ";
@@ -764,6 +1054,47 @@ const ProjectsPage = () => {
 
       const res = await api.post(endpoint, payload);
       if (res.data.status === "success") {
+        if (!editMode) {
+          const projectId = Number(res.data.project_id ?? res.data.data?.project_id ?? res.data.data?.id ?? 0);
+          const documentName = createDocumentForm.name.trim();
+          const documentDriveLink = createDocumentDriveLink.trim();
+          const documentWebsiteLink = createDocumentWebsiteLink.trim();
+          const shouldCreateAttachments = Boolean(documentDriveLink || documentWebsiteLink || createDocumentFiles.length > 0);
+
+          if (shouldCreateAttachments) {
+            try {
+              if (!Number.isInteger(projectId) || projectId <= 0) {
+                throw new Error("ไม่พบรหัสโครงการสำหรับบันทึกเอกสารแนบ");
+              }
+
+              await saveProjectAttachments({
+                projectId,
+                name: documentName,
+                date: createDocumentForm.date,
+                googleDriveLink: documentDriveLink,
+                websiteLink: documentWebsiteLink,
+                files: createDocumentFiles,
+              });
+
+              toast({
+                title: "สำเร็จ",
+                description: "สร้างโครงการและบันทึกเอกสารแนบสำเร็จ",
+              });
+            } catch (documentError: unknown) {
+              toast({
+                title: "สร้างโครงการสำเร็จ แต่บันทึกเอกสารแนบไม่สำเร็จ",
+                description: getApiErrorMessage(documentError, "ระบบไม่สามารถบันทึกเอกสารแนบได้"),
+                variant: "destructive",
+              });
+            }
+
+            resetCreateDocumentFields();
+            setIsModalOpen(false);
+            fetchProjects();
+            return;
+          }
+        }
+
         const documentName = createDocumentForm.name.trim();
         const documentDriveLink = createDocumentDriveLink.trim();
         const shouldCreateDocument = !editMode && Boolean(documentName || createDocumentForm.date || documentDriveLink);
@@ -859,7 +1190,6 @@ const ProjectsPage = () => {
   const editingProject = editMode
     ? projects.find((project) => project.project_id.toString() === formData.project_id) || null
     : null;
-  const editingProgress = editingProject ? projectProgress(editingProject) : 0;
   const academicYearOptions = useMemo(() => {
     const years = projects
       .map(projectAcademicYear)
@@ -883,13 +1213,10 @@ const ProjectsPage = () => {
 
   return (
     <div className="app-page animate-fade-in">
-      <div className="app-page-header">
-        <div>
-          <h1 className="app-page-title">จัดการโครงการ</h1>
-          <p className="app-page-description">สร้าง แก้ไข และติดตามความคืบหน้าโครงการภาควิชา</p>
-        </div>
-        {canManageProjects && (
-          <div className="flex flex-wrap gap-2">
+      <PageHeader
+        title="จัดการโครงการ"
+        description="สร้าง แก้ไข และติดตามความคืบหน้าโครงการภาควิชา"
+        actions={canManageProjects ? <>
             <Button variant="outline" className="gap-2" onClick={() => setIsImportOpen(true)}>
               <Upload className="h-4 w-4" />
               Import ข้อมูล
@@ -898,9 +1225,8 @@ const ProjectsPage = () => {
               <Plus className="h-4 w-4" />
               สร้างโครงการใหม่
             </Button>
-          </div>
-        )}
-      </div>
+        </> : null}
+      />
 
       {canManageProjects && (
         <ImportDataDialog
@@ -914,15 +1240,13 @@ const ProjectsPage = () => {
       )}
 
       <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
+        <SearchInput
             placeholder="ค้นหาโครงการด้วยชื่อภาษาไทย หรือ ภาษาอังกฤษ..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10"
-          />
-        </div>
+          wrapperClassName="flex-1"
+        />
         <Popover>
           <PopoverTrigger asChild>
             <Button variant="outline" className="gap-2">
@@ -996,10 +1320,7 @@ const ProjectsPage = () => {
           ))}
         </TabsList>
       </Tabs>
-
-      <div role="status" aria-live="polite" className="min-h-6 text-sm text-muted-foreground">
-        {isLoading || searchQuery !== debouncedSearch ? "กำลังอัปเดตผลลัพธ์…" : ""}
-      </div>
+      
       {isLoading && projects.length === 0 ? (
         <div className="flex justify-center items-center py-20">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -1031,7 +1352,7 @@ const ProjectsPage = () => {
                         {statusLabels[status]}
                       </Badge>
                     </div>
-                    <h3 className="font-semibold text-foreground line-clamp-2">{project.project_name_th}</h3>
+                    <h3 className="text-lg font-semibold text-foreground line-clamp-2">{project.project_name_th}</h3>
                     {project.project_name_en && (
                       <p className="text-xs text-muted-foreground mt-1 truncate">{project.project_name_en}</p>
                     )}
@@ -1070,14 +1391,12 @@ const ProjectsPage = () => {
                           >
                             <Upload className="h-4 w-4 text-green-500" /> อัปโหลดเอกสาร
                           </DropdownMenuItem>
-                          {projectType === "academic_service" && (
-                            <DropdownMenuItem
-                              className="gap-2"
-                              onClick={() => navigateToProjectPage("project-links", project.project_id)}
-                            >
-                              <Link2 className="h-4 w-4 text-purple-500" /> เชื่อมโยงระดับ LO
-                            </DropdownMenuItem>
-                          )}
+                          <DropdownMenuItem
+                            className="gap-2"
+                            onClick={() => navigateToProjectLinks(project.project_id)}
+                          >
+                            <Link2 className="h-4 w-4 text-purple-500" /> เชื่อมโยง PLO
+                          </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem className="gap-2 text-red-600 focus:bg-red-50" onClick={() => openDeleteConfirm(project.project_id)}>
                             <Trash2 className="h-4 w-4" /> ลบโครงการ
@@ -1170,6 +1489,9 @@ const ProjectsPage = () => {
                 <SelectContent>
                   <SelectItem value="academic_service">บริการวิชาการ</SelectItem>
                   <SelectItem value="culture">ทำนุบำรุงศิลปวัฒนธรรม</SelectItem>
+                  <SelectItem value="teaching">การเรียนการสอน</SelectItem>
+                  <SelectItem value="research">วิจัย</SelectItem>
+                  <SelectItem value="quality_assurance">การประกันคุณภาพ</SelectItem>
                   <SelectItem value="other">อื่น ๆ / ยังไม่จำแนก</SelectItem>
                 </SelectContent>
               </Select>
@@ -1354,8 +1676,8 @@ const ProjectsPage = () => {
             {!editMode && (
               <div className="space-y-3 rounded-lg border bg-muted/20 p-4">
                 <div>
-                  <Label>เอกสาร Google Drive</Label>
-                  <p className="text-xs text-muted-foreground">แนบลิงก์เอกสารตั้งต้นให้โครงการใหม่ หากกรอกต้องระบุชื่อ วันที่ และลิงก์ให้ครบ</p>
+                  <Label>เอกสารแนบ</Label>
+                  <p className="text-xs text-muted-foreground">แนบ Google Drive, URL เว็บไซต์ หรือไฟล์ตั้งต้นให้โครงการใหม่ หากเป็นลิงก์ต้องระบุชื่อเอกสาร</p>
                 </div>
                   <div className="grid gap-2">
                     <Label htmlFor="create-project-document-name">ชื่อเอกสาร</Label>
@@ -1382,6 +1704,39 @@ const ProjectsPage = () => {
                     />
                   </div>
                 </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="create-project-document-website-link">URL เว็บไซต์</Label>
+                  <div className="relative">
+                    <Globe2 className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="create-project-document-website-link"
+                      type="url"
+                      value={createDocumentWebsiteLink}
+                      onChange={(event) => setCreateDocumentWebsiteLink(event.target.value)}
+                      placeholder="https://example.com/..."
+                      className="pl-10"
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="create-project-document-files">แนบไฟล์ PDF / Word / รูปภาพ</Label>
+                  <Input
+                    id="create-project-document-files"
+                    type="file"
+                    multiple
+                    accept={PROJECT_DOCUMENT_FILE_ACCEPT}
+                    onChange={(event) => setCreateDocumentFiles(Array.from(event.target.files || []))}
+                    disabled={isSubmitting}
+                  />
+                  {createDocumentFiles.length > 0 && (
+                    <div className="rounded-md border bg-muted/30 p-2 text-xs text-muted-foreground">
+                      {createDocumentFiles.map((file) => (
+                        <p key={`${file.name}-${file.size}`} className="truncate">{file.name}</p>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
             {editMode && editingProject && (
@@ -1389,19 +1744,19 @@ const ProjectsPage = () => {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <Label>เอกสารที่อัปโหลด</Label>
-                    <p className="text-xs text-muted-foreground">แก้ไขข้อมูลเอกสาร เปลี่ยนลิงก์ Google Drive หรือลบเอกสารออกจากโครงการ</p>
+                    <p className="text-xs text-muted-foreground">แก้ไขข้อมูลเอกสาร เปิดลิงก์หรือไฟล์ และลบเอกสารออกจากโครงการ</p>
                   </div>
-                  <Badge variant="outline">{projectDocuments(editingProject).length} ลิงก์</Badge>
+                  <Badge variant="outline">{projectDocuments(editingProject).length} รายการ</Badge>
                 </div>
                 {projectDocuments(editingProject).length === 0 ? (
                   <div className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
-                    ยังไม่มีลิงก์เอกสารสำหรับโครงการนี้
+                    ยังไม่มีเอกสารแนบสำหรับโครงการนี้
                   </div>
                 ) : (
                   <div className="space-y-2">
                     {projectDocuments(editingProject).map((documentItem) => (
                       <div key={documentItem.id} className="flex flex-col gap-3 rounded-lg border bg-background p-3 sm:flex-row sm:items-center">
-                        <GoogleDriveIcon className="h-5 w-5 shrink-0" />
+                        <DocumentAttachmentIcon document={documentItem} className="h-5 w-5 shrink-0" />
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-medium text-foreground">{documentItem.name}</p>
                           <p className="truncate text-xs text-muted-foreground">
@@ -1411,12 +1766,8 @@ const ProjectsPage = () => {
                         </div>
                         <div className="flex flex-wrap gap-2">
                           <Button type="button" variant="outline" size="sm" disabled={!documentItem.file_path} onClick={() => openDocumentFile(documentItem)}>
-                            <GoogleDriveIcon className="mr-1 h-4 w-4" />
-                            Google Drive
-                          </Button>
-                          <Button type="button" variant="outline" size="sm" onClick={() => handleOpenDocumentEdit(documentItem)}>
-                            <Edit className="mr-1 h-4 w-4" />
-                            แก้ไข
+                            <DocumentAttachmentIcon document={documentItem} className="mr-1 h-4 w-4" />
+                            {getDocumentOpenLabel(documentItem)}
                           </Button>
                           <Button type="button" variant="outline" size="sm" className="text-red-600 hover:text-red-700" onClick={() => handleOpenDocumentDelete(documentItem)}>
                             <Trash2 className="mr-1 h-4 w-4" />
@@ -1457,7 +1808,6 @@ const ProjectsPage = () => {
           {viewProject && (
             <div className="space-y-4 py-2 text-sm">
               {(() => {
-                const progress = projectProgress(viewProject);
                 const facultyMembers = projectFacultyMembers(viewProject);
 
                 return (
@@ -1554,11 +1904,11 @@ const ProjectsPage = () => {
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-foreground text-base font-bold">เอกสารที่อัปโหลด</p>
-                  <Badge variant="outline">{projectDocuments(viewProject).length} ลิงก์</Badge>
+                  <Badge variant="outline">{projectDocuments(viewProject).length} รายการ</Badge>
                 </div>
                 {projectDocuments(viewProject).length === 0 ? (
                   <div className="rounded-lg border border-dashed p-4 text-center text-muted-foreground">
-                    ยังไม่มีลิงก์เอกสารสำหรับโครงการนี้
+                    ยังไม่มีเอกสารแนบสำหรับโครงการนี้
                   </div>
                 ) : (
                   <div className="grid gap-3 sm:grid-cols-5">
@@ -1569,13 +1919,14 @@ const ProjectsPage = () => {
                         className="flex flex-col items-center gap-2 rounded-md bg-background px-2 py-3 text-center transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
                         disabled={!documentItem.file_path}
                         onClick={() => openDocumentFile(documentItem)}
-                        title="เปิด Google Drive"
-                        aria-label={`เปิดเอกสาร ${documentItem.name || "Google Drive"}`}
+                        title={getDocumentOpenLabel(documentItem)}
+                        aria-label={`เปิดเอกสาร ${documentItem.name || getDocumentDisplayName(documentItem)}`}
                       >
-                        <GoogleDriveIcon className="h-14 w-14 shrink-0" />
+                        <DocumentAttachmentIcon document={documentItem} className="h-14 w-14 shrink-0" />
                         <div className="min-w-0 w-full">
                           <p className="max-w-[7rem] truncate text-center text-[13px] font-semibold text-foreground">{documentItem.name}</p>
                           <p className="truncate text-xs text-muted-foreground">{formatDate(documentItem.date)}</p>
+                          <p className="truncate text-xs text-muted-foreground">{getDocumentDisplayName(documentItem)}</p>
                         </div>
                       </button>
                     ))}
@@ -1613,77 +1964,12 @@ const ProjectsPage = () => {
         </DialogContent>
       </Dialog>
 
-      <Dialog
-        open={isDocumentEditOpen}
-        onOpenChange={(open) => {
-          if (isSavingDocument && !open) return;
-          setIsDocumentEditOpen(open);
-          if (!open) {
-            setEditingDocument(null);
-            setDocumentEditDriveLink("");
-          }
-        }}
-      >
-        <DialogContent className="app-dialog-3xl">
-          <DialogHeader>
-            <DialogTitle>แก้ไขเอกสารโครงการ</DialogTitle>
-            <DialogDescription>แก้ไขข้อมูลเอกสารและลิงก์ Google Drive</DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleSaveDocumentEdit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-project-document-name">ชื่อเอกสาร</Label>
-              <Input
-                id="edit-project-document-name"
-                value={documentEditForm.name}
-                onChange={(event) => setDocumentEditForm((prev) => ({ ...prev, name: event.target.value }))}
-                disabled={isSavingDocument}
-                required
-              />
-            </div>
-              <div className="space-y-2">
-              <Label htmlFor="edit-project-document-drive-link">ลิงก์ Google Drive</Label>
-                <div className="relative">
-                  <GoogleDriveIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
-                  <Input
-                    id="edit-project-document-drive-link"
-                    type="url"
-                    value={documentEditDriveLink}
-                      onChange={(event) => setDocumentEditDriveLink(event.target.value)}
-                    placeholder="https://drive.google.com/..."
-                    className="pl-10"
-                    disabled={isSavingDocument}
-                    required
-                  />
-                </div>
-            </div>
-            {editingDocument && (
-              <div className="rounded-lg border bg-muted/30 p-3 text-sm">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <GoogleDriveIcon />
-                  <p>ลิงก์ปัจจุบัน</p>
-                </div>
-                <p className="mt-1 truncate font-medium text-foreground">{editingDocument.file_path || "-"}</p>
-              </div>
-            )}
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsDocumentEditOpen(false)} disabled={isSavingDocument}>
-                ยกเลิก
-              </Button>
-              <Button type="submit" disabled={isSavingDocument || !documentEditForm.name.trim() || !documentEditForm.date || !documentEditDriveLink.trim()}>
-                {isSavingDocument ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                บันทึกเอกสาร
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
       <Dialog open={isUploadOpen} onOpenChange={handleUploadOpenChange}>
         <DialogContent className="app-dialog-2xl">
           <DialogHeader>
             <DialogTitle>อัปโหลดเอกสารโครงการ</DialogTitle>
             <DialogDescription>
-              แนบลิงก์ Google Drive เพิ่มเติมให้กับโครงการที่เลือก
+              แนบลิงก์ Google Drive, URL เว็บไซต์ หรือไฟล์ PDF/Word/รูปภาพ ให้กับโครงการที่เลือก
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmitProjectDocuments} className="space-y-5">
@@ -1704,7 +1990,6 @@ const ProjectsPage = () => {
                   onChange={(event) => setUploadForm((prev) => ({ ...prev, name: event.target.value }))}
                   placeholder="เช่น รายงานความก้าวหน้าโครงการ"
                   disabled={isUploadingDocuments}
-                  required
                 />
               </div>
 
@@ -1720,16 +2005,50 @@ const ProjectsPage = () => {
                   placeholder="https://drive.google.com/..."
                   className="pl-10"
                   disabled={isUploadingDocuments}
-                  required
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="project-document-website-link">URL เว็บไซต์</Label>
+              <div className="relative">
+                <Globe2 className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="project-document-website-link"
+                  type="url"
+                  value={uploadWebsiteLink}
+                  onChange={(event) => setUploadWebsiteLink(event.target.value)}
+                  placeholder="https://example.com/..."
+                  className="pl-10"
+                  disabled={isUploadingDocuments}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="project-document-files">แนบไฟล์ PDF / Word / รูปภาพ</Label>
+              <Input
+                id="project-document-files"
+                type="file"
+                multiple
+                accept={PROJECT_DOCUMENT_FILE_ACCEPT}
+                onChange={(event) => setUploadFiles(Array.from(event.target.files || []))}
+                disabled={isUploadingDocuments}
+              />
+              {uploadFiles.length > 0 && (
+                <div className="rounded-md border bg-muted/30 p-2 text-xs text-muted-foreground">
+                  {uploadFiles.map((file) => (
+                    <p key={`${file.name}-${file.size}`} className="truncate">{file.name}</p>
+                  ))}
+                </div>
+              )}
             </div>
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => handleUploadOpenChange(false)} disabled={isUploadingDocuments}>
                 ยกเลิก
               </Button>
-              <Button type="submit" disabled={isUploadingDocuments || !uploadForm.name.trim() || !uploadForm.date || !uploadDriveLink.trim()}>
+              <Button type="submit" disabled={isUploadingDocuments || !uploadForm.date || (!uploadDriveLink.trim() && !uploadWebsiteLink.trim() && uploadFiles.length === 0)}>
                 {isUploadingDocuments ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -1737,7 +2056,7 @@ const ProjectsPage = () => {
                   </>
                 ) : (
                   <>
-                    บันทึกลิงก์
+                    บันทึกเอกสารแนบ
                   </>
                 )}
               </Button>

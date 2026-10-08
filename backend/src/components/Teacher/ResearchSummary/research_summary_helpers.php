@@ -46,7 +46,9 @@ function researchAuthorRoles(array $row): array
 function researchRevision(array $row): string
 {
     $values = [];
-    foreach (['title', 'publication_date', 'publication_year', 'article_type', 'journal_name', 'category', 'first_author_id', 'corresponding_author_id', 'co_author_ids'] as $key) {
+    foreach (['title', 'publication_date', 'publication_year', 'article_type', 'journal_name', 'category',
+        'work_category', 'funding_type', 'funding_source', 'funding_amount', 'irb_approved',
+        'intellectual_property_status', 'award_name', 'first_author_id', 'corresponding_author_id', 'co_author_ids'] as $key) {
         $values[$key] = $row[$key] ?? null;
     }
     return hash('sha256', json_encode($values, JSON_UNESCAPED_UNICODE));
@@ -72,7 +74,10 @@ function researchSummaryData(PDO $db, bool $canManage): array
     }
     unset($person);
     $publications = [];
-    $rows = $db->query('SELECT research_id, faculty_id, title, publication_year, publication_date, article_type, journal_name, category, first_author_id, corresponding_author_id, co_author_ids FROM faculty_research ORDER BY research_id DESC')->fetchAll(PDO::FETCH_ASSOC);
+    $rows = $db->query('SELECT research_id, faculty_id, title, publication_year, publication_date, article_type, journal_name, category,
+        work_category, funding_type, funding_source, funding_amount, irb_approved,
+        intellectual_property_status, award_name, first_author_id, corresponding_author_id, co_author_ids
+        FROM faculty_research ORDER BY research_id DESC')->fetchAll(PDO::FETCH_ASSOC);
     foreach ($rows as $row) {
         $authors = [];
         foreach (researchAuthorRoles($row) as $id => $role) {
@@ -90,7 +95,19 @@ function researchSummaryData(PDO $db, bool $canManage): array
             'id' => (int)$row['research_id'], 'title' => $row['title'], 'revision' => researchRevision($row),
             'journal' => $row['journal_name'] ?? '', 'publication_date' => $date,
             'buddhist_year' => $date ? (int)substr($date, 0, 4) + 543 : $year,
-            'publication_type' => $type, 'database_level' => $row['category'] ?? '', 'authors' => $authors,
+            'publication_type' => $type,
+            'database_level' => $row['category'] ?? '',
+            'work_category' => in_array($row['work_category'] ?? '', ['research', 'innovation'], true)
+                ? $row['work_category'] : 'research',
+            'funding_type' => in_array($row['funding_type'] ?? '', ['none', 'internal', 'external'], true)
+                ? $row['funding_type'] : 'none',
+            'funding_source' => $row['funding_source'] ?? '',
+            'funding_amount' => round((float)($row['funding_amount'] ?? 0), 2),
+            'irb_approved' => (bool)($row['irb_approved'] ?? false),
+            'intellectual_property_status' => in_array($row['intellectual_property_status'] ?? '', ['none', 'applying', 'copyright', 'petty_patent', 'patent'], true)
+                ? $row['intellectual_property_status'] : 'none',
+            'award_name' => $row['award_name'] ?? '',
+            'authors' => $authors,
         ];
     }
     return ['years' => range(currentAcademicYear() - 4, currentAcademicYear()), 'faculty' => $faculty,

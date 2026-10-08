@@ -5,6 +5,7 @@ require_once __DIR__ . '/../../../config/audit_helper.php'; // นำเข้�
 
 $db = project_db();
 $auth = project_require_auth($db, ['PROJECT_DOCS_MANAGE']);
+project_require_admin_write($auth);
 $input = project_payload();
 
 try {
@@ -12,7 +13,17 @@ try {
     $projectId = isset($input['project_id']) ? (int) $input['project_id'] : 0;
     $type = trim((string) ($input['type'] ?? 'summary'));
     $date = trim((string) ($input['date'] ?? ''));
+    $attachmentType = trim((string) ($input['attachment_type'] ?? ''));
+    $attachmentUrl = trim((string) ($input['attachment_url'] ?? ''));
     $googleDriveLink = trim((string) ($input['google_drive_link'] ?? ''));
+
+    if ($attachmentType === '' && $googleDriveLink !== '') {
+        $attachmentType = 'google_drive';
+        $attachmentUrl = $googleDriveLink;
+    }
+    if ($attachmentType === '') {
+        $attachmentType = 'file';
+    }
 
     $allowedTypes = ['proposal', 'progress', 'financial', 'summary'];
     if ($name === '' || $projectId <= 0 || $type === '' || $date === '') {
@@ -23,7 +34,20 @@ try {
         project_json(["status" => "error", "message" => "ประเภทเอกสารไม่ถูกต้อง"], 400);
         exit;
     }
-    project_document_validate_google_drive_link($googleDriveLink);
+    $filePath = null;
+    $fileName = null;
+    if ($attachmentType === 'google_drive') {
+        project_document_validate_google_drive_link($attachmentUrl);
+        $filePath = $attachmentUrl !== '' ? $attachmentUrl : null;
+        $fileName = $attachmentUrl !== '' ? 'Google Drive' : null;
+    } elseif ($attachmentType === 'website_url') {
+        project_document_validate_website_url($attachmentUrl);
+        $filePath = $attachmentUrl !== '' ? $attachmentUrl : null;
+        $fileName = $attachmentUrl !== '' ? 'Website URL' : null;
+    } elseif ($attachmentType !== 'file') {
+        project_json(["status" => "error", "message" => "ประเภทเอกสารแนบไม่ถูกต้อง"], 400);
+        exit;
+    }
 
     $project = project_require_existing_project($db, $projectId);
     $projectName = $project['project_name_th'] ?: ($project['project_name_en'] ?: 'Project #' . $projectId);
@@ -38,8 +62,8 @@ try {
         ':project' => $projectName,
         ':type' => $type,
         ':date' => $date,
-        ':file_path' => $googleDriveLink !== '' ? $googleDriveLink : null,
-        ':file_name' => $googleDriveLink !== '' ? 'Google Drive' : null,
+        ':file_path' => $filePath,
+        ':file_name' => $fileName,
     ];
     $stmt->execute($stmtParams);
 

@@ -64,7 +64,7 @@ try {
         exit;
     }
 
-    $allowedProjectTypes = ['academic_service', 'culture', 'other'];
+    $allowedProjectTypes = ['academic_service', 'culture', 'research', 'teaching', 'quality_assurance', 'other'];
     $projectType = $input['project_type'] ?? 'other';
     if (!in_array($projectType, $allowedProjectTypes, true)) {
         project_json(["status" => "error", "message" => "ประเภทโครงการไม่ถูกต้อง"], 422);
