@@ -76,7 +76,36 @@ frontend/.env
 ตัวอย่าง:
 
 ```env
-VITE_API_BASE_URL=http://localhost:8080
+# Base URL สำหรับเชื่อมต่อ Backend API
+VITE_API_BASE_URL = http://localhost:8080
+
+# คัดลอกไฟล์นี้เป็น .env (วางข้าง docker-compose.yml) แล้วกรอกค่าจริง จากนั้นรัน: docker compose up -d backend
+# .env อยู่ใน .gitignore แล้ว — ห้าม commit รหัสผ่านขึ้น git
+
+# ---------- อีเมลแจ้งเตือน (ใบประกอบวิชาชีพใกล้หมดอายุ) ----------
+# ถ้าเว้น SMTP_HOST ว่าง ระบบยังแจ้งเตือนในระบบได้ แต่จะไม่ส่งอีเมล
+#
+# ตัวอย่าง Gmail: ต้องเปิด 2-Step Verification แล้วสร้าง "App password" (16 ตัวอักษร) มาใส่ใน SMTP_PASSWORD
+#   SMTP_HOST=smtp.gmail.com / SMTP_PORT=587 / SMTP_SECURE=tls
+# ตัวอย่าง Microsoft 365 / Outlook:
+#   SMTP_HOST=smtp.office365.com / SMTP_PORT=587 / SMTP_SECURE=tls
+
+SMTP_HOST=
+SMTP_PORT=587
+# tls (STARTTLS พอร์ต 587) | ssl (พอร์ต 465) | none (ไม่เข้ารหัส ใช้ทดสอบเท่านั้น)
+SMTP_SECURE=tls
+SMTP_USERNAME=
+SMTP_PASSWORD=
+# ผู้ส่งที่แสดงในอีเมล (ถ้าว่างจะใช้ SMTP_USERNAME)
+SMTP_FROM_EMAIL=
+SMTP_FROM_NAME=ระบบบริหารจัดการคณะพยาบาลศาสตร์
+
+# ลิงก์ "เข้าสู่ระบบ" ในอีเมล
+APP_URL=http://localhost:5173
+
+# ---------- แจ้งเตือนโครงการใกล้สิ้นสุด (30 และ 14 วันก่อนวันสิ้นสุด, ไม่รวมโครงการที่เสร็จสิ้น/ยกเลิก) ----------
+# ส่งอีเมลไปที่อีเมลคณะ + แจ้งเตือนแอดมินในระบบ (ใช้ SMTP ชุดเดียวกับด้านบน)
+PROJECT_REMINDER_EMAIL=nus1@siam.edu
 ```
 
 ถ้าไม่ได้ตั้งค่านี้ axios จะไม่มี base URL ชัดเจน และ API เช่น `/index.php?page=login` อาจยิงผิดที่

@@ -380,7 +380,7 @@ export default function ResearchSummary() {
   return (
     <div className="space-y-6">
       <Dialog open={editingPublication !== null} onOpenChange={(open) => { if (!open && !isSaving) setEditingPublication(null); }}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-h-[90vh] app-dialog-2xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>แก้ไขรายละเอียดผลงาน</DialogTitle>
             <DialogDescription>แก้ไขข้อมูลแล้วกดบันทึก วันที่และประเภทผลงานจะใช้คำนวณตารางและ KPI ใหม่</DialogDescription>
