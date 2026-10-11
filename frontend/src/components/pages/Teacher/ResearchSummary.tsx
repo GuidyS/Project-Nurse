@@ -5,6 +5,7 @@ import {
   BarChart3,
   Banknote,
   CalendarDays,
+  ChevronDown,
   CheckCircle2,
   Loader2,
   Microscope,
@@ -78,8 +79,8 @@ interface ResearchSummaryResponse {
 }
 
 const roleLabel: Record<AuthorRole, string> = {
-  first_author: "First",
-  corresponding: "Corresponding",
+  first_author: "Head",
+  corresponding: "Head",
   co_author: "ชื่อร่วม",
 };
 
@@ -178,6 +179,9 @@ export default function ResearchSummary() {
   const [saveFailed, setSaveFailed] = useState(false);
   const savingRef = useRef(false);
   const [editingPublication, setEditingPublication] = useState<Publication | null>(null);
+  const [editingHeadFacultyId, setEditingHeadFacultyId] = useState<number | null>(null);
+  const [editingCoAuthorIds, setEditingCoAuthorIds] = useState<number[]>([]);
+  const [facultyPickerSearch, setFacultyPickerSearch] = useState("");
   const [editError, setEditError] = useState('');
 
   useEffect(() => {
@@ -308,7 +312,7 @@ export default function ResearchSummary() {
     );
   }, [publicationsMatchingResearchFilters, search, yearFilter, yearMode]);
 
-  const saveChange = async (payload: Record<string, string | number | boolean>) => {
+  const saveChange = async (payload: Record<string, string | number | boolean | number[]>) => {
     if (savingRef.current || saveFailed || !canManageResearch) return false;
     savingRef.current = true;
     setIsSaving(true);
@@ -359,6 +363,45 @@ export default function ResearchSummary() {
     if (target) void saveChange({ action: 'remove', faculty_id: person.faculty_id, publication_id: target.id });
   };
 
+  const openPublicationEditor = (publication: Publication) => {
+    const head = publication.authors.find((author) => author.role === "first_author" || author.role === "corresponding")
+      ?? null;
+    setEditError("");
+    setFacultyPickerSearch("");
+    setEditingPublication({ ...publication });
+    setEditingHeadFacultyId(head?.faculty_id ?? null);
+    setEditingCoAuthorIds(publication.authors
+      .filter((author) => author.role === "co_author" && author.faculty_id !== head?.faculty_id)
+      .map((author) => author.faculty_id));
+  };
+
+  const closePublicationEditor = () => {
+    setEditingPublication(null);
+    setEditingHeadFacultyId(null);
+    setEditingCoAuthorIds([]);
+    setFacultyPickerSearch("");
+    setEditError("");
+  };
+
+  const filteredPickerFaculty = useMemo(() => {
+    const query = facultyPickerSearch.trim().toLocaleLowerCase("th-TH");
+    if (!query) return faculty;
+    return faculty.filter((person) =>
+      `${person.name} ${person.note ?? ""}`.toLocaleLowerCase("th-TH").includes(query));
+  }, [faculty, facultyPickerSearch]);
+
+  const showAuthorInFacultyTable = (author: PublicationAuthor) => {
+    setSearch(author.name);
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        document.getElementById(`research-faculty-${author.faculty_id}`)?.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      });
+    });
+  };
+
   if (isLoading) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
@@ -379,8 +422,8 @@ export default function ResearchSummary() {
 
   return (
     <div className="space-y-6">
-      <Dialog open={editingPublication !== null} onOpenChange={(open) => { if (!open && !isSaving) setEditingPublication(null); }}>
-        <DialogContent className="max-h-[90vh] app-dialog-2xl overflow-y-auto">
+      <Dialog open={editingPublication !== null} onOpenChange={(open) => { if (!open && !isSaving) closePublicationEditor(); }}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>แก้ไขรายละเอียดผลงาน</DialogTitle>
             <DialogDescription>แก้ไขข้อมูลแล้วกดบันทึก วันที่และประเภทผลงานจะใช้คำนวณตารางและ KPI ใหม่</DialogDescription>
@@ -388,6 +431,10 @@ export default function ResearchSummary() {
           {editingPublication && (
             <form className="space-y-4" onSubmit={async (event) => {
               event.preventDefault();
+              if (editingHeadFacultyId === null) {
+                setEditError("กรุณาเลือก Head อย่างน้อย 1 คน");
+                return;
+              }
               const saved = await saveChange({
                 action: 'update', publication_id: editingPublication.id,
                 faculty_id: editingPublication.authors[0].faculty_id,
@@ -402,8 +449,10 @@ export default function ResearchSummary() {
                 irb_approved: editingPublication.irb_approved,
                 intellectual_property_status: editingPublication.intellectual_property_status,
                 award_name: editingPublication.award_name,
+                head_faculty_id: editingHeadFacultyId,
+                co_author_ids: editingCoAuthorIds,
               });
-              if (saved) setEditingPublication(null);
+              if (saved) closePublicationEditor();
             }}>
               <fieldset disabled={isSaving || saveFailed} className="space-y-4">
                 <div className="space-y-2"><Label htmlFor="research-title">ชื่อผลงาน</Label>
@@ -460,11 +509,77 @@ export default function ResearchSummary() {
                   <input id="research-irb-approved" type="checkbox" className="h-4 w-4 rounded border-input" checked={editingPublication.irb_approved} onChange={(e) => setEditingPublication({ ...editingPublication, irb_approved: e.target.checked })} />
                   งานวิจัยนี้ผ่าน IRB แล้ว
                 </label>
+                <div className="space-y-2">
+                  <div>
+                    <Label>ผู้รับผิดชอบผลงาน</Label>
+                    <p className="text-xs text-muted-foreground">
+                      {editingHeadFacultyId === null
+                        ? "เลือก Head ได้ 1 คน และเลือก Co ได้หลายคน"
+                        : "ผลงานนี้มี Head แล้ว ระบบจึงปิดการเลือก Head เพิ่ม แต่ยังแก้ไข Co ได้"}
+                    </p>
+                  </div>
+                  <div className="relative">
+                    <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      value={facultyPickerSearch}
+                      onChange={(event) => setFacultyPickerSearch(event.target.value)}
+                      placeholder="ค้นหาชื่อหรือตำแหน่งอาจารย์..."
+                      className="pl-9"
+                      aria-label="ค้นหาอาจารย์สำหรับกำหนด Head หรือ Co"
+                    />
+                  </div>
+                  <div className="max-h-64 overflow-y-auto rounded-md border">
+                    <div className="sticky top-0 grid grid-cols-[1fr_64px_64px] gap-2 border-b bg-muted/95 px-3 py-2 text-xs font-medium backdrop-blur">
+                      <span>อาจารย์</span>
+                      <span className="text-center">Head</span>
+                      <span className="text-center">Co</span>
+                    </div>
+                    {filteredPickerFaculty.length === 0 && (
+                      <p className="px-3 py-6 text-center text-sm text-muted-foreground">ไม่พบอาจารย์ที่ตรงกับคำค้น</p>
+                    )}
+                    {filteredPickerFaculty.map((person) => {
+                      const isHead = editingHeadFacultyId === person.faculty_id;
+                      const isCo = editingCoAuthorIds.includes(person.faculty_id);
+                      return (
+                        <div key={person.faculty_id} className="grid grid-cols-[1fr_64px_64px] items-center gap-2 border-b px-3 py-2 last:border-b-0">
+                          <span className="text-sm">{person.name}</span>
+                          <label className="flex justify-center" title={`เลือก ${person.name} เป็น Head`}>
+                            <input
+                              type="radio"
+                              name="research-head-faculty"
+                              value={person.faculty_id}
+                              checked={isHead}
+                              disabled={editingHeadFacultyId !== null}
+                              onChange={() => {
+                                setEditingHeadFacultyId(person.faculty_id);
+                                setEditingCoAuthorIds((current) => current.filter((id) => id !== person.faculty_id));
+                              }}
+                              className="h-4 w-4"
+                              aria-label={`เลือก ${person.name} เป็น Head`}
+                            />
+                          </label>
+                          <label className="flex justify-center" title={`เลือก ${person.name} เป็น Co`}>
+                            <input
+                              type="checkbox"
+                              checked={isCo}
+                              disabled={isHead}
+                              onChange={(event) => setEditingCoAuthorIds((current) => event.target.checked
+                                ? [...current, person.faculty_id]
+                                : current.filter((id) => id !== person.faculty_id))}
+                              className="h-4 w-4 rounded border-input"
+                              aria-label={`เลือก ${person.name} เป็น Co`}
+                            />
+                          </label>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               </fieldset>
               {saveFailed && <p role="alert" className="text-sm text-destructive">{saveMessage}</p>}
               {editError && <p role="alert" className="text-sm text-destructive">{editError}</p>}
               <DialogFooter>
-                <Button type="button" variant="outline" disabled={isSaving} onClick={() => setEditingPublication(null)}>ยกเลิก</Button>
+                <Button type="button" variant="outline" disabled={isSaving} onClick={closePublicationEditor}>ยกเลิก</Button>
                 {saveFailed ? <Button type="button" onClick={() => window.location.reload()}>โหลดข้อมูลใหม่</Button> : <Button type="submit" disabled={isSaving}>{isSaving ? 'กำลังบันทึก...' : 'บันทึกการแก้ไข'}</Button>}
               </DialogFooter>
             </form>
@@ -556,7 +671,7 @@ export default function ResearchSummary() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">{summary.kpi}</div>
-            <p className="text-xs text-muted-foreground">รับเฉพาะ First/Corresponding</p>
+            <p className="text-xs text-muted-foreground">นับเฉพาะ Head</p>
           </CardContent>
         </Card>
         <Card>
@@ -654,8 +769,8 @@ export default function ResearchSummary() {
             <CardTitle>ตารางจำนวนผลงานวิจัยและวิชาการตีพิมพ์ของอาจารย์</CardTitle>
             <CardDescription>
               {canManageResearch
-                ? "กดช่องปีเพื่อเพิ่ม/ลดจำนวน โดยช่องรวมเฉพาะ KPI รับเฉพาะผลงานสีแดง First/Corresponding"
-                : "รูปแบบใกล้เคียง D74: ช่องรวมเฉพาะผลงานสีแดง First/Corresponding"}
+                ? "กดช่องปีเพื่อเพิ่ม/ลดจำนวน โดยช่องรวมเฉพาะ KPI รับเฉพาะผลงานสีแดงที่เป็น Head"
+                : "รูปแบบใกล้เคียง D74: ช่องรวมเฉพาะผลงานสีแดงที่เป็น Head"}
             </CardDescription>
           </div>
           <div className="flex flex-col gap-3 border-t pt-4 lg:flex-row lg:items-center lg:justify-between">
@@ -693,7 +808,7 @@ export default function ResearchSummary() {
                 {filteredFaculty.map((person, index) => {
                   const totalKpi = years.reduce((acc, year) => acc + authorCountsForYear(publications, person.faculty_id, year, yearMode).kpi, 0);
                   return (
-                    <TableRow key={person.faculty_id}>
+                    <TableRow key={person.faculty_id} id={`research-faculty-${person.faculty_id}`}>
                       <TableCell className="text-center text-muted-foreground">{index + 1}</TableCell>
                       <TableCell className="font-medium">{person.name}</TableCell>
                       {years.map((year) => {
@@ -832,11 +947,11 @@ export default function ResearchSummary() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card id="recorded-research-publications">
         <CardHeader>
           <CardTitle>รายการผลงานที่บันทึก</CardTitle>
           <CardDescription>
-            ข้อมูลที่บันทึกในฐานข้อมูลและใช้คำนวณตัวเลขในตาราง รายการที่เพิ่มด้วยปุ่ม + เป็นบันทึกจำนวนผลงาน โดยใช้วันเริ่มต้นของปีที่เลือกเป็นวันที่อ้างอิง
+            ข้อมูลที่บันทึกในฐานข้อมูลและใช้คำนวณตัวเลขในตาราง เปิดป้ายผู้รับผิดชอบแล้วเลือกชื่อเพื่อไปยังแถวของอาจารย์คนนั้น รายการที่เพิ่มด้วยปุ่ม + เป็นบันทึกจำนวนผลงาน โดยใช้วันเริ่มต้นของปีที่เลือกเป็นวันที่อ้างอิง
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -844,6 +959,13 @@ export default function ResearchSummary() {
             {visiblePublications.length === 0 && <p className="text-sm text-muted-foreground">ยังไม่มีผลงานที่ตรงกับเงื่อนไข</p>}
             {visiblePublications.map((publication) => {
               const isAcademic = publication.publication_type === "academic" || publication.publication_type === "textbook";
+              const responsibleAuthors = [...publication.authors].sort((first, second) =>
+                Number(first.role === "co_author") - Number(second.role === "co_author"));
+              const authorBadgeColor = (author: PublicationAuthor) => {
+                if (isAcademic) return "border-sky-600 bg-sky-600 text-white hover:bg-sky-600";
+                if (author.role !== "co_author") return "border-red-600 bg-red-600 text-white hover:bg-red-600";
+                return "border-zinc-900 bg-zinc-900 text-white hover:bg-zinc-900";
+              };
               return (
                 <div key={publication.id} className="rounded-md border p-4">
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -864,23 +986,81 @@ export default function ResearchSummary() {
                         {publication.award_name && <p>รางวัล: {publication.award_name}</p>}
                       </div>}
                       <div className="flex flex-wrap gap-2 pt-1">
-                        {publication.authors.map((author) => (
-                          <Badge
-                            key={`${publication.id}-${author.faculty_id}-${author.role}`}
-                            variant={isAcademic ? "default" : author.role === "co_author" ? "outline" : "default"}
-                            className={cn(
-                              isAcademic && "bg-sky-600",
-                              !isAcademic && author.role !== "co_author" && "bg-red-600"
-                            )}
+                        {responsibleAuthors.length === 1 && (
+                          <button
+                            type="button"
+                            onClick={() => showAuthorInFacultyTable(responsibleAuthors[0])}
+                            className="rounded-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                            title={`ไปยังข้อมูลของ ${responsibleAuthors[0].name} ในตาราง`}
                           >
-                            {author.name}: {roleLabel[author.role]}
-                          </Badge>
-                        ))}
+                            <Badge
+                              variant="default"
+                              className={cn(
+                                "cursor-pointer py-1",
+                                responsibleAuthors[0].role === "co_author" ? "text-sm font-medium" : "text-base font-bold",
+                                authorBadgeColor(responsibleAuthors[0])
+                              )}
+                            >
+                              {responsibleAuthors[0].name}: {roleLabel[responsibleAuthors[0].role]}
+                            </Badge>
+                          </button>
+                        )}
+                        {responsibleAuthors.length > 1 && (
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <button
+                                type="button"
+                                className="rounded-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                title="เปิดรายชื่อผู้รับผิดชอบผลงาน"
+                              >
+                                <Badge
+                                  variant="outline"
+                                  className="cursor-pointer gap-1 py-1 text-sm font-medium"
+                                >
+                                  ผู้รับผิดชอบ {responsibleAuthors.length} คน
+                                  <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
+                                </Badge>
+                              </button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[28rem] max-w-[calc(100vw-2rem)] p-2" align="start">
+                              <p className="px-2 pb-2 text-sm font-semibold">ผู้รับผิดชอบผลงาน</p>
+                              <div className="max-h-64 space-y-1 overflow-y-auto">
+                                {responsibleAuthors.map((author) => {
+                                  const isHead = author.role !== "co_author";
+                                  return (
+                                    <button
+                                      key={`${publication.id}-${author.faculty_id}-${author.role}`}
+                                      type="button"
+                                      onClick={() => showAuthorInFacultyTable(author)}
+                                      className="flex w-full items-center justify-between gap-3 rounded-md px-2 py-2 text-left hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                    >
+                                      <span
+                                        className={cn("min-w-0 flex-1 truncate whitespace-nowrap text-sm", isHead ? "font-bold" : "font-medium")}
+                                        title={author.name}
+                                      >
+                                        {author.name}
+                                      </span>
+                                      <Badge
+                                        variant="default"
+                                        className={cn(
+                                          "shrink-0",
+                                          authorBadgeColor(author)
+                                        )}
+                                      >
+                                        {roleLabel[author.role]}
+                                      </Badge>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                        )}
                       </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                       <Badge variant="secondary">{typeLabel[publication.publication_type]}</Badge>
-                      {canManageResearch && <Button type="button" size="sm" variant="outline" disabled={isSaving || saveFailed || publication.authors.length === 0} onClick={() => { setEditError(''); setEditingPublication({ ...publication }); }}>
+                      {canManageResearch && <Button type="button" size="sm" variant="outline" disabled={isSaving || saveFailed || publication.authors.length === 0} onClick={() => openPublicationEditor(publication)}>
                         <Pencil className="mr-1 h-4 w-4" />แก้ไข
                       </Button>}
                     </div>

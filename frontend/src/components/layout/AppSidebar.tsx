@@ -70,7 +70,6 @@ const previewMenuSectionsByRole: Record<string, any[]> = {
       items: [
         { title: "จัดการรายวิชา", url: "courses", icon: "Library" },
         { title: "CLO", url: "clos", icon: "Target" },
-        { title: "นักศึกษาที่รับผิดชอบ", url: "students-info", icon: "Users" },
         { title: "มอบหมายอาจารย์", url: "assign-instructors", icon: "UserCheck" },
         { title: "โครงการ", url: "projectspage", icon: "FolderKanban" },
         { title: "เอกสารโครงการ", url: "project-docs", icon: "FileText" },

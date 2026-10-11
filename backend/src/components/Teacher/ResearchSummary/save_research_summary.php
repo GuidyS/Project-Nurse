@@ -47,6 +47,16 @@ try {
         $ipStatus = $input['intellectual_property_status'] ?? '';
         $fundingAmountRaw = $input['funding_amount'] ?? null;
         $irbApproved = filter_var($input['irb_approved'] ?? null, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+        $headFacultyId = filter_var($input['head_faculty_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        $coAuthorIdsInput = $input['co_author_ids'] ?? null;
+        if (!is_array($coAuthorIdsInput)) researchFail(422, 'รายชื่อ Co ไม่ถูกต้อง');
+        $coAuthorIds = [];
+        foreach ($coAuthorIdsInput as $coAuthorId) {
+            $normalizedId = filter_var($coAuthorId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+            if ($normalizedId === false) researchFail(422, 'รายชื่อ Co ไม่ถูกต้อง');
+            $coAuthorIds[] = (int)$normalizedId;
+        }
+        $coAuthorIds = array_values(array_unique($coAuthorIds));
         $revision = $input['revision'] ?? '';
         $parsedDate = is_string($date) ? DateTimeImmutable::createFromFormat('!Y-m-d', $date) : false;
         if (!$id || $fields['title'] === '' || !$parsedDate || $parsedDate->format('Y-m-d') !== $date
@@ -55,8 +65,12 @@ try {
             || !in_array($workCategory, ['research', 'innovation'], true)
             || !in_array($fundingType, ['none', 'internal', 'external'], true)
             || !in_array($ipStatus, ['none', 'applying', 'copyright', 'petty_patent', 'patent'], true)
-            || $irbApproved === null || !is_string($revision)) {
+            || $irbApproved === null || !$headFacultyId || !is_string($revision)) {
             researchFail(422, 'กรุณาระบุชื่อผลงาน วันที่ และประเภทให้ถูกต้อง');
+        }
+        $headFacultyId = (int)$headFacultyId;
+        if (in_array($headFacultyId, $coAuthorIds, true)) {
+            researchFail(422, 'Head ไม่สามารถเป็น Co ในผลงานเดียวกันได้');
         }
         if (!is_numeric($fundingAmountRaw) || (float)$fundingAmountRaw < 0 || (float)$fundingAmountRaw > 9999999999.99) {
             researchFail(422, 'จำนวนทุนต้องเป็นตัวเลขตั้งแต่ 0 ขึ้นไป');
@@ -77,9 +91,25 @@ try {
             $db->rollBack();
             researchFail(409, 'รายการนี้เปลี่ยนแปลงแล้ว กรุณาโหลดข้อมูลใหม่ก่อนแก้ไข');
         }
-        $stmt = $db->prepare('UPDATE faculty_research SET title = ?, publication_date = ?, publication_year = ?, article_type = ?, journal_name = ?, category = ?, work_category = ?, funding_type = ?, funding_source = ?, funding_amount = ?, irb_approved = ?, intellectual_property_status = ?, award_name = ? WHERE research_id = ?');
+        $currentHeadFacultyId = !empty($row['first_author_id'])
+            ? (int)$row['first_author_id']
+            : (!empty($row['corresponding_author_id']) ? (int)$row['corresponding_author_id'] : null);
+        if ($currentHeadFacultyId !== null && $currentHeadFacultyId !== $headFacultyId) {
+            $db->rollBack();
+            researchFail(422, 'ผลงานนี้มี Head แล้ว ไม่สามารถเปลี่ยน Head ได้');
+        }
+        $selectedFacultyIds = array_values(array_unique(array_merge([$headFacultyId], $coAuthorIds)));
+        $facultyPlaceholders = implode(',', array_fill(0, count($selectedFacultyIds), '?'));
+        $stmt = $db->prepare("SELECT COUNT(*) FROM faculty WHERE faculty_id IN ($facultyPlaceholders)");
+        $stmt->execute($selectedFacultyIds);
+        if ((int)$stmt->fetchColumn() !== count($selectedFacultyIds)) {
+            $db->rollBack();
+            researchFail(422, 'มีรายชื่อ Head หรือ Co ที่ไม่พบในระบบ');
+        }
+        $stmt = $db->prepare('UPDATE faculty_research SET title = ?, publication_date = ?, publication_year = ?, article_type = ?, journal_name = ?, category = ?, work_category = ?, funding_type = ?, funding_source = ?, funding_amount = ?, irb_approved = ?, intellectual_property_status = ?, award_name = ?, faculty_id = ?, first_author_id = ?, corresponding_author_id = NULL, co_author_ids = ? WHERE research_id = ?');
         $stmt->execute([$fields['title'], $date, (int)$parsedDate->format('Y') + 543, $type, $fields['journal'], $fields['database_level'],
-            $workCategory, $fundingType, $fields['funding_source'], $fundingAmount, $irbApproved ? 1 : 0, $ipStatus, $fields['award_name'], $id]);
+            $workCategory, $fundingType, $fields['funding_source'], $fundingAmount, $irbApproved ? 1 : 0, $ipStatus, $fields['award_name'],
+            $headFacultyId, $headFacultyId, json_encode($coAuthorIds), $id]);
     } else {
         $id = filter_var($input['publication_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
         if (!$id) researchFail(422, 'รายการผลงานไม่ถูกต้อง');
