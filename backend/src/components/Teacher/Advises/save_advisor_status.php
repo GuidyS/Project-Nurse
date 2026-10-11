@@ -32,10 +32,11 @@ try {
     $input = json_decode(file_get_contents('php://input'), true);
     
     $studentId = $input['studentId'] ?? '';
-    $status = $input['status'] ?? ''; // 'ปกติ' or 'ไม่ปกติ'
+    $status = $input['status'] ?? ''; // 'ปกติ', 'ไม่ปกติ', 'จบการศึกษา'
     $statusDetails = trim($input['statusDetails'] ?? '');
+    $isEmployed = !empty($input['isEmployed']) ? 1 : 0;
 
-    if (!$studentId || !in_array($status, ['ปกติ', 'ไม่ปกติ'])) {
+    if (!$studentId || !in_array($status, ['ปกติ', 'ไม่ปกติ', 'จบการศึกษา'])) {
         throw new Exception("ข้อมูลไม่ครบถ้วนหรือไม่ถูกต้อง");
     }
 
@@ -43,8 +44,17 @@ try {
         throw new Exception("กรุณาระบุหมายเหตุสำหรับสถานะไม่ปกติ");
     }
 
+    if ($status === 'จบการศึกษา' && $isEmployed == 1 && $statusDetails === '') {
+        throw new Exception("กรุณาระบุสถานที่ทำงานหรือหมายเหตุสำหรับผู้มีงานทำ");
+    }
+
     if ($status === 'ปกติ') {
         $statusDetails = null;
+        $isEmployed = 0;
+    }
+
+    if ($status === 'ไม่ปกติ') {
+        $isEmployed = 0;
     }
 
     // ตรวจสอบว่าเป็นนักศึกษาในความดูแลของอาจารย์คนนี้จริงหรือไม่
@@ -54,8 +64,14 @@ try {
         throw new Exception("ไม่มีสิทธิ์แก้ไขข้อมูลนักศึกษาคนนี้");
     }
 
-    $updateStmt = $db->prepare("UPDATE student SET advisor_status = ?, advisor_status_details = ? WHERE student_id = ?");
-    $updateStmt->execute([$status, $statusDetails, $studentId]);
+    try {
+        $db->query("SELECT advisor_is_employed FROM student LIMIT 1");
+    } catch (Exception $e) {
+        $db->query("ALTER TABLE student ADD COLUMN advisor_is_employed TINYINT(1) DEFAULT 0");
+    }
+
+    $updateStmt = $db->prepare("UPDATE student SET advisor_status = ?, advisor_status_details = ?, advisor_is_employed = ? WHERE student_id = ?");
+    $updateStmt->execute([$status, $statusDetails, $isEmployed, $studentId]);
 
     echo json_encode(["status" => "success", "message" => "อัปเดตสถานะนักศึกษาเรียบร้อยแล้ว"]);
 } catch (Exception $e) {
