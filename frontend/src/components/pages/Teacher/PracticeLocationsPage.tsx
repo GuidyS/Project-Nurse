@@ -4,7 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Upload, Building, FileSignature, MapPin, Building2, BookOpen, Save, AlertCircle, Trash2 } from "lucide-react";
+import { Loader2, Upload, Download, Building, FileSignature, MapPin, Building2, BookOpen, Save, AlertCircle, Trash2 } from "lucide-react";
 import api from "@/lib/axios";
 import * as XLSX from "xlsx";
 
@@ -88,6 +88,26 @@ export default function PracticeLocationsPage() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  //  ฟังก์ชันสำหรับดาวน์โหลดแบบฟอร์มเปล่า
+  const handleDownloadTemplate = () => {
+    // กำหนดหัวคอลัมน์ให้ตรงเป๊ะ
+    const headers = [["ชื่อโรงพยาบาล", "ชื่อ รพ.สต.", "อนามัย", "MOU", "วิชาที่ฝึก"]];
+    const ws = XLSX.utils.aoa_to_sheet(headers);
+    
+    // ตั้งค่าความกว้างคอลัมน์ให้สวยงามตอนเปิด Excel
+    ws['!cols'] = [
+      { wch: 25 }, // ชื่อโรงพยาบาล
+      { wch: 25 }, // ชื่อ รพ.สต.
+      { wch: 25 }, // อนามัย
+      { wch: 10 }, // MOU
+      { wch: 30 }  // วิชาที่ฝึก
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Template");
+    XLSX.writeFile(wb, "แบบฟอร์มนำเข้าแหล่งฝึกภาคปฏิบัติ.xlsx");
+  };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -259,7 +279,6 @@ export default function PracticeLocationsPage() {
             <Table className="relative">
               <TableHeader className="bg-muted/50 sticky top-0 z-10 shadow-sm">
                 <TableRow>
-                  {/*  ล็อกความกว้างคอลัมน์ให้เท่ากันทุกตาราง (ใช้ % และ px บังคับ) */}
                   <TableHead className="w-[80px] text-center">ลำดับ</TableHead>
                   <TableHead className="w-[35%]">ชื่อ{title}</TableHead>
                   <TableHead className="w-[120px] text-center">MOU</TableHead>
@@ -311,7 +330,6 @@ export default function PracticeLocationsPage() {
     <div className="p-6 space-y-6 animate-fade-in max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          {/* ✅ เอาไอคอน MapPin ตรงหัวข้อหลักออกแล้วครับ */}
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold text-foreground">แหล่งฝึกภาคปฏิบัติ</h1>
           </div>
@@ -319,6 +337,11 @@ export default function PracticeLocationsPage() {
         </div>
         
         <div className="flex flex-wrap items-center gap-2">
+          {/* ✅ ปุ่มโหลดฟอร์แมต Excel นำมาไว้หน้าสุด */}
+          <Button variant="outline" className="gap-2 border-primary text-primary hover:bg-primary/5" onClick={handleDownloadTemplate}>
+            <Download className="h-4 w-4" /> โหลดฟอร์แมต
+          </Button>
+
           <input 
             type="file" 
             accept=".xlsx, .xls" 
