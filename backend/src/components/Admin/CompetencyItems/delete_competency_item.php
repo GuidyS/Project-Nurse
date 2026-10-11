@@ -58,14 +58,24 @@ try {
     $frameworkId = isset($_GET['framework_id']) ? (int)$_GET['framework_id'] : 0;
     $ploId = isset($_GET['plo_id']) ? (int)$_GET['plo_id'] : 0;
     $itemId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+    // ชั้นปี (YLO) ที่กำลังเปิดอยู่ — ลบเฉพาะชั้นปีนี้ ไม่ไปแตะชั้นปีอื่น
+    $yearLevel = isset($_GET['year_level']) ? (int)$_GET['year_level'] : 0;
 
-    // ลบทั้งหมดของ PLO เดียว หรือทั้งหลักสูตร — ลบทุกชั้นปีของ PLO นั้น
+    // ลบทั้งหมดของ PLO เดียว หรือทุก PLO — เฉพาะชั้นปีที่ระบุ
     if ($scope === 'plo' || $scope === 'all') {
         if ($frameworkId <= 0) {
             http_response_code(400);
             echo json_encode(["status" => "error", "message" => "ไม่พบหลักสูตรที่ระบุ"], JSON_UNESCAPED_UNICODE);
             exit;
         }
+        if ($yearLevel < 1 || $yearLevel > OUTCOME_MAX_YLO) {
+            http_response_code(400);
+            echo json_encode(["status" => "error", "message" => "ไม่พบชั้นปี (YLO) ที่ต้องการลบ"], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        $params = [':fid' => $frameworkId, ':yl' => $yearLevel];
+        $sql = "SELECT id FROM curriculum_sub_plo WHERE framework_id = :fid AND year_level = :yl";
 
         if ($scope === 'plo') {
             if ($ploId <= 0) {
@@ -73,12 +83,12 @@ try {
                 echo json_encode(["status" => "error", "message" => "ไม่พบหัวข้อ PLO ที่ระบุ"], JSON_UNESCAPED_UNICODE);
                 exit;
             }
-            $idStmt = $db->prepare("SELECT id FROM curriculum_sub_plo WHERE framework_id = :fid AND plo_id = :pid");
-            $idStmt->execute([':fid' => $frameworkId, ':pid' => $ploId]);
-        } else {
-            $idStmt = $db->prepare("SELECT id FROM curriculum_sub_plo WHERE framework_id = :fid");
-            $idStmt->execute([':fid' => $frameworkId]);
+            $sql .= " AND plo_id = :pid";
+            $params[':pid'] = $ploId;
         }
+
+        $idStmt = $db->prepare($sql);
+        $idStmt->execute($params);
 
         $ids = array_map('intval', $idStmt->fetchAll(PDO::FETCH_COLUMN) ?: []);
         if (empty($ids)) {
@@ -91,7 +101,13 @@ try {
         $db->commit();
 
         $label = $scope === 'plo' ? "PLO (plo_id {$ploId})" : "ทุก PLO ของหลักสูตร";
-        logAudit($db, $userId, 'delete', 'curriculum_sub_plo', "ลบ Sub PLO ทั้งหมดใน {$label} จำนวน {$deleted} รายการ");
+        logAudit(
+            $db,
+            $userId,
+            'delete',
+            'curriculum_sub_plo',
+            "ลบ Sub PLO ทั้งหมดใน {$label} ชั้นปีที่ {$yearLevel} จำนวน {$deleted} รายการ"
+        );
 
         echo json_encode([
             "status" => "success",

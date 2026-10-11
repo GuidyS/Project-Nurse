@@ -36,7 +36,7 @@ interface PloGroup {
   plo_code: string;
   plo_name: string;
   items: CompetencyItem[];
-  /** จำนวนรายการของ PLO นี้รวมทุกชั้นปี — ใช้บอกผลของปุ่ม "ลบทั้งหมด" */
+  /** จำนวนรายการของ PLO นี้รวมทุกชั้นปี — ใช้บอกว่ามีรายการอยู่ในชั้นปีอื่นด้วย */
   total_all_years: number;
 }
 
@@ -68,8 +68,9 @@ export default function CompetencyItemsManagement() {
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const totalAllPlos = useMemo(
-    () => groups.reduce((sum, g) => sum + (g.total_all_years || 0), 0),
+  // จำนวนรายการของ "ชั้นปีที่เลือกอยู่" เท่านั้น — ปุ่มลบทั้งหมดทำงานในขอบเขตชั้นปีนี้
+  const totalThisYear = useMemo(
+    () => groups.reduce((sum, g) => sum + g.items.length, 0),
     [groups]
   );
 
@@ -196,9 +197,9 @@ export default function CompetencyItemsManagement() {
       if (pendingDelete.scope === "item") {
         url = `/index.php?page=delete-competency-item&scope=item&id=${pendingDelete.id}`;
       } else if (pendingDelete.scope === "plo") {
-        url = `/index.php?page=delete-competency-item&scope=plo&framework_id=${frameworkId}&plo_id=${pendingDelete.ploId}`;
+        url = `/index.php?page=delete-competency-item&scope=plo&framework_id=${frameworkId}&plo_id=${pendingDelete.ploId}&year_level=${yearLevel}`;
       } else {
-        url = `/index.php?page=delete-competency-item&scope=all&framework_id=${frameworkId}`;
+        url = `/index.php?page=delete-competency-item&scope=all&framework_id=${frameworkId}&year_level=${yearLevel}`;
       }
 
       const res = await api.delete(url);
@@ -226,9 +227,9 @@ export default function CompetencyItemsManagement() {
       return `ต้องการลบรายการ "${pendingDelete.label}" ใช่หรือไม่? รหัส Sub PLO ของข้ออื่นใน PLO นี้จะถูกจัดเรียงใหม่อัตโนมัติ และคะแนนที่นักศึกษาเคยได้จากข้อนี้จะถูกลบไปด้วย`;
     }
     if (pendingDelete.scope === "plo") {
-      return `ต้องการลบรายการทั้งหมดของ ${pendingDelete.label} จำนวน ${pendingDelete.count} รายการ (ทุกชั้นปี) ใช่หรือไม่? คะแนนที่นักศึกษาเคยได้จากรายการเหล่านี้จะถูกลบไปด้วย`;
+      return `ต้องการลบรายการทั้งหมดของ ${pendingDelete.label} เฉพาะชั้นปีที่ ${yearLevel} จำนวน ${pendingDelete.count} รายการ ใช่หรือไม่? ชั้นปีอื่นจะไม่ถูกลบ และคะแนนที่นักศึกษาเคยได้จากรายการเหล่านี้จะถูกลบไปด้วย`;
     }
-    return `ต้องการลบรายการทั้งหมดตั้งแต่ PLO1 ถึง PLO8 จำนวน ${pendingDelete.count} รายการ (ทุกชั้นปี) ใช่หรือไม่? คะแนนที่นักศึกษาเคยได้จากรายการเหล่านี้จะถูกลบไปด้วย การกระทำนี้ย้อนกลับไม่ได้`;
+    return `ต้องการลบรายการทั้งหมดตั้งแต่ PLO1 ถึง PLO8 เฉพาะชั้นปีที่ ${yearLevel} จำนวน ${pendingDelete.count} รายการ ใช่หรือไม่? ชั้นปีอื่นจะไม่ถูกลบ แต่คะแนนที่นักศึกษาเคยได้จากรายการเหล่านี้จะถูกลบไปด้วย การกระทำนี้ย้อนกลับไม่ได้`;
   })();
 
   return (
@@ -244,12 +245,13 @@ export default function CompetencyItemsManagement() {
         {groups.length > 0 && (
           <Button
             variant="destructive"
-            disabled={totalAllPlos === 0}
+            disabled={totalThisYear === 0}
+            title={`ลบรายการทั้งหมดของ PLO1–PLO8 เฉพาะชั้นปีที่ ${yearLevel}`}
             onClick={() =>
-              setPendingDelete({ scope: "all", label: "PLO1 ถึง PLO8", count: totalAllPlos })
+              setPendingDelete({ scope: "all", label: "PLO1 ถึง PLO8", count: totalThisYear })
             }
           >
-            <Trash2 className="h-4 w-4 mr-1" /> ลบทั้งหมด (PLO1–PLO8)
+            <Trash2 className="h-4 w-4 mr-1" /> ลบทั้งหมดของชั้นปีที่ {yearLevel} (PLO1–PLO8)
           </Button>
         )}
       </div>
@@ -341,14 +343,14 @@ export default function CompetencyItemsManagement() {
                         variant="ghost"
                         size="sm"
                         className="h-8 text-destructive hover:bg-destructive/10 gap-1"
-                        disabled={group.total_all_years === 0}
-                        title={`ลบรายการทั้งหมดของ ${group.plo_code} ทุกชั้นปี`}
+                        disabled={group.items.length === 0}
+                        title={`ลบรายการทั้งหมดของ ${group.plo_code} เฉพาะชั้นปีที่ ${yearLevel}`}
                         onClick={() =>
                           setPendingDelete({
                             scope: "plo",
                             ploId: group.plo_id,
                             label: group.plo_code,
-                            count: group.total_all_years,
+                            count: group.items.length,
                           })
                         }
                       >
