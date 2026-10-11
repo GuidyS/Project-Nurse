@@ -14,15 +14,14 @@
     header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
     header("Content-Type: application/json; charset=UTF-8");
 
-    // --- เพิ่มส่วนนี้เข้าไป ---
     if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
         http_response_code(200);
         exit();
     }
 
     // เรียกใช้งาน Helper สำหรับคำนวณปีการศึกษาและชั้นปีแบบ Real-time (ตัดรอบ 10 สิงหาคม)
-    if (file_exists(__DIR__ . '/src/config/academic_helper.php')) {
-        require_once __DIR__ . '/src/config/academic_helper.php';
+    if (file_exists(__DIR__ . '/config/academic_helper.php')) {
+        require_once __DIR__ . '/config/academic_helper.php';
     }
 
     $page = isset($_GET['page']) ? $_GET['page'] : '';
@@ -423,8 +422,9 @@
                 require_once 'components/Teacher/PracticalStudents/get_practical_students.php';
                 break;  
                 
+           // ✅ แหล่งฝึกภาคปฏิบัติ (แก้ไขเส้นทางให้ชี้มาที่โฟลเดอร์ใหม่ที่ชื่อ PracticeLocations)
            case 'practice-locations':
-                require_once 'components/Teacher/Practice/practice_locations_api.php';
+                require_once 'components/PracticeLocations/practice_locations_api.php';
                 break;
                               
             // MyProjects
