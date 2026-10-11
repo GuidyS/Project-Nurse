@@ -33,10 +33,18 @@ try {
     
     $studentId = $input['studentId'] ?? '';
     $status = $input['status'] ?? ''; // 'ปกติ' or 'ไม่ปกติ'
-    $statusDetails = $input['statusDetails'] ?? '';
+    $statusDetails = trim($input['statusDetails'] ?? '');
 
     if (!$studentId || !in_array($status, ['ปกติ', 'ไม่ปกติ'])) {
         throw new Exception("ข้อมูลไม่ครบถ้วนหรือไม่ถูกต้อง");
+    }
+
+    if ($status === 'ไม่ปกติ' && $statusDetails === '') {
+        throw new Exception("กรุณาระบุหมายเหตุสำหรับสถานะไม่ปกติ");
+    }
+
+    if ($status === 'ปกติ') {
+        $statusDetails = null;
     }
 
     // ตรวจสอบว่าเป็นนักศึกษาในความดูแลของอาจารย์คนนี้จริงหรือไม่

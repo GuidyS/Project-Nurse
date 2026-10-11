@@ -67,12 +67,14 @@ try {
     // 4. ใช้สถานะจากฐานข้อมูล (ปกติ = normal, ไม่ปกติ = critical)
     foreach ($advisees as &$student) {
         $student['gpa'] = (float)$student['gpa'];
-        $raw_status = $student['advisor_status_raw'];
+        $raw_status = $student['advisor_status_raw'] ?? 'ปกติ';
         if ($raw_status === 'ไม่ปกติ') {
             $student['status'] = 'critical';
+            $student['advisor_status'] = 'ไม่ปกติ';
             $student['needsAdvice'] = true;
         } else {
             $student['status'] = 'normal';
+            $student['advisor_status'] = 'ปกติ';
             $student['needsAdvice'] = false;
         }
         $student['statusDetails'] = $student['advisor_status_details'] ?? '';
