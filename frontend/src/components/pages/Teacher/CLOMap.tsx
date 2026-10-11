@@ -7,6 +7,9 @@ import { useState, useEffect, useMemo } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface CLOMapData {
   [courseCode: string]: string[];
@@ -15,7 +18,13 @@ interface CLOMapData {
 interface CourseData {
   code: string;
   name: string;
+  /** YLO (ชั้นปี) ของรายวิชา ตั้งค่าที่หน้า "จัดการหลักสูตร" — null = ยังไม่กำหนด */
+  ylo: number | null;
 }
+
+const YLO_FILTER_ALL = 'all';
+const YLO_FILTER_NONE = 'none';
+const YLO_OPTIONS = [1, 2, 3, 4];
 
 export default function CLOMap() {
   const { toast } = useToast();
@@ -26,6 +35,7 @@ export default function CLOMap() {
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [courseSearch, setCourseSearch] = useState('');
+  const [yloFilter, setYloFilter] = useState<string>(YLO_FILTER_ALL);
 
   // 🌟 ดึงข้อมูลจากฐานข้อมูลเมื่อเปิดหน้า
   const fetchMapData = async () => {
@@ -50,13 +60,17 @@ export default function CLOMap() {
 
   const filteredCourses = useMemo(() => {
     const q = courseSearch.trim().toLowerCase();
-    if (!q) return courses;
-    return courses.filter(
-      (c) =>
+    return courses.filter((c) => {
+      // กรองตาม YLO ก่อน แล้วค่อยกรองด้วยคำค้นหา
+      if (yloFilter === YLO_FILTER_NONE && c.ylo !== null && c.ylo !== undefined) return false;
+      if (yloFilter !== YLO_FILTER_ALL && yloFilter !== YLO_FILTER_NONE && String(c.ylo ?? '') !== yloFilter) return false;
+      if (!q) return true;
+      return (
         String(c.code ?? '').toLowerCase().includes(q) ||
         String(c.name ?? '').toLowerCase().includes(q)
-    );
-  }, [courses, courseSearch]);
+      );
+    });
+  }, [courses, courseSearch, yloFilter]);
 
   const toggleMapping = (courseCode: string, plo: string) => {
     if (!isEditing) return;
@@ -150,6 +164,22 @@ return (
                 ติ๊กเลือกความสอดคล้องระหว่างรายวิชา (แกน Y) และ PLO (แกน X)
               </CardDescription>
             </div>
+            <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-end">
+            <div className="w-full sm:w-52 shrink-0 space-y-1.5">
+              <Label className="text-xs text-muted-foreground">กรองตาม YLO (ชั้นปี)</Label>
+              <Select value={yloFilter} onValueChange={setYloFilter}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={YLO_FILTER_ALL}>ทุก YLO</SelectItem>
+                  {YLO_OPTIONS.map((y) => (
+                    <SelectItem key={y} value={String(y)}>YLO{y} — ชั้นปีที่ {y}</SelectItem>
+                  ))}
+                  <SelectItem value={YLO_FILTER_NONE}>ยังไม่กำหนด YLO</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div className="relative w-full sm:w-64 shrink-0">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -159,6 +189,7 @@ return (
                 className="pl-9"
               />
             </div>
+            </div>
           </CardHeader>
           <CardContent className="overflow-x-auto">
             <Table>
@@ -166,6 +197,7 @@ return (
                 <TableRow>
                   <TableHead className="min-w-[100px]">รหัสวิชา</TableHead>
                   <TableHead className="min-w-[250px]">ชื่อวิชา</TableHead>
+                  <TableHead className="w-[90px] text-center">YLO</TableHead>
                   {plos.map((plo) => (
                     <TableHead key={plo} className="text-center min-w-[80px]">{plo}</TableHead>
                   ))}
@@ -174,13 +206,13 @@ return (
               <TableBody>
                 {courses.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={plos.length + 2} className="text-center py-6">
+                    <TableCell colSpan={plos.length + 3} className="text-center py-6">
                       ไม่มีรายวิชาในระบบ
                     </TableCell>
                   </TableRow>
                 ) : filteredCourses.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={plos.length + 2} className="text-center py-6">
+                    <TableCell colSpan={plos.length + 3} className="text-center py-6">
                       ไม่พบรายวิชาที่ตรงกับคำค้นหา
                     </TableCell>
                   </TableRow>
@@ -189,6 +221,11 @@ return (
                     <TableRow key={course.code}>
                       <TableCell className="font-medium">{course.code}</TableCell>
                       <TableCell>{course.name}</TableCell>
+                      <TableCell className="text-center">
+                        {course.ylo
+                          ? <Badge variant="secondary" className="font-medium">YLO{course.ylo}</Badge>
+                          : <span className="text-muted-foreground text-xs">-</span>}
+                      </TableCell>
                       {plos.map((plo) => (
                         <TableCell key={plo} className="text-center">
                           <Checkbox

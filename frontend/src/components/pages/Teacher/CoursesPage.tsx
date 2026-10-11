@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
-import { BookOpen, Users, Edit, Eye, MoreVertical, Plus, Search } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { BookOpen, Users, Edit, Loader2, Save, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -11,12 +11,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -36,7 +30,8 @@ import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
 
 interface Course {
-  id: number;
+  /** null = วิชาที่มีเฉพาะในหน้า "จัดการหลักสูตร" (ยังไม่มีในตาราง subject จึงยังลงทะเบียน/ให้คะแนนไม่ได้) */
+  id: number | null;
   code: string;
   name: string;
   credits: number;
@@ -56,6 +51,9 @@ interface SubPlo {
   code: string;
   plo: string | null;
   description: string;
+  /** คะแนนเต็ม/เกณฑ์ผ่านของข้อนี้ ตั้งไว้ที่หน้า "จัดการ CLO รายวิชา" */
+  max_score: number | null;
+  pass_score: number | null;
 }
 
 interface CloHeader {
@@ -65,6 +63,9 @@ interface CloHeader {
   ylo: string | null;
   plos: { code: string; description: string }[];
   sub_plos: SubPlo[];
+  /** ผลรวมคะแนนเต็ม/เกณฑ์ผ่านของ Sub PLO ทั้งหมดใน CLO นี้ */
+  max_score: number | null;
+  pass_score: number | null;
 }
 
 interface StudentGrade {
@@ -75,29 +76,39 @@ interface StudentGrade {
   cloScores: Record<string, number | null>;
   /** คะแนน Sub PLO ที่กรอกไว้ (key = clo_id -> รหัส Sub PLO) */
   subScores: Record<string, Record<string, number>>;
-  /** คะแนนรวมรายวิชา = ผลรวมคะแนน CLO ÷ จำนวน CLO ทั้งหมด */
+  /** คะแนนรวมรายวิชา = ผลรวมคะแนน CLO ทุกตัว (เต็ม 100) */
   overall: number | null;
   status: string;
 }
 
+/** ข้อมูลที่โหลดมาแล้วของแต่ละรายวิชา (เก็บไว้สลับวิชาได้โดยไม่ต้องโหลดใหม่) */
+interface CourseGradeData {
+  headers: CloHeader[];
+  students: StudentGrade[];
+}
+
+/** ร่างคะแนน: draft[subjectId][studentId][cloId][subCode] = ค่าที่พิมพ์ */
+type ScoreDraft = Record<string, Record<string, Record<string, Record<string, string>>>>;
+
+/** ตัดทศนิยมท้ายที่ไม่จำเป็นออก เช่น 12.50 -> 12.5 */
+const formatScore = (value: number | null | undefined): string =>
+  value === null || value === undefined
+    ? "-"
+    : Number.isInteger(value) ? String(value) : String(Number(Number(value).toFixed(2)));
+
 const CoursesPage = () => {
-  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
-  const [isGradeDialogOpen, setIsGradeDialogOpen] = useState(false);
-  const [viewOnly, setViewOnly] = useState(false);
-  const [studentGrades, setStudentGrades] = useState<StudentGrade[]>([]);
-  const [cloHeaders, setCloHeaders] = useState<CloHeader[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-
-  // หน้าต่างให้คะแนน: สลับ CLO ได้อิสระ กรอกครบทุกคนแล้วค่อยบันทึกทีเดียว
-  const [isScoringOpen, setIsScoringOpen] = useState(false);
-  const [activeCloId, setActiveCloId] = useState<string>("");
-  const [scoreSearch, setScoreSearch] = useState("");
-  /** ร่างคะแนนทั้งหมด: draft[studentId][cloId][subCode] = ค่าที่พิมพ์ */
-  const [scoreDraft, setScoreDraft] = useState<Record<string, Record<string, Record<string, string>>>>({});
-  const [isSavingScore, setIsSavingScore] = useState(false);
   const { toast } = useToast();
+
+  // หน้าต่างให้คะแนน — เลือกวิชาได้จากในหน้าต่าง และคะแนนที่กรอกค้างไว้ไม่หายเมื่อสลับวิชา
+  const [isScoringOpen, setIsScoringOpen] = useState(false);
+  const [scoringCourseId, setScoringCourseId] = useState<string>("");
+  const [courseData, setCourseData] = useState<Record<string, CourseGradeData>>({});
+  const [loadingCourseId, setLoadingCourseId] = useState<string | null>(null);
+  const [scoreSearch, setScoreSearch] = useState("");
+  const [scoreDraft, setScoreDraft] = useState<ScoreDraft>({});
+  const [isSavingScore, setIsSavingScore] = useState(false);
 
   const fetchCourses = useCallback(async () => {
     setLoading(true);
@@ -105,7 +116,7 @@ const CoursesPage = () => {
       const response = await api.get("/index.php?page=get-my-courses");
       if (response.data && response.data.status === "success") {
         const mappedCourses = response.data.data.map((course: any) => ({
-          id: Number(course.id),
+          id: course.id === null || course.id === undefined ? null : Number(course.id),
           code: course.code,
           name: course.name,
           credits: Number(course.credits),
@@ -143,51 +154,7 @@ const CoursesPage = () => {
     fetchCourses();
   }, [fetchCourses]);
 
-  const openGradeDialog = async (course: Course, viewMode: boolean = false) => {
-    setSelectedCourse(course);
-    setIsGradeDialogOpen(true);
-    setViewOnly(viewMode);
-    setSearchQuery("");
-    setStudentGrades([]); // Clear old students
-    setCloHeaders([]);
-
-    try {
-      const response = await api.get(`/index.php?page=get-course-students-clo&subject_id=${course.id}`);
-      if (response.data && response.data.status === "success") {
-        const payload = response.data.data || {};
-        const headers: CloHeader[] = Array.isArray(payload.clo_headers) ? payload.clo_headers : [];
-        setCloHeaders(headers);
-
-        const mappedStudents: StudentGrade[] = (Array.isArray(payload.students) ? payload.students : []).map(
-          (student: any) => ({
-            id: Number(student.id),
-            studentId: String(student.studentId ?? ""),
-            name: student.name,
-            cloScores: student.clo_scores || {},
-            subScores: student.sub_scores || {},
-            overall: student.overall === null || student.overall === undefined ? null : Number(student.overall),
-            status: student.status || "pending",
-          })
-        );
-        setStudentGrades(mappedStudents);
-      } else {
-        toast({
-          title: "เกิดข้อผิดพลาด",
-          description: response.data.message || "ไม่สามารถดึงรายชื่อนักศึกษาได้",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      console.error("Failed to fetch students:", error);
-      toast({
-        title: "เกิดข้อผิดพลาด",
-        description: "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์เพื่อดึงรายชื่อนักศึกษาได้",
-        variant: "destructive",
-      });
-    }
-  };
-
-  /** สร้างร่างคะแนนของนักศึกษาทุกคน x ทุก CLO จากค่าที่บันทึกไว้ */
+  /** สร้างร่างคะแนนเริ่มต้นของวิชาหนึ่งจากค่าที่บันทึกไว้ */
   const buildDraft = (students: StudentGrade[], headers: CloHeader[]) => {
     const draft: Record<string, Record<string, Record<string, string>>> = {};
     students.forEach((student) => {
@@ -207,53 +174,111 @@ const CoursesPage = () => {
     return draft;
   };
 
-  /** เปิดหน้าต่างให้คะแนน โดยเริ่มที่ CLO ที่กดมา */
-  const openScoreDialog = (clo?: CloHeader) => {
-    if (cloHeaders.length === 0) return;
-    const scorable = cloHeaders.filter((c) => c.sub_plos.length > 0);
-    if (scorable.length === 0) {
+  /** โหลดข้อมูลของวิชา (ข้ามถ้าเคยโหลดแล้ว เพื่อไม่ทับร่างคะแนนที่กรอกค้างไว้) */
+  const loadCourseData = useCallback(
+    async (course: Course): Promise<boolean> => {
+      if (course.id === null) return false;
+      const key = String(course.id);
+      if (courseData[key]) return true;
+
+      setLoadingCourseId(key);
+      try {
+        const response = await api.get(`/index.php?page=get-course-students-clo&subject_id=${course.id}`);
+        if (response.data && response.data.status === "success") {
+          const payload = response.data.data || {};
+          const headers: CloHeader[] = Array.isArray(payload.clo_headers) ? payload.clo_headers : [];
+          const students: StudentGrade[] = (Array.isArray(payload.students) ? payload.students : []).map(
+            (student: any) => ({
+              id: Number(student.id),
+              studentId: String(student.studentId ?? ""),
+              name: student.name,
+              cloScores: student.clo_scores || {},
+              subScores: student.sub_scores || {},
+              overall: student.overall === null || student.overall === undefined ? null : Number(student.overall),
+              status: student.status || "pending",
+            })
+          );
+
+          setCourseData((prev) => ({ ...prev, [key]: { headers, students } }));
+          setScoreDraft((prev) => (prev[key] ? prev : { ...prev, [key]: buildDraft(students, headers) }));
+          return true;
+        }
+
+        toast({
+          title: "เกิดข้อผิดพลาด",
+          description: response.data.message || "ไม่สามารถดึงรายชื่อนักศึกษาได้",
+          variant: "destructive",
+        });
+        return false;
+      } catch (error) {
+        console.error("Failed to fetch students:", error);
+        toast({
+          title: "เกิดข้อผิดพลาด",
+          description: "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์เพื่อดึงรายชื่อนักศึกษาได้",
+          variant: "destructive",
+        });
+        return false;
+      } finally {
+        setLoadingCourseId(null);
+      }
+    },
+    [courseData, toast]
+  );
+
+  /** เปิดหน้าต่างให้คะแนนของวิชาที่กดมา */
+  const openScoring = async (course: Course) => {
+    if (course.id === null) {
       toast({
         title: "ยังให้คะแนนไม่ได้",
-        description: 'CLO ของรายวิชานี้ยังไม่ได้ผูก Sub PLO — กรุณาติ๊ก Sub PLO ในหน้า "จัดการ CLO รายวิชา" ก่อน',
+        description: `วิชา ${course.code} ยังไม่มีในตารางเรียนของระบบ จึงยังไม่มีนักศึกษาลงทะเบียน`,
         variant: "destructive",
       });
       return;
     }
-    const start = clo && clo.sub_plos.length > 0 ? clo : scorable[0];
-    setActiveCloId(String(start.clo_id));
-    setScoreDraft(buildDraft(studentGrades, cloHeaders));
+    setScoringCourseId(String(course.id));
     setScoreSearch("");
     setIsScoringOpen(true);
+    await loadCourseData(course);
   };
 
-  const closeScoreDialog = () => {
-    setIsScoringOpen(false);
-    setScoreDraft({});
+  /** สลับวิชาในหน้าต่าง — ร่างคะแนนของวิชาเดิมยังอยู่ */
+  const switchCourse = async (nextId: string) => {
+    setScoringCourseId(nextId);
     setScoreSearch("");
+    const next = courses.find((c) => String(c.id) === nextId);
+    if (next) await loadCourseData(next);
   };
 
-  const activeClo = cloHeaders.find((c) => String(c.clo_id) === activeCloId) || null;
+  const scoringCourse = courses.find((c) => String(c.id) === scoringCourseId) || null;
+  const activeData = courseData[scoringCourseId];
+  const cloHeaders = useMemo(() => activeData?.headers ?? [], [activeData]);
+  const studentGrades = useMemo(() => activeData?.students ?? [], [activeData]);
 
-  const setDraftValue = (studentId: number, cloId: number, subCode: string, value: string) => {
-    setScoreDraft((prev) => ({
-      ...prev,
-      [String(studentId)]: {
-        ...(prev[String(studentId)] || {}),
-        [String(cloId)]: {
-          ...((prev[String(studentId)] || {})[String(cloId)] || {}),
-          [subCode]: value,
+  /** CLO ที่ผูก Sub PLO ไว้แล้วเท่านั้นจึงให้คะแนนได้ */
+  const scorableClos = useMemo(() => cloHeaders.filter((c) => c.sub_plos.length > 0), [cloHeaders]);
+
+  const setDraftValue = (subjectKey: string, studentId: number, cloId: number, subCode: string, value: string) => {
+    setScoreDraft((prev) => {
+      const perSubject = prev[subjectKey] || {};
+      const perStudent = perSubject[String(studentId)] || {};
+      const perClo = perStudent[String(cloId)] || {};
+      return {
+        ...prev,
+        [subjectKey]: {
+          ...perSubject,
+          [String(studentId)]: {
+            ...perStudent,
+            [String(cloId)]: { ...perClo, [subCode]: value },
+          },
         },
-      },
-    }));
+      };
+    });
   };
 
-  /**
-   * คะแนน CLO = ผลรวมคะแนน Sub PLO ÷ จำนวน Sub PLO ทั้งหมดของ CLO นั้น
-   * (Sub PLO ที่ยังไม่กรอกนับเป็น 0 ในตัวตั้ง แต่ยังนับเป็นตัวหาร)
-   */
-  const draftCloScore = (studentId: number, clo: CloHeader): number | null => {
+  /** คะแนน CLO = ผลรวมคะแนน Sub PLO ของ CLO นั้น (คะแนนเต็มมาจากหน้า "จัดการ CLO รายวิชา") */
+  const draftCloScore = (subjectKey: string, studentId: number, clo: CloHeader): number | null => {
     if (clo.sub_plos.length === 0) return null;
-    const perClo = scoreDraft[String(studentId)]?.[String(clo.clo_id)] || {};
+    const perClo = scoreDraft[subjectKey]?.[String(studentId)]?.[String(clo.clo_id)] || {};
     let sum = 0;
     let filled = 0;
     clo.sub_plos.forEach((sub) => {
@@ -264,118 +289,150 @@ const CoursesPage = () => {
       }
     });
     if (filled === 0) return null;
-    return Math.round((sum / clo.sub_plos.length) * 100) / 100;
+    return Math.round(sum * 100) / 100;
   };
 
-  /** คะแนนรวมรายวิชาจากร่างปัจจุบัน = ผลรวมคะแนน CLO ÷ จำนวน CLO ทั้งหมด */
-  const draftOverall = (studentId: number): number | null => {
-    if (cloHeaders.length === 0) return null;
+  /** คะแนนรวมรายวิชาจากร่างปัจจุบัน = ผลรวมคะแนน CLO ทุกตัว */
+  const draftOverall = (subjectKey: string, studentId: number, headers: CloHeader[]): number | null => {
+    if (headers.length === 0) return null;
     let sum = 0;
     let filled = 0;
-    cloHeaders.forEach((clo) => {
-      const value = draftCloScore(studentId, clo);
+    headers.forEach((clo) => {
+      const value = draftCloScore(subjectKey, studentId, clo);
       if (value !== null) {
         sum += value;
         filled++;
       }
     });
     if (filled === 0) return null;
-    return Math.round((sum / cloHeaders.length) * 100) / 100;
+    return Math.round(sum * 100) / 100;
   };
 
-  /** รายการที่แก้ไปจากค่าที่บันทึกไว้ (ใช้ตัดสินว่ามีอะไรค้างต้องบันทึก) */
-  const collectChangedEntries = () => {
-    const entries: { student_id: number; clo_id: number; scores: Record<string, number | null> }[] = [];
+  /** รายการที่แก้ไปจากค่าที่บันทึกไว้ ของวิชาหนึ่ง */
+  const collectChangedEntries = useCallback(
+    (subjectKey: string) => {
+      const data = courseData[subjectKey];
+      if (!data) return [];
 
-    studentGrades.forEach((student) => {
-      cloHeaders.forEach((clo) => {
-        if (clo.sub_plos.length === 0) return;
-        const cloKey = String(clo.clo_id);
-        const saved = student.subScores?.[cloKey] || {};
-        const perClo = scoreDraft[String(student.id)]?.[cloKey] || {};
+      const entries: { student_id: number; clo_id: number; scores: Record<string, number | null> }[] = [];
+      data.students.forEach((student) => {
+        data.headers.forEach((clo) => {
+          if (clo.sub_plos.length === 0) return;
+          const cloKey = String(clo.clo_id);
+          const saved = student.subScores?.[cloKey] || {};
+          const perClo = scoreDraft[subjectKey]?.[String(student.id)]?.[cloKey] || {};
 
-        const scores: Record<string, number | null> = {};
-        let changed = false;
+          const scores: Record<string, number | null> = {};
+          let changed = false;
 
-        clo.sub_plos.forEach((sub) => {
-          const raw = perClo[sub.code];
-          const current = raw === undefined || raw === "" ? null : Number(raw);
-          const before = saved[sub.code] === undefined || saved[sub.code] === null ? null : Number(saved[sub.code]);
-          if (current !== before) changed = true;
-          scores[sub.code] = current;
+          clo.sub_plos.forEach((sub) => {
+            const raw = perClo[sub.code];
+            const current = raw === undefined || raw === "" ? null : Number(raw);
+            const before = saved[sub.code] === undefined || saved[sub.code] === null ? null : Number(saved[sub.code]);
+            if (current !== before) changed = true;
+            scores[sub.code] = current;
+          });
+
+          if (changed) {
+            entries.push({ student_id: student.id, clo_id: clo.clo_id, scores });
+          }
         });
-
-        if (changed) {
-          entries.push({ student_id: student.id, clo_id: clo.clo_id, scores });
-        }
       });
-    });
+      return entries;
+    },
+    [courseData, scoreDraft]
+  );
 
-    return entries;
-  };
+  /** วิชาที่ยังมีคะแนนค้างไม่ได้บันทึก (รวมวิชาที่สลับผ่านไปแล้ว) */
+  const pendingSubjects = useMemo(() => {
+    if (!isScoringOpen) return [];
+    return Object.keys(courseData)
+      .map((key) => ({ key, entries: collectChangedEntries(key) }))
+      .filter((item) => item.entries.length > 0);
+  }, [isScoringOpen, courseData, collectChangedEntries]);
 
-  const changedCount = isScoringOpen ? collectChangedEntries().length : 0;
+  const changedCount = pendingSubjects.reduce((sum, item) => sum + item.entries.length, 0);
 
   const saveAllCloScores = async () => {
-    if (!selectedCourse) return;
-
-    // ตรวจช่วงคะแนนทั้งหมดก่อนส่ง
-    for (const student of studentGrades) {
-      for (const clo of cloHeaders) {
-        const perClo = scoreDraft[String(student.id)]?.[String(clo.clo_id)] || {};
-        for (const sub of clo.sub_plos) {
-          const raw = perClo[sub.code];
-          if (raw === undefined || raw === "") continue;
-          const value = Number(raw);
-          if (Number.isNaN(value) || value < 0 || value > 100) {
-            toast({
-              title: "คะแนนไม่ถูกต้อง",
-              description: `${student.name} — ${clo.clo_code} Sub PLO ${sub.code} ต้องอยู่ระหว่าง 0-100`,
-              variant: "destructive",
-            });
-            return;
+    // ตรวจช่วงคะแนนของทุกวิชาที่มีการแก้ไขก่อนส่ง
+    for (const { key } of pendingSubjects) {
+      const data = courseData[key];
+      const course = courses.find((c) => String(c.id) === key);
+      for (const student of data.students) {
+        for (const clo of data.headers) {
+          const perClo = scoreDraft[key]?.[String(student.id)]?.[String(clo.clo_id)] || {};
+          for (const sub of clo.sub_plos) {
+            const raw = perClo[sub.code];
+            if (raw === undefined || raw === "") continue;
+            const value = Number(raw);
+            const max = sub.max_score ?? 100;
+            if (Number.isNaN(value) || value < 0 || value > max) {
+              toast({
+                title: "คะแนนไม่ถูกต้อง",
+                description: `${course?.code ?? ""} ${student.name} — Sub PLO ${sub.code} ต้องอยู่ระหว่าง 0-${formatScore(max)}`,
+                variant: "destructive",
+              });
+              return;
+            }
           }
         }
       }
     }
 
-    const entries = collectChangedEntries();
-    if (entries.length === 0) {
+    if (pendingSubjects.length === 0) {
       toast({ title: "ไม่มีการเปลี่ยนแปลง", description: "ยังไม่ได้แก้ไขคะแนนใด ๆ" });
       return;
     }
 
     setIsSavingScore(true);
     try {
-      const response = await api.post("/index.php?page=save-student-clo-scores", {
-        subject_id: selectedCourse.id,
-        entries,
-      });
-
-      if (response.data && response.data.status === "success") {
-        const updated = response.data.data?.students || {};
-        setStudentGrades((prev) =>
-          prev.map((s) => {
-            const result = updated[String(s.id)];
-            if (!result) return s;
-            return {
-              ...s,
-              cloScores: result.clo_scores || s.cloScores,
-              subScores: result.sub_scores || s.subScores,
-              overall:
-                result.overall === null || result.overall === undefined ? null : Number(result.overall),
-            };
-          })
-        );
-        toast({ title: "บันทึกสำเร็จ", description: response.data.message });
-        closeScoreDialog();
-      } else {
-        toast({
-          title: "เกิดข้อผิดพลาด",
-          description: response.data.message || "ไม่สามารถบันทึกคะแนนได้",
-          variant: "destructive",
+      let savedSubjects = 0;
+      for (const { key, entries } of pendingSubjects) {
+        const response = await api.post("/index.php?page=save-student-clo-scores", {
+          subject_id: Number(key),
+          entries,
         });
+
+        if (!response.data || response.data.status !== "success") {
+          const course = courses.find((c) => String(c.id) === key);
+          toast({
+            title: "เกิดข้อผิดพลาด",
+            description: `${course?.code ?? ""} — ${response.data?.message || "ไม่สามารถบันทึกคะแนนได้"}`,
+            variant: "destructive",
+          });
+          return;
+        }
+
+        const updated = response.data.data?.students || {};
+        setCourseData((prev) => {
+          const data = prev[key];
+          if (!data) return prev;
+          return {
+            ...prev,
+            [key]: {
+              ...data,
+              students: data.students.map((s) => {
+                const result = updated[String(s.id)];
+                if (!result) return s;
+                return {
+                  ...s,
+                  cloScores: result.clo_scores || s.cloScores,
+                  subScores: result.sub_scores || s.subScores,
+                  overall: result.overall === null || result.overall === undefined ? null : Number(result.overall),
+                };
+              }),
+            },
+          };
+        });
+        savedSubjects++;
       }
+
+      toast({
+        title: "บันทึกสำเร็จ",
+        description: savedSubjects > 1 ? `บันทึกคะแนนแล้ว ${savedSubjects} รายวิชา` : "บันทึกคะแนนเรียบร้อยแล้ว",
+      });
+      setIsScoringOpen(false);
+      fetchCourses();
     } catch (error: any) {
       toast({
         title: "เกิดข้อผิดพลาด",
@@ -387,26 +444,32 @@ const CoursesPage = () => {
     }
   };
 
-  const filteredStudents = studentGrades.filter(
-    (s) =>
-      s.name.includes(searchQuery) || s.studentId.includes(searchQuery)
-  );
-
   /** เกณฑ์ผ่านของวิชาที่เปิดอยู่ — ตั้งค่าที่หน้า "จัดการหลักสูตร" */
   const passScore =
-    selectedCourse?.pass_score === null || selectedCourse?.pass_score === undefined || selectedCourse?.pass_score === ""
+    scoringCourse?.pass_score === null || scoringCourse?.pass_score === undefined || scoringCourse?.pass_score === ""
       ? DEFAULT_PASS_SCORE
-      : Number(selectedCourse.pass_score);
+      : Number(scoringCourse.pass_score);
 
-  /** สีของคะแนน: ผ่าน/ไม่ผ่านตามเกณฑ์ของรายวิชา */
-  const scoreClass = (value: number | null) => {
+  /** สีของคะแนนรวม: ผ่าน/ไม่ผ่านตามเกณฑ์ของรายวิชา */
+  const overallClass = (value: number | null) => {
     if (value === null) return "text-muted-foreground";
     if (value >= passScore) return "text-success font-semibold";
     return "text-destructive font-semibold";
   };
 
-  const formatScore = (value: number | null) =>
-    value === null || value === undefined ? "-" : Number(value).toFixed(2).replace(/\.00$/, "");
+  /** สีของคะแนน CLO: เทียบกับเกณฑ์ผ่านของ CLO นั้นเอง */
+  const cloClass = (value: number | null, clo: CloHeader) => {
+    if (value === null) return "text-muted-foreground";
+    if (clo.pass_score === null) return "font-semibold";
+    return value >= clo.pass_score ? "text-success font-semibold" : "text-destructive font-semibold";
+  };
+
+  const filteredScoreStudents = studentGrades.filter(
+    (s) => s.name.includes(scoreSearch) || s.studentId.includes(scoreSearch)
+  );
+
+  // จำนวนคอลัมน์ทั้งหมดในตารางให้คะแนน (ใช้กับแถว "ไม่พบข้อมูล")
+  const scoreColumnCount = 2 + scorableClos.reduce((sum, clo) => sum + clo.sub_plos.length + 1, 0) + 1;
 
   return (
     <div className="space-y-6">
@@ -462,328 +525,242 @@ const CoursesPage = () => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {courses.map((course) => (
-              <TableRow key={course.id}>
-                <TableCell className="font-medium text-primary">{course.code}</TableCell>
-                <TableCell>
-                  <p className="font-medium text-foreground">{course.name}</p>
-                  <p className="text-xs text-muted-foreground">กลุ่ม {course.section}</p>
-                </TableCell>
-                <TableCell className="text-muted-foreground">{course.credits}</TableCell>
-                <TableCell className="text-muted-foreground">{course.students} คน</TableCell>
-                <TableCell>
-                  <Badge variant="secondary">{course.semester}</Badge>
-                </TableCell>
-                <TableCell>
-                  <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">
-                    {course.cloCount} CLO
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  {course.instructor ? (
-                    <Badge className="bg-green-500 px-2 py-0.5 text-white">
-                      {course.instructor}
-                    </Badge>
-                  ) : (
-                    <Badge variant="destructive" className="px-2 py-0.5">
-                      ยังไม่มอบหมาย
-                    </Badge>
-                  )}
-                </TableCell>
-                <TableCell className="text-right">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem className="gap-2" onClick={() => openGradeDialog(course, false)}>
-                        <Edit className="h-4 w-4" /> บันทึก/แก้ไขผลการเรียน
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={8} className="py-10 text-center">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" />
                 </TableCell>
               </TableRow>
-            ))}
+            ) : courses.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
+                  ไม่มีรายวิชาที่คุณรับผิดชอบ
+                </TableCell>
+              </TableRow>
+            ) : (
+              courses.map((course) => (
+                <TableRow key={course.code}>
+                  <TableCell className="font-medium text-primary">{course.code}</TableCell>
+                  <TableCell>
+                    <p className="font-medium text-foreground">{course.name}</p>
+                    <p className="text-xs text-muted-foreground">กลุ่ม {course.section}</p>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">{course.credits}</TableCell>
+                  <TableCell className="text-muted-foreground">{course.students} คน</TableCell>
+                  <TableCell>
+                    <Badge variant="secondary">{course.semester}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">
+                      {course.cloCount} CLO
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {course.instructor ? (
+                      <Badge className="bg-green-500 px-2 py-0.5 text-white">
+                        {course.instructor}
+                      </Badge>
+                    ) : (
+                      <Badge variant="destructive" className="px-2 py-0.5">
+                        ยังไม่มอบหมาย
+                      </Badge>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-2"
+                      disabled={course.id === null}
+                      title={
+                        course.id === null
+                          ? "วิชานี้ยังไม่มีในตารางเรียนของระบบ จึงยังไม่มีนักศึกษาลงทะเบียน"
+                          : "บันทึกผลการเรียน"
+                      }
+                      onClick={() => openScoring(course)}
+                    >
+                      <Edit className="h-4 w-4" /> บันทึกผลการเรียน
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </div>
 
-      {/* Grade Dialog */}
-      <Dialog open={isGradeDialogOpen} onOpenChange={setIsGradeDialogOpen}>
-        <DialogContent className="app-dialog-5xl overflow-hidden flex flex-col">
-          <DialogHeader>
-            <DialogTitle>
-              {viewOnly ? "รายชื่อนักศึกษา" : "บันทึก/แก้ไขผลการเรียน"} - {selectedCourse?.code} {selectedCourse?.name}
+      {/* หน้าต่างให้คะแนน — Sub PLO ทุกข้อของทุก CLO อยู่ในตารางเดียว */}
+      <Dialog open={isScoringOpen} onOpenChange={setIsScoringOpen}>
+        {/* ตารางให้คะแนนกว้างตามจำนวน Sub PLO จึงใช้ความกว้างเต็มจอ */}
+        <DialogContent
+          className="app-dialog-screen flex flex-col overflow-hidden"
+          onInteractOutside={(e) => e.preventDefault()}
+        >
+          <DialogHeader className="shrink-0">
+            <DialogTitle className="flex flex-wrap items-center gap-3">
+              <span>บันทึกผลการเรียน</span>
+              <Select value={scoringCourseId} onValueChange={switchCourse}>
+                <SelectTrigger className="w-[22rem] max-w-full">
+                  <SelectValue placeholder="เลือกรายวิชา" />
+                </SelectTrigger>
+                <SelectContent>
+                  {courses
+                    .filter((c) => c.id !== null)
+                    .map((c) => (
+                      <SelectItem key={c.code} value={String(c.id)}>
+                        {c.code} — {c.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+              {scoringCourse && (
+                <span className="text-sm font-normal text-muted-foreground">
+                  กลุ่ม {scoringCourse.section} · ภาคเรียน {scoringCourse.semester} · เกณฑ์ผ่าน {formatScore(passScore)} คะแนน
+                </span>
+              )}
             </DialogTitle>
             <DialogDescription>
-              กลุ่ม {selectedCourse?.section} ภาคเรียน {selectedCourse?.semester} · เกณฑ์ผ่าน {passScore} คะแนน
-              {(selectedCourse?.pass_score === null || selectedCourse?.pass_score === undefined) && " (ค่าเริ่มต้น — กำหนดได้ที่หน้าจัดการหลักสูตร)"}
+              กรอกคะแนนของทุกข้อได้ในตารางเดียว เปลี่ยนรายวิชาได้โดยคะแนนที่กรอกค้างไว้จะไม่หาย แล้วกด "บันทึกทั้งหมด" ครั้งเดียวเมื่อกรอกครบ
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex-1 overflow-hidden flex flex-col gap-4">
-            {/* Search */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="ค้นหาชื่อหรือรหัสนักศึกษา..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
+          <div className="relative shrink-0">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={scoreSearch}
+              onChange={(e) => setScoreSearch(e.target.value)}
+              placeholder="ค้นหาชื่อหรือรหัสนักศึกษา..."
+              className="pl-9"
+            />
+          </div>
 
-            {/* Grades Table */}
-            <div className="flex-1 overflow-auto overscroll-contain border rounded-lg [&>div]:overflow-visible">
+          {loadingCourseId === scoringCourseId ? (
+            <div className="flex-1 min-h-0 flex items-center justify-center py-16">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : scorableClos.length === 0 ? (
+            <div className="flex-1 min-h-0 flex items-center justify-center py-16 text-center text-muted-foreground px-6">
+              รายวิชานี้ยังไม่มี CLO ที่ผูก Sub PLO และกำหนดคะแนนไว้ —
+              กรุณาตั้งค่าที่หน้า "จัดการ CLO รายวิชา" ก่อน
+            </div>
+          ) : (
+            <div className="flex-1 min-h-0 overflow-auto overscroll-contain border rounded-lg [&>div]:overflow-visible">
               <Table>
-                <TableHeader className="sticky top-0 bg-card">
+                <TableHeader className="sticky top-0 bg-card z-10">
                   <TableRow>
-                    <TableHead className="w-[120px] whitespace-nowrap">รหัส นศ.</TableHead>
-                    <TableHead className="whitespace-nowrap">ชื่อ-นามสกุล</TableHead>
-                    {cloHeaders.map((clo) => (
-                      <TableHead key={clo.clo_id} className="text-center w-[110px] whitespace-nowrap">
+                    <TableHead rowSpan={2} className="w-[120px] whitespace-nowrap align-bottom">รหัส นศ.</TableHead>
+                    <TableHead rowSpan={2} className="min-w-[180px] whitespace-nowrap align-bottom">ชื่อ-นามสกุล</TableHead>
+                    {scorableClos.map((clo) => (
+                      <TableHead
+                        key={clo.clo_id}
+                        colSpan={clo.sub_plos.length + 1}
+                        className="text-center whitespace-nowrap border-l border-border"
+                      >
                         {clo.clo_code}
-                        <br />
-                        <span className="text-[10px] font-normal text-muted-foreground">
-                          ({clo.sub_plos.length} Sub PLO)
+                        <span className="ml-1 text-[10px] font-normal text-muted-foreground">
+                          (เต็ม {formatScore(clo.max_score)})
                         </span>
                       </TableHead>
                     ))}
-                    <TableHead className="text-center w-[110px] whitespace-nowrap">
+                    <TableHead rowSpan={2} className="text-center w-[110px] whitespace-nowrap align-bottom border-l border-border">
                       คะแนนรวม
                       <br />
-                      <span className="text-[10px] font-normal text-muted-foreground">
-                        (÷ {cloHeaders.length || "-"} CLO)
-                      </span>
+                      <span className="text-[10px] font-normal text-muted-foreground">(เต็ม 100)</span>
                     </TableHead>
+                  </TableRow>
+                  <TableRow>
+                    {scorableClos.map((clo) => [
+                      ...clo.sub_plos.map((sub) => (
+                        <TableHead
+                          key={`${clo.clo_id}-${sub.code}`}
+                          className="text-center w-[110px] whitespace-nowrap border-l border-border"
+                          title={sub.description || undefined}
+                        >
+                          Sub {sub.code}
+                          <br />
+                          <span className="text-[10px] font-normal text-muted-foreground">
+                            (เต็ม {formatScore(sub.max_score)}
+                            {sub.pass_score !== null ? ` / ผ่าน ${formatScore(sub.pass_score)}` : ""})
+                          </span>
+                        </TableHead>
+                      )),
+                      <TableHead
+                        key={`${clo.clo_id}-total`}
+                        className="text-center w-[90px] whitespace-nowrap bg-muted/40"
+                      >
+                        รวม
+                      </TableHead>,
+                    ])}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {cloHeaders.length === 0 && (
+                  {filteredScoreStudents.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={3} className="text-center py-10 text-muted-foreground">
-                        รายวิชานี้ยังไม่ได้กำหนด CLO — กรุณาเพิ่ม CLO ในหน้า "จัดการ CLO รายวิชา" ก่อน
+                      <TableCell colSpan={scoreColumnCount} className="py-8 text-center text-muted-foreground">
+                        ไม่พบนักศึกษาที่ตรงกับคำค้นหา
                       </TableCell>
                     </TableRow>
-                  )}
-                  {cloHeaders.length > 0 &&
-                    filteredStudents.map((student) => (
-                      <TableRow key={student.id}>
-                        <TableCell className="font-mono text-sm whitespace-nowrap">{student.studentId}</TableCell>
-                        <TableCell className="font-medium">{student.name}</TableCell>
-                        {cloHeaders.map((clo) => {
-                          const value = student.cloScores?.[String(clo.clo_id)] ?? null;
-                          return (
-                            <TableCell key={clo.clo_id} className="text-center">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                disabled={viewOnly || clo.sub_plos.length === 0}
-                                onClick={() => openScoreDialog(clo)}
-                                className={`h-8 w-full ${scoreClass(value)}`}
-                                title={
-                                  clo.sub_plos.length === 0
-                                    ? "CLO นี้ยังไม่ได้ผูก Sub PLO"
-                                    : `ให้คะแนน ${clo.clo_code} (${clo.sub_plos.map((s) => s.code).join(", ")})`
-                                }
+                  ) : (
+                    filteredScoreStudents.map((student) => {
+                      const overall = draftOverall(scoringCourseId, student.id, scorableClos);
+                      return (
+                        <TableRow key={student.id}>
+                          <TableCell className="font-mono text-sm whitespace-nowrap">{student.studentId}</TableCell>
+                          <TableCell className="font-medium whitespace-nowrap">{student.name}</TableCell>
+                          {scorableClos.map((clo) => {
+                            const cloScore = draftCloScore(scoringCourseId, student.id, clo);
+                            return [
+                              ...clo.sub_plos.map((sub) => (
+                                <TableCell key={`${clo.clo_id}-${sub.code}`} className="text-center border-l border-border">
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    max={sub.max_score ?? 100}
+                                    placeholder="-"
+                                    className="h-9 w-[5.5rem] mx-auto text-center"
+                                    value={
+                                      scoreDraft[scoringCourseId]?.[String(student.id)]?.[String(clo.clo_id)]?.[sub.code] ?? ""
+                                    }
+                                    onChange={(e) =>
+                                      setDraftValue(scoringCourseId, student.id, clo.clo_id, sub.code, e.target.value)
+                                    }
+                                  />
+                                </TableCell>
+                              )),
+                              <TableCell
+                                key={`${clo.clo_id}-total`}
+                                className={`text-center bg-muted/30 ${cloClass(cloScore, clo)}`}
                               >
-                                {formatScore(value)}
-                              </Button>
-                            </TableCell>
-                          );
-                        })}
-                        <TableCell className={`text-center ${scoreClass(student.overall)}`}>
-                          {formatScore(student.overall)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                                {formatScore(cloScore)}
+                              </TableCell>,
+                            ];
+                          })}
+                          <TableCell className={`text-center border-l border-border ${overallClass(overall)}`}>
+                            {formatScore(overall)}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
                 </TableBody>
               </Table>
             </div>
-          </div>
-
-          <DialogFooter className="sm:justify-between">
-            {!viewOnly && cloHeaders.length > 0 && (
-              <p className="text-xs text-muted-foreground text-left">
-                คลิกที่ช่องคะแนนของ CLO หรือกดปุ่ม "ให้คะแนน" เพื่อกรอกคะแนน Sub PLO ของนักศึกษาทุกคน
-              </p>
-            )}
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setIsGradeDialogOpen(false)}>
-                ปิด
-              </Button>
-              {!viewOnly && cloHeaders.length > 0 && (
-                <Button onClick={() => openScoreDialog()}>ให้คะแนน</Button>
-              )}
-            </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* หน้าต่างให้คะแนน Sub PLO — สลับ CLO ได้อิสระ กรอกครบทุกคนแล้วบันทึกทีเดียว */}
-      <Dialog open={isScoringOpen} onOpenChange={(open) => { if (!open) closeScoreDialog(); }}>
-        <DialogContent className="app-dialog-5xl max-h-[92vh] overflow-hidden flex flex-col">
-          <DialogHeader>
-            <DialogTitle>
-              ให้คะแนน CLO — {selectedCourse?.code} {selectedCourse?.name}
-              <span className="ml-2 text-sm font-normal text-muted-foreground">เกณฑ์ผ่าน {passScore} คะแนน</span>
-            </DialogTitle>
-            <DialogDescription>
-              เลือก CLO ที่ต้องการให้คะแนน กรอกได้ทุกคนในหน้าเดียว สลับ CLO ได้โดยคะแนนที่กรอกไว้จะไม่หาย
-              แล้วกด "บันทึกทั้งหมด" ครั้งเดียวเมื่อกรอกครบ
-            </DialogDescription>
-          </DialogHeader>
-
-          {activeClo && (
-            <div className="flex-1 overflow-hidden flex flex-col gap-3">
-              {/* แถบเลือก CLO + ค้นหานักศึกษา */}
-              <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium whitespace-nowrap">เลือก CLO</span>
-                  <Select value={activeCloId} onValueChange={setActiveCloId}>
-                    <SelectTrigger className="w-[260px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {cloHeaders.map((clo) => (
-                        <SelectItem
-                          key={clo.clo_id}
-                          value={String(clo.clo_id)}
-                          disabled={clo.sub_plos.length === 0}
-                        >
-                          {clo.clo_code}
-                          {clo.sub_plos.length === 0
-                            ? " (ยังไม่ผูก Sub PLO)"
-                            : ` — Sub ${clo.sub_plos.map((s) => s.code).join(", ")}`}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="ค้นหาชื่อหรือรหัสนักศึกษา..."
-                    value={scoreSearch}
-                    onChange={(e) => setScoreSearch(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-              </div>
-
-              {/* รายละเอียด CLO ที่กำลังให้คะแนน */}
-              <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge className="border-primary/25 bg-primary/15 text-primary">{activeClo.clo_code}</Badge>
-                  {activeClo.ylo && <Badge variant="secondary">{activeClo.ylo}</Badge>}
-                  {activeClo.plos.map((plo) => (
-                    <Badge key={plo.code} variant="outline">{plo.code}</Badge>
-                  ))}
-                  {activeClo.sub_plos.map((sub) => (
-                    <Badge key={sub.code} variant="outline" className="border-amber-500 text-amber-600">
-                      Sub {sub.code}
-                    </Badge>
-                  ))}
-                </div>
-                {activeClo.description && (
-                  <p className="text-sm text-foreground whitespace-pre-wrap">{activeClo.description}</p>
-                )}
-                <div className="space-y-1">
-                  {activeClo.sub_plos.map((sub) => (
-                    <p key={sub.code} className="text-xs text-muted-foreground">
-                      <span className="font-medium text-amber-600">Sub {sub.code}</span>
-                      {sub.plo ? ` (${sub.plo})` : ""} — {sub.description || "ไม่มีคำอธิบาย"}
-                    </p>
-                  ))}
-                </div>
-              </div>
-
-              {/* ตารางกรอกคะแนนนักศึกษาทุกคน (เลื่อนดูได้) */}
-              <div className="flex-1 overflow-auto overscroll-contain border rounded-lg [&>div]:overflow-visible">
-                <Table>
-                  <TableHeader className="sticky top-0 bg-card z-10">
-                    <TableRow>
-                      <TableHead className="w-[120px] whitespace-nowrap">รหัส นศ.</TableHead>
-                      <TableHead className="whitespace-nowrap">ชื่อ-นามสกุล</TableHead>
-                      {activeClo.sub_plos.map((sub) => (
-                        <TableHead key={sub.code} className="text-center w-[120px] whitespace-nowrap">
-                          Sub {sub.code}
-                          <br />
-                          <span className="text-[10px] font-normal text-muted-foreground">(เต็ม 100)</span>
-                        </TableHead>
-                      ))}
-                      <TableHead className="text-center w-[110px] whitespace-nowrap">
-                        {activeClo.clo_code}
-                        <br />
-                        <span className="text-[10px] font-normal text-muted-foreground">
-                          (÷ {activeClo.sub_plos.length})
-                        </span>
-                      </TableHead>
-                      <TableHead className="text-center w-[110px] whitespace-nowrap">
-                        คะแนนรวม
-                        <br />
-                        <span className="text-[10px] font-normal text-muted-foreground">
-                          (÷ {cloHeaders.length} CLO)
-                        </span>
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {studentGrades
-                      .filter((s) => s.name.includes(scoreSearch) || s.studentId.includes(scoreSearch))
-                      .map((student) => (
-                        <TableRow key={student.id}>
-                          <TableCell className="font-mono text-sm whitespace-nowrap">
-                            {student.studentId}
-                          </TableCell>
-                          <TableCell className="font-medium">{student.name}</TableCell>
-                          {activeClo.sub_plos.map((sub) => (
-                            <TableCell key={sub.code} className="text-center">
-                              <Input
-                                type="number"
-                                min="0"
-                                max="100"
-                                placeholder="-"
-                                value={scoreDraft[String(student.id)]?.[activeCloId]?.[sub.code] ?? ""}
-                                onChange={(e) =>
-                                  setDraftValue(student.id, activeClo.clo_id, sub.code, e.target.value)
-                                }
-                                className="w-20 h-8 text-center mx-auto"
-                              />
-                            </TableCell>
-                          ))}
-                          <TableCell className={`text-center ${scoreClass(draftCloScore(student.id, activeClo))}`}>
-                            {formatScore(draftCloScore(student.id, activeClo))}
-                          </TableCell>
-                          <TableCell className={`text-center ${scoreClass(draftOverall(student.id))}`}>
-                            {formatScore(draftOverall(student.id))}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
           )}
 
-          <DialogFooter className="sm:justify-between">
-            <p className="text-xs text-left">
-              {changedCount > 0 ? (
-                <span className="text-warning font-medium">
-                  มี {changedCount} รายการที่แก้ไขแล้วยังไม่ได้บันทึก
-                </span>
-              ) : (
-                <span className="text-muted-foreground">ยังไม่มีการเปลี่ยนแปลง</span>
-              )}
-            </p>
+          <DialogFooter className="shrink-0 gap-2 sm:justify-between">
+            <span className="text-sm text-muted-foreground self-center">
+              {changedCount === 0
+                ? "ยังไม่มีการเปลี่ยนแปลง"
+                : `มีคะแนนที่ยังไม่บันทึก ${changedCount} รายการ` +
+                  (pendingSubjects.length > 1 ? ` จาก ${pendingSubjects.length} รายวิชา` : "")}
+            </span>
             <div className="flex gap-2">
-              <Button variant="outline" onClick={closeScoreDialog} disabled={isSavingScore}>
+              <Button variant="outline" onClick={() => setIsScoringOpen(false)} disabled={isSavingScore}>
                 ยกเลิก
               </Button>
-              <Button onClick={saveAllCloScores} disabled={isSavingScore || changedCount === 0}>
-                {isSavingScore ? "กำลังบันทึก..." : "บันทึกทั้งหมด"}
+              <Button onClick={saveAllCloScores} disabled={isSavingScore || changedCount === 0} className="gap-2">
+                {isSavingScore ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                บันทึกทั้งหมด
               </Button>
             </div>
           </DialogFooter>

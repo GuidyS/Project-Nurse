@@ -43,7 +43,8 @@ import StudentVaccinationPage from "@/components/pages/Student/StudentVaccinatio
 import StudentHealthRecordsPage from "@/components/pages/Student/StudentHealthRecordsPage";
 import AdvisorHealthRecordsView from "@/components/pages/Teacher/AdvisorHealthRecordsView";
 import CompetencyItemsManagement from "@/components/pages/Admin/CompetencyItemsManagement";
-import StudentCompetencyView from "@/components/pages/Student/StudentCompetencyView"; 
+import StudentCompetencyView from "@/components/pages/Student/StudentCompetencyView";
+import CourseRegistration from "@/components/pages/Student/CourseRegistration"; 
 import CurriculumCycles from "@/components/pages/Admin/CurriculumCycles";
 import PracticeLocationsPage from "@/components/pages/Teacher/PracticeLocationsPage";
 import { getPageFromUrl, navigateToPage } from "@/lib/projectNavigation";
@@ -275,7 +276,7 @@ const Index = () => {
     }
 
     // 6. 🔒 หมวดสิทธิ์นักศึกษา (Student - Role 3) หรือ Admin
-    const studentPages = ["transcript", "portfolio", "student-vaccinations", "student-health-records", "student-competency-view"];
+    const studentPages = ["transcript", "portfolio", "student-vaccinations", "student-health-records", "student-competency-view", "student-registration"];
     if (studentPages.includes(activeItem)) {
       if (roleId !== 1 && roleId !== 3) return <UnauthorizedView />;
       switch (activeItem) {
@@ -284,6 +285,7 @@ const Index = () => {
         case "student-vaccinations": return <StudentVaccinationPage />;
         case "student-health-records": return <StudentHealthRecordsPage />;
         case "student-competency-view": return <StudentCompetencyView />;
+        case "student-registration": return <CourseRegistration />;
       }
     }
 

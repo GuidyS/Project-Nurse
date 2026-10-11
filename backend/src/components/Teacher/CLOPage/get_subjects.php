@@ -19,8 +19,9 @@ try {
 
     $userId = $_SESSION['user_id'];
     $isAdmin = cloAccessIsAdmin($pdo, $userId);
-    // อาจารย์เห็นเฉพาะวิชาที่ตนเองเป็นผู้สอน
-    $myCodes = $isAdmin ? [] : cloAccessMySubjectCodes($pdo, $userId);
+    // ทุกคนเห็นเฉพาะวิชาที่ตนเองเป็นผู้รับผิดชอบ รวมถึงผู้ดูแลระบบด้วย
+    // (มอบหมายผู้สอนที่หน้า "จัดอาจารย์ผู้สอน")
+    $myCodes = cloAccessMySubjectCodes($pdo, $userId);
 
     $curriculumSubjects = activeCurriculumSubjects($pdo);
     if ($curriculumSubjects !== null) {
@@ -29,7 +30,7 @@ try {
         $myCodeSet = array_fill_keys(array_map('mb_strtolower', $myCodes), true);
         $subjects = [];
         foreach ($curriculumSubjects as $subject) {
-            if (!$isAdmin && !isset($myCodeSet[mb_strtolower($subject['subject_code'])])) {
+            if (!isset($myCodeSet[mb_strtolower($subject['subject_code'])])) {
                 continue;
             }
             $subjects[] = [
@@ -38,11 +39,6 @@ try {
                 'subject_name_th' => $subject['subject_name'],
             ];
         }
-    } elseif ($isAdmin) {
-        // ยังไม่มีหลักสูตรในระบบ → รายวิชาทั้งหมดจากตาราง subject แบบเดิม (admin แก้ไขได้ทุกวิชา)
-        $stmt = $pdo->prepare("SELECT subject_id, subject_code, subject_name_th FROM subject WHERE is_active = 1 ORDER BY subject_code ASC");
-        $stmt->execute();
-        $subjects = $stmt->fetchAll(PDO::FETCH_ASSOC);
     } elseif (empty($myCodes)) {
         $subjects = [];
     } else {

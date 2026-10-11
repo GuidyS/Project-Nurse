@@ -110,6 +110,7 @@ function researchSummaryData(PDO $db, bool $canManage): array
             'authors' => $authors,
         ];
     }
-    return ['years' => range(currentAcademicYear() - 4, currentAcademicYear()), 'faculty' => $faculty,
+    $currentYear = currentAcademicYear(null, $db);
+    return ['years' => range($currentYear - 4, $currentYear), 'faculty' => $faculty,
         'publications' => $publications, 'can_manage' => $canManage];
 }

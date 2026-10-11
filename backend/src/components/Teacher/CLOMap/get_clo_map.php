@@ -6,6 +6,7 @@ if (session_status() === PHP_SESSION_NONE) {
 require_once __DIR__ . '/../CLOPage/clo_mapping_helpers.php';
 require_once __DIR__ . '/../CLOPage/curriculum_repository.php';
 require_once __DIR__ . '/../../../config/active_curriculum.php';
+require_once __DIR__ . '/../../../config/curriculum_outcomes.php';
 
 $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -30,6 +31,14 @@ try {
         $stmt_subjects->execute();
         $courses = $stmt_subjects->fetchAll(PDO::FETCH_ASSOC);
     }
+
+    // YLO ของแต่ละรายวิชา (ตั้งค่าที่หน้า "จัดการหลักสูตร") — ใช้กรองในหน้า CLO Map
+    outcomesEnsureSchema($pdo);
+    $yloMap = outcomesSubjectYloMap($pdo);
+    foreach ($courses as &$course) {
+        $course['ylo'] = $yloMap[(string)$course['code']] ?? null;
+    }
+    unset($course);
 
     $frameworkId = getActiveFrameworkId($pdo);
     $plos = [];

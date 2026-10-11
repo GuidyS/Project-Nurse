@@ -103,6 +103,10 @@
                 break;
 
             // ตั้งค่าปีการศึกษา / ลบข้อมูลนักศึกษาที่เกินกำหนด (เฉพาะผู้ดูแลระบบ)
+            case 'get-term-settings':
+            case 'save-term-settings':
+                require_once 'components/Admin/AcademicSettings/term_settings_api.php';
+                break;
             case 'get-academic-settings':
             case 'save-academic-settings':
             case 'run-student-purge':
@@ -122,6 +126,9 @@
                 break;
             case 'delete-competency-item':
                 require_once 'components/Admin/CompetencyItems/delete_competency_item.php';
+                break;
+            case 'save-plo-heading':
+                require_once 'components/Admin/CompetencyItems/save_plo_heading.php';
                 break;
             case 'manage-role':
                 require_once 'components/Admin/ManageUsers/manage-role.php';
@@ -224,13 +231,7 @@
                 }
                 require_once $compPath;
                 break;
-            case 'save-student-competency':
-                $saveCompPath = 'components/Teacher/StudentCompetency/save_student_competency.php';
-                if (!file_exists(__DIR__ . '/' . $saveCompPath)) {
-                    $saveCompPath = 'components/Teacher/student_competency/save_student_competency.php';
-                }
-                require_once $saveCompPath;
-                break;
+            // ผลประเมินสมรรถนะคำนวณจากคะแนนรายวิชาอัตโนมัติแล้ว จึงไม่มีการบันทึกด้วยมืออีก
 
             // AssignStudents (มอบหมายนักศึกษาให้อาจารย์ — เฉพาะผู้ดูแลระบบ)
             case 'get-assign-students':
@@ -286,12 +287,7 @@
             case 'delete-clo':
                 require_once 'components/Teacher/CLOPage/delete_clo.php';
                 break;
-            case 'save-ylo-matrix':
-                require_once 'components/Teacher/CLOPage/save_ylo_matrix.php';
-                break;
-            case 'save-sub-plo-catalog':
-                require_once 'components/Teacher/CLOPage/save_sub_plo_catalog.php';
-                break;
+            // YLO / Sub PLO ย้ายไปกำหนดที่หน้า "ประเมินสมรรถนะหลักแต่ละชั้นปี (YLO)" และ "จัดการหลักสูตร" แล้ว
             case 'migrate-mapping-json-to-tables':
                 require_once 'components/Teacher/CLOPage/migrate_mapping_json_to_tables.php';
                 break;
@@ -502,6 +498,14 @@
                 break;
 
             /* -------- Student -------- */
+
+            // ลงทะเบียนเรียน (รายวิชาของหลักสูตรที่ใช้งานในระบบ)
+            case 'student-registration':
+                require_once 'components/Student/CourseRegistration/get_registration.php';
+                break;
+            case 'save-student-registration':
+                require_once 'components/Student/CourseRegistration/save_registration.php';
+                break;
 
             // Transcript
             case 'transcript-api':

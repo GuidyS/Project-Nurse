@@ -8,6 +8,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 if (session_status() == PHP_SESSION_NONE) { session_start(); }
 require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../config/audit_helper.php';
+require_once __DIR__ . '/competency_helpers.php';
 
 ob_end_clean();
 header("Content-Type: application/json; charset=UTF-8");
@@ -19,85 +20,127 @@ if (!$userId) {
     exit;
 }
 
+/**
+ * ลบ Sub PLO ตาม id ที่กำหนด พร้อมเก็บกวาดคะแนนที่ผูกไว้
+ * curriculum_clo_sub_plo มี FK แบบ CASCADE อยู่แล้ว เหลือแค่คะแนนนักศึกษาที่อ้างด้วยรหัสข้อความ
+ */
+function competencyDeleteSubPlos(PDO $db, array $ids): int
+{
+    if (empty($ids)) {
+        return 0;
+    }
+
+    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+
+    // ลบคะแนนเฉพาะของ CLO ที่ผูกกับ Sub PLO เหล่านี้จริง ๆ
+    // (รหัสอย่าง "1.1" ซ้ำกันได้ระหว่างชั้นปี จึงลบด้วยรหัสอย่างเดียวไม่ได้)
+    if (outcomesTableExists($db, 'student_clo_sub_scores')) {
+        $db->prepare("
+            DELETE sc FROM student_clo_sub_scores sc
+            INNER JOIN curriculum_clo_sub_plo cs ON cs.clo_id = sc.clo_id
+            INNER JOIN curriculum_sub_plo s ON s.id = cs.sub_plo_id
+            WHERE cs.sub_plo_id IN ($placeholders)
+              AND sc.sub_plo_code COLLATE utf8mb4_general_ci = s.code COLLATE utf8mb4_general_ci
+        ")->execute($ids);
+    }
+
+    $del = $db->prepare("DELETE FROM curriculum_sub_plo WHERE id IN ($placeholders)");
+    $del->execute($ids);
+    return $del->rowCount();
+}
+
 try {
     $db = new Connect;
+    competencyRequireAdmin($db, $userId);
+    outcomesEnsureSchema($db);
 
-    // 1. ตรวจสอบสิทธิ์ Admin (role_id = 1)
-    $stmt = $db->prepare("SELECT role_id FROM users WHERE user_id = :id");
-    $stmt->execute([':id' => $userId]);
-    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+    $scope = (string)($_GET['scope'] ?? 'item'); // item | plo | all
+    $frameworkId = isset($_GET['framework_id']) ? (int)$_GET['framework_id'] : 0;
+    $ploId = isset($_GET['plo_id']) ? (int)$_GET['plo_id'] : 0;
+    $itemId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
-    if (!$user || (int)($user['role_id'] ?? 0) !== 1) {
-        http_response_code(403);
-        echo json_encode(["status" => "error", "message" => "Forbidden: คุณไม่มีสิทธิ์จัดการส่วนนี้"], JSON_UNESCAPED_UNICODE);
+    // ลบทั้งหมดของ PLO เดียว หรือทั้งหลักสูตร — ลบทุกชั้นปีของ PLO นั้น
+    if ($scope === 'plo' || $scope === 'all') {
+        if ($frameworkId <= 0) {
+            http_response_code(400);
+            echo json_encode(["status" => "error", "message" => "ไม่พบหลักสูตรที่ระบุ"], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        if ($scope === 'plo') {
+            if ($ploId <= 0) {
+                http_response_code(400);
+                echo json_encode(["status" => "error", "message" => "ไม่พบหัวข้อ PLO ที่ระบุ"], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+            $idStmt = $db->prepare("SELECT id FROM curriculum_sub_plo WHERE framework_id = :fid AND plo_id = :pid");
+            $idStmt->execute([':fid' => $frameworkId, ':pid' => $ploId]);
+        } else {
+            $idStmt = $db->prepare("SELECT id FROM curriculum_sub_plo WHERE framework_id = :fid");
+            $idStmt->execute([':fid' => $frameworkId]);
+        }
+
+        $ids = array_map('intval', $idStmt->fetchAll(PDO::FETCH_COLUMN) ?: []);
+        if (empty($ids)) {
+            echo json_encode(["status" => "success", "deleted" => 0, "message" => "ไม่มีรายการให้ลบ"], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        $db->beginTransaction();
+        $deleted = competencyDeleteSubPlos($db, $ids);
+        $db->commit();
+
+        $label = $scope === 'plo' ? "PLO (plo_id {$ploId})" : "ทุก PLO ของหลักสูตร";
+        logAudit($db, $userId, 'delete', 'curriculum_sub_plo', "ลบ Sub PLO ทั้งหมดใน {$label} จำนวน {$deleted} รายการ");
+
+        echo json_encode([
+            "status" => "success",
+            "deleted" => $deleted,
+            "message" => "ลบรายการเรียบร้อยแล้ว {$deleted} รายการ",
+        ], JSON_UNESCAPED_UNICODE);
         exit;
     }
 
-    $itemId = (int)($_GET['id'] ?? 0);
+    // ลบรายการเดียว
     if ($itemId <= 0) {
         http_response_code(400);
-        echo json_encode(["status" => "error", "message" => "กรุณาระบุรหัสรายการที่ต้องการลบ"], JSON_UNESCAPED_UNICODE);
+        echo json_encode(["status" => "error", "message" => "ไม่พบรหัสรายการที่ต้องการลบ"], JSON_UNESCAPED_UNICODE);
         exit;
     }
 
-    // 2. ดึงข้อมูลก่อนลบเพื่อเก็บชื่อและชั้นปีไว้บันทึก Log
-    $itemInfoStmt = $db->prepare("
-        SELECT ci.year_level, ci.competency_name, cp.framework_id, cp.plo_code
-        FROM competency_items ci
-        JOIN curriculum_plo cp ON cp.id = ci.plo_id
-        WHERE ci.id = :id
+    $infoStmt = $db->prepare("
+        SELECT s.code, s.description, s.year_level, s.framework_id, s.plo_id, p.plo_code
+        FROM curriculum_sub_plo s
+        INNER JOIN curriculum_plo p ON p.id = s.plo_id
+        WHERE s.id = :id LIMIT 1
     ");
-    $itemInfoStmt->execute([':id' => $itemId]);
-    $itemInfo = $itemInfoStmt->fetch(PDO::FETCH_ASSOC);
+    $infoStmt->execute([':id' => $itemId]);
+    $info = $infoStmt->fetch(PDO::FETCH_ASSOC);
 
-    if (!$itemInfo) {
+    if (!$info) {
         http_response_code(404);
         echo json_encode(["status" => "error", "message" => "ไม่พบรายการที่ต้องการลบในระบบ"], JSON_UNESCAPED_UNICODE);
         exit;
     }
 
-    // 3. เริ่ม Transaction ลบทั้งผลประเมินที่เกี่ยวข้องและตัวรายการข้อประเมิน
     $db->beginTransaction();
-
-    $delAssessStmt = $db->prepare("DELETE FROM student_competency_assessments WHERE competency_item_id = :id");
-    $delAssessStmt->execute([':id' => $itemId]);
-
-    $delStmt = $db->prepare("DELETE FROM competency_items WHERE id = :id");
-    $delStmt->execute([':id' => $itemId]);
-
-    // 4. Re-index จัดเรียง sequence_no ใหม่
-    $reorderStmt = $db->prepare("
-        SELECT ci.id 
-        FROM competency_items ci
-        JOIN curriculum_plo cp ON cp.id = ci.plo_id
-        WHERE cp.framework_id = :fid AND ci.year_level = :yl
-        ORDER BY COALESCE(cp.sort_order, cp.id) ASC, ci.sequence_no ASC, ci.id ASC
-    ");
-    $reorderStmt->execute([
-        ':fid' => $itemInfo['framework_id'],
-        ':yl' => $itemInfo['year_level']
-    ]);
-    $remainingItems = $reorderStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-
-    $updateSeq = $db->prepare("UPDATE competency_items SET sequence_no = :seq WHERE id = :id");
-    $seq = 1;
-    foreach ($remainingItems as $row) {
-        $updateSeq->execute([':seq' => $seq++, ':id' => $row['id']]);
-    }
-
+    competencyDeleteSubPlos($db, [$itemId]);
+    competencyResequenceSubCodes($db, (int)$info['framework_id'], (int)$info['plo_id'], (int)$info['year_level']);
     $db->commit();
 
-    // 5. บันทึก Audit Log เมื่อลบจริงสำเร็จ
-    $compTitle = !empty($itemInfo['competency_name']) ? ": " . $itemInfo['competency_name'] : "";
     logAudit(
         $db,
         $userId,
         'delete',
-        'competency_items',
-        "ลบรายการประเมินสมรรถนะ (ID: {$itemId}){$compTitle} ชั้นปีที่ {$itemInfo['year_level']}"
+        'curriculum_sub_plo',
+        "ลบ Sub PLO {$info['code']}: {$info['description']} (ชั้นปีที่ {$info['year_level']}, {$info['plo_code']})"
     );
 
-    echo json_encode(["status" => "success", "message" => "ลบรายการและผลประเมินที่เกี่ยวข้องเรียบร้อยแล้ว"], JSON_UNESCAPED_UNICODE);
+    echo json_encode([
+        "status" => "success",
+        "deleted" => 1,
+        "message" => "ลบรายการเรียบร้อยแล้ว",
+    ], JSON_UNESCAPED_UNICODE);
 
 } catch (Exception $e) {
     if (isset($db) && $db->inTransaction()) {

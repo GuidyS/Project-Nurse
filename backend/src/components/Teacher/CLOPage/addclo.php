@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../../config/audit_helper.php';
 require_once __DIR__ . '/clo_mapping_helpers.php';
 require_once __DIR__ . '/curriculum_repository.php';
 require_once __DIR__ . '/clo_access_helpers.php';
+require_once __DIR__ . '/../../../config/curriculum_outcomes.php';
 
 $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -45,10 +46,6 @@ try {
         exit();
     }
 
-    $mappingData = loadActiveMappingData($pdo);
-    $mapped_plos = derivePlosFromYlo($mappingData, $input['ylo_id'] ?? null);
-    $sub_plos = filterSubPlosByAllowedPlos($mappingData, $input['sub_plos'] ?? null, $mapped_plos);
-
     if (!curriculumTablesReady($pdo) || !curriculumHasRelationalData($pdo, $frameworkId)) {
         http_response_code(503);
         echo json_encode([
@@ -58,6 +55,29 @@ try {
         exit();
     }
 
+    outcomesEnsureSchema($pdo);
+
+    // YLO มาจากหน้า "จัดการหลักสูตร" ไม่ได้เลือกที่หน้านี้แล้ว
+    $subjectYlo = outcomesSubjectYlo($pdo, (string)$subject_code);
+    if ($subjectYlo === null) {
+        http_response_code(400);
+        echo json_encode([
+            "status" => "error",
+            "message" => "รายวิชานี้ยังไม่ได้กำหนด YLO — ตั้งค่าที่หน้า \"จัดการหลักสูตร\" ก่อน",
+        ], JSON_UNESCAPED_UNICODE);
+        exit();
+    }
+
+    // Sub PLO ที่เลือกได้ = Sub PLO ของชั้นปีนั้น และ PLO ของ CLO มาจาก Sub PLO ที่ติ๊ก
+    [$sub_plos, $mapped_plos, $scoreEntries] = cloResolveSubPloSelection(
+        $pdo,
+        $frameworkId,
+        $subjectYlo,
+        $input['sub_plos'] ?? [],
+        $input['sub_plo_scores'] ?? []
+    );
+    $cleanScores = outcomesNormalizeCloScores($pdo, $frameworkId, (string)$subject_code, null, $scoreEntries);
+
     $pdo->beginTransaction();
     $cloId = addCurriculumClo(
         $pdo,
@@ -66,11 +86,13 @@ try {
         [
             'clo_code' => $input['clo_code'] ?? null,
             'description' => $input['description'],
-            'ylo_id' => $input['ylo_id'] ?? null,
+            'ylo_id' => 'YLO' . $subjectYlo,
         ],
         $mapped_plos,
-        $sub_plos
+        $sub_plos,
+        getSubPloIdMap($pdo, $frameworkId, $subjectYlo)
     );
+    outcomesApplyCloScores($pdo, $cloId, $cleanScores);
     $pdo->commit();
     
     // บันทึก Log เมื่อเพิ่ม CLO สำเร็จ
@@ -78,6 +100,13 @@ try {
     logAudit($pdo, $_SESSION['user_id'], 'create', 'clos', "เพิ่ม CLO{$cloCodeStr} (ID: {$cloId}) ในรายวิชา {$subject_code}");
 
     echo json_encode(["status" => "success", "message" => "เพิ่ม CLO สำเร็จ"], JSON_UNESCAPED_UNICODE);
+} catch (InvalidArgumentException $e) {
+    // ข้อมูลที่กรอกไม่ผ่านกติกาคะแนน — เป็นความผิดฝั่งผู้ใช้ ไม่ใช่ระบบล่ม
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
+    http_response_code(400);
+    echo json_encode(["status" => "error", "message" => $e->getMessage()], JSON_UNESCAPED_UNICODE);
 } catch (Exception $e) {
     if ($pdo->inTransaction()) {
         $pdo->rollBack();

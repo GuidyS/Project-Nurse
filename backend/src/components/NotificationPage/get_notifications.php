@@ -46,6 +46,14 @@ try {
         error_log('project reminder: ' . $e->getMessage());
     }
 
+    // ลบข้อมูลนักศึกษาที่เข้าศึกษาเกินกำหนด (ปีละครั้ง และเฉพาะเมื่อแอดมินเปิดใช้งานไว้)
+    try {
+        require_once __DIR__ . '/../Admin/AcademicSettings/student_purge_helpers.php';
+        studentPurgeRunIfDue($pdo);
+    } catch (Throwable $e) {
+        error_log('student purge: ' . $e->getMessage());
+    }
+
     // ตรวจสอบบทบาทผู้ใช้ และดึงข้อมูลอาจารย์ที่ปรึกษา/อาจารย์ปฏิบัติ หากเป็นนักศึกษา
     $studentAdvisorInfo = null;
     $userStmt = $pdo->prepare("SELECT username, role_id FROM users WHERE user_id = :user_id LIMIT 1");

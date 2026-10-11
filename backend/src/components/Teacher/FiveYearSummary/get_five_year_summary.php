@@ -12,7 +12,7 @@ try {
     $db = new Connect();
  
     // 1. กำหนดช่วงปีการศึกษา 5 ปีล่าสุดตามปฏิทินกลาง
-    $current_year = currentAcademicYear();
+    $current_year = currentAcademicYear(null, $db);
     $years = [$current_year-4, $current_year-3, $current_year-2, $current_year-1, $current_year];
  
     // โครงสร้างสำหรับเก็บผลลัพธ์
