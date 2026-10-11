@@ -8,6 +8,12 @@ import { useState, useEffect } from 'react';
 import api from '@/lib/axios';
 import { useToast } from '@/hooks/use-toast';
 
+/** ตัดทศนิยมท้ายที่ไม่จำเป็นออก เช่น 12.50 -> 12.5 */
+const formatScore = (value: number | null | undefined): string =>
+  value === null || value === undefined
+    ? '-'
+    : Number.isInteger(value) ? String(value) : String(Number(Number(value).toFixed(2)));
+
 const getStatusBadge = (status: string) => {
   switch (status) {
     case 'passed': return <Badge className="bg-green-500">ผ่านเกณฑ์</Badge>;
@@ -146,11 +152,20 @@ export default function CourseStudents() {
                         {clo.clo_code}
                         <br />
                         <span className="text-[10px] font-normal text-muted-foreground">
-                          ({clo.sub_plos?.length || 0} Sub PLO)
+                          (เต็ม {formatScore(clo.max_score)}
+                          {clo.pass_score !== null && clo.pass_score !== undefined
+                            ? ` / ผ่าน ${formatScore(clo.pass_score)}`
+                            : ''})
                         </span>
                       </TableHead>
                     ))}
-                    <TableHead className="text-center">ภาพรวมวิชา</TableHead>
+                    <TableHead className="text-center">
+                      ภาพรวมวิชา
+                      <br />
+                      <span className="text-[10px] font-normal text-muted-foreground">
+                        (เต็ม 100 / ผ่าน {formatScore(passScore)})
+                      </span>
+                    </TableHead>
                     <TableHead>ผลประเมิน</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -170,13 +185,17 @@ export default function CourseStudents() {
                         {/* คะแนนของแต่ละ CLO — key เป็น clo_id ตามที่ backend ส่งมา */}
                         {cloHeaders.map((clo) => {
                           const score = student.clo_scores?.[String(clo.clo_id)];
+                          // เทียบกับเกณฑ์ผ่านของ CLO นั้นเอง (ผลรวมคะแนนผ่านของ Sub PLO ใน CLO)
+                          const cloPass = clo.pass_score ?? null;
                           return (
                             <TableCell key={clo.clo_id} className="text-center">
                               {score === null || score === undefined ? (
                                 <span className="text-muted-foreground">-</span>
+                              ) : cloPass === null ? (
+                                <span className="font-medium">{formatScore(score)}</span>
                               ) : (
-                                <span className={score >= passScore ? 'text-success font-medium' : 'text-destructive font-medium'}>
-                                  {score}
+                                <span className={score >= cloPass ? 'text-success font-medium' : 'text-destructive font-medium'}>
+                                  {formatScore(score)}
                                 </span>
                               )}
                             </TableCell>
@@ -187,7 +206,7 @@ export default function CourseStudents() {
                           {student.overall === null || student.overall === undefined ? (
                             <span className="text-muted-foreground font-normal">-</span>
                           ) : (
-                            student.overall
+                            formatScore(student.overall)
                           )}
                         </TableCell>
                         <TableCell>{getStatusBadge(student.status)}</TableCell>

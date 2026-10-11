@@ -13,14 +13,15 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 try {
     $db = new Connect();
     approvalRequireAdmin($db);
+    $currentYear = currentAcademicYear(null, $db);
     // Same admin scope and columns as export-data; no student records are returned.
     $admissionYears = $db->query('SELECT DISTINCT admission_year FROM student WHERE admission_year IS NOT NULL')->fetchAll(PDO::FETCH_COLUMN);
     $projectYears = $db->query('SELECT DISTINCT academic_year FROM project WHERE academic_year IS NOT NULL')->fetchAll(PDO::FETCH_COLUMN);
     echo json_encode([
         'status' => 'success', 'message' => 'รายการปีสำหรับส่งออก',
         'data' => [
-            'students' => academicYearOptions($admissionYears),
-            'projects' => academicYearOptions($projectYears),
+            'students' => academicYearOptions($admissionYears, $currentYear),
+            'projects' => academicYearOptions($projectYears, $currentYear),
         ],
     ], JSON_UNESCAPED_UNICODE);
 } catch (Throwable $error) {

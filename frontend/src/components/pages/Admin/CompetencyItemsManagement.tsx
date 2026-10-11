@@ -1,19 +1,24 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Plus, Pencil, Trash2, Save, X, AlertCircle } from "lucide-react";
+import { Loader2, Plus, Pencil, Trash2, Save, X, AlertCircle, Library } from "lucide-react";
 import api from "@/lib/axios";
 
-interface Framework {
+/** หลักสูตรที่ใช้งานในระบบ — ตัวเดียวกับที่หน้า "จัดการหลักสูตร" ตั้งค่าไว้ */
+interface ActiveCurriculum {
   id: number;
-  curriculum_year: number;
-  program_name: string;
+  start_year: number;
+  end_year: number;
+  is_explicit: boolean;
+  label: string;
 }
 
 interface CompetencyItem {
@@ -21,6 +26,7 @@ interface CompetencyItem {
   plo_id: number;
   year_level: number;
   sequence_no: number;
+  sub_plo_code: string;
   competency_name: string;
   is_scorable: number;
 }
@@ -30,76 +36,73 @@ interface PloGroup {
   plo_code: string;
   plo_name: string;
   items: CompetencyItem[];
+  /** จำนวนรายการของ PLO นี้รวมทุกชั้นปี — ใช้บอกผลของปุ่ม "ลบทั้งหมด" */
+  total_all_years: number;
 }
 
 const emptyDraft = { id: null as number | null, competency_name: "", is_scorable: true };
 
+/** งานลบที่รอการยืนยัน */
+type PendingDelete =
+  | { scope: "item"; id: number; label: string }
+  | { scope: "plo"; ploId: number; label: string; count: number }
+  | { scope: "all"; label: string; count: number };
+
 export default function CompetencyItemsManagement() {
   const { toast } = useToast();
-  const [frameworks, setFrameworks] = useState<Framework[]>([]);
+  const [curriculum, setCurriculum] = useState<ActiveCurriculum | null>(null);
   const [frameworkId, setFrameworkId] = useState<string>("");
   const [yearLevel, setYearLevel] = useState<string>("1");
   const [groups, setGroups] = useState<PloGroup[]>([]);
-  const [isLoadingFrameworks, setIsLoadingFrameworks] = useState(true);
   const [isLoadingItems, setIsLoadingItems] = useState(false);
 
   const [editingPloId, setEditingPloId] = useState<number | null>(null);
   const [draft, setDraft] = useState(emptyDraft);
   const [isSaving, setIsSaving] = useState(false);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
 
-  const fetchFrameworks = async () => {
-    try {
-      setIsLoadingFrameworks(true);
-      const res = await api.get("/index.php?page=competency-items");
-      if (res.data.status === "success" && Array.isArray(res.data.data)) {
-        setFrameworks(res.data.data);
-        if (res.data.data.length > 0) {
-          setFrameworkId(String(res.data.data[0].id));
-        }
-      }
-    } catch (error) {
-      toast({ title: "ข้อผิดพลาด", description: "โหลดรายชื่อหลักสูตรไม่สำเร็จ", variant: "destructive" });
-    } finally {
-      setIsLoadingFrameworks(false);
-    }
-  };
+  // แก้ไขหัวข้อ PLO (ข้อความของ PLO1–PLO8)
+  const [headingPloId, setHeadingPloId] = useState<number | null>(null);
+  const [headingDraft, setHeadingDraft] = useState("");
+  const [isSavingHeading, setIsSavingHeading] = useState(false);
+
+  const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const totalAllPlos = useMemo(
+    () => groups.reduce((sum, g) => sum + (g.total_all_years || 0), 0),
+    [groups]
+  );
 
   const fetchItems = useCallback(async () => {
-    if (!frameworkId) return;
     try {
       setIsLoadingItems(true);
-      const res = await api.get(
-        `/index.php?page=competency-items&framework_id=${frameworkId}&year_level=${yearLevel}`
-      );
+      // ไม่ส่ง framework_id — backend ยึดหลักสูตรที่ใช้งานในระบบให้เอง
+      const res = await api.get(`/index.php?page=competency-items&year_level=${yearLevel}`);
       if (res.data.status === "success") {
         setGroups(res.data.data || []);
+        setCurriculum(res.data.curriculum ?? null);
+        setFrameworkId(res.data.framework_id ? String(res.data.framework_id) : "");
       }
     } catch (error) {
       toast({ title: "ข้อผิดพลาด", description: "โหลดรายการประเมินไม่สำเร็จ", variant: "destructive" });
     } finally {
       setIsLoadingItems(false);
     }
-  }, [frameworkId, yearLevel]);
-
-  useEffect(() => {
-    fetchFrameworks();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [yearLevel]);
 
   useEffect(() => {
     fetchItems();
   }, [fetchItems]);
 
   const startAdd = (ploId: number) => {
+    setHeadingPloId(null);
     setEditingPloId(ploId);
-    setDraft({ 
-      id: null, 
-      competency_name: "", 
-      is_scorable: true 
-    });
+    setDraft({ id: null, competency_name: "", is_scorable: true });
   };
 
   const startEdit = (ploId: number, item: CompetencyItem) => {
+    setHeadingPloId(null);
     setEditingPloId(ploId);
     setDraft({
       id: item.id,
@@ -113,12 +116,47 @@ export default function CompetencyItemsManagement() {
     setDraft(emptyDraft);
   };
 
+  const startEditHeading = (group: PloGroup) => {
+    cancelEdit();
+    setHeadingPloId(group.plo_id);
+    setHeadingDraft(group.plo_name || "");
+  };
+
+  const handleSaveHeading = async (ploId: number) => {
+    if (!headingDraft.trim()) {
+      toast({ title: "ข้อมูลไม่ครบถ้วน", description: "กรุณาระบุข้อความหัวข้อ PLO", variant: "destructive" });
+      return;
+    }
+    setIsSavingHeading(true);
+    try {
+      const res = await api.post("/index.php?page=save-plo-heading", {
+        plo_id: ploId,
+        plo_name: headingDraft.trim(),
+      });
+      if (res.data.status === "success") {
+        toast({ title: "บันทึกสำเร็จ", description: res.data.message });
+        setHeadingPloId(null);
+        fetchItems();
+      } else {
+        toast({ title: "บันทึกไม่สำเร็จ", description: res.data.message, variant: "destructive" });
+      }
+    } catch (error: any) {
+      toast({
+        title: "ข้อผิดพลาด",
+        description: error.response?.data?.message || "แก้ไขหัวข้อ PLO ไม่สำเร็จ",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingHeading(false);
+    }
+  };
+
   const handleSave = async (ploId: number) => {
     if (!draft.competency_name.trim()) {
-      toast({ 
-        title: "ข้อมูลไม่ครบถ้วน", 
-        description: "กรุณาระบุข้อความรายการประเมิน", 
-        variant: "destructive" 
+      toast({
+        title: "ข้อมูลไม่ครบถ้วน",
+        description: "กรุณาระบุข้อความรายการประเมิน",
+        variant: "destructive",
       });
       return;
     }
@@ -140,77 +178,108 @@ export default function CompetencyItemsManagement() {
         toast({ title: "บันทึกไม่สำเร็จ", description: res.data.message, variant: "destructive" });
       }
     } catch (error: any) {
-      toast({ 
-        title: "ข้อผิดพลาด", 
-        description: error.response?.data?.message || "บันทึกรายการไม่สำเร็จ", 
-        variant: "destructive" 
+      toast({
+        title: "ข้อผิดพลาด",
+        description: error.response?.data?.message || "บันทึกรายการไม่สำเร็จ",
+        variant: "destructive",
       });
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleDelete = async (itemId: number) => {
-    if (!window.confirm("คุณแน่ใจหรือไม่ว่าต้องการลบรายการประเมินนี้? (ลำดับข้ออื่นจะถูกจัดเรียงใหม่อัตโนมัติ)")) return;
-    setDeletingId(itemId);
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
+    setIsDeleting(true);
     try {
-      const res = await api.delete(`/index.php?page=delete-competency-item&id=${itemId}`);
+      let url = "";
+      if (pendingDelete.scope === "item") {
+        url = `/index.php?page=delete-competency-item&scope=item&id=${pendingDelete.id}`;
+      } else if (pendingDelete.scope === "plo") {
+        url = `/index.php?page=delete-competency-item&scope=plo&framework_id=${frameworkId}&plo_id=${pendingDelete.ploId}`;
+      } else {
+        url = `/index.php?page=delete-competency-item&scope=all&framework_id=${frameworkId}`;
+      }
+
+      const res = await api.delete(url);
       if (res.data.status === "success") {
         toast({ title: "ลบสำเร็จ", description: res.data.message });
+        setPendingDelete(null);
         fetchItems();
       } else {
         toast({ title: "ลบไม่สำเร็จ", description: res.data.message, variant: "destructive" });
       }
     } catch (error: any) {
-      toast({ 
-        title: "ข้อผิดพลาด", 
-        description: error.response?.data?.message || "ลบรายการไม่สำเร็จ", 
-        variant: "destructive" 
+      toast({
+        title: "ข้อผิดพลาด",
+        description: error.response?.data?.message || "ลบรายการไม่สำเร็จ",
+        variant: "destructive",
       });
     } finally {
-      setDeletingId(null);
+      setIsDeleting(false);
     }
   };
+
+  const deleteDescription = (() => {
+    if (!pendingDelete) return "";
+    if (pendingDelete.scope === "item") {
+      return `ต้องการลบรายการ "${pendingDelete.label}" ใช่หรือไม่? รหัส Sub PLO ของข้ออื่นใน PLO นี้จะถูกจัดเรียงใหม่อัตโนมัติ และคะแนนที่นักศึกษาเคยได้จากข้อนี้จะถูกลบไปด้วย`;
+    }
+    if (pendingDelete.scope === "plo") {
+      return `ต้องการลบรายการทั้งหมดของ ${pendingDelete.label} จำนวน ${pendingDelete.count} รายการ (ทุกชั้นปี) ใช่หรือไม่? คะแนนที่นักศึกษาเคยได้จากรายการเหล่านี้จะถูกลบไปด้วย`;
+    }
+    return `ต้องการลบรายการทั้งหมดตั้งแต่ PLO1 ถึง PLO8 จำนวน ${pendingDelete.count} รายการ (ทุกชั้นปี) ใช่หรือไม่? คะแนนที่นักศึกษาเคยได้จากรายการเหล่านี้จะถูกลบไปด้วย การกระทำนี้ย้อนกลับไม่ได้`;
+  })();
 
   return (
     <div className="app-page max-w-5xl animate-fade-in">
       <div className="app-page-header">
         <div>
-          <h1 className="app-page-title">จัดการรายการประเมินสมรรถนะหลัก</h1>
-          <p className="app-page-description">สร้าง/แก้ไข/ลบรายการประเมินตามหัวข้อ PLO แต่ละหลักสูตรและชั้นปี (ระบบจัดลำดับให้อัตโนมัติ)</p>
+          <h1 className="app-page-title">ประเมินสมรรถนะหลักแต่ละชั้นปี (YLO)</h1>
+          <p className="app-page-description">
+            สร้าง/แก้ไข/ลบรายการประเมินตามหัวข้อ PLO แต่ละหลักสูตรและชั้นปี — รายการเหล่านี้คือ Sub PLO
+            ที่หน้า "จัดการ CLO รายวิชา" จะดึงไปใช้ตาม YLO ของรายวิชา (ระบบออกรหัสให้อัตโนมัติ)
+          </p>
         </div>
+        {groups.length > 0 && (
+          <Button
+            variant="destructive"
+            disabled={totalAllPlos === 0}
+            onClick={() =>
+              setPendingDelete({ scope: "all", label: "PLO1 ถึง PLO8", count: totalAllPlos })
+            }
+          >
+            <Trash2 className="h-4 w-4 mr-1" /> ลบทั้งหมด (PLO1–PLO8)
+          </Button>
+        )}
       </div>
 
       <Card>
         <CardContent className="pt-6 flex flex-wrap gap-4 items-end">
-          <div className="space-y-2 min-w-[280px]">
+          <div className="space-y-2 min-w-[320px]">
             <Label>หลักสูตร</Label>
-            {isLoadingFrameworks ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Select value={frameworkId} onValueChange={(val) => { setFrameworkId(val); cancelEdit(); }}>
-                <SelectTrigger>
-                  <SelectValue placeholder="เลือกหลักสูตร" />
-                </SelectTrigger>
-                <SelectContent>
-                  {frameworks.map((f) => (
-                    <SelectItem key={f.id} value={String(f.id)}>
-                      {f.program_name} (ปรับปรุง {f.curriculum_year})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
+            <div className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2">
+              <p className="flex items-center gap-2 text-sm font-medium text-foreground">
+                <Library className="h-4 w-4 text-primary" />
+                {curriculum ? `หลักสูตร ${curriculum.label}` : "ยังไม่มีหลักสูตรในระบบ"}
+                {curriculum?.is_explicit && (
+                  <Badge variant="secondary" className="text-xs">ใช้งานในระบบ</Badge>
+                )}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                ใช้หลักสูตรเดียวกับหน้า "จัดการหลักสูตร" (เปลี่ยนได้ที่หน้านั้น) — PLO และ Sub PLO ใช้ร่วมกันทุกรอบหลักสูตร
+              </p>
+            </div>
           </div>
-          <div className="space-y-2 w-40">
-            <Label>ชั้นปีที่</Label>
-            <Select value={yearLevel} onValueChange={(val) => { setYearLevel(val); cancelEdit(); }}>
+          <div className="space-y-2 w-48">
+            <Label>ชั้นปีที่ (YLO)</Label>
+            <Select value={yearLevel} onValueChange={(val) => { setYearLevel(val); cancelEdit(); setHeadingPloId(null); }}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {[1, 2, 3, 4].map((y) => (
-                  <SelectItem key={y} value={String(y)}>ชั้นปีที่ {y}</SelectItem>
+                  <SelectItem key={y} value={String(y)}>ชั้นปีที่ {y} (YLO{y})</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -234,18 +303,74 @@ export default function CompetencyItemsManagement() {
           {groups.map((group) => (
             <Card key={group.plo_id}>
               <CardHeader className="pb-3 border-b border-border/50 bg-muted/20">
-                <CardTitle className="text-base font-semibold text-foreground">
-                  <span className="text-primary mr-1.5">{group.plo_code}</span> {group.plo_name}
-                </CardTitle>
+                {headingPloId === group.plo_id ? (
+                  <div className="space-y-2">
+                    <Label className="text-xs">หัวข้อ {group.plo_code}</Label>
+                    <Textarea
+                      rows={3}
+                      value={headingDraft}
+                      onChange={(e) => setHeadingDraft(e.target.value)}
+                      placeholder="พิมพ์ข้อความหัวข้อ PLO"
+                    />
+                    <div className="flex gap-2 justify-end">
+                      <Button variant="outline" size="sm" onClick={() => setHeadingPloId(null)}>
+                        <X className="h-4 w-4 mr-1" /> ยกเลิก
+                      </Button>
+                      <Button size="sm" disabled={isSavingHeading} onClick={() => handleSaveHeading(group.plo_id)}>
+                        {isSavingHeading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
+                        บันทึกหัวข้อ
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-start justify-between gap-3">
+                    <CardTitle className="text-base font-semibold text-foreground leading-relaxed">
+                      <span className="text-primary mr-1.5">{group.plo_code}</span> {group.plo_name}
+                    </CardTitle>
+                    <div className="flex gap-1 shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        title={`แก้ไขหัวข้อ ${group.plo_code}`}
+                        onClick={() => startEditHeading(group)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 text-destructive hover:bg-destructive/10 gap-1"
+                        disabled={group.total_all_years === 0}
+                        title={`ลบรายการทั้งหมดของ ${group.plo_code} ทุกชั้นปี`}
+                        onClick={() =>
+                          setPendingDelete({
+                            scope: "plo",
+                            ploId: group.plo_id,
+                            label: group.plo_code,
+                            count: group.total_all_years,
+                          })
+                        }
+                      >
+                        <Trash2 className="h-4 w-4" /> ลบทั้งหมด
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </CardHeader>
               <CardContent className="pt-4 space-y-3">
                 {group.items.length === 0 && editingPloId !== group.plo_id && (
-                  <p className="text-sm text-muted-foreground italic">ยังไม่มีรายการประเมินใน PLO นี้</p>
+                  <p className="text-sm text-muted-foreground italic">
+                    ยังไม่มีรายการประเมินใน PLO นี้สำหรับชั้นปีที่ {yearLevel}
+                    {group.total_all_years > 0 && ` (มีในชั้นปีอื่นรวม ${group.total_all_years} รายการ)`}
+                  </p>
                 )}
 
                 {group.items.map((item) => (
                   <div key={item.id} className="flex items-start gap-3 border border-border/80 rounded-md p-3 hover:bg-muted/10 transition-colors">
-                    <span className="text-sm font-semibold text-muted-foreground w-8 shrink-0">{item.sequence_no}.</span>
+                    <Badge variant="outline" className="shrink-0 font-mono text-xs mt-0.5">
+                      {item.sub_plo_code}
+                    </Badge>
                     <div className="flex-1 text-sm leading-relaxed">
                       {item.competency_name}
                       {!item.is_scorable && (
@@ -260,10 +385,11 @@ export default function CompetencyItemsManagement() {
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 text-destructive hover:bg-destructive/10"
-                        disabled={deletingId === item.id}
-                        onClick={() => handleDelete(item.id)}
+                        onClick={() =>
+                          setPendingDelete({ scope: "item", id: item.id, label: item.competency_name })
+                        }
                       >
-                        {deletingId === item.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
@@ -272,14 +398,14 @@ export default function CompetencyItemsManagement() {
                 {editingPloId === group.plo_id ? (
                   <div className="border border-primary/40 rounded-md p-4 space-y-3 bg-muted/30 animate-in fade-in-50">
                     <div className="space-y-1">
-                      <Label className="text-xs">รายการประเมินสมรรถนะ</Label>
+                      <Label className="text-xs">รายการประเมินสมรรถนะ (Sub PLO)</Label>
                       <Input
                         value={draft.competency_name}
                         onChange={(e) => setDraft((d) => ({ ...d, competency_name: e.target.value }))}
-                        placeholder="พิมพ์ข้อความรายการประเมิน (ลำดับจะถูกกำหนดให้อัตโนมัติ)"
+                        placeholder="พิมพ์ข้อความรายการประเมิน (รหัส Sub PLO จะถูกกำหนดให้อัตโนมัติ)"
                       />
                     </div>
-                    <div className="flex items-center justify-between pt-1">
+                    <div className="flex items-center justify-between pt-1 flex-wrap gap-2">
                       <div className="flex items-center gap-2">
                         <Checkbox
                           id={`scorable-${group.plo_id}`}
@@ -316,6 +442,16 @@ export default function CompetencyItemsManagement() {
           ))}
         </div>
       )}
+
+      <ConfirmActionDialog
+        open={pendingDelete !== null}
+        onOpenChange={(next) => { if (!next) setPendingDelete(null); }}
+        title="ยืนยันการลบ"
+        description={deleteDescription}
+        confirmLabel="ลบ"
+        isLoading={isDeleting}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }

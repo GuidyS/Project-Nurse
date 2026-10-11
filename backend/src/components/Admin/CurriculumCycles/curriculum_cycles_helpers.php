@@ -8,6 +8,7 @@ const CURRICULUM_YEAR_MIN = 2500;
 const CURRICULUM_YEAR_MAX = 2700;
 const CURRICULUM_CREDIT_MAX = 30;
 const CURRICULUM_IMPORT_MAX_ROWS = 1000;
+const CURRICULUM_YLO_MAX = 4;
 
 function curriculumCyclesRespond(int $code, array $payload): void
 {
@@ -80,6 +81,11 @@ function curriculumCyclesEnsureSchema(PDO $db): void
     // เกณฑ์ผ่านของรายวิชา (คะแนน 0-100) — หน้าให้คะแนนของอาจารย์ใช้ค่านี้ตัดสินผ่าน/ไม่ผ่าน
     if (!activeCurriculumColumnExists($db, 'curriculum_cycle_subject', 'pass_score')) {
         $db->exec("ALTER TABLE curriculum_cycle_subject ADD COLUMN pass_score DECIMAL(5,2) DEFAULT NULL AFTER subject_type");
+    }
+
+    // YLO ของรายวิชา (ชั้นปี 1-4) — หน้า "จัดการ CLO รายวิชา" ใช้ค่านี้เลือก Sub PLO ที่จะแสดง
+    if (!activeCurriculumColumnExists($db, 'curriculum_cycle_subject', 'ylo')) {
+        $db->exec("ALTER TABLE curriculum_cycle_subject ADD COLUMN ylo TINYINT DEFAULT NULL AFTER subject_type");
     }
 }
 
@@ -167,6 +173,17 @@ function curriculumCyclesNormalizeSubject(array $row): array
         $passScore = round($passValue, 2);
     }
 
+    // YLO: ไม่บังคับกรอก ถ้ากรอกต้องเป็นชั้นปี 1-4 (รับทั้ง "3" และ "YLO3")
+    $yloRaw = trim((string)($row['ylo'] ?? ''));
+    $ylo = null;
+    if ($yloRaw !== '') {
+        $yloDigits = preg_replace('/\D/', '', $yloRaw);
+        if ($yloDigits === '' || (int)$yloDigits < 1 || (int)$yloDigits > CURRICULUM_YLO_MAX) {
+            throw new InvalidArgumentException("YLO ต้องเป็นชั้นปี 1 - " . CURRICULUM_YLO_MAX . " เช่น 2 หรือ YLO2");
+        }
+        $ylo = (int)$yloDigits;
+    }
+
     return [
         'subject_code' => $code,
         'subject_name' => $name,
@@ -175,6 +192,7 @@ function curriculumCyclesNormalizeSubject(array $row): array
         'credit_desc' => $creditDesc,
         'subject_type' => $type !== '' ? $type : null,
         'pass_score' => $passScore,
+        'ylo' => $ylo,
     ];
 }
 

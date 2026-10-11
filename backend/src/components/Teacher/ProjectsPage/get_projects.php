@@ -232,7 +232,7 @@ try {
 
     // PROJECT_VIEW already authorizes this catalogue; search must not hide historical filter options.
     $availableYears = $db->query('SELECT DISTINCT academic_year FROM project WHERE academic_year IS NOT NULL')->fetchAll(PDO::FETCH_COLUMN);
-    project_json(["status" => "success", "data" => $projects, "academicYears" => academicYearOptions($availableYears)]);
+    project_json(["status" => "success", "data" => $projects, "academicYears" => academicYearOptions($availableYears, currentAcademicYear(null, $db))]);
 } catch (Exception $e) {
     project_json(["status" => "error", "message" => $e->getMessage()], 500);
 }

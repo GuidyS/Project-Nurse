@@ -6,6 +6,7 @@ if (session_status() === PHP_SESSION_NONE) {
 require_once __DIR__ . '/clo_mapping_helpers.php';
 require_once __DIR__ . '/curriculum_repository.php';
 require_once __DIR__ . '/clo_access_helpers.php';
+require_once __DIR__ . '/../../../config/curriculum_outcomes.php';
 
 $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -31,20 +32,43 @@ try {
 
         $frameworkId = getActiveFrameworkId($pdo);
         if (!$frameworkId) {
-            echo json_encode(["status" => "success", "data" => ["clos" => [], "plos" => [], "ylo_matrix" => new stdClass(), "sub_plo_catalog" => []]], JSON_UNESCAPED_UNICODE);
+            echo json_encode(["status" => "success", "data" => ["clos" => [], "plos" => [], "subject_ylo" => null, "sub_plo_catalog" => []]], JSON_UNESCAPED_UNICODE);
             exit();
         }
 
         if (curriculumTablesReady($pdo) && curriculumHasRelationalData($pdo, $frameworkId)) {
+            outcomesEnsureSchema($pdo);
+
+            // YLO ของรายวิชามาจากหน้า "จัดการหลักสูตร" — หน้านี้ไม่ให้เลือกเองอีกแล้ว
+            $subjectYlo = outcomesSubjectYlo($pdo, (string)$subject_code);
+            $subPloCatalog = $subjectYlo === null
+                ? []
+                : outcomesSubPlos($pdo, $frameworkId, $subjectYlo);
+
+            // คะแนนที่แต่ละ CLO แบ่งให้ Sub PLO ไว้แล้ว
+            $scoresByClo = [];
+            foreach (outcomesSubjectCloScores($pdo, $frameworkId, (string)$subject_code) as $score) {
+                $scoresByClo[$score['clo_id']][$score['code']] = [
+                    'sub_plo_id' => $score['sub_plo_id'],
+                    'max_score' => $score['max_score'],
+                    'pass_score' => $score['pass_score'],
+                ];
+            }
+
             $clos = listClosBySubjectCode($pdo, $frameworkId, (string)$subject_code);
-            $yloMatrix = getYloMatrixFromTables($pdo, $frameworkId);
+            foreach ($clos as &$clo) {
+                $clo['sub_plo_scores'] = $scoresByClo[(int)$clo['clo_id']] ?? new stdClass();
+            }
+            unset($clo);
+
             echo json_encode([
                 "status" => "success",
                 "data" => [
                     "clos" => $clos,
                     "plos" => getPloCatalogFromTables($pdo, $frameworkId),
-                    "ylo_matrix" => empty($yloMatrix) ? new stdClass() : $yloMatrix,
-                    "sub_plo_catalog" => getSubPloCatalogFromTables($pdo, $frameworkId),
+                    "subject_ylo" => $subjectYlo,
+                    "sub_plo_catalog" => $subPloCatalog,
+                    "score_budget" => outcomesSubjectScoreBudget($pdo, $frameworkId, (string)$subject_code),
                 ],
             ], JSON_UNESCAPED_UNICODE);
             exit();
@@ -70,14 +94,14 @@ try {
             "data" => [
                 "clos" => $clos,
                 "plos" => getPloCatalog($mappingData),
-                "ylo_matrix" => $mappingData['ylo_plo_matrix'] ?? new stdClass(),
-                "sub_plo_catalog" => getSubPloCatalog($mappingData),
+                "subject_ylo" => null,
+                "sub_plo_catalog" => [],
             ],
         ], JSON_UNESCAPED_UNICODE);
         exit();
     }
 
-    echo json_encode(["status" => "success", "data" => ["clos" => [], "plos" => [], "ylo_matrix" => new stdClass(), "sub_plo_catalog" => []]], JSON_UNESCAPED_UNICODE);
+    echo json_encode(["status" => "success", "data" => ["clos" => [], "plos" => [], "subject_ylo" => null, "sub_plo_catalog" => []]], JSON_UNESCAPED_UNICODE);
 } catch (Exception $e) {
     http_response_code(500);
     echo json_encode(["status" => "error", "message" => $e->getMessage()]);

@@ -62,7 +62,7 @@ try {
     )->fetchAll(PDO::FETCH_COLUMN));
 
     $years = academicYearOptions($years);
-    $defaultYear = currentAcademicYear();
+    $defaultYear = currentAcademicYear(null, $db);
     $academicYear = isset($_GET['year']) ? (int)$_GET['year'] : $defaultYear;
     if ($academicYear < 2500 || $academicYear > 2700) {
         $academicYear = $defaultYear;

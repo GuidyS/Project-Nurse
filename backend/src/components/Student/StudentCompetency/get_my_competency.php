@@ -1,4 +1,10 @@
 <?php
+/**
+ * ผลการประเมินสมรรถนะหลักของนักศึกษาที่ล็อกอินอยู่
+ *
+ * ใช้ตัวคำนวณชุดเดียวกับหน้าของอาจารย์ที่ปรึกษา (competency_result_helpers.php)
+ * เพื่อให้ทั้งสองหน้าแสดงผลตรงกันเสมอ
+ */
 ob_start();
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -8,6 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 if (session_status() == PHP_SESSION_NONE) { session_start(); }
 require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/../../Teacher/StudentCompetency/competency_result_helpers.php';
 
 ob_end_clean();
 header("Content-Type: application/json; charset=UTF-8");
@@ -23,16 +30,7 @@ if (!$userId) {
 try {
     $db = new Connect;
 
-    // ดึงข้อมูลนักศึกษา
-    $stmt = $db->prepare("
-        SELECT u.user_id, u.username, 
-               s.student_id, s.first_name_th, s.last_name_th,
-               s.admission_year, s.year_level
-        FROM users u
-        LEFT JOIN student s ON s.student_id = u.username
-        WHERE u.user_id = :id
-        LIMIT 1
-    ");
+    $stmt = $db->prepare("SELECT username, role_id FROM users WHERE user_id = :id LIMIT 1");
     $stmt->execute([':id' => $userId]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -42,127 +40,26 @@ try {
         exit;
     }
 
-    $studentId = (string)($user['student_id'] ?? $user['username'] ?? '');
-    $fullName = trim(($user['first_name_th'] ?? '') . ' ' . ($user['last_name_th'] ?? ''));
-    if ($fullName === '') {
-        $fullName = $studentId;
-    }
-
-    // คำนวณปีการศึกษาและชั้นปีโดยตรงจากรหัสนักศึกษา
-    $now = new DateTime();
-    $currentYearBE = (int)$now->format('Y') + 543;
-    $cutOffDate = new DateTime($now->format('Y') . '-08-10 00:00:00');
-    $academicYear = ($now >= $cutOffDate) ? $currentYearBE : ($currentYearBE - 1);
-
-    $entryYear = 0;
-    if (strlen($studentId) >= 2 && is_numeric(substr($studentId, 0, 2))) {
-        $entryYear = 2500 + (int)substr($studentId, 0, 2);
-    } else {
-        $entryYear = $academicYear;
-    }
-
-    $yearLevel = $academicYear - $entryYear + 1;
-    if ($yearLevel < 1) $yearLevel = 1;
-    if ($yearLevel > 8) $yearLevel = 8;
-
-    // ค้นหาหลักสูตร
-    $fwStmt = $db->prepare("
-        SELECT id, curriculum_year, program_name 
-        FROM curriculum_framework 
-        WHERE is_active = 1
-        LIMIT 1
-    ");
-    $fwStmt->execute();
-    $framework = $fwStmt->fetch(PDO::FETCH_ASSOC);
-
-    if (!$framework) {
-        $fwFallback = $db->query("SELECT id, curriculum_year, program_name FROM curriculum_framework ORDER BY id DESC LIMIT 1");
-        $framework = $fwFallback ? $fwFallback->fetch(PDO::FETCH_ASSOC) : null;
-    }
-
-    if (!$framework) {
-        echo json_encode([
-            "status" => "success",
-            "data" => [
-                "student_id"    => $studentId,
-                "full_name"     => $fullName,
-                "year_level"    => $yearLevel,
-                "academic_year" => $academicYear,
-                "framework"     => null,
-                "items"         => [],
-                "groups"        => []
-            ]
-        ], JSON_UNESCAPED_UNICODE);
+    // หน้านี้ของนักศึกษาเท่านั้น และดูได้เฉพาะผลของตัวเอง
+    if ((int)($user['role_id'] ?? 0) !== 3) {
+        http_response_code(403);
+        echo json_encode(["status" => "error", "message" => "หน้านี้สำหรับนักศึกษาเท่านั้น"], JSON_UNESCAPED_UNICODE);
         exit;
     }
 
-    // ดึงเกณฑ์ประเมินสมรรถนะตามชั้นปีจริง
-    $itemStmt = $db->prepare("
-        SELECT 
-            ci.id, 
-            ci.plo_id, 
-            COALESCE(cp.plo_code, '') AS plo_code, 
-            COALESCE(cp.name, '') AS plo_name, 
-            ci.sequence_no, 
-            ci.competency_name, 
-            ci.is_scorable,
-            sca.score, 
-            sca.assessed_at
-        FROM competency_items ci
-        JOIN curriculum_plo cp ON cp.id = ci.plo_id
-        LEFT JOIN student_competency_assessments sca 
-               ON sca.competency_item_id = ci.id 
-              AND sca.student_id = :sid
-              AND sca.academic_year = :ay
-        WHERE cp.framework_id = :fid AND ci.year_level = :yl
-        ORDER BY ci.sequence_no ASC
-    ");
-    $itemStmt->execute([
-        ':sid' => $studentId,
-        ':ay'  => $academicYear,
-        ':fid' => $framework['id'],
-        ':yl'  => $yearLevel,
-    ]);
-    $rawItems = $itemStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-
-    //  นำลอจิกจากฝั่งอาจารย์มาใส่: ยุบแถวซ้ำขั้นเด็ดขาดและรักษาสถานะคะแนน
-    $processedItems = [];
-    $seenItems = []; // เก็บ index ว่าข้อนี้ถูก push ไปที่ตำแหน่งไหนใน $processedItems
-
-    foreach ($rawItems as $item) {
-        $uniqueKey = $item['plo_id'] . '_' . $item['sequence_no'];
-
-        // ระบบตัดคำนำหน้าชื่อ PLO ที่ซ้ำซ้อน
-        $cleanName = trim($item['plo_name']);
-        $stripped = preg_replace('/^[A-Za-z]+\s*\d+\s*[:\-]?\s*/', '', $cleanName);
-        $item['plo_name'] = trim($stripped) !== '' ? trim($stripped) : $cleanName;
-
-        if (!isset($seenItems[$uniqueKey])) {
-            $processedItems[] = $item;
-            $seenItems[$uniqueKey] = count($processedItems) - 1; 
-        } else {
-            // ถ้าเจอซ้ำ ให้เช็กว่าตัวใหม่มีคะแนนไหม ถ้ามีให้เอามาทับ
-            $idx = $seenItems[$uniqueKey];
-            if (empty($processedItems[$idx]['score']) && !empty($item['score'])) {
-                $processedItems[$idx] = $item;
-            }
-        }
+    $studentId = (string)($user['username'] ?? '');
+    if ($studentId === '') {
+        http_response_code(404);
+        echo json_encode(["status" => "error", "message" => "ไม่พบรหัสนักศึกษาของผู้ใช้งานนี้"], JSON_UNESCAPED_UNICODE);
+        exit;
     }
 
     echo json_encode([
         "status" => "success",
-        "data" => [
-            "student_id"    => $studentId,
-            "full_name"     => $fullName,
-            "year_level"    => $yearLevel,
-            "academic_year" => $academicYear,
-            "framework"     => $framework,
-            "items"         => $processedItems 
-        ]
+        "data" => competencyResultPayload($db, $studentId),
     ], JSON_UNESCAPED_UNICODE);
 
 } catch (Exception $e) {
     http_response_code(500);
     echo json_encode(["status" => "error", "message" => $e->getMessage()], JSON_UNESCAPED_UNICODE);
 }
-?>

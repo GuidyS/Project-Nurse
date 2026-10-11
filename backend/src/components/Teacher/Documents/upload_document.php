@@ -17,7 +17,7 @@ try {
         $courseCode = $input['course'];
         $name = $input['name'];
         $type = $input['type']; // e.g. 'มคอ.3'
-        $academicYear = $input['academic_year'] ?? currentAcademicYear();
+        $academicYear = $input['academic_year'] ?? currentAcademicYear(null, $pdo);
         if (!is_scalar($academicYear) || !preg_match('/^\d{4}$/', (string)$academicYear) || (int)$academicYear < 2500 || (int)$academicYear > 2700) {
             http_response_code(422);
             echo json_encode(['status' => 'error', 'message' => 'ปีการศึกษาต้องเป็น พ.ศ. 2500–2700'], JSON_UNESCAPED_UNICODE);

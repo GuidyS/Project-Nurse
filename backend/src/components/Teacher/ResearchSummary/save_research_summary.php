@@ -22,7 +22,10 @@ try {
         $mode = $input['year_mode'] ?? '';
         $kind = $input['kind'] ?? '';
         if (!$year || !in_array($mode, ['academic', 'calendar'], true) || !in_array($kind, ['kpi', 'co_author', 'academic'], true)) researchFail(422, 'ปีหรือประเภทผลงานไม่ถูกต้อง');
-        $date = ($year - 543) . ($mode === 'academic' ? '-04-01' : '-01-01');
+        // โหมดปีการศึกษาใช้วันเปิดภาคการศึกษาที่ 1 ที่ตั้งค่าไว้ (เส้นแบ่งปีการศึกษาของทั้งระบบ)
+        $boundary = academicYearBoundary($db);
+        $academicStart = sprintf('-%02d-%02d', $boundary['month'], $boundary['day']);
+        $date = ($year - 543) . ($mode === 'academic' ? $academicStart : '-01-01');
         $db->beginTransaction();
         $stmt = $db->prepare('INSERT INTO faculty_research (faculty_id, title, publication_year, publication_date, article_type, first_author_id, co_author_ids) VALUES (?, ?, ?, ?, ?, ?, ?)');
         $stmt->execute([$facultyId, 'บันทึกจำนวนผลงาน' . ($kind === 'academic' ? 'วิชาการ/ตำรา' : 'วิจัย') . ' ปี ' . $year,

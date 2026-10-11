@@ -59,27 +59,64 @@ try {
         exit();
     }
 
-    // 3. ดึงรายละเอียดวิชา และ จำนวนนักศึกษาที่ลงทะเบียน
+    // 3. รายละเอียดวิชา + จำนวนนักศึกษาที่ลงทะเบียน
+    //    ใช้รายวิชาของหลักสูตรเป็นหลัก เพื่อให้วิชาที่มีเฉพาะในหน้า "จัดการหลักสูตร"
+    //    (ยังไม่มีแถวในตาราง subject) แสดงให้อาจารย์เห็นด้วย ไม่หายไปจากรายการ
     subjectTermEnsureColumn($db);
-    $inQuery = implode(',', array_fill(0, count($my_subject_codes), '?'));
-    $sql = "SELECT s.subject_id as id, s.subject_code as code, s.subject_name_th as name, s.credit as credits,
-                   s.semester, s.academic_year,
-            (SELECT COUNT(*) FROM enrollment e WHERE e.subject_id = s.subject_id) as students
-            FROM subject s WHERE s.subject_code IN ($inQuery) AND s.is_active = 1";
 
-    $stmt = $db->prepare($sql);
-    $stmt->execute($my_subject_codes);
-    $courses = activeCurriculumApplyNames($db, $stmt->fetchAll(PDO::FETCH_ASSOC), 'code', 'name');
-    // เกณฑ์ผ่านของรายวิชา ตั้งค่าที่หน้า "จัดการหลักสูตร" (null = ใช้ค่าเริ่มต้นของระบบ)
-    $courses = activeCurriculumApplyPassScore($db, $courses, 'code');
+    $wanted = array_flip($my_subject_codes);
+    $curriculumSubjects = activeCurriculumSubjects($db);
+    $courses = [];
+
+    if ($curriculumSubjects !== null) {
+        foreach ($curriculumSubjects as $subject) {
+            if (!isset($wanted[$subject['subject_code']])) {
+                continue;
+            }
+            $courses[] = [
+                'id' => $subject['subject_id'],
+                'code' => $subject['subject_code'],
+                'name' => $subject['subject_name'],
+                'credits' => $subject['credit'],
+                'semester' => $subject['semester'],
+                'academic_year' => $subject['academic_year'],
+                'students' => 0,
+                'pass_score' => $subject['pass_score'],
+            ];
+        }
+    } else {
+        $inQuery = implode(',', array_fill(0, count($my_subject_codes), '?'));
+        $stmt = $db->prepare("
+            SELECT s.subject_id as id, s.subject_code as code, s.subject_name_th as name, s.credit as credits,
+                   s.semester, s.academic_year
+            FROM subject s WHERE s.subject_code IN ($inQuery) AND s.is_active = 1
+        ");
+        $stmt->execute($my_subject_codes);
+        $courses = activeCurriculumApplyNames($db, $stmt->fetchAll(PDO::FETCH_ASSOC), 'code', 'name');
+        $courses = activeCurriculumApplyPassScore($db, $courses, 'code');
+    }
+
+    // จำนวนนักศึกษาที่ลงทะเบียน (เฉพาะวิชาที่มีอยู่ในตาราง subject)
+    $subjectIds = array_values(array_filter(array_column($courses, 'id'), static fn($id) => $id !== null));
+    $enrolled = [];
+    if (!empty($subjectIds)) {
+        $ph = implode(',', array_fill(0, count($subjectIds), '?'));
+        $enrollStmt = $db->prepare("SELECT subject_id, COUNT(*) AS total FROM enrollment WHERE subject_id IN ($ph) GROUP BY subject_id");
+        $enrollStmt->execute($subjectIds);
+        foreach ($enrollStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $enrolled[(int)$row['subject_id']] = (int)$row['total'];
+        }
+    }
 
     foreach ($courses as &$course) {
+        $course['students'] = $course['id'] === null ? 0 : ($enrolled[(int)$course['id']] ?? 0);
         $course['cloCount'] = $cloCounts[$course['code']] ?? 0;
         $course['section'] = '01'; // Default
         $course['instructor'] = $instructor_name;
         // ข้อความภาคเรียนคำนวณจากข้อมูลจริงที่เดียว ไม่ให้หน้าเว็บเดาค่าเอง
         $course['term_label'] = subjectTermLabel($course['semester'], $course['academic_year']);
     }
+    unset($course);
 
     echo json_encode(["status" => "success", "data" => $courses]);
 

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/axios";
-import { academicNow, getCurrentAcademicYear, syncAcademicClock } from "@/lib/academicYear";
+import { academicNow, getAcademicBoundary, getCurrentAcademicYear, syncAcademicBoundary, syncAcademicClock } from "@/lib/academicYear";
 
 export function useAcademicYear(): number {
   const [tick, refresh] = useState(0);
@@ -10,7 +10,9 @@ export function useAcademicYear(): number {
     queryFn: async ({ signal }) => {
       const response = await api.get("/index.php?page=academic-calendar", { signal });
       if (response.data?.status !== "success") throw new Error("โหลดปฏิทินปีการศึกษาไม่สำเร็จ");
+      // ซิงก์ทั้งเวลาและเส้นแบ่งปีการศึกษา เพื่อให้หน้าเว็บคิดปีตรงกับเซิร์ฟเวอร์เสมอ
       syncAcademicClock(response.data.data.serverNow);
+      syncAcademicBoundary(response.data.data.boundary);
       return response.data.data as { serverNow: string; academicYear: number };
     },
     staleTime: 60_000,
@@ -20,7 +22,9 @@ export function useAcademicYear(): number {
   });
   const year = getCurrentAcademicYear();
   useEffect(() => {
-    const rollover = Date.parse(`${year - 543 + 1}-04-01T00:00:00+07:00`);
+    const { month, day } = getAcademicBoundary();
+    const pad = (value: number) => String(value).padStart(2, "0");
+    const rollover = Date.parse(`${year - 543 + 1}-${pad(month)}-${pad(day)}T00:00:00+07:00`);
     // Wake at the boundary, with a daily maximum to avoid overflowing browser timers.
     const timer = window.setTimeout(() => refresh((value) => value + 1),
       Math.max(1, Math.min(86_400_000, rollover - academicNow().getTime())));

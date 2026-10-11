@@ -13,7 +13,9 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     exit;
 }
 
-$academicYear = $_GET['year'] ?? (string)currentAcademicYear();
+// เปิดการเชื่อมต่อไว้ก่อน เพราะปีการศึกษาต้องอ่านวันเปิดเทอมที่ตั้งค่าไว้จากฐานข้อมูล
+$reportsDb = new Connect();
+$academicYear = $_GET['year'] ?? (string)currentAcademicYear(null, $reportsDb);
 if (!is_string($academicYear) || !preg_match('/^\d{4}$/', $academicYear) || (int)$academicYear < 2500 || (int)$academicYear > 2700) {
     http_response_code(422);
     echo json_encode(['status' => 'error', 'message' => 'ปีการศึกษาไม่ถูกต้อง'], JSON_UNESCAPED_UNICODE);
@@ -323,7 +325,7 @@ function buildAvailableFilters(array $allRows, string $academicYear): array
     $responsiblePeople = array_values(array_unique(array_filter(array_map(fn($row) => $row['responsiblePerson'] ?? '', $yearRows))));
 
     return [
-        'academicYears' => array_map('strval', academicYearOptions(array_map(fn($row) => $row['academicYear'], $allRows))),
+        'academicYears' => array_map('strval', academicYearOptions(array_map(fn($row) => $row['academicYear'], $allRows), currentAcademicYear(null, $db))),
         'strategies' => array_values(array_filter($strategies)),
         'responsiblePeople' => $responsiblePeople,
     ];

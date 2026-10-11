@@ -102,7 +102,7 @@ try {
 
     $insert = $db->prepare("INSERT INTO student_advisor_mapping (student_id, faculty_id, advisor_type, academic_year)
                             VALUES (?, ?, ?, ?)");
-    $academicYear = currentAcademicYear();
+    $academicYear = currentAcademicYear(null, $db);
     foreach ($studentIds as $sid) {
         $insert->execute([$sid, $facultyId, $type['key'], $academicYear]);
     }
