@@ -413,7 +413,7 @@
 
             // Practical
            case 'practice-locations':
-                require_once 'components/Teacher/Practice/practice_locations_api.php';
+                require_once 'components/PracticeLocations/practice_locations_api.php';
                 break;
                               
             // MyProjects

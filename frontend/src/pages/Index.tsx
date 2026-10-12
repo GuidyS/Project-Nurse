@@ -46,7 +46,8 @@ import CompetencyItemsManagement from "@/components/pages/Admin/CompetencyItemsM
 import StudentCompetencyView from "@/components/pages/Student/StudentCompetencyView";
 import CourseRegistration from "@/components/pages/Student/CourseRegistration"; 
 import CurriculumCycles from "@/components/pages/Admin/CurriculumCycles";
-import PracticeLocationsPage from "@/components/pages/Teacher/PracticeLocationsPage";
+import PracticeLocationsManage from "@/components/pages/Admin/PracticeLocationsManage";
+import PracticeLocationsView from "@/components/pages/Teacher/PracticeLocationsView";
 import { getPageFromUrl, navigateToPage } from "@/lib/projectNavigation";
 
 type LoginUserPayload = Record<string, unknown> & {
@@ -205,6 +206,13 @@ const Index = () => {
       return <CurriculumCycles />;
     }
 
+    // ✅ แทรกระบบหน้าแหล่งฝึกภาคปฏิบัติเข้าไปตรงนี้ (เช็ก Role)
+    if (activeItem === "practice-locations") {
+      if (roleId === 1) return <PracticeLocationsManage />; // Admin ไปหน้าจัดการ
+      if (roleId === 2) return <PracticeLocationsView />;   // Teacher ไปหน้าดู
+      return <UnauthorizedView />;
+    }
+
     // 3.2 🔒 หมวดโครงการ — แอดมินจัดการคนเดียวทั้งหมด
     // (ยกเว้น "โครงการของฉัน" ที่เปิดให้ทุก Role ไปแล้วด้านบน)
     const projectAdminPages = ["projectspage", "project-links", "project-reports"];
@@ -246,7 +254,7 @@ const Index = () => {
       "evidence", "grades", "performance", "practical-students",
       "schedule-tasks", "advise-notes", "advisor-notifications", "advises",
       "students", "students-info", "my-research", "research-summary",
-      "advisor-health-records-view", "practice-locations"
+      "advisor-health-records-view"
     ];
     
     if (teacherPages.includes(activeItem)) {
@@ -271,7 +279,6 @@ const Index = () => {
         case "research-summary": return <ResearchSummary />;
         // หน้ารวม: ข้อมูลวัคซีน / ข้อมูลสุขภาพ / ประเมินสมรรถนะหลัก อยู่ในหน้าเดียว
         case "advisor-health-records-view": return <AdvisorHealthRecordsView />;
-        case "practice-locations": return <PracticeLocationsPage />;
       }
     }
 

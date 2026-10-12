@@ -5,8 +5,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 if (session_status() == PHP_SESSION_NONE) { session_start(); }
-require_once __DIR__ . '/../../../config/config.php';
-require_once __DIR__ . '/../../../config/audit_helper.php';
+
+// ✅ แก้ไขเส้นทาง (Path) ให้ถอยหลังแค่ 2 ชั้น ( ../../ ) เพราะเราย้ายโฟลเดอร์ขึ้นมา 1 ระดับแล้ว
+require_once __DIR__ . '/../../config/config.php';
+require_once __DIR__ . '/../../config/audit_helper.php';
 
 if (!isset($_SESSION['user_id'])) {
     http_response_code(401);
@@ -19,7 +21,12 @@ try {
     $userId = $_SESSION['user_id'];
     $method = $_SERVER['REQUEST_METHOD'];
 
-    // [GET] ดึงข้อมูลทั้งหมดไปแสดงผลและทำสรุป
+    // ดึงสิทธิ์ (Role ID) ของ User ปัจจุบัน
+    $roleStmt = $db->prepare("SELECT role_id FROM users WHERE user_id = :uid");
+    $roleStmt->execute([':uid' => $userId]);
+    $roleId = (int)$roleStmt->fetchColumn();
+
+    // [GET] ทุกคน (แอดมินและอาจารย์) สามารถดึงข้อมูลไปดูได้
     if ($method === 'GET') {
         $stmt = $db->query("SELECT * FROM practice_locations ORDER BY id ASC");
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
@@ -27,7 +34,14 @@ try {
         exit;
     }
 
-    // [POST] รับข้อมูลจาก Excel มาบันทึกลงฐานข้อมูล
+    // ป้องกัน! ถ้าพยายามบันทึก หรือ ลบ โดยไม่ใช่แอดมิน (role_id != 1) ให้บล็อกทันที
+    if (in_array($method, ['POST', 'DELETE']) && $roleId !== 1) {
+        http_response_code(403);
+        echo json_encode(["status" => "error", "message" => "ปฏิเสธการเข้าถึง: เฉพาะผู้ดูแลระบบเท่านั้นที่มีสิทธิ์จัดการข้อมูลนี้"], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    // [POST] รับข้อมูลจาก Excel มาบันทึกลงฐานข้อมูล (แอดมินเท่านั้น)
     if ($method === 'POST') {
         $input = json_decode(file_get_contents('php://input'), true);
         $locations = $input['locations'] ?? [];
@@ -40,6 +54,7 @@ try {
 
         $db->beginTransaction();
         try {
+            // ลบข้อมูลเดิมทิ้งก่อนเพิ่มข้อมูลชุดใหม่จาก Excel
             $db->exec("DELETE FROM practice_locations");
 
             if (!empty($locations)) {
@@ -63,6 +78,7 @@ try {
                 }
             }
             
+            // เก็บ Audit Log เมื่อมีการอัปโหลด
             logAudit($db, $userId, 'update', 'practice_locations', "อัปโหลดอัปเดตข้อมูลแหล่งฝึกภาคปฏิบัติด้วยไฟล์ Excel");
             $db->commit();
 
@@ -75,11 +91,11 @@ try {
         exit;
     }
 
-    // [DELETE] สำหรับลบข้อมูล
+    // [DELETE] สำหรับลบข้อมูล (แอดมินเท่านั้น)
     if ($method === 'DELETE') {
         $action = $_GET['action'] ?? '';
 
-        //  กรณีลบข้อมูลทั้งหมด
+        // กรณีลบข้อมูลทั้งหมด
         if ($action === 'delete_all') {
             $db->beginTransaction();
             try {
@@ -97,7 +113,7 @@ try {
             }
         }
 
-        //  กรณีลบทีละรายการ
+        // กรณีลบทีละรายการ
         $id = $_GET['id'] ?? null;
         if (!$id) {
             http_response_code(400);
@@ -105,6 +121,7 @@ try {
             exit;
         }
 
+        // ดึงชื่อขึ้นมาก่อนเพื่อเอาไปใส่ใน Audit log
         $stmt = $db->prepare("SELECT hospital_name, sub_district_hospital, health_center FROM practice_locations WHERE id = :id");
         $stmt->execute([':id' => $id]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -117,6 +134,7 @@ try {
                 $delStmt = $db->prepare("DELETE FROM practice_locations WHERE id = :id");
                 $delStmt->execute([':id' => $id]);
                 
+                // เก็บลง Audit Log
                 logAudit($db, $userId, 'delete', 'practice_locations', "ลบแหล่งฝึกภาคปฏิบัติ: " . $locationName);
                 
                 $db->commit();
