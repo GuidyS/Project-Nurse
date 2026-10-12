@@ -59,7 +59,7 @@ export default function StudentCompetencyView() {
   }, [fetchMyCompetency]);
 
   return (
-    <div className="p-6 space-y-6 animate-fade-in max-w-6xl mx-auto">
+    <div className="app-page">
       <div>
         <div className="flex items-center gap-2">
           <h1 className="text-xl font-bold text-foreground">
