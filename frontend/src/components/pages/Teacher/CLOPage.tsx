@@ -721,7 +721,7 @@ export default function CLOPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 text-destructive"
+                            className="h-8 w-8 hover:bg-red-100 hover:text-red-600 border-red-200"
                             onClick={() => openDeleteConfirm(clo.clo_id)}
                           >
                             <Trash2 className="h-4 w-4" />

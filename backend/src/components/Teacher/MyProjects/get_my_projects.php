@@ -10,6 +10,9 @@ function my_project_type_label(string $projectType): string
     return match ($projectType) {
         'academic_service' => 'บริการวิชาการ',
         'culture' => 'ทำนุบำรุงศิลปวัฒนธรรม',
+        'teaching' => 'การเรียนการสอน',
+        'research' => 'วิจัย',
+        'quality_assurance' => 'การประกันคุณภาพ',
         default => 'โครงการอื่น',
     };
 }
@@ -32,12 +35,14 @@ try {
     $stmt = $db->prepare("
         SELECT
             p.project_id AS id,
+            p.project_id,
             p.project_name_th,
             p.project_name_en,
             p.description,
             COALESCE(NULLIF(p.project_name_th, ''), NULLIF(p.project_name_en, ''), CONCAT('Project #', p.project_id)) AS name,
             COALESCE(p.project_type, 'other') AS project_type,
             p.responsible_faculty_id,
+            CONCAT_WS(' ', NULLIF(f.title, ''), NULLIF(f.first_name_th, ''), NULLIF(f.last_name_th, '')) AS responsible_name,
             p.academic_year,
             p.status,
             p.start_date,
@@ -48,8 +53,14 @@ try {
             END AS members,
             pb.budget AS budget,
             pb.spent AS spent,
+            pb.budget AS budget_allocated,
+            pb.spent AS budget_spent,
+            pb.project_budget_years_id,
+            pb.fiscal_year,
+            pb.budget_note,
             COALESCE(pl.progress, 0) AS progress
         FROM project p
+        LEFT JOIN faculty f ON f.faculty_id = p.responsible_faculty_id
         LEFT JOIN (
             SELECT project_id, COUNT(DISTINCT faculty_id) AS members
             FROM project_faculty_members
@@ -58,8 +69,11 @@ try {
         LEFT JOIN (
             SELECT
                 project_id,
+                MAX(project_budget_years_id) AS project_budget_years_id,
+                MAX(fiscal_year) AS fiscal_year,
                 SUM(budget_allocated) AS budget,
-                SUM(budget_spent) AS spent
+                SUM(budget_spent) AS spent,
+                MAX(result) AS budget_note
             FROM project_budget_years
             GROUP BY project_id
         ) pb ON pb.project_id = p.project_id
@@ -132,6 +146,23 @@ try {
             "mime_type" => $document['mime_type'],
             "file_size" => $document['file_size'] !== null ? (int) $document['file_size'] : null,
         ];
+    }
+
+    $plosByProject = [];
+    $ploStmt = $db->prepare("
+        SELECT project_id, outcome_code
+        FROM project_outcome_links
+        WHERE project_id IN ({$projectIdSql})
+          AND outcome_type = 'plo'
+        ORDER BY project_id ASC, outcome_code ASC
+    ");
+    $ploStmt->execute($params);
+    foreach ($ploStmt->fetchAll(PDO::FETCH_ASSOC) as $link) {
+        $projectKey = (string) $link['project_id'];
+        $code = trim((string) ($link['outcome_code'] ?? ''));
+        if ($code !== '') {
+            $plosByProject[$projectKey][] = $code;
+        }
     }
 
     $membersByProject = [];
@@ -211,22 +242,31 @@ try {
 
         $myProjects[] = [
             "id" => (string) $projectId,
+            "project_id" => $projectId,
             "name" => $project['name'],
             "project_name_th" => $project['project_name_th'] ?? '',
             "project_name_en" => $project['project_name_en'] ?? '',
             "description" => $project['description'] ?? '',
             "project_type" => $projectType,
+            "responsible_faculty_id" => $responsibleFacultyId > 0 ? $responsibleFacultyId : null,
+            "responsible_name" => trim((string) ($project['responsible_name'] ?? '')),
             "type" => my_project_type_label($projectType),
             "status" => strtolower((string) ($project['status'] ?? 'pending')),
             "progress" => (int) round((float) ($project['progress'] ?? 0)),
             "budget" => $project['budget'] !== null ? (float) $project['budget'] : null,
             "spent" => $project['spent'] !== null ? (float) $project['spent'] : null,
+            "budget_allocated" => $project['budget_allocated'] !== null ? (float) $project['budget_allocated'] : null,
+            "budget_spent" => $project['budget_spent'] !== null ? (float) $project['budget_spent'] : null,
+            "project_budget_years_id" => $project['project_budget_years_id'] !== null ? (int) $project['project_budget_years_id'] : null,
+            "fiscal_year" => $project['fiscal_year'] !== null ? (int) $project['fiscal_year'] : null,
+            "budget_note" => $project['budget_note'] ?? '',
             "members" => count($members),
             "deadline" => $project['end_date'] ?: "-",
             "academic_year" => $project['academic_year'] !== null ? (int) $project['academic_year'] : null,
             "start_date" => $project['start_date'] ?? null,
             "end_date" => $project['end_date'] ?? null,
             "documents" => $documentsByProject[$projectKey] ?? [],
+            "plos" => array_values(array_unique($plosByProject[$projectKey] ?? [])),
             "member_faculty_ids" => $memberFacultyIds,
             "member_faculties" => $members,
             "member_details" => $members,

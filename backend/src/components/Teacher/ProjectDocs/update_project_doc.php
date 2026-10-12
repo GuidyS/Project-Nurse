@@ -5,13 +5,20 @@ require_once __DIR__ . '/../../../config/audit_helper.php';
 
 $db = project_db();
 $auth = project_require_auth($db, ['PROJECT_DOCS_MANAGE']);
+project_require_admin_write($auth);
 
 try {
     $documentId = project_request_int('document_id', 'post');
     $name = trim((string) ($_POST['name'] ?? ''));
     $type = trim((string) ($_POST['type'] ?? 'summary'));
     $date = trim((string) ($_POST['date'] ?? ''));
+    $attachmentType = trim((string) ($_POST['attachment_type'] ?? ''));
+    $attachmentUrl = trim((string) ($_POST['attachment_url'] ?? ''));
     $googleDriveLink = trim((string) ($_POST['google_drive_link'] ?? ''));
+    if ($attachmentType === '' && $googleDriveLink !== '') {
+        $attachmentType = 'google_drive';
+        $attachmentUrl = $googleDriveLink;
+    }
 
     $allowedTypes = ['proposal', 'progress', 'financial', 'summary'];
     if ($documentId === null || $name === '' || $type === '' || $date === '') {
@@ -22,7 +29,14 @@ try {
         project_json(["status" => "error", "message" => "ประเภทเอกสารไม่ถูกต้อง"], 400);
         exit;
     }
-    project_document_validate_google_drive_link($googleDriveLink);
+    if ($attachmentType === 'google_drive') {
+        project_document_validate_google_drive_link($attachmentUrl);
+    } elseif ($attachmentType === 'website_url') {
+        project_document_validate_website_url($attachmentUrl);
+    } elseif ($attachmentType !== '' && $attachmentType !== 'file') {
+        project_json(["status" => "error", "message" => "ประเภทเอกสารแนบไม่ถูกต้อง"], 400);
+        exit;
+    }
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) || strtotime($date) === false) {
         project_json(["status" => "error", "message" => "วันที่เอกสารไม่ถูกต้อง"], 400);
         exit;
@@ -75,10 +89,13 @@ try {
             file_name = :file_name,
             mime_type = :mime_type,
             file_size = :file_size";
-    $params[':file_path'] = $googleDriveLink !== '' ? $googleDriveLink : ($document['file_path'] ?? null);
-    $params[':file_name'] = $googleDriveLink !== '' ? 'Google Drive' : ($document['file_name'] ?? null);
-    $params[':mime_type'] = $googleDriveLink !== '' ? null : ($document['mime_type'] ?? null);
-    $params[':file_size'] = $googleDriveLink !== '' ? null : ($document['file_size'] ?? null);
+    $hasAttachmentUrl = $attachmentUrl !== '' && in_array($attachmentType, ['google_drive', 'website_url'], true);
+    $params[':file_path'] = $hasAttachmentUrl ? $attachmentUrl : ($document['file_path'] ?? null);
+    $params[':file_name'] = $hasAttachmentUrl
+        ? ($attachmentType === 'google_drive' ? 'Google Drive' : 'Website URL')
+        : ($document['file_name'] ?? null);
+    $params[':mime_type'] = $hasAttachmentUrl ? null : ($document['mime_type'] ?? null);
+    $params[':file_size'] = $hasAttachmentUrl ? null : ($document['file_size'] ?? null);
 
     if ($uploadedFile !== null) {
         $setFileSql = ",
@@ -104,17 +121,17 @@ try {
     ");
     $stmt->execute($params);
 
-    if ($uploadedFile !== null || $googleDriveLink !== '') {
+    if ($uploadedFile !== null || $hasAttachmentUrl) {
         project_document_delete_file($document['file_path'] ?? null);
     }
 
-    $fileAction = $uploadedFile !== null ? ', อัปโหลดไฟล์ใหม่' : ($googleDriveLink !== '' ? ', เปลี่ยนเป็น Google Drive link' : '');
+    $fileAction = $uploadedFile !== null ? ', อัปโหลดไฟล์ใหม่' : ($hasAttachmentUrl ? ', เปลี่ยนเป็น URL link' : '');
     logAudit($db, $auth['user_id'], 'update', 'project_documents', "แก้ไขเอกสารโครงการ ID: {$documentId} ชื่อ: {$name} (project_id: {$document['project_id']}{$fileAction})");
 
     project_json([
         "status" => "success",
         "message" => "บันทึกการแก้ไขเอกสารสำเร็จ",
-        "file_path" => $uploadedFile['file_path'] ?? ($googleDriveLink !== '' ? $googleDriveLink : ($document['file_path'] ?? null)),
+        "file_path" => $uploadedFile['file_path'] ?? ($hasAttachmentUrl ? $attachmentUrl : ($document['file_path'] ?? null)),
     ]);
 } catch (Exception $e) {
     project_json(["status" => "error", "message" => $e->getMessage()], 400);

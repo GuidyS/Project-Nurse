@@ -320,6 +320,7 @@ function buildBudgetBreakdown(array $rows): array
 
 function buildAvailableFilters(array $allRows, string $academicYear): array
 {
+    $db = new Connect();
     $yearRows = array_values(array_filter($allRows, fn($row) => ($row['academicYear'] ?? '') === $academicYear));
     $strategies = array_values(array_unique(array_map(fn($row) => $row['strategy'] ?? '', $yearRows)));
     $responsiblePeople = array_values(array_unique(array_filter(array_map(fn($row) => $row['responsiblePerson'] ?? '', $yearRows))));

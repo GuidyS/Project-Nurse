@@ -233,7 +233,7 @@ export default function CompetencyItemsManagement() {
   })();
 
   return (
-    <div className="app-page max-w-5xl animate-fade-in">
+    <div className="app-page">
       <div className="app-page-header">
         <div>
           <h1 className="app-page-title">ประเมินสมรรถนะหลักแต่ละชั้นปี (YLO)</h1>
@@ -342,7 +342,7 @@ export default function CompetencyItemsManagement() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-8 text-destructive hover:bg-destructive/10 gap-1"
+                        className="h-8 text-destructive hover:bg-red-100 hover:text-red-600 border-red-200 gap-1"
                         disabled={group.items.length === 0}
                         title={`ลบรายการทั้งหมดของ ${group.plo_code} เฉพาะชั้นปีที่ ${yearLevel}`}
                         onClick={() =>
@@ -386,7 +386,7 @@ export default function CompetencyItemsManagement() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                        className="h-8 w-8 text-destructive hover:bg-red-100 hover:text-red-600 border-red-200"
                         onClick={() =>
                           setPendingDelete({ scope: "item", id: item.id, label: item.competency_name })
                         }

@@ -7,7 +7,7 @@ function project_document_base_upload_dir(): string
 
 function project_document_allowed_extensions(): array
 {
-    return ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'png', 'jpg', 'jpeg'];
+    return ['pdf', 'doc', 'docx', 'png', 'jpg', 'jpeg'];
 }
 
 function project_document_allowed_mimes(): array
@@ -16,8 +16,6 @@ function project_document_allowed_mimes(): array
         'application/pdf',
         'application/msword',
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'application/vnd.ms-excel',
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'image/png',
         'image/jpeg',
     ];
@@ -39,6 +37,24 @@ function project_document_validate_google_drive_link(string $url): void
     $host = strtolower((string) ($parts['host'] ?? ''));
     if ($scheme !== 'https' || !in_array($host, ['drive.google.com', 'docs.google.com'], true)) {
         throw new InvalidArgumentException("กรุณาแนบลิงก์ Google Drive ที่ถูกต้อง");
+    }
+}
+
+function project_document_validate_website_url(string $url): void
+{
+    $trimmedUrl = trim($url);
+    if ($trimmedUrl === '') {
+        return;
+    }
+
+    if (!filter_var($trimmedUrl, FILTER_VALIDATE_URL)) {
+        throw new InvalidArgumentException("ลิงก์เว็บไซต์ไม่ถูกต้อง");
+    }
+
+    $parts = parse_url($trimmedUrl);
+    $scheme = strtolower((string) ($parts['scheme'] ?? ''));
+    if ($scheme !== 'https') {
+        throw new InvalidArgumentException("กรุณาแนบลิงก์เว็บไซต์ที่ขึ้นต้นด้วย https://");
     }
 }
 

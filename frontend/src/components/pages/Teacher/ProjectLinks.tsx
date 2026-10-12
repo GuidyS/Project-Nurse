@@ -3,10 +3,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { TrendingUp, Save, Link } from 'lucide-react';
+import { ChevronLeft, TrendingUp, Save, Link } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import api from '@/lib/axios'; 
-import { consumePendingProjectNavigation } from '@/lib/projectNavigation';
+import { consumePendingProjectNavigation, navigateToPage } from '@/lib/projectNavigation';
 
 interface TargetOption {
   code: string;
@@ -36,6 +36,10 @@ export default function ProjectLinks() {
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+
+  const onBack = () => {
+    navigateToPage('projectspage');
+  };
 
   useEffect(() => {
     // ดึงข้อมูลผ่าน routing index.php หรือ path ตรง ขึ้นอยู่กับวิธีจัดตั้งค่าหน้าอื่นๆ ของคุณ
@@ -134,7 +138,10 @@ export default function ProjectLinks() {
 
   return (
     <div className="app-page animate-fade-in">
-      <div className="app-page-header">
+      <div className="flex items-center gap-3">
+        <Button variant="ghost" size="icon" onClick={onBack} className="shrink-0">
+          <ChevronLeft className="h-5 w-5" />
+        </Button>
         <div>
           <h1 className="app-page-title">เชื่อมโยงผลลัพธ์โครงการ</h1>
           <p className="app-page-description">จัดการความเชื่อมโยงโครงการกับ PLO, YLO และ CLO</p>

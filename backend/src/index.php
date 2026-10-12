@@ -53,6 +53,9 @@
             case 'profile':
                 require_once 'components/ProfilePage/get_profile.php';
                 break;
+            case 'manage-faculty-extras':
+                require_once 'components/ProfilePage/manage_faculty_extras.php';
+                break;
 
             // LicenseReminder (ใบประกอบวิชาชีพ: อัปโหลดรูป + แจ้งเตือนใกล้หมดอายุ)
             case 'upload-license-image':
@@ -203,6 +206,9 @@
             case 'send-advisor-message':
                 require_once 'components/Teacher/Advises/send_advisor_message.php';
                 break;
+            case 'save-advisor-status':
+                require_once 'components/Teacher/Advises/save_advisor_status.php';
+                break;
 
             // AdviseNotes
             case 'get-advise-notes':
@@ -284,14 +290,6 @@
             // YLO / Sub PLO ย้ายไปกำหนดที่หน้า "ประเมินสมรรถนะหลักแต่ละชั้นปี (YLO)" และ "จัดการหลักสูตร" แล้ว
             case 'migrate-mapping-json-to-tables':
                 require_once 'components/Teacher/CLOPage/migrate_mapping_json_to_tables.php';
-                break;
-
-            // CoursesReports
-            case 'get-course-report':
-                require_once 'components/Teacher/CourseReports/get_course_report.php';
-                break;
-            case 'get-report-filters':
-                require_once 'components/Teacher/CourseReports/get_report_filters.php';
                 break;
 
             // CoursesPage
@@ -400,11 +398,6 @@
                 require_once 'components/Research/delete_research.php';
                 break;
 
-            // PLOYLOReport
-            case 'get-plo-ylo-report':
-                require_once 'components/Teacher/PLOYLOReport/get_plo_ylo_report.php';
-                break;
-
             // Performance
             case 'get-performance':
                 require_once 'components/Teacher/Performance/get_performance.php';
@@ -417,6 +410,11 @@
             case 'get-practical-students':
                 require_once 'components/Teacher/PracticalStudents/get_practical_students.php';
                 break;  
+
+            // Practical
+           case 'practice-locations':
+                require_once 'components/PracticeLocations/practice_locations_api.php';
+                break;
                               
             // MyProjects
             case 'get-my-projects':
@@ -447,6 +445,23 @@
                 break;
             case 'update-project':
                 require_once 'components/Teacher/ProjectsPage/update_project.php';
+                break;
+
+            // ProjectDocs
+            case 'get-project-docs':
+                require_once 'components/Teacher/ProjectDocs/get_project_docs.php';
+                break;
+            case 'create-project-doc':
+                require_once 'components/Teacher/ProjectDocs/create_project_doc.php';
+                break;
+            case 'upload-project-file':
+                require_once 'components/Teacher/ProjectDocs/upload_project_file.php';
+                break;
+            case 'update-project-doc':
+                require_once 'components/Teacher/ProjectDocs/update_project_doc.php';
+                break;
+            case 'delete-project-doc':
+                require_once 'components/Teacher/ProjectDocs/delete_project_doc.php';
                 break;
 
             // ProjectLinks
@@ -480,17 +495,6 @@
                 break;
             case 'delete-schedule-task':
                 require_once 'components/Teacher/ScheduleTasks/delete_schedule_task.php';
-                break;
-
-            // TransferRequests
-            case 'create-transfer-request':
-                require_once 'components/Teacher/TransferRequests/create_transfer_request.php';
-                break;
-            case 'get-transfer-requests':
-                require_once 'components/Teacher/TransferRequests/get_transfer_requests.php';
-                break;
-            case 'update-transfer-status':
-                require_once 'components/Teacher/TransferRequests/update_transfer_status.php';
                 break;
 
             /* -------- Student -------- */

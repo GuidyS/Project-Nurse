@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar, Search, User, FileEdit, Trash2, Plus, Shield, FileUp, FileDown } from "lucide-react";
+import { Calendar, User, FileEdit, Trash2, Plus, Shield, FileUp, FileDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
+import { PageHeader } from "@/components/shared/PageHeader";
+import { SearchInput } from "@/components/shared/SearchInput";
+import { TableStateRow } from "@/components/shared/TableStateRow";
 
 interface AuditEntry {
   id: string;
@@ -82,12 +84,10 @@ export default function AuditLog() {
 
   return (
     <div className="app-page">
-      <div className="app-page-header">
-        <div>
-          <h1 className="app-page-title">Audit Log</h1>
-          <p className="app-page-description">ประวัติการสร้าง แก้ไข และลบข้อมูลของผู้ใช้ทั้งหมด</p>
-        </div>
-      </div>
+      <PageHeader
+        title="Audit Log"
+        description="ประวัติการสร้าง แก้ไข และลบข้อมูลของผู้ใช้ทั้งหมด"
+      />
 
       <Card className="app-section-card">
         <CardHeader>
@@ -97,15 +97,12 @@ export default function AuditLog() {
               <CardDescription>แสดง {filteredLogs.length} รายการ</CardDescription>
             </div>
             <div className="flex flex-wrap gap-2">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
+              <SearchInput
                   placeholder="ค้นหา..."
                   className="pl-9 w-48"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
-              </div>
               <Select value={actionFilter} onValueChange={setActionFilter}>
                 <SelectTrigger className="w-32">
                   <SelectValue placeholder="การกระทำ" />
@@ -147,11 +144,9 @@ export default function AuditLog() {
             </TableHeader>
             <TableBody>
               {filteredLogs.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">
-                    ไม่มีประวัติการใช้งาน
-                  </TableCell>
-                </TableRow>
+                <TableStateRow colSpan={5} className="py-6">
+                  ไม่มีประวัติการใช้งาน
+                </TableStateRow>
               ) : (
                 filteredLogs.map((entry) => (
                   <TableRow key={entry.id}>

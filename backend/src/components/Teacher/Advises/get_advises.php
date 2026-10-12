@@ -39,6 +39,12 @@ try {
     // 2. เช็คก่อนว่าในฐานข้อมูลมีการสร้างตาราง advice_log ไว้หรือยัง
     $has_advice_log = $db->query("SHOW TABLES LIKE 'advice_log'")->rowCount() > 0;
 
+    try {
+        $db->query("SELECT advisor_is_employed FROM student LIMIT 1");
+    } catch (Exception $e) {
+        $db->query("ALTER TABLE student ADD COLUMN advisor_is_employed TINYINT(1) DEFAULT 0");
+    }
+
     // 3. ดึงนักศึกษาในความดูแล พร้อม GPA จริง และวันที่ให้คำปรึกษาล่าสุดจาก advice_log
     $sql = "
         SELECT
@@ -47,6 +53,9 @@ try {
             CONCAT(IFNULL(s.title,''), s.first_name_th, ' ', s.last_name_th) as name,
             IFNULL(s.year_level, 1) as year,
             IFNULL(s.gpa, 0) as gpa,
+            s.advisor_status as advisor_status_raw,
+            s.advisor_status_details as advisor_status_details,
+            IFNULL(s.advisor_is_employed, 0) as is_employed,
             (SELECT DATE_FORMAT(MAX(al.created_at), '%Y-%m-%d')
              FROM advice_log al
              WHERE al.student_id = s.student_id AND al.advisor_id = :advisor_uid) as lastContact
@@ -62,12 +71,25 @@ try {
     $stmt->execute([':faculty_id' => $my_faculty_id, ':advisor_uid' => $user_id] + $typeParams);
     $advisees = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // 4. คำนวณสถานะจาก GPA จริง (< 2.00 วิกฤต, < 2.50 ต้องติดตาม)
+    // 4. ใช้สถานะจากฐานข้อมูล (ปกติ = normal, ไม่ปกติ = critical)
     foreach ($advisees as &$student) {
-        $gpa = (float)$student['gpa'];
-        $student['gpa'] = $gpa;
-        $student['status'] = ($gpa > 0 && $gpa < 2.00) ? 'critical' : (($gpa > 0 && $gpa < 2.50) ? 'warning' : 'normal');
-        $student['needsAdvice'] = $student['status'] !== 'normal';
+        $student['gpa'] = (float)$student['gpa'];
+        $raw_status = $student['advisor_status_raw'] ?? 'ปกติ';
+        if ($raw_status === 'ไม่ปกติ') {
+            $student['status'] = 'critical';
+            $student['advisor_status'] = 'ไม่ปกติ';
+            $student['needsAdvice'] = true;
+        } elseif ($raw_status === 'จบการศึกษา') {
+            $student['status'] = 'graduated';
+            $student['advisor_status'] = 'จบการศึกษา';
+            $student['needsAdvice'] = false;
+        } else {
+            $student['status'] = 'normal';
+            $student['advisor_status'] = 'ปกติ';
+            $student['needsAdvice'] = false;
+        }
+        $student['statusDetails'] = $student['advisor_status_details'] ?? '';
+        $student['is_employed'] = (bool)($student['is_employed'] ?? 0);
         $student['lastContact'] = $student['lastContact'] ? $student['lastContact'] : '-';
     }
 

@@ -1,4 +1,4 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -22,12 +22,15 @@ interface ProjectOption {
   project_type?: ProjectType;
 }
 
-type ProjectType = 'academic_service' | 'culture' | 'other';
+type ProjectType = 'academic_service' | 'culture' | 'other' | 'teaching' | 'research' | 'quality_assurance';;
 type ProjectTypeFilter = ProjectType | 'all';
 
 const projectTypeLabels: Record<ProjectType, string> = {
   academic_service: 'บริการวิชาการ',
   culture: 'ทำนุบำรุงศิลปวัฒนธรรม',
+  teaching: 'การเรียนการสอน',
+  research: 'วิจัย',
+  quality_assurance: 'การประกันคุณภาพ',
   other: 'อื่น ๆ / ยังไม่จำแนก',
 };
 
@@ -35,6 +38,9 @@ const projectTypeFilterOptions: { value: ProjectTypeFilter; label: string }[] = 
   { value: 'all', label: 'ทั้งหมด' },
   { value: 'academic_service', label: projectTypeLabels.academic_service },
   { value: 'culture', label: projectTypeLabels.culture },
+  { value: 'teaching', label: projectTypeLabels.teaching },
+  { value: 'research', label: projectTypeLabels.research },
+  { value: 'quality_assurance', label: projectTypeLabels.quality_assurance },
   { value: 'other', label: projectTypeLabels.other },
 ];
 
