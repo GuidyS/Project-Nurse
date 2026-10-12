@@ -579,7 +579,7 @@ const Portfolio = () => {
                               <Button 
                                 variant="ghost" 
                                 size="icon" 
-                                className="h-8 w-8 text-destructive hover:bg-destructive/10 z-10" 
+                                className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive" 
                                 onClick={(e) => {
                                   e.stopPropagation(); 
                                   openDeleteConfirm(item.id);
