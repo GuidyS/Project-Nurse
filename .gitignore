@@ -38,3 +38,4 @@ config.php
 .codex-devlogs
 skills-lock.json
 Functional-Requirement NSP02.md
+MYSQL_DATABASE.sql
