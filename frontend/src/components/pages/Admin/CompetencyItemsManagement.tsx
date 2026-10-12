@@ -233,7 +233,7 @@ export default function CompetencyItemsManagement() {
   })();
 
   return (
-    <div className="app-page max-w-5xl animate-fade-in">
+    <div className="app-page">
       <div className="app-page-header">
         <div>
           <h1 className="app-page-title">ประเมินสมรรถนะหลักแต่ละชั้นปี (YLO)</h1>

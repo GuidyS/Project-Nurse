@@ -62,7 +62,6 @@ export default function StudentCompetencyView() {
     <div className="p-6 space-y-6 animate-fade-in max-w-6xl mx-auto">
       <div>
         <div className="flex items-center gap-2">
-          <Award className="h-6 w-6 text-primary" />
           <h1 className="text-xl font-bold text-foreground">
             ผลการประเมินสมรรถนะหลักของนักศึกษาชั้นปีที่ {yearLevel || "—"}{" "}
             {curriculumYear && `(หลักสูตรปรับปรุง ${curriculumYear})`}
