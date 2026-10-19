@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { type ReactNode, useState, useEffect, useCallback, useMemo } from "react";
 import { Edit, Trash2, Save, BookOpen, Loader2, AlertCircle, Library } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
 import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
@@ -87,6 +88,66 @@ const CLO_OPTIONS = Array.from({ length: 10 }, (_, i) => `CLO${i + 1}`);
 
 /** คะแนนเต็มที่แบ่งได้ต่อ 1 รายวิชา (ต้องตรงกับ OUTCOME_SUBJECT_SCORE_BUDGET ฝั่ง backend) */
 const SUBJECT_SCORE_BUDGET = 100;
+const TOOLTIP_DELAY_MS = 1000;
+
+const tooltipText = (value?: string | null): string | undefined => {
+  const text = value?.trim();
+  return text ? text : undefined;
+};
+
+function DescriptionTooltip({
+  content,
+  children,
+}: {
+  content?: string | null;
+  children: ReactNode;
+}) {
+  const text = tooltipText(content);
+  if (!text) return <>{children}</>;
+
+  return (
+    <Tooltip delayDuration={TOOLTIP_DELAY_MS}>
+      <TooltipTrigger asChild>{children}</TooltipTrigger>
+      <TooltipContent className="max-w-xs whitespace-normal break-words">
+        <p>{text}</p>
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+function TooltipBadge({
+  tooltip,
+  className,
+  variant,
+  children,
+}: {
+  tooltip?: string | null;
+  className?: string;
+  variant?: "default" | "secondary" | "destructive" | "outline";
+  children: ReactNode;
+}) {
+  const hasTooltip = !!tooltipText(tooltip);
+
+  return (
+    <DescriptionTooltip content={tooltip}>
+      <span
+        className="inline-flex rounded-full focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+        tabIndex={hasTooltip ? 0 : undefined}
+      >
+        <Badge variant={variant} className={className}>
+          {children}
+        </Badge>
+      </span>
+    </DescriptionTooltip>
+  );
+}
+
+const yloDescription = (yloId?: string | null): string | undefined => {
+  const text = tooltipText(yloId);
+  if (!text) return undefined;
+  const year = text.replace(/\D/g, "");
+  return year ? `${text} — ชั้นปีที่ ${year}` : text;
+};
 
 // เรียงรหัส Sub PLO ตามตัวเลข (1.2 ก่อน 1.10 และ 2.1)
 const subCodeOrder = (code: string): number => {
@@ -203,7 +264,14 @@ function CloSubPloFields({
 
         {sortPloCodes(Object.keys(groups)).map((plo) => (
           <div key={plo} className="divide-y divide-border/60">
-            <div className="bg-accent/20 px-3 py-1.5 text-xs font-semibold text-foreground">{plo}</div>
+            <DescriptionTooltip content={groups[plo]?.[0]?.plo_name}>
+              <div
+                className="bg-accent/20 px-3 py-1.5 text-xs font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                tabIndex={tooltipText(groups[plo]?.[0]?.plo_name) ? 0 : undefined}
+              >
+                {plo}
+              </div>
+            </DescriptionTooltip>
             {groups[plo].map((sub) => {
               const checked = formData.sub_plos.includes(sub.code);
               const draft = formData.scores[sub.code] ?? { max: "", pass: "" };
@@ -216,10 +284,12 @@ function CloSubPloFields({
                       onCheckedChange={(c) => toggleSub(sub.code, Boolean(c))}
                       className="mt-0.5"
                     />
-                    <Label htmlFor={`sub-${sub.code}`} className="text-xs font-normal cursor-pointer leading-relaxed">
-                      <span className="font-semibold mr-1">{sub.code}</span>
-                      <span className="text-muted-foreground">{sub.description}</span>
-                    </Label>
+                    <DescriptionTooltip content={sub.description}>
+                      <Label htmlFor={`sub-${sub.code}`} className="text-xs font-normal cursor-pointer leading-relaxed">
+                        <span className="font-semibold mr-1">{sub.code}</span>
+                        <span className="text-muted-foreground">{sub.description}</span>
+                      </Label>
+                    </DescriptionTooltip>
                   </div>
                   <Input
                     inputMode="decimal"
@@ -299,6 +369,19 @@ export default function CLOPage() {
   const [addFormData, setAddFormData] = useState<CLOFormData>(EMPTY_FORM);
   const [editFormData, setEditFormData] = useState<CLOFormData>(EMPTY_FORM);
   const [isAdmin, setIsAdmin] = useState(false);
+
+  const subPloByCode = useMemo(
+    () => new Map(subPloCatalog.map((sub) => [sub.code, sub])),
+    [subPloCatalog]
+  );
+  const ploNameByCode = useMemo(() => {
+    const map = new Map<string, string>();
+    subPloCatalog.forEach((sub) => {
+      if (!map.has(sub.plo_code)) map.set(sub.plo_code, sub.plo_name);
+    });
+    return map;
+  }, [subPloCatalog]);
+  const subjectYloLabel = subjectYlo === null ? undefined : `YLO${subjectYlo} — ชั้นปีที่ ${subjectYlo}`;
 
   useEffect(() => {
     let cancelled = false;
@@ -609,9 +692,9 @@ export default function CLOPage() {
                       ยังไม่กำหนด — ตั้งค่าที่หน้า "จัดการหลักสูตร"
                     </p>
                   ) : (
-                    <Badge variant="secondary" className="mt-1 font-medium">
-                      YLO{subjectYlo} — ชั้นปีที่ {subjectYlo}
-                    </Badge>
+                    <TooltipBadge variant="secondary" className="mt-1 font-medium" tooltip={subjectYloLabel}>
+                      {subjectYloLabel}
+                    </TooltipBadge>
                   )}
                 </div>
                 <RemainingScoreBox remaining={scoreBudget.remaining} />
@@ -686,24 +769,31 @@ export default function CLOPage() {
                       <div className="flex justify-between items-start gap-4">
                         <div className="space-y-2 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
-                            <Badge className="bg-primary/10 text-primary">
+                            <TooltipBadge className="bg-primary/10 text-primary" tooltip={clo.description}>
                               {clo.clo_code || `CLO ${index + 1}`}
-                            </Badge>
-                            {clo.ylo_id && <Badge variant="secondary">{clo.ylo_id}</Badge>}
+                            </TooltipBadge>
+                            {clo.ylo_id && (
+                              <TooltipBadge variant="secondary" tooltip={yloDescription(clo.ylo_id)}>
+                                {clo.ylo_id}
+                              </TooltipBadge>
+                            )}
                             {sortPloCodes(clo.mapped_plos || []).map((plo) => (
-                              <Badge key={plo} variant="outline">{plo}</Badge>
+                              <TooltipBadge key={plo} variant="outline" tooltip={ploNameByCode.get(plo)}>
+                                {plo}
+                              </TooltipBadge>
                             ))}
                           </div>
                           {(clo.sub_plos || []).length > 0 && (
                             <div className="flex flex-wrap items-center gap-2">
                               {sortSubCodes(clo.sub_plos || []).map((sub) => (
-                                <Badge
+                                <TooltipBadge
                                   key={sub}
                                   variant="outline"
                                   className="border-amber-500/60 text-amber-600 dark:text-amber-400"
+                                  tooltip={subPloByCode.get(sub)?.description}
                                 >
                                   Sub {sub}{scoreLabel(clo, sub)}
-                                </Badge>
+                                </TooltipBadge>
                               ))}
                             </div>
                           )}

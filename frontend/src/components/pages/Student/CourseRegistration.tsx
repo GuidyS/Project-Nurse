@@ -204,7 +204,7 @@ export default function CourseRegistration() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="text-destructive hover:bg-destructive/10"
+                          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                           disabled={busyCode === subject.subject_code || subject.has_scores}
                           title={subject.has_scores ? "มีคะแนนที่อาจารย์บันทึกไว้แล้ว จึงถอนเองไม่ได้" : "ถอนรายวิชา"}
                           onClick={() => setPendingWithdraw(subject)}
