@@ -17,9 +17,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
-  ComposedChart,
   Legend,
-  Line,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -42,7 +40,6 @@ interface YearlyDataItem {
   graduates: number;
   employmentRespondents: number;
   employedCount: number;
-  employmentRate: number;
   licenseFirstAttemptPassed: number;
   licenseWithinOneYearPassed: number;
 }
@@ -100,7 +97,6 @@ function normalizeYearlyData(
     graduates: Number(row.graduates || 0),
     employmentRespondents: Number(row.employmentRespondents || 0),
     employedCount: Number(row.employedCount || 0),
-    employmentRate: Number(row.employmentRate || 0),
     licenseFirstAttemptPassed: Number(row.licenseFirstAttemptPassed || 0),
     licenseWithinOneYearPassed: Number(row.licenseWithinOneYearPassed || 0),
   }));
@@ -156,10 +152,7 @@ export default function FiveYearSummaryDashboard() {
       0,
     );
     const employedCount = yearlyData.reduce((sum, row) => sum + Number(row.employedCount || 0), 0);
-    const employmentRate = employmentRespondents > 0
-      ? employedCount / employmentRespondents * 100
-      : 0;
-    return { graduates, employmentRespondents, employedCount, employmentRate };
+    return { graduates, employmentRespondents, employedCount };
   }, [yearlyData]);
 
   const unassignedTotal = Object.values(coverage.unassigned).reduce((sum, value) => sum + value, 0);
@@ -170,7 +163,6 @@ export default function FiveYearSummaryDashboard() {
       'บัณฑิต (คน)': row.graduates,
       'ผู้ตอบแบบสำรวจ (คน)': row.employmentRespondents,
       'ผู้มีงานทำ (คน)': row.employedCount,
-      'อัตราการมีงานทำ (%)': row.employmentRate,
       'สอบผ่านใบประกอบวิชาชีพครั้งแรก (คน)': row.licenseFirstAttemptPassed,
       'สอบผ่านใบประกอบวิชาชีพภายใน 1 ปี (คน)': row.licenseWithinOneYearPassed,
     }));
@@ -190,13 +182,12 @@ export default function FiveYearSummaryDashboard() {
     document.text(`Five Year Summary - ${selectedProgramLabel}`, 14, 15);
     autoTable(document, {
       startY: 22,
-      head: [['Year', 'Graduates', 'Respondents', 'Employed', 'Employment (%)', 'First-attempt pass', 'Pass within 1 year']],
+      head: [['Year', 'Graduates', 'Respondents', 'Employed (people)', 'First-attempt pass', 'Pass within 1 year']],
       body: yearlyData.map((row) => [
         row.year,
         row.graduates,
         row.employmentRespondents,
         row.employedCount,
-        `${row.employmentRate}%`,
         row.licenseFirstAttemptPassed,
         row.licenseWithinOneYearPassed,
       ]),
@@ -289,12 +280,12 @@ export default function FiveYearSummaryDashboard() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">อัตราการมีงานทำเฉลี่ย</CardTitle>
+            <CardTitle className="text-sm font-medium">ผู้มีงานทำรวม 5 ปี</CardTitle>
             <BriefcaseBusiness className="h-5 w-5 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{totals.employmentRate.toFixed(1)}%</div>
-            <p className="text-xs text-muted-foreground">เฉลี่ย 5 ปี</p>
+            <div className="text-2xl font-bold text-green-600">{totals.employedCount.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">คน จากผู้ตอบแบบสำรวจ {totals.employmentRespondents.toLocaleString()} คน</p>
           </CardContent>
         </Card>
       </div>
@@ -304,21 +295,20 @@ export default function FiveYearSummaryDashboard() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <BarChart3 className="h-5 w-5" />
-              จำนวนบัณฑิตและอัตราการมีงานทำ
+              จำนวนบัณฑิตและผู้มีงานทำ
             </CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={320}>
-              <ComposedChart data={yearlyData}>
+              <BarChart data={yearlyData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="year" />
-                <YAxis yAxisId="people" allowDecimals={false} />
-                <YAxis yAxisId="percent" orientation="right" domain={[0, 100]} unit="%" />
+                <YAxis allowDecimals={false} />
                 <Tooltip />
                 <Legend />
-                <Bar yAxisId="people" dataKey="graduates" name="บัณฑิต (คน)" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                <Line yAxisId="percent" type="monotone" dataKey="employmentRate" name="มีงานทำ (%)" stroke="#22c55e" strokeWidth={3} />
-              </ComposedChart>
+                <Bar dataKey="graduates" name="บัณฑิต (คน)" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="employedCount" name="มีงานทำ (คน)" fill="#22c55e" radius={[4, 4, 0, 0]} />
+              </BarChart>
             </ResponsiveContainer>
             <p className="mt-2 text-xs text-muted-foreground">
               {sourceNotes.graduateAndEmploymentYear || 'จัดกลุ่มตามวันที่จบการศึกษา'}
