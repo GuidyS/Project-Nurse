@@ -13,7 +13,7 @@ import LoginPage from "@/components/pages/Auth/LoginPage";
 import RegisterPage from "@/components/pages/Auth/RegisterPage";
 import Transcript from "@/components/pages/Student/Transcript";
 import Portfolio from "@/components/pages/Student/Portfolio";
-import FiveYearSummary from "@/components/pages/Teacher/FiveYearSummary";
+import FiveYearSummary from "@/components/pages/Teacher/FiveYearSummaryDashboard";
 import Documents from "@/components/pages/Teacher/Documents";
 import AdviseNotes from "@/components/pages/Teacher/AdviseNotes";
 import Advises from "@/components/pages/Teacher/Advises";
