@@ -4,7 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Upload, Download, Building, FileSignature, MapPin, Building2, BookOpen, Save, AlertCircle, Trash2 } from "lucide-react";
+import { Loader2, Upload, Download, Building, FileSignature, MapPin, Building2, BookOpen, Trash2, Plus, X } from "lucide-react";
 import api from "@/lib/axios";
 import * as XLSX from "xlsx";
 
@@ -34,38 +34,16 @@ export default function PracticeLocationsManage() {
   const { toast } = useToast();
   const [data, setData] = useState<LocationItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<number | null>(null);
-  const [deleteAllConfirmOpen, setDeleteAllConfirmOpen] = useState(false);
 
-  const hasUnsavedChanges = data.some(item => item.id === undefined);
-
-  useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (hasUnsavedChanges) {
-        e.preventDefault();
-        e.returnValue = ''; 
-      }
-    };
-    const handleAppNavigate = (e: Event) => {
-      if (hasUnsavedChanges) {
-        const confirmLeave = window.confirm("⚠️ คุณมีข้อมูลที่รออัปโหลดและยังไม่ได้บันทึก\n\nต้องการทิ้งข้อมูลและออกจากหน้านี้ใช่หรือไม่?");
-        if (!confirmLeave) {
-          e.stopImmediatePropagation(); 
-          e.preventDefault();
-        }
-      }
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    window.addEventListener('app:navigate', handleAppNavigate, { capture: true });
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      window.removeEventListener('app:navigate', handleAppNavigate, { capture: true });
-    };
-  }, [hasUnsavedChanges]);
+  // State สำหรับ Modal เพิ่มข้อมูลทีละรายการ
+  const [addModalOpen, setAddModalOpen] = useState(false);
+  const [addType, setAddType] = useState<"hospital" | "sub_district" | "health_center">("hospital");
+  const [newLocation, setNewLocation] = useState({ name: "", mou: "", subject: "" });
+  const [isSavingManual, setIsSavingManual] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -81,20 +59,21 @@ export default function PracticeLocationsManage() {
 
   useEffect(() => { fetchData(); }, []);
 
+  // ✅ ฟังก์ชันดาวน์โหลดแพทเทิร์นแบบใหม่ (ดึงไฟล์ .xlsx ที่เราทำสูตรไว้จากโฟลเดอร์ public)
   const handleDownloadTemplate = () => {
-    const headers = [["ชื่อโรงพยาบาล", "ชื่อ รพ.สต.", "อนามัย", "MOU", "วิชาที่ฝึก"]];
-    const ws = XLSX.utils.aoa_to_sheet(headers);
-    ws['!cols'] = [{ wch: 25 }, { wch: 25 }, { wch: 25 }, { wch: 10 }, { wch: 30 }];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Template");
-    XLSX.writeFile(wb, "แบบฟอร์มนำเข้าแหล่งฝึกภาคปฏิบัติ.xlsx");
+    const link = document.createElement("a");
+    link.href = "/template_practice_locations.xlsx"; 
+    link.download = "แบบฟอร์มนำเข้าแหล่งฝึกภาคปฏิบัติ.xlsx"; 
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
         const arrayBuffer = event.target?.result;
         const workbook = XLSX.read(arrayBuffer, { type: "array" });
@@ -114,8 +93,12 @@ export default function PracticeLocationsManage() {
             });
           }
         }
-        setData(newLocations);
-        toast({ title: "อ่านไฟล์สำเร็จ", description: `พบข้อมูลแหล่งฝึก ${newLocations.length} รายการ กรุณากดบันทึก` });
+        
+        if (newLocations.length > 0) {
+          await handleAutoSave(newLocations);
+        } else {
+          toast({ title: "ไฟล์ว่างเปล่า", description: "ไม่พบข้อมูลในไฟล์ Excel", variant: "destructive" });
+        }
       } catch (err) {
         toast({ title: "เกิดข้อผิดพลาด", description: "ไฟล์ Excel ไม่ถูกต้องตามรูปแบบ", variant: "destructive" });
       }
@@ -124,19 +107,45 @@ export default function PracticeLocationsManage() {
     reader.readAsArrayBuffer(file);
   };
 
-  const handleSave = async () => {
-    if (data.length === 0) return toast({ title: "ไม่มีข้อมูล", description: "กรุณาอัปโหลดไฟล์ Excel ก่อน", variant: "destructive" });
+  const handleAutoSave = async (locationsToSave: LocationItem[]) => {
     try {
-      setSaving(true);
-      const res = await api.post("/index.php?page=practice-locations", { locations: data });
+      setLoading(true);
+      const res = await api.post("/index.php?page=practice-locations", { locations: locationsToSave });
+      
       if (res.data?.status === "success") {
-        toast({ title: "บันทึกสำเร็จ", description: "อัปเดตข้อมูลแหล่งฝึกภาคปฏิบัติเรียบร้อยแล้ว" });
+        toast({ title: "ดำเนินการสำเร็จ", description: res.data.message }); 
         fetchData(); 
-      } else throw new Error(res.data?.message);
+        return true;
+      } else {
+        throw new Error(res.data?.message || "บันทึกล้มเหลว");
+      }
     } catch (error) {
       const err = error as { response?: { data?: { message?: string } }; message?: string };
-      toast({ title: "บันทึกล้มเหลว", description: err.response?.data?.message || err.message, variant: "destructive" });
-    } finally { setSaving(false); }
+      toast({ title: "ไม่สามารถบันทึกได้", description: err.response?.data?.message || err.message, variant: "destructive" });
+      setLoading(false);
+      return false;
+    }
+  };
+
+  const submitManualAdd = async () => {
+    if (!newLocation.name.trim()) return toast({ title: "ข้อมูลไม่ครบ", description: "กรุณาระบุชื่อสถานที่", variant: "destructive" });
+    
+    setIsSavingManual(true);
+    const payload: LocationItem = {
+      hospital_name: addType === 'hospital' ? newLocation.name : "",
+      sub_district_hospital: addType === 'sub_district' ? newLocation.name : "",
+      health_center: addType === 'health_center' ? newLocation.name : "",
+      mou_status: newLocation.mou,
+      subject_name: newLocation.subject
+    };
+
+    const success = await handleAutoSave([payload]);
+    setIsSavingManual(false);
+
+    if (success) {
+      setAddModalOpen(false);
+      setNewLocation({ name: "", mou: "", subject: "" });
+    }
   };
 
   const executeDelete = async () => {
@@ -153,43 +162,17 @@ export default function PracticeLocationsManage() {
         const err = error as { response?: { data?: { message?: string } }; message?: string };
         toast({ title: "ลบล้มเหลว", description: err.response?.data?.message || err.message, variant: "destructive" });
       }
-    } else {
-      const newData = [...data];
-      newData.splice(itemToDelete, 1);
-      setData(newData);
-      toast({ title: "นำออกแล้ว", description: "นำข้อมูลออกจากรายการที่รออัปโหลดแล้ว" });
     }
     setDeleteConfirmOpen(false);
     setItemToDelete(null);
   };
 
-  const executeDeleteAll = async () => {
-    try {
-      setLoading(true);
-      const hasSavedData = data.some(item => item.id !== undefined);
-      if (hasSavedData) {
-        const res = await api.delete("/index.php?page=practice-locations&action=delete_all");
-        if (res.data?.status === "success") {
-          toast({ title: "ลบสำเร็จ", description: "ลบข้อมูลแหล่งฝึกทั้งหมดออกจากระบบเรียบร้อยแล้ว" });
-          setData([]);
-        } else throw new Error(res.data?.message);
-      } else {
-        setData([]);
-        toast({ title: "เคลียร์ข้อมูลสำเร็จ", description: "นำข้อมูลที่รออัปโหลดออกจากหน้าจอแล้ว" });
-      }
-    } catch (error) {
-      const err = error as { response?: { data?: { message?: string } }; message?: string };
-      toast({ title: "ลบล้มเหลว", description: err.response?.data?.message || err.message, variant: "destructive" });
-    } finally {
-      setLoading(false);
-      setDeleteAllConfirmOpen(false);
-    }
-  };
-
   const dataWithIndex = data.map((item, index) => ({ ...item, originalIndex: index }));
-  const hospitals = dataWithIndex.filter(d => d.hospital_name?.trim() !== "");
-  const subDistricts = dataWithIndex.filter(d => d.sub_district_hospital?.trim() !== "");
-  const healthCenters = dataWithIndex.filter(d => d.health_center?.trim() !== "");
+  
+  // กรองข้อมูลว่างทิ้ง
+  const hospitals = dataWithIndex.filter(d => d.hospital_name && String(d.hospital_name).trim() !== "");
+  const subDistricts = dataWithIndex.filter(d => d.sub_district_hospital && String(d.sub_district_hospital).trim() !== "");
+  const healthCenters = dataWithIndex.filter(d => d.health_center && String(d.health_center).trim() !== "");
 
   const summary = {
     hospitalCount: hospitals.length,
@@ -203,14 +186,33 @@ export default function PracticeLocationsManage() {
     if (d.subject_name) summary.subjects[d.subject_name] = (summary.subjects[d.subject_name] || 0) + 1;
   });
 
-  const renderLocationTable = (title: string, items: typeof dataWithIndex, nameKey: "hospital_name" | "sub_district_hospital" | "health_center", icon: React.ReactNode, borderColorClass: string, titleColorClass: string) => {
-    if (items.length === 0) return null; 
+  const renderLocationTable = (
+    title: string, 
+    items: typeof dataWithIndex, 
+    nameKey: "hospital_name" | "sub_district_hospital" | "health_center", 
+    typeValue: "hospital" | "sub_district" | "health_center",
+    icon: React.ReactNode, 
+    borderColorClass: string, 
+    titleColorClass: string
+  ) => {
     return (
       <Card className={`shadow-sm border-t-4 ${borderColorClass}`}>
         <CardHeader className="bg-muted/20 border-b pb-3 pt-4 px-5">
           <CardTitle className={`text-base flex items-center gap-2 ${titleColorClass}`}>
             {icon} {title}
-            <Badge variant="secondary" className="ml-auto bg-background shadow-sm border">{items.length} แห่ง</Badge>
+            <div className="ml-auto flex items-center gap-2">
+              <Badge variant="secondary" className="bg-background shadow-sm border text-foreground font-medium">
+                {items.length} แห่ง
+              </Badge>
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="h-7 px-2 text-xs border-primary/20 text-primary hover:bg-primary/10 hover:text-primary transition-colors"
+                onClick={() => { setAddType(typeValue); setAddModalOpen(true); }}
+              >
+                <Plus className="h-3.5 w-3.5 mr-1" /> เพิ่ม
+              </Button>
+            </div>
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
@@ -226,25 +228,31 @@ export default function PracticeLocationsManage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {items.map((row, idx) => (
-                  <TableRow key={idx} className="hover:bg-muted/30">
-                    <TableCell className="text-center text-muted-foreground">{idx + 1}</TableCell>
-                    <TableCell className="font-medium text-foreground">{row[nameKey]}</TableCell>
-                    <TableCell className="text-center">
-                      {row.mou_status ? (
-                        String(row.mou_status).trim() === "มี" ? <Badge className="bg-green-100 text-green-700">มี</Badge>
-                        : String(row.mou_status).trim() === "ไม่มี" ? <Badge className="bg-red-100 text-red-700">ไม่มี</Badge>
-                        : <Badge variant="outline">{row.mou_status}</Badge>
-                      ) : "-"}
-                    </TableCell>
-                    <TableCell>{row.subject_name ? <Badge variant="secondary" className="font-normal">{row.subject_name}</Badge> : "-"}</TableCell>
-                    <TableCell className="text-center">
-                      <Button variant="ghost" size="icon" onClick={() => { setItemToDelete(row.originalIndex); setDeleteConfirmOpen(true); }} className="text-destructive hover:bg-destructive/10 h-8 w-8">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
+                {items.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">ไม่มีข้อมูล</TableCell>
                   </TableRow>
-                ))}
+                ) : (
+                  items.map((row, idx) => (
+                    <TableRow key={idx} className="hover:bg-muted/30">
+                      <TableCell className="text-center text-muted-foreground">{idx + 1}</TableCell>
+                      <TableCell className="font-medium text-foreground">{row[nameKey]}</TableCell>
+                      <TableCell className="text-center">
+                        {row.mou_status ? (
+                          String(row.mou_status).trim() === "มี" ? <Badge className="bg-green-100 text-green-700 hover:bg-green-100">มี</Badge>
+                          : String(row.mou_status).trim() === "ไม่มี" ? <Badge className="bg-red-100 text-red-700 hover:bg-red-100">ไม่มี</Badge>
+                          : <Badge variant="outline">{row.mou_status}</Badge>
+                        ) : "-"}
+                      </TableCell>
+                      <TableCell>{row.subject_name ? <Badge variant="secondary" className="font-normal">{row.subject_name}</Badge> : "-"}</TableCell>
+                      <TableCell className="text-center">
+                        <Button variant="ghost" size="icon" onClick={() => { setItemToDelete(row.originalIndex); setDeleteConfirmOpen(true); }} className="text-destructive hover:bg-destructive/10 h-8 w-8">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>
@@ -254,36 +262,23 @@ export default function PracticeLocationsManage() {
   };
 
   return (
-    <div className="p-6 space-y-6 animate-fade-in max-w-7xl mx-auto">
+    <div className="p-6 space-y-6 animate-fade-in max-w-7xl mx-auto relative">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold text-foreground">จัดการแหล่งฝึกภาคปฏิบัติ</h1>
           </div>
-          <p className="text-sm text-muted-foreground mt-1">อัปโหลดข้อมูลจากไฟล์ Excel และจัดการระบบแหล่งฝึก</p>
+          <p className="text-sm text-muted-foreground mt-1">อัปโหลดข้อมูลจากไฟล์ Excel หรือเพิ่มข้อมูลทีละรายการ</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" className="gap-2 border-primary text-primary hover:bg-primary/5" onClick={handleDownloadTemplate}>
-            <Download className="h-4 w-4" /> โหลดฟอร์แมต
+            <Download className="h-4 w-4" /> ดาวน์โหลดแพทเทิร์น
           </Button>
           <input type="file" accept=".xlsx, .xls" className="hidden" ref={fileInputRef} onChange={handleFileUpload} />
-          <Button variant="outline" className="gap-2 border-primary text-primary hover:bg-primary/5" onClick={() => fileInputRef.current?.click()}>
-            <Upload className="h-4 w-4" /> นำเข้า Excel
+          <Button className="gap-2 bg-primary hover:bg-primary/90" onClick={() => fileInputRef.current?.click()} disabled={loading}>
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />} 
+            นำเข้า Excel
           </Button>
-          <Button onClick={handleSave} disabled={saving || data.length === 0} className="gap-2 bg-primary">
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} บันทึกข้อมูล
-          </Button>
-          <Button variant="destructive" className="gap-2" onClick={() => setDeleteAllConfirmOpen(true)} disabled={loading || data.length === 0}>
-            <Trash2 className="h-4 w-4" /> ลบทั้งหมด
-          </Button>
-        </div>
-      </div>
-
-      <div className="bg-amber-50/50 border border-amber-200/60 p-3 rounded-md text-sm text-amber-800 flex items-start gap-2">
-        <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-        <div>
-          <span className="font-semibold">รูปแบบไฟล์ Excel: </span>
-          1. ชื่อโรงพยาบาล, 2. ชื่อ รพ.สต., 3. อนามัย, 4. MOU (มี/ไม่มี), 5. วิชาที่ฝึก (ข้ามหัวตารางแถวแรกอัตโนมัติ)
         </div>
       </div>
 
@@ -310,19 +305,85 @@ export default function PracticeLocationsManage() {
             </Card>
 
             <div className="col-span-1 lg:col-span-3 space-y-6">
-              {data.length === 0 && (
-                <Card className="shadow-sm border-dashed border-2"><CardContent className="flex flex-col items-center justify-center py-24 text-muted-foreground gap-3"><div className="bg-muted p-4 rounded-full"><MapPin className="h-10 w-10 text-muted-foreground/50" /></div><p className="font-medium text-lg">ยังไม่มีข้อมูล</p><p className="text-sm text-center">อัปโหลดไฟล์ Excel เพื่อเพิ่มข้อมูลเข้าสู่ระบบ</p></CardContent></Card>
-              )}
-              {renderLocationTable("โรงพยาบาล", hospitals, "hospital_name", <Building2 className="h-5 w-5" />, "border-blue-500", "text-blue-700")}
-              {renderLocationTable("รพ.สต.", subDistricts, "sub_district_hospital", <Building className="h-5 w-5" />, "border-emerald-500", "text-emerald-700")}
-              {renderLocationTable("อนามัย", healthCenters, "health_center", <MapPin className="h-5 w-5" />, "border-orange-500", "text-orange-700")}
+              {renderLocationTable("โรงพยาบาล", hospitals, "hospital_name", "hospital", <Building2 className="h-5 w-5" />, "border-blue-500", "text-blue-700")}
+              {renderLocationTable("รพ.สต.", subDistricts, "sub_district_hospital", "sub_district", <Building className="h-5 w-5" />, "border-emerald-500", "text-emerald-700")}
+              {renderLocationTable("อนามัย", healthCenters, "health_center", "health_center", <MapPin className="h-5 w-5" />, "border-orange-500", "text-orange-700")}
             </div>
           </div>
         </>
       )}
 
-      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>ยืนยันลบแหล่งฝึก?</AlertDialogTitle><AlertDialogDescription>คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูลนี้?</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>ยกเลิก</AlertDialogCancel><AlertDialogAction onClick={executeDelete} className="bg-destructive">ยืนยันการลบ</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
-      <AlertDialog open={deleteAllConfirmOpen} onOpenChange={setDeleteAllConfirmOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle className="text-destructive">ยืนยันลบข้อมูลทั้งหมด?</AlertDialogTitle><AlertDialogDescription>ลบข้อมูลทั้งหมดออกจากระบบ (กู้คืนไม่ได้)</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>ยกเลิก</AlertDialogCancel><AlertDialogAction onClick={executeDeleteAll} className="bg-destructive">ลบทั้งหมด</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+      {addModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-background rounded-xl shadow-xl w-full max-w-md overflow-hidden border">
+            <div className="flex items-center justify-between border-b px-5 py-4 bg-muted/30">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <Plus className="h-5 w-5 text-primary" /> 
+                เพิ่มข้อมูล{addType === 'hospital' ? 'โรงพยาบาล' : addType === 'sub_district' ? 'รพ.สต.' : 'อนามัย'}
+              </h2>
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => setAddModalOpen(false)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-foreground">ชื่อสถานที่ <span className="text-destructive">*</span></label>
+                <input 
+                  type="text" 
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" 
+                  placeholder="เช่น โรงพยาบาลศิริราช"
+                  value={newLocation.name}
+                  onChange={(e) => setNewLocation({...newLocation, name: e.target.value})}
+                  autoFocus
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-foreground">สถานะ MOU</label>
+                <select 
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  value={newLocation.mou}
+                  onChange={(e) => setNewLocation({...newLocation, mou: e.target.value})}
+                >
+                  <option value="">-- ไม่ระบุ --</option>
+                  <option value="มี">มี</option>
+                  <option value="ไม่มี">ไม่มี</option>
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-foreground">วิชาที่ฝึก</label>
+                <input 
+                  type="text" 
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" 
+                  placeholder="เช่น การพยาบาลอนามัยชุมชน"
+                  value={newLocation.subject}
+                  onChange={(e) => setNewLocation({...newLocation, subject: e.target.value})}
+                />
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 border-t px-5 py-4 bg-muted/10">
+              <Button variant="outline" onClick={() => setAddModalOpen(false)}>ยกเลิก</Button>
+              <Button onClick={submitManualAdd} disabled={isSavingManual || !newLocation.name.trim()}>
+                {isSavingManual ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                บันทึกข้อมูล
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ยืนยันลบแหล่งฝึก?</AlertDialogTitle>
+            <AlertDialogDescription>คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูลนี้? ข้อมูลจะถูกลบออกจากฐานข้อมูลทันที</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction onClick={executeDelete} className="bg-destructive">ยืนยันการลบ</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </div>
   );
 }
