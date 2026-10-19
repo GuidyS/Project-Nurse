@@ -59,16 +59,15 @@ export default function PracticeLocationsManage() {
 
   useEffect(() => { fetchData(); }, []);
 
-  // ✅ ฟังก์ชันดาวน์โหลดแพทเทิร์นแบบใหม่ (ดึงไฟล์ .xlsx ที่เราทำสูตรไว้จากโฟลเดอร์ public)
-  const handleDownloadTemplate = () => {
-    const link = document.createElement("a");
-    link.href = "/template_practice_locations.xlsx"; 
-    link.download = "แบบฟอร์มนำเข้าแหล่งฝึกภาคปฏิบัติ.xlsx"; 
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
+ const handleDownloadTemplate = () => {
+  const link = document.createElement("a");
+  // ใช้ import.meta.env.BASE_URL เพื่ออ้างอิง path ที่ถูกต้องของ public folder
+  link.href = `${import.meta.env.BASE_URL}template_practice_locations.xlsx`; 
+  link.download = "แบบฟอร์มนำเข้าแหล่งฝึกภาคปฏิบัติ.xlsx"; 
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
