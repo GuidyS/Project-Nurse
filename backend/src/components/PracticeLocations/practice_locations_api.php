@@ -6,7 +6,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 if (session_status() == PHP_SESSION_NONE) { session_start(); }
 
-// ✅ แก้ไขเส้นทาง (Path) ให้ถอยหลังแค่ 2 ชั้น ( ../../ ) เพราะเราย้ายโฟลเดอร์ขึ้นมา 1 ระดับแล้ว
 require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../config/audit_helper.php';
 
@@ -21,12 +20,10 @@ try {
     $userId = $_SESSION['user_id'];
     $method = $_SERVER['REQUEST_METHOD'];
 
-    // ดึงสิทธิ์ (Role ID) ของ User ปัจจุบัน
     $roleStmt = $db->prepare("SELECT role_id FROM users WHERE user_id = :uid");
     $roleStmt->execute([':uid' => $userId]);
     $roleId = (int)$roleStmt->fetchColumn();
 
-    // [GET] ทุกคน (แอดมินและอาจารย์) สามารถดึงข้อมูลไปดูได้
     if ($method === 'GET') {
         $stmt = $db->query("SELECT * FROM practice_locations ORDER BY id ASC");
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
@@ -34,76 +31,122 @@ try {
         exit;
     }
 
-    // ป้องกัน! ถ้าพยายามบันทึก หรือ ลบ โดยไม่ใช่แอดมิน (role_id != 1) ให้บล็อกทันที
     if (in_array($method, ['POST', 'DELETE']) && $roleId !== 1) {
         http_response_code(403);
         echo json_encode(["status" => "error", "message" => "ปฏิเสธการเข้าถึง: เฉพาะผู้ดูแลระบบเท่านั้นที่มีสิทธิ์จัดการข้อมูลนี้"], JSON_UNESCAPED_UNICODE);
         exit;
     }
 
-    // [POST] รับข้อมูลจาก Excel มาบันทึกลงฐานข้อมูล (แอดมินเท่านั้น)
+    // [POST] สำหรับบันทึกข้อมูล (นำเข้า Excel หรือ เพิ่มข้อมูลด้วยมือ)
     if ($method === 'POST') {
         $input = json_decode(file_get_contents('php://input'), true);
         $locations = $input['locations'] ?? [];
 
-        if (!is_array($locations)) {
+        if (!is_array($locations) || empty($locations)) {
             http_response_code(400);
-            echo json_encode(["status" => "error", "message" => "รูปแบบข้อมูลไม่ถูกต้อง"], JSON_UNESCAPED_UNICODE);
+            echo json_encode(["status" => "error", "message" => "ไม่พบข้อมูลสำหรับบันทึก"], JSON_UNESCAPED_UNICODE);
             exit;
         }
 
         $db->beginTransaction();
         try {
-            // ลบข้อมูลเดิมทิ้งก่อนเพิ่มข้อมูลชุดใหม่จาก Excel
-            $db->exec("DELETE FROM practice_locations");
+            // ✅ 1. ดึงข้อมูลสถานที่เดิมที่มีอยู่แล้วขึ้นมา เพื่อเอามาเช็กซ้ำ
+            $stmtExist = $db->query("SELECT hospital_name, sub_district_hospital, health_center FROM practice_locations");
+            $existingRecords = $stmtExist->fetchAll(PDO::FETCH_ASSOC);
 
-            if (!empty($locations)) {
-                $insertSql = "INSERT INTO practice_locations 
-                    (hospital_name, sub_district_hospital, health_center, mou_status, subject_name, uploaded_by) 
-                    VALUES (:hospital, :sub_district, :health, :mou, :subject, :uid)";
-                $stmt = $db->prepare($insertSql);
+            $existingHospitals = [];
+            $existingSubDistricts = [];
+            $existingHealthCenters = [];
 
-                foreach ($locations as $loc) {
-                    if (empty($loc['hospital_name']) && empty($loc['sub_district_hospital']) && empty($loc['health_center'])) {
-                        continue; 
-                    }
-                    $stmt->execute([
-                        ':hospital'     => $loc['hospital_name'] ?? null,
-                        ':sub_district' => $loc['sub_district_hospital'] ?? null,
-                        ':health'       => $loc['health_center'] ?? null,
-                        ':mou'          => $loc['mou_status'] ?? null,
-                        ':subject'      => $loc['subject_name'] ?? null,
-                        ':uid'          => $userId
-                    ]);
+            foreach ($existingRecords as $row) {
+                if (!empty($row['hospital_name'])) $existingHospitals[] = trim($row['hospital_name']);
+                if (!empty($row['sub_district_hospital'])) $existingSubDistricts[] = trim($row['sub_district_hospital']);
+                if (!empty($row['health_center'])) $existingHealthCenters[] = trim($row['health_center']);
+            }
+
+            $insertSql = "INSERT INTO practice_locations 
+                (hospital_name, sub_district_hospital, health_center, mou_status, subject_name, uploaded_by) 
+                VALUES (:hospital, :sub_district, :health, :mou, :subject, :uid)";
+            $stmt = $db->prepare($insertSql);
+
+            $addedCount = 0;
+            $skippedCount = 0;
+
+            foreach ($locations as $loc) {
+                $hName = isset($loc['hospital_name']) ? trim($loc['hospital_name']) : '';
+                $sName = isset($loc['sub_district_hospital']) ? trim($loc['sub_district_hospital']) : '';
+                $hcName = isset($loc['health_center']) ? trim($loc['health_center']) : '';
+
+                if (empty($hName) && empty($sName) && empty($hcName)) {
+                    continue; 
                 }
+
+                // ✅ 2. เช็กว่าชื่อสถานที่ซ้ำกับที่มีอยู่แล้วหรือไม่
+                $isDuplicate = false;
+                if ($hName !== '' && in_array($hName, $existingHospitals)) $isDuplicate = true;
+                if ($sName !== '' && in_array($sName, $existingSubDistricts)) $isDuplicate = true;
+                if ($hcName !== '' && in_array($hcName, $existingHealthCenters)) $isDuplicate = true;
+
+                if ($isDuplicate) {
+                    $skippedCount++;
+                    continue; // 🚨 ข้ามการทำงาน (ไม่บันทึกลงฐานข้อมูล)
+                }
+
+                // ✅ 3. ถ้าเป็นข้อมูลใหม่ (ไม่ซ้ำ) ให้บันทึกลงฐานข้อมูล
+                $stmt->execute([
+                    ':hospital'     => $hName ?: null,
+                    ':sub_district' => $sName ?: null,
+                    ':health'       => $hcName ?: null,
+                    ':mou'          => $loc['mou_status'] ?? null,
+                    ':subject'      => $loc['subject_name'] ?? null,
+                    ':uid'          => $userId
+                ]);
+                $addedCount++;
+
+                // เอาชื่อที่เพิ่งเพิ่มเข้าไป ใส่ในอาเรย์กันเหนียวไว้เช็กแถวถัดไป (กรณีไฟล์ Excel มีชื่อซ้ำกันเอง)
+                if ($hName !== '') $existingHospitals[] = $hName;
+                if ($sName !== '') $existingSubDistricts[] = $sName;
+                if ($hcName !== '') $existingHealthCenters[] = $hcName;
             }
             
-            // เก็บ Audit Log เมื่อมีการอัปโหลด
-            logAudit($db, $userId, 'update', 'practice_locations', "อัปโหลดอัปเดตข้อมูลแหล่งฝึกภาคปฏิบัติด้วยไฟล์ Excel");
+            if ($addedCount > 0) {
+                logAudit($db, $userId, 'add', 'practice_locations', "เพิ่มข้อมูลแหล่งฝึกภาคปฏิบัติจำนวน {$addedCount} รายการ");
+            }
             $db->commit();
+
+            // ✅ 4. ส่งข้อความแจ้งเตือนกลับไปยังหน้าบ้าน
+            if (count($locations) === 1) {
+                // กรณีเพิ่มข้อมูลทีละรายการ (แบบ Manual)
+                if ($skippedCount > 0) {
+                    echo json_encode(["status" => "error", "message" => "ชื่อสถานที่นี้มีอยู่ในระบบแล้ว (ข้อมูลซ้ำ)"], JSON_UNESCAPED_UNICODE);
+                } else {
+                    echo json_encode(["status" => "success", "message" => "เพิ่มข้อมูลแหล่งฝึกใหม่เรียบร้อยแล้ว"], JSON_UNESCAPED_UNICODE);
+                }
+            } else {
+                // กรณีนำเข้าผ่านไฟล์ Excel
+                $msg = "นำเข้าข้อมูลสำเร็จ! เพิ่มใหม่ {$addedCount} รายการ";
+                if ($skippedCount > 0) {
+                    $msg .= ", ข้ามข้อมูลที่ซ้ำ {$skippedCount} รายการ";
+                }
+                echo json_encode(["status" => "success", "message" => $msg], JSON_UNESCAPED_UNICODE);
+            }
+            exit;
 
         } catch (Throwable $e) {
             if ($db->inTransaction()) { $db->rollBack(); }
             throw $e;
         }
-
-        echo json_encode(["status" => "success", "message" => "บันทึกข้อมูลแหล่งฝึกเรียบร้อยแล้ว"], JSON_UNESCAPED_UNICODE);
-        exit;
     }
 
-    // [DELETE] สำหรับลบข้อมูล (แอดมินเท่านั้น)
     if ($method === 'DELETE') {
+        $id = $_GET['id'] ?? null;
         $action = $_GET['action'] ?? '';
 
-        // กรณีลบข้อมูลทั้งหมด
         if ($action === 'delete_all') {
             $db->beginTransaction();
             try {
                 $db->exec("DELETE FROM practice_locations");
-                
-                // เก็บลง Audit Log
                 logAudit($db, $userId, 'delete', 'practice_locations', "ลบข้อมูลแหล่งฝึกภาคปฏิบัติทั้งหมดในระบบ");
-                
                 $db->commit();
                 echo json_encode(["status" => "success", "message" => "ลบข้อมูลทั้งหมดเรียบร้อยแล้ว"], JSON_UNESCAPED_UNICODE);
                 exit;
@@ -113,30 +156,23 @@ try {
             }
         }
 
-        // กรณีลบทีละรายการ
-        $id = $_GET['id'] ?? null;
         if (!$id) {
             http_response_code(400);
             echo json_encode(["status" => "error", "message" => "ไม่พบรหัสข้อมูลที่ต้องการลบ"], JSON_UNESCAPED_UNICODE);
             exit;
         }
 
-        // ดึงชื่อขึ้นมาก่อนเพื่อเอาไปใส่ใน Audit log
         $stmt = $db->prepare("SELECT hospital_name, sub_district_hospital, health_center FROM practice_locations WHERE id = :id");
         $stmt->execute([':id' => $id]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($row) {
             $locationName = $row['hospital_name'] ?: ($row['sub_district_hospital'] ?: $row['health_center']);
-            
             $db->beginTransaction();
             try {
                 $delStmt = $db->prepare("DELETE FROM practice_locations WHERE id = :id");
                 $delStmt->execute([':id' => $id]);
-                
-                // เก็บลง Audit Log
                 logAudit($db, $userId, 'delete', 'practice_locations', "ลบแหล่งฝึกภาคปฏิบัติ: " . $locationName);
-                
                 $db->commit();
             } catch (Throwable $e) {
                 if ($db->inTransaction()) { $db->rollBack(); }
