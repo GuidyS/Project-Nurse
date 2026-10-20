@@ -1,0 +1,11 @@
+Options -Indexes
+RewriteEngine On
+
+# Only the page router is a public PHP entry point.
+RewriteRule ^(?:components|config|cron|vendor)(?:/|$) - [F,L,NC]
+RewriteRule ^(?!index\.php$).*\.(?:php|phar|phtml|sql|ini|env|log|bak)$ - [F,L,NC]
+RewriteRule ^uploads/imports(?:/|$) - [F,L,NC]
+
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>

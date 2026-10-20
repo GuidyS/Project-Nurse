@@ -1,0 +1,7 @@
+Options -Indexes
+RewriteEngine On
+RewriteRule \.(?:php|phar|phtml|cgi|pl|py|sh|htm|html|svg)$ - [F,L,NC]
+
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>

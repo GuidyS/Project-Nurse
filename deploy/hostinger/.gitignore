@@ -1,0 +1,5 @@
+/output/
+*.zip
+!api-hostinger-fixes-20261020.zip
+*.png
+config.local.php
