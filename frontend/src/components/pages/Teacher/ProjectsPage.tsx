@@ -81,7 +81,6 @@ interface Project {
   budget_spent?: string | number | null;
   budget_note?: string | null;
   result?: string | null;
-  progress?: string | number | null;
   members?: string | number | null;
   member_details?: ProjectMember[];
   member_names?: string[];
@@ -159,10 +158,8 @@ const projectTypeTabs: { value: ProjectTypeFilter; label: string }[] = [
 
 const statusFilterOptions: { value: ProjectStatusFilter; label: string }[] = [
   { value: "all", label: "ทุกสถานะ" },
-  { value: "pending", label: statusLabels.pending },
   { value: "active", label: statusLabels.active },
   { value: "completed", label: statusLabels.completed },
-  { value: "cancelled", label: statusLabels.cancelled },
 ];
 
 const statusClassNames: Record<ProjectStatus, string> = {
@@ -180,6 +177,7 @@ const projectImportTypes: ImportDataTypeOption[] = [
     label: "ข้อมูลโครงการ",
     icon: Upload,
     description: "นำเข้าข้อมูลโครงการจากไฟล์ Excel หรือ CSV",
+    templateColumns: ["project_name_th", "project_name_en", "description", "mapping_json", "responsible_faculty_id", "academic_year"],
   },
 ];
 
@@ -208,7 +206,7 @@ const createInitialFormData = (): ProjectFormData => ({
   academic_year: String(getCurrentAcademicYear()),
   start_date: "",
   end_date: "",
-  status: "pending",
+  status: "active",
   budget_allocated: "",
   budget_spent: "",
   budget_source: "",
@@ -340,12 +338,6 @@ const projectAcademicYear = (project: Project) => project.academic_year ?? proje
 const projectBudgetAllocated = (project: Project) => project.budget_allocated ?? project.budget ?? 0;
 const projectBudgetSpent = (project: Project) => project.budget_spent ?? project.spent ?? 0;
 const projectBudgetNote = (project: Project) => project.budget_note ?? project.result ?? "";
-
-const projectProgress = (project: Project) => {
-  const progress = Number(project.progress ?? 0);
-  if (!Number.isFinite(progress)) return 0;
-  return Math.max(0, Math.min(100, Math.round(progress)));
-};
 
 const projectResponsibleName = (project: Project) => {
   const responsibleName = (project.responsible_name || "").trim();
@@ -1012,12 +1004,6 @@ const ProjectsPage = () => {
       }
     }
 
-    const currentProject = projects.find((project) => project.project_id.toString() === formData.project_id);
-    const currentProgress = Number(currentProject?.progress || 0);
-    if (editMode && formData.status === "completed" && currentProgress < 100) {
-      return `ความคืบหน้าปัจจุบัน ${currentProgress}% ต้องครบ 100% ก่อนเปลี่ยนเป็นเสร็จสิ้น`;
-    }
-
     return null;
   };
 
@@ -1398,7 +1384,10 @@ const ProjectsPage = () => {
                             <Link2 className="h-4 w-4 text-purple-500" /> เชื่อมโยง PLO
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem className="gap-2 text-red-600 focus:bg-red-50" onClick={() => openDeleteConfirm(project.project_id)}>
+                          <DropdownMenuItem
+                            className="gap-2 text-destructive hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive"
+                            onClick={() => openDeleteConfirm(project.project_id)}
+                          >
                             <Trash2 className="h-4 w-4" /> ลบโครงการ
                           </DropdownMenuItem>
                         </>
@@ -1627,10 +1616,8 @@ const ProjectsPage = () => {
                   <SelectValue placeholder="เลือกสถานะ" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="pending">รออนุมัติ</SelectItem>
                   <SelectItem value="active">กำลังดำเนินการ</SelectItem>
                   <SelectItem value="completed">เสร็จสิ้น</SelectItem>
-                  <SelectItem value="cancelled">ไม่อนุมัติ/ยกเลิก</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1720,10 +1707,11 @@ const ProjectsPage = () => {
                   </div>
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="create-project-document-files">แนบไฟล์ PDF / Word / รูปภาพ</Label>
+                  <Label htmlFor="create-project-document-files" className="inline-flex w-fit cursor-pointer items-center rounded-md border px-4 py-2 text-sm hover:bg-muted">เลือกไฟล์ PDF / Word / รูปภาพ</Label>
                   <Input
                     id="create-project-document-files"
                     type="file"
+                    className="sr-only"
                     multiple
                     accept={PROJECT_DOCUMENT_FILE_ACCEPT}
                     onChange={(event) => setCreateDocumentFiles(Array.from(event.target.files || []))}
@@ -2026,10 +2014,11 @@ const ProjectsPage = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="project-document-files">แนบไฟล์ PDF / Word / รูปภาพ</Label>
+              <Label htmlFor="project-document-files" className="inline-flex w-fit cursor-pointer items-center rounded-md border px-4 py-2 text-sm hover:bg-muted">เลือกไฟล์ PDF / Word / รูปภาพ</Label>
               <Input
                 id="project-document-files"
                 type="file"
+                className="sr-only"
                 multiple
                 accept={PROJECT_DOCUMENT_FILE_ACCEPT}
                 onChange={(event) => setUploadFiles(Array.from(event.target.files || []))}

@@ -337,8 +337,23 @@ export default function ResearchSummary() {
         setSaveMessage('ยังไม่ได้บันทึกการแก้ไข');
         return false;
       }
-      setSaveFailed(true);
-      setSaveMessage('ยืนยันการบันทึกไม่สำเร็จ กรุณาโหลดข้อมูลใหม่เพื่อตรวจสอบก่อนทำรายการต่อ');
+      const failureMessage = response?.data?.message || 'บันทึกไม่สำเร็จ';
+      // The request might have reached the server even when its response was lost.
+      // Reconcile with the server before allowing another click, so a retry
+      // cannot accidentally remove a second publication.
+      try {
+        const latest = await api.get<ResearchSummaryResponse>('/index.php?page=get-research-summary');
+        if (latest.data.status !== 'success' || !latest.data.data) throw new Error('Reload failed');
+        setPublications(latest.data.data.publications);
+        setFaculty(latest.data.data.faculty);
+        setYears(latest.data.data.years);
+        setCanManageResearch(latest.data.data.can_manage);
+        setSaveFailed(false);
+        setSaveMessage(`${failureMessage} ตรวจสอบข้อมูลล่าสุดแล้ว สามารถลองอีกครั้งได้`);
+      } catch {
+        setSaveFailed(true);
+        setSaveMessage(`${failureMessage} กรุณาโหลดข้อมูลใหม่เพื่อตรวจสอบก่อนทำรายการต่อ`);
+      }
       return false;
     } finally {
       savingRef.current = false;

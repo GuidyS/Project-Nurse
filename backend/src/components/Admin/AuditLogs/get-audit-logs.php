@@ -26,13 +26,6 @@ if (!isset($_SESSION['user_id'])) {
 try {
     $db = new Connect();
 
-    //  ระบบลบ Log อัตโนมัติ (เก่าเกิน 90 วัน)
-    try {
-        $db->exec("DELETE FROM audit_log WHERE created_at < (NOW() - INTERVAL 90 DAY)");
-    } catch (Exception $cleanupError) {
-        error_log('Audit log cleanup failed: ' . $cleanupError->getMessage());
-    }
-
     //  เตรียม Query ค้นหา "ชื่อ-นามสกุล" จากรหัส (ทั้งนักศึกษาและอาจารย์)
     $stmt_find_name = $db->prepare("
         SELECT fullname FROM (
@@ -58,9 +51,10 @@ try {
     $result = [];
     foreach($logs as $log) {
         
-        $roleStr = 'นักศึกษา';
+        $roleStr = 'ไม่ทราบบทบาท';
         if ($log['role_id'] == 1) $roleStr = 'ผู้ดูแลระบบ';
         else if ($log['role_id'] == 2) $roleStr = 'อาจารย์';
+        else if ($log['role_id'] == 3) $roleStr = 'นักศึกษา';
         else if ($log['role_id'] == 5) $roleStr = 'คณบดี';
 
         // ส่ง Action กลับเป็นคำดั้งเดิมให้ระบบ Frontend แสดงป้ายสี (สร้าง, แก้ไข, ลบ)

@@ -10,6 +10,7 @@ if (!is_array($input)) researchFail(422, 'ข้อมูลไม่ถูก�
 $facultyId = filter_var($input['faculty_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
 $action = $input['action'] ?? '';
 if (!$facultyId || !in_array($action, ['add', 'remove', 'update'], true)) researchFail(422, 'ข้อมูลไม่ถูกต้อง');
+$auditIdLockAcquired = false;
 try {
     $db = new Connect();
     $access = researchAccess($db, (int)$_SESSION['user_id']);
@@ -22,7 +23,10 @@ try {
         $mode = $input['year_mode'] ?? '';
         $kind = $input['kind'] ?? '';
         if (!$year || !in_array($mode, ['academic', 'calendar'], true) || !in_array($kind, ['kpi', 'co_author', 'academic'], true)) researchFail(422, 'ปีหรือประเภทผลงานไม่ถูกต้อง');
-        $date = ($year - 543) . ($mode === 'academic' ? '-04-01' : '-01-01');
+        // โหมดปีการศึกษาใช้วันเปิดภาคการศึกษาที่ 1 ที่ตั้งค่าไว้ (เส้นแบ่งปีการศึกษาของทั้งระบบ)
+        $boundary = academicYearBoundary($db);
+        $academicStart = sprintf('-%02d-%02d', $boundary['month'], $boundary['day']);
+        $date = ($year - 543) . ($mode === 'academic' ? $academicStart : '-01-01');
         $db->beginTransaction();
         $stmt = $db->prepare('INSERT INTO faculty_research (faculty_id, title, publication_year, publication_date, article_type, work_category, funding_type, funding_amount, irb_approved, intellectual_property_status, first_author_id, co_author_ids) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
         $stmt->execute([$facultyId, 'บันทึกจำนวนผลงาน' . ($kind === 'academic' ? 'วิชาการ/ตำรา' : 'วิจัย') . ' ปี ' . $year,
@@ -133,13 +137,33 @@ try {
         }
     }
     // Data and audit must commit together; do not log names or publication titles.
-    $stmt = $db->prepare('INSERT INTO audit_log (user_id, action_type, resource, details, ip_address) VALUES (?, ?, ?, ?, ?)');
-    $stmt->execute([(int)$_SESSION['user_id'], $action === 'add' ? 'create' : ($action === 'update' ? 'update' : 'delete'), 'research_summary',
-        'publication_id=' . $id . '; faculty_id=' . $facultyId, $_SERVER['REMOTE_ADDR'] ?? null]);
+    $auditColumn = $db->query("SHOW COLUMNS FROM audit_log LIKE 'audit_log_id'")->fetch(PDO::FETCH_ASSOC);
+    if (!$auditColumn) throw new RuntimeException('ไม่พบคอลัมน์รหัสประวัติการใช้งาน');
+    $needsExplicitAuditId = !str_contains(strtolower((string)($auditColumn['Extra'] ?? '')), 'auto_increment');
+    $auditParams = [(int)$_SESSION['user_id'], $action === 'add' ? 'create' : ($action === 'update' ? 'update' : 'delete'),
+        'research_summary', 'publication_id=' . $id . '; faculty_id=' . $facultyId, $_SERVER['REMOTE_ADDR'] ?? null];
+    if ($needsExplicitAuditId) {
+        $auditIdLockAcquired = (int)$db->query("SELECT GET_LOCK('nurse_mis_audit_log_id', 10)")->fetchColumn() === 1;
+        if (!$auditIdLockAcquired) throw new RuntimeException('ระบบกำลังบันทึกประวัติการใช้งาน กรุณาลองอีกครั้ง');
+        $nextAuditId = (int)$db->query('SELECT COALESCE(MAX(audit_log_id), 0) FROM audit_log')->fetchColumn() + 1;
+        $stmt = $db->prepare('INSERT INTO audit_log (audit_log_id, user_id, action_type, resource, details, ip_address) VALUES (?, ?, ?, ?, ?, ?)');
+        $stmt->execute(array_merge([$nextAuditId], $auditParams));
+    } else {
+        $stmt = $db->prepare('INSERT INTO audit_log (user_id, action_type, resource, details, ip_address) VALUES (?, ?, ?, ?, ?)');
+        $stmt->execute($auditParams);
+    }
     $data = researchSummaryData($db, true);
     $db->commit();
+    if ($auditIdLockAcquired) {
+        try { $db->query("SELECT RELEASE_LOCK('nurse_mis_audit_log_id')"); } catch (Throwable $ignored) {}
+        $auditIdLockAcquired = false;
+    }
     echo json_encode(['status' => 'success', 'message' => 'บันทึกอัตโนมัติแล้ว', 'data' => $data], JSON_UNESCAPED_UNICODE);
 } catch (Throwable $e) {
     if (isset($db) && $db->inTransaction()) $db->rollBack();
+    if ($auditIdLockAcquired && isset($db)) {
+        try { $db->query("SELECT RELEASE_LOCK('nurse_mis_audit_log_id')"); } catch (Throwable $ignored) {}
+    }
+    error_log('[ResearchSummary save] ' . get_class($e) . ' code=' . $e->getCode());
     researchFail(500, 'ไม่สามารถบันทึกผลงานได้ กรุณาโหลดข้อมูลใหม่ก่อนลองอีกครั้ง');
 }

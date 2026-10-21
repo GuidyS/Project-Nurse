@@ -728,7 +728,7 @@ const NotificationsPage = () => {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="z-10 h-8 w-8 text-destructive hover:bg-primary/15 hover:text-primary"
+                      className="z-10 h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
                       onClick={(e) => {
                         e.stopPropagation(); // 🎯 ดักจับ Event ไม่ให้การกดปุ่ม "ลบ" ทะลุไปเปิดหน้าต่างรายละเอียด
                         openDeleteConfirm(notification.id);

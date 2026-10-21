@@ -53,6 +53,9 @@
             case 'profile':
                 require_once 'components/ProfilePage/get_profile.php';
                 break;
+            case 'manage-faculty-extras':
+                require_once 'components/ProfilePage/manage_faculty_extras.php';
+                break;
 
             // LicenseReminder (ใบประกอบวิชาชีพ: อัปโหลดรูป + แจ้งเตือนใกล้หมดอายุ)
             case 'upload-license-image':
@@ -100,6 +103,10 @@
                 break;
 
             // ตั้งค่าปีการศึกษา / ลบข้อมูลนักศึกษาที่เกินกำหนด (เฉพาะผู้ดูแลระบบ)
+            case 'get-term-settings':
+            case 'save-term-settings':
+                require_once 'components/Admin/AcademicSettings/term_settings_api.php';
+                break;
             case 'get-academic-settings':
             case 'save-academic-settings':
             case 'run-student-purge':
@@ -196,6 +203,9 @@
             case 'send-advisor-message':
                 require_once 'components/Teacher/Advises/send_advisor_message.php';
                 break;
+            case 'save-advisor-status':
+                require_once 'components/Teacher/Advises/save_advisor_status.php';
+                break;
 
             // AdviseNotes
             case 'get-advise-notes':
@@ -217,13 +227,6 @@
                     $compPath = 'components/Teacher/student_competency/get_student_competency.php';
                 }
                 require_once $compPath;
-                break;
-            case 'save-student-competency':
-                $saveCompPath = 'components/Teacher/StudentCompetency/save_student_competency.php';
-                if (!file_exists(__DIR__ . '/' . $saveCompPath)) {
-                    $saveCompPath = 'components/Teacher/student_competency/save_student_competency.php';
-                }
-                require_once $saveCompPath;
                 break;
 
             // AssignStudents (มอบหมายนักศึกษาให้อาจารย์ — เฉพาะผู้ดูแลระบบ)
@@ -280,12 +283,7 @@
             case 'delete-clo':
                 require_once 'components/Teacher/CLOPage/delete_clo.php';
                 break;
-            case 'save-ylo-matrix':
-                require_once 'components/Teacher/CLOPage/save_ylo_matrix.php';
-                break;
-            case 'save-sub-plo-catalog':
-                require_once 'components/Teacher/CLOPage/save_sub_plo_catalog.php';
-                break;
+            // YLO / Sub PLO ย้ายไปกำหนดที่หน้า "ประเมินสมรรถนะหลักแต่ละชั้นปี (YLO)" และ "จัดการหลักสูตร" แล้ว
             case 'migrate-mapping-json-to-tables':
                 require_once 'components/Teacher/CLOPage/migrate_mapping_json_to_tables.php';
                 break;
@@ -411,7 +409,7 @@
 
             // Practical
            case 'practice-locations':
-                require_once 'components/Teacher/Practice/practice_locations_api.php';
+                require_once 'components/PracticeLocations/practice_locations_api.php';
                 break;
                               
             // MyProjects

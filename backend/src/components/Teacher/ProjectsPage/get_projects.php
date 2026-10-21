@@ -50,8 +50,7 @@ try {
             COALESCE(pb.spent, 0) AS budget_spent,
             pb.project_budget_years_id,
             pb.fiscal_year,
-            pb.budget_note,
-            COALESCE(pl.progress, 0) AS progress
+            pb.budget_note
         FROM project p
         LEFT JOIN faculty f ON f.faculty_id = p.responsible_faculty_id
         LEFT JOIN (
@@ -69,11 +68,6 @@ try {
             FROM project_budget_years
             GROUP BY project_id
         ) pb ON pb.project_id = p.project_id
-        LEFT JOIN (
-            SELECT project_id, MAX(actual_percent) AS progress
-            FROM project_progress_logs
-            GROUP BY project_id
-        ) pl ON pl.project_id = p.project_id
     ";
 
     if (!empty($where)) {
@@ -232,7 +226,7 @@ try {
 
     // PROJECT_VIEW already authorizes this catalogue; search must not hide historical filter options.
     $availableYears = $db->query('SELECT DISTINCT academic_year FROM project WHERE academic_year IS NOT NULL')->fetchAll(PDO::FETCH_COLUMN);
-    project_json(["status" => "success", "data" => $projects, "academicYears" => academicYearOptions($availableYears)]);
+    project_json(["status" => "success", "data" => $projects, "academicYears" => academicYearOptions($availableYears, currentAcademicYear(null, $db))]);
 } catch (Exception $e) {
     project_json(["status" => "error", "message" => $e->getMessage()], 500);
 }

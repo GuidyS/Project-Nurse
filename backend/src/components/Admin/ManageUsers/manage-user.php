@@ -5,6 +5,8 @@ require_once __DIR__ . '/../../../config/audit_helper.php';
 require_once __DIR__ . '/user_status_helpers.php';
 require_once __DIR__ . '/../../../config/academic_helper.php';
 require_once __DIR__ . '/../../../config/name_validation.php';
+require_once __DIR__ . '/user-account-import-helper.php';
+require_once __DIR__ . '/admin_role_guard.php';
 header('Access-Control-Allow-Origin: ' . (in_array($_SERVER['HTTP_ORIGIN'] ?? '', ['http://localhost:5173', 'http://127.0.0.1:5173'], true) ? ($_SERVER['HTTP_ORIGIN'] ?? '') : 'http://localhost:5173'));
 header('Vary: Origin');
 header("Access-Control-Allow-Credentials: true");
@@ -22,6 +24,13 @@ try {
     $method = $_SERVER['REQUEST_METHOD'];
 
     if (!isset($_SESSION['user_id'])) throw new Exception("Unauthorized: กรุณาล็อกอินใหม่");
+    $adminRoleStmt = $db->prepare('SELECT role_id FROM users WHERE user_id = ? LIMIT 1');
+    $adminRoleStmt->execute([$_SESSION['user_id']]);
+    if ((int)$adminRoleStmt->fetchColumn() !== 1) {
+        http_response_code(403);
+        echo json_encode(['status' => 'error', 'message' => 'ไม่มีสิทธิ์จัดการผู้ใช้'], JSON_UNESCAPED_UNICODE);
+        exit();
+    }
 
     function hasUploadedFileInput(string $fieldName): bool {
         if (!isset($_FILES[$fieldName])) {
@@ -471,6 +480,30 @@ try {
         $id = $input['user_id'] ?? $input['id'] ?? null;
         if (!$id) throw new Exception("ข้อมูลไม่ครบถ้วน");
 
+        if (($input['action'] ?? '') === 'create_student_account') {
+            $studentId = trim((string)($input['student_id'] ?? ''));
+            if ($studentId === '' || !preg_match('/^[A-Za-z0-9_-]{1,50}$/', $studentId)) {
+                http_response_code(400);
+                echo json_encode(['status' => 'error', 'message' => 'รหัสนักศึกษาไม่ถูกต้อง'], JSON_UNESCAPED_UNICODE);
+                exit();
+            }
+            $candidates = getImportedUserAccountCandidates($db, 'students', [$studentId]);
+            if (!$candidates) {
+                http_response_code(404);
+                echo json_encode(['status' => 'error', 'message' => 'ไม่พบข้อมูลนักศึกษา'], JSON_UNESCAPED_UNICODE);
+                exit();
+            }
+            $summary = createUserAccountsFromRows($db, $candidates, ['student' => 3]);
+            if (($summary['skippedNoBirth'] ?? 0) > 0) {
+                http_response_code(422);
+                echo json_encode(['status' => 'error', 'message' => 'ต้องระบุวันเกิดในข้อมูลนักศึกษาก่อนสร้างบัญชี'], JSON_UNESCAPED_UNICODE);
+                exit();
+            }
+            logAudit($db, $_SESSION['user_id'], 'create', 'users', "สร้างบัญชีนักศึกษาจากข้อมูลที่นำเข้า: {$studentId}");
+            echo json_encode(['status' => 'success', 'message' => buildUserAccountCreationMessage($summary)], JSON_UNESCAPED_UNICODE);
+            exit();
+        }
+
         // ระงับ / เปิดใช้งานบัญชีผู้ใช้
         if (($input['action'] ?? '') === 'toggle_status') {
             $adminStmt = $db->prepare("SELECT role_id FROM users WHERE user_id = ?");
@@ -485,7 +518,8 @@ try {
                 throw new Exception("ไม่สามารถระงับบัญชีของตัวเองได้");
             }
 
-            $u_stmt = $db->prepare("SELECT user_id, username, COALESCE(status, 'active') AS status FROM users WHERE user_id = :id");
+            $db->beginTransaction();
+            $u_stmt = $db->prepare("SELECT user_id, username, role_id, COALESCE(status, 'active') AS status FROM users WHERE user_id = :id FOR UPDATE");
             $u_stmt->execute([':id' => $id]);
             $u_info = $u_stmt->fetch(PDO::FETCH_ASSOC);
             if (!$u_info) throw new Exception("ไม่พบผู้ใช้งานในระบบ");
@@ -495,6 +529,10 @@ try {
                 $newStatus = $requested;
             } else {
                 $newStatus = ($u_info['status'] === 'inactive') ? 'active' : 'inactive';
+            }
+
+            if ((int)$u_info['role_id'] === 1 && $newStatus === 'inactive' && $u_info['status'] === 'active') {
+                assertCanRemoveActiveAdmin($db, (int)$id, (int)$_SESSION['user_id']);
             }
 
             $upd = $db->prepare("UPDATE users SET status = :status WHERE user_id = :id");
@@ -507,6 +545,8 @@ try {
                    "{$actionLabel}บัญชีผู้ใช้ {$u_info['username']} (user_id={$id})",
                    $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'
                ]);
+
+            $db->commit();
 
             echo json_encode([
                 "status" => "success",
@@ -522,6 +562,11 @@ try {
             $u_stmt->execute([':id' => $id]);
             $u_info = $u_stmt->fetch(PDO::FETCH_ASSOC);
             if (!$u_info) throw new Exception("ไม่พบผู้ใช้งานในระบบ");
+            if ((int)$u_info['role_id'] === 3) {
+                http_response_code(403);
+                echo json_encode(['status' => 'error', 'message' => 'เอกสารนักศึกษาแก้ไขได้โดยเจ้าของเท่านั้น'], JSON_UNESCAPED_UNICODE);
+                exit();
+            }
 
             $filePath = ltrim(str_replace('\\', '/', trim((string)($input['file_path'] ?? ''))), '/');
             $field = trim((string)($input['field'] ?? ''));
@@ -621,43 +666,6 @@ try {
             $currentDetails = $currentStmt->fetch(PDO::FETCH_ASSOC);
             if (!$currentDetails) throw new Exception("ไม่พบข้อมูลนักศึกษา");
             $details = array_merge($currentDetails, $details);
-
-            $studentPdfFields = [
-                'student_id_card_file' => ['title' => 'สำเนาบัตรประชาชน', 'type' => 'document'],
-                'student_record_file' => ['title' => 'ระเบียนนักศึกษา', 'type' => 'document'],
-                'student_certificate_file' => ['title' => 'ประกาศนียบัตร/ใบรับรอง', 'type' => 'certificate'],
-            ];
-
-            foreach ($studentPdfFields as $fileField => $meta) {
-                // Handle file uploads if any (legacy compatibility)
-                $uploadedPaths = savePdfUploads($fileField, $u_info['username']);
-                
-                // Add google drive link from pdfLinks if provided
-                if (!empty($input['pdfLinks'][$fileField])) {
-                    $uploadedPaths[] = trim($input['pdfLinks'][$fileField]);
-                }
-
-                if (!empty($uploadedPaths)) {
-                    $uploadedDocuments[$fileField] = $uploadedPaths;
-                }
-
-                foreach ($uploadedPaths as $uploadedPath) {
-                    $portfolioStmt = $db->prepare("
-                        INSERT INTO portfolio (student_id, title, type, description, file_name, file_path, mime_type, file_category)
-                        VALUES (:student_id, :title, :type, :description, :file_name, :file_path, :mime_type, :file_category)
-                    ");
-                    $portfolioStmt->execute([
-                        ':student_id' => $u_info['username'],
-                        ':title' => $meta['title'],
-                        ':type' => $meta['type'],
-                        ':description' => 'อัปโหลดโดยผู้ดูแลระบบจากหน้าจัดการผู้ใช้ (Google Drive Link)',
-                        ':file_name' => str_starts_with($uploadedPath, 'http') ? $meta['title'] : basename($uploadedPath),
-                        ':file_path' => $uploadedPath,
-                        ':mime_type' => str_starts_with($uploadedPath, 'http') ? 'text/uri-list' : 'application/pdf',
-                        ':file_category' => 'document'
-                    ]);
-                }
-            }
 
             // ผู้ดูแลระบบแก้ข้อมูลนักศึกษาได้เฉพาะ "สถานะ" (และเหตุผลของสถานะ) เท่านั้น
             // ข้อมูลอื่นทั้งหมดนักศึกษากรอกเอง หรือระบบคำนวณให้
@@ -778,10 +786,19 @@ try {
     if ($method === 'DELETE') {
         $id = $_GET['id'] ?? null;
         if (!$id) throw new Exception("ไม่พบ ID");
-        $userStmt = $db->prepare("SELECT username, role_id, status FROM users WHERE user_id = :id LIMIT 1");
+        if ((string)$id === (string)$_SESSION['user_id']) {
+            http_response_code(403);
+            echo json_encode(["status" => "error", "message" => "ไม่สามารถลบบัญชีผู้ดูแลระบบของตัวเองได้"], JSON_UNESCAPED_UNICODE);
+            exit();
+        }
+        $db->beginTransaction();
+        $userStmt = $db->prepare("SELECT username, role_id, status FROM users WHERE user_id = :id LIMIT 1 FOR UPDATE");
         $userStmt->execute([':id' => $id]);
         $deletedUser = $userStmt->fetch(PDO::FETCH_ASSOC);
         if (!$deletedUser) throw new Exception("ไม่พบผู้ใช้งานในระบบ");
+        if ((int)$deletedUser['role_id'] === 1) {
+            assertCanRemoveActiveAdmin($db, (int)$id, (int)$_SESSION['user_id']);
+        }
 
         $stmt = $db->prepare("DELETE FROM users WHERE user_id = :id");
         $stmt->execute([':id' => $id]);
@@ -792,11 +809,13 @@ try {
             'users',
             "ลบบัญชีผู้ใช้ {$deletedUser['username']} (user_id={$id}, role_id={$deletedUser['role_id']}, status={$deletedUser['status']})"
         );
+        $db->commit();
         echo json_encode(["status" => "success"]);
         exit();
     }
 
 } catch (Exception $e) {
+    if (isset($db) && $db->inTransaction()) $db->rollBack();
     http_response_code(400);
     echo json_encode(["status" => "error", "message" => $e->getMessage()]);
 }

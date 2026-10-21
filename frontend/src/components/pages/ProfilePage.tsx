@@ -15,11 +15,16 @@ import {
   Loader2,
   Upload,
   BellRing,
+  Trash2,
+  Download,
 } from "lucide-react";
+
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -90,6 +95,9 @@ export default function ProfilePage() {
   const [licensePreviewUrl, setLicensePreviewUrl] = useState("");
   const [licenseFileError, setLicenseFileError] = useState("");
   const licenseInputRef = useRef<HTMLInputElement>(null);
+  const [studentLicenseEvidenceFiles, setStudentLicenseEvidenceFiles] = useState<Record<string, File | null>>({});
+  const [studentLicenseEvidenceErrors, setStudentLicenseEvidenceErrors] = useState<Record<string, string>>({});
+  const studentLicenseEvidenceRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const { toast } = useToast();
 
@@ -139,6 +147,28 @@ export default function ProfilePage() {
     setLicenseFile(file);
   };
 
+  const handleStudentLicenseEvidenceChange = (fieldName: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] ?? null;
+    e.target.value = "";
+    if (!file) return;
+    if (!STUDENT_LICENSE_EVIDENCE_TYPES.includes(file.type)) {
+      setStudentLicenseEvidenceErrors((prev) => ({
+        ...prev,
+        [fieldName]: "รองรับเฉพาะไฟล์ PDF, JPG หรือ PNG",
+      }));
+      return;
+    }
+    if (file.size > STUDENT_LICENSE_EVIDENCE_MAX_BYTES) {
+      setStudentLicenseEvidenceErrors((prev) => ({
+        ...prev,
+        [fieldName]: "ไฟล์หลักฐานต้องมีขนาดไม่เกิน 5 MB",
+      }));
+      return;
+    }
+    setStudentLicenseEvidenceErrors((prev) => ({ ...prev, [fieldName]: "" }));
+    setStudentLicenseEvidenceFiles((prev) => ({ ...prev, [fieldName]: file }));
+  };
+
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
@@ -168,6 +198,17 @@ export default function ProfilePage() {
     setFormData((prev: any) => ({ ...prev, [name]: value }));
   };
 
+  const handleCheckboxChange = (name: string, checked: boolean | "indeterminate") => {
+    setFormData((prev: any) => ({ ...prev, [name]: checked === true ? 1 : 0 }));
+    if (checked !== true) {
+      const item = STUDENT_LICENSE_ITEMS.find((licenseItem) => licenseItem.passedField === name);
+      if (item) {
+        setStudentLicenseEvidenceFiles((prev) => ({ ...prev, [item.fileField]: null }));
+        setStudentLicenseEvidenceErrors((prev) => ({ ...prev, [item.fileField]: "" }));
+      }
+    }
+  };
+
   // ฟังก์ชันคำนวณ BMI อัตโนมัติ
   const calculateBMI = (height?: number | string, weight?: number | string) => {
     if (!height || !weight) return "-";
@@ -189,8 +230,51 @@ export default function ProfilePage() {
         return;
       }
 
+      if (userRole === "student") {
+        for (const item of STUDENT_LICENSE_ITEMS) {
+          if (!isPassedValue(formData[item.passedField])) continue;
+          const hasNewEvidence = Boolean(studentLicenseEvidenceFiles[item.fileField]);
+          const hasExistingEvidence = Boolean(formData[item.pathField] || profileData?.[item.pathField]);
+          if (!hasNewEvidence && !hasExistingEvidence) {
+            toast({
+              title: "กรุณาแนบหลักฐาน",
+              description: `ต้องแนบหลักฐานสำหรับ${item.label}`,
+              variant: "destructive",
+            });
+            return;
+          }
+          if (studentLicenseEvidenceErrors[item.fileField]) {
+            toast({
+              title: "ไฟล์หลักฐานไม่ถูกต้อง",
+              description: studentLicenseEvidenceErrors[item.fileField],
+              variant: "destructive",
+            });
+            return;
+          }
+        }
+      }
+
       setIsSaving(true);
-      const res = await api.post("/index.php?page=profile", formData);
+      const hasStudentLicenseEvidenceFiles =
+        userRole === "student" &&
+        STUDENT_LICENSE_ITEMS.some((item) => Boolean(studentLicenseEvidenceFiles[item.fileField]));
+
+      let res;
+      if (hasStudentLicenseEvidenceFiles) {
+        const payload = new FormData();
+        payload.append("profile", JSON.stringify(formData));
+        for (const item of STUDENT_LICENSE_ITEMS) {
+          const file = studentLicenseEvidenceFiles[item.fileField];
+          if (file) {
+            payload.append(item.fileField, file);
+          }
+        }
+        res = await api.post("/index.php?page=profile", payload, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+      } else {
+        res = await api.post("/index.php?page=profile", formData);
+      }
       if (res.data.status === "success") {
         // บันทึกข้อมูลแล้วค่อยอัปโหลดรูปใบประกอบวิชาชีพ (ถ้าเลือกรูปใหม่)
         if (userRole === "teacher" && licenseFile) {
@@ -214,6 +298,8 @@ export default function ProfilePage() {
         }
         toast({ title: "อัปเดตข้อมูลส่วนตัวเรียบร้อยแล้ว" });
         setEditing(false);
+        setStudentLicenseEvidenceFiles({});
+        setStudentLicenseEvidenceErrors({});
         fetchProfile();
       } else {
         toast({
@@ -279,6 +365,8 @@ export default function ProfilePage() {
               });
               setLicenseFile(null);
               setLicenseFileError(""); 
+              setStudentLicenseEvidenceFiles({});
+              setStudentLicenseEvidenceErrors({});
               setEditing(true); 
             }}
           >
@@ -342,7 +430,9 @@ export default function ProfilePage() {
                   }
                 />
                 <InfoRow icon={<Calendar className="h-4 w-4 text-primary" />} label="วันที่เริ่มปฏิบัติงาน" value={formatThaiDate(profileData.start_work_date)} />
+                <InfoRow icon={<Calendar className="h-4 w-4 text-primary" />} label="วันที่สัญญาจ้าง" value={formatThaiDate(profileData.contract_date)} />
                 <InfoRow icon={<Calendar className="h-4 w-4 text-primary" />} label="วันที่รับตำแหน่งทางวิชาการ" value={formatThaiDate(profileData.academic_position_date)} />
+                <InfoRow icon={<Calendar className="h-4 w-4 text-primary" />} label="วันที่รับตำแหน่ง พตส" value={formatThaiDate(profileData.pts_date)} />
                 <div className="md:col-span-2">
                   <InfoRow icon={<MapPin className="h-4 w-4 text-primary" />} label="ที่อยู่ปัจจุบัน" value={profileData.current_address} />
                 </div>
@@ -350,6 +440,14 @@ export default function ProfilePage() {
                   <LicenseImageRow url={currentLicenseImageUrl} />
                 </div>
                 <PdfDocumentsSection documents={pdfDocuments} />
+
+                <div className="md:col-span-2 border-t border-border pt-6 mt-2">
+                  <WorkloadsSection workloads={profileData.teaching_workloads || []} onUpdate={fetchProfile} />
+                </div>
+                
+                <div className="md:col-span-2 border-t border-border pt-6 mt-2">
+                  <PersonnelDevelopmentsSection developments={profileData.personnel_developments || []} onUpdate={fetchProfile} />
+                </div>
               </>
             ) : (
               <>
@@ -365,6 +463,49 @@ export default function ProfilePage() {
                 <InfoRow icon={<Calendar className="h-4 w-4 text-primary" />} label="ปีการศึกษาที่เข้าศึกษา" value={academicCalculated.entryYear} />
                 <div className="md:col-span-2">
                   <InfoRow icon={<MapPin className="h-4 w-4 text-primary" />} label="ที่อยู่ปัจจุบัน" value={profileData.home_address || profileData.address} />
+                </div>
+
+                <div className="md:col-span-2 border-t border-border pt-6 mt-2">
+                  <div className="flex items-center gap-2 mb-4">
+                    <h3 className="font-semibold text-foreground text-base">ข้อมูลการสอบใบประกอบวิชาชีพ</h3>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {STUDENT_LICENSE_ITEMS.map((item) => {
+                      const passed = isPassedValue(profileData[item.passedField]);
+                      const evidenceUrl = resolveUploadUrl(profileData[item.pathField], apiBaseUrl);
+                      return (
+                        <div key={item.key} className="rounded-lg border border-border bg-muted/20 p-4 space-y-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-start gap-3">
+                              <div className="bg-primary/10 p-2 rounded-full flex items-center justify-center">
+                                <ShieldCheck className="h-4 w-4 text-primary" />
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium text-foreground">{item.label}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {passed ? formatThaiDateTime(profileData[item.dateField]) || "บันทึกแล้ว" : "ยังไม่ได้บันทึก"}
+                                </p>
+                              </div>
+                            </div>
+                            <Badge className={passed ? "bg-success text-success-foreground" : ""} variant={passed ? "default" : "secondary"}>
+                              {passed ? "ผ่าน" : "ยังไม่ผ่าน"}
+                            </Badge>
+                          </div>
+                          {passed && evidenceUrl ? (
+                            <a
+                              href={evidenceUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
+                            >
+                              <FileText className="h-4 w-4" />
+                              {profileData[item.nameField] || "เปิดหลักฐาน"}
+                            </a>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 {/* 👨‍👩‍👧 ส่วนข้อมูลครอบครัว (บิดา-มารดา) */}
@@ -578,7 +719,7 @@ export default function ProfilePage() {
                 </h4>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="nursing_council_no">เลขที่ใบประกอบวิชาชีพ</Label>
+                    <Label htmlFor="nursing_council_no">เลขที่ใบประกอบวิชาชีพสภาการพยาบาล</Label>
                     <Input
                       id="nursing_council_no"
                       name="nursing_council_no"
@@ -601,6 +742,36 @@ export default function ProfilePage() {
                         <LicenseStatusBadge expiry={formData.license_expiry} showRemaining />
                       </div>
                     )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="start_work_date">วันที่เริ่มปฏิบัติงาน</Label>
+                    <Input
+                      id="start_work_date"
+                      name="start_work_date"
+                      type="date"
+                      value={formData.start_work_date || ""}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="contract_date">วันที่สัญญาจ้าง</Label>
+                    <Input
+                      id="contract_date"
+                      name="contract_date"
+                      type="date"
+                      value={formData.contract_date || ""}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="pts_date">วันที่รับตำแหน่ง พตส</Label>
+                    <Input
+                      id="pts_date"
+                      name="pts_date"
+                      type="date"
+                      value={formData.pts_date || ""}
+                      onChange={handleInputChange}
+                    />
                   </div>
 
                   <div className="space-y-2 col-span-2">
@@ -703,11 +874,91 @@ export default function ProfilePage() {
               </div>
             )}
 
+            {/* หมวดที่ 3: ข้อมูลการสอบใบประกอบวิชาชีพ (เฉพาะ Student) */}
+            {userRole === "student" && (
+              <div className="space-y-4">
+                <h4 className="font-semibold text-primary border-b border-border pb-1">
+                  3. ข้อมูลการสอบใบประกอบวิชาชีพ
+                </h4>
+                <div className="grid gap-4">
+                  {STUDENT_LICENSE_ITEMS.map((item) => {
+                    const checked = isPassedValue(formData[item.passedField]);
+                    const existingPath = formData[item.pathField] || profileData?.[item.pathField];
+                    const existingUrl = resolveUploadUrl(existingPath, apiBaseUrl);
+                    const selectedFile = studentLicenseEvidenceFiles[item.fileField];
+                    const evidenceError = studentLicenseEvidenceErrors[item.fileField];
+                    return (
+                      <div key={item.key} className="rounded-lg border border-border p-4 space-y-3">
+                        <div className="flex items-start gap-3">
+                          <Checkbox
+                            id={item.passedField}
+                            checked={checked}
+                            onCheckedChange={(value) => handleCheckboxChange(item.passedField, value)}
+                            disabled={isSaving}
+                          />
+                          <div className="space-y-1">
+                            <Label htmlFor={item.passedField} className="font-medium">
+                              {item.label}
+                            </Label>
+                            <p className="text-xs text-muted-foreground">
+                              เมื่อติ๊กแล้วต้องแนบหลักฐาน ระบบจะบันทึกวันที่ตามเวลาที่กดบันทึกข้อมูล
+                            </p>
+                          </div>
+                        </div>
+
+                        {checked && (
+                          <div className="ml-7 flex flex-wrap items-center gap-3">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => studentLicenseEvidenceRefs.current[item.fileField]?.click()}
+                              disabled={isSaving}
+                            >
+                              <Upload className="mr-2 h-4 w-4" />
+                              {selectedFile || existingUrl ? "เปลี่ยนหลักฐาน" : "แนบหลักฐาน"}
+                            </Button>
+                            <input
+                              ref={(node) => {
+                                studentLicenseEvidenceRefs.current[item.fileField] = node;
+                              }}
+                              type="file"
+                              accept="application/pdf,image/jpeg,image/png"
+                              className="hidden"
+                              onChange={(e) => handleStudentLicenseEvidenceChange(item.fileField, e)}
+                            />
+                            <div className="min-w-0 text-xs text-muted-foreground">
+                              {selectedFile ? (
+                                <p className="truncate">ไฟล์ใหม่: {selectedFile.name}</p>
+                              ) : existingUrl ? (
+                                <a
+                                  href={existingUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-primary hover:underline"
+                                >
+                                  <FileText className="h-3.5 w-3.5" />
+                                  {formData[item.nameField] || "ดูหลักฐานเดิม"}
+                                </a>
+                              ) : (
+                                <p>PDF, JPG หรือ PNG ขนาดไม่เกิน 5 MB</p>
+                              )}
+                              {evidenceError && <p className="text-red-600">{evidenceError}</p>}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* หมวดที่ 3: ข้อมูลครอบครัว (เฉพาะ Student) */}
             {userRole === "student" && (
               <div className="space-y-4">
                 <h4 className="font-semibold text-primary border-b border-border pb-1">
-                  3. ข้อมูลครอบครัว (บิดา-มารดา)
+                  4. ข้อมูลครอบครัว (บิดา-มารดา)
                 </h4>
 
                 {/* ข้อมูลบิดา */}
@@ -844,6 +1095,30 @@ const THAI_MONTHS = [
 
 const LICENSE_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const LICENSE_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+const STUDENT_LICENSE_EVIDENCE_TYPES = ["application/pdf", "image/jpeg", "image/png"];
+const STUDENT_LICENSE_EVIDENCE_MAX_BYTES = 5 * 1024 * 1024;
+const STUDENT_LICENSE_ITEMS = [
+  {
+    key: "first_attempt",
+    label: "ผ่านใบประกอบวิชาชีพครั้งแรก",
+    passedField: "license_first_attempt_passed",
+    dateField: "license_first_attempt_passed_at",
+    pathField: "license_first_attempt_evidence_path",
+    nameField: "license_first_attempt_evidence_name",
+    fileField: "license_first_attempt_evidence",
+  },
+  {
+    key: "within_one_year",
+    label: "ผ่านใบประกอบวิชาชีพภายใน 1 ปี",
+    passedField: "license_within_one_year_passed",
+    dateField: "license_within_one_year_passed_at",
+    pathField: "license_within_one_year_evidence_path",
+    nameField: "license_within_one_year_evidence_name",
+    fileField: "license_within_one_year_evidence",
+  },
+] as const;
+
+const isPassedValue = (value: unknown) => value === true || value === 1 || value === "1" || value === "true";
 
 const resolveUploadUrl = (path: unknown, apiBaseUrl: string) => {
   const raw = String(path ?? "").trim();
@@ -920,6 +1195,14 @@ const formatThaiDate = (value: unknown): string | null => {
 
   const buddhistYear = year < 2400 ? year + 543 : year;
   return `${day} ${THAI_MONTHS[month - 1]} ${buddhistYear}`;
+};
+
+const formatThaiDateTime = (value: unknown): string | null => {
+  const dateText = formatThaiDate(value);
+  if (!dateText) return null;
+  const raw = String(value ?? "");
+  const timeMatch = raw.match(/\b(\d{2}):(\d{2})/);
+  return timeMatch ? `${dateText} ${timeMatch[1]}:${timeMatch[2]} น.` : dateText;
 };
 
 const getWorkStatusBadge = (status?: string | null) => {
@@ -1064,6 +1347,233 @@ const PdfDocumentsSection = ({ documents }: { documents: any[] }) => {
           );
         })}
       </div>
+    </div>
+  );
+};
+
+const WorkloadsSection = ({ workloads, onUpdate }: { workloads: any[], onUpdate: () => void }) => {
+  const [academicYear, setAcademicYear] = useState("");
+  const [term, setTerm] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const { toast } = useToast();
+
+  const handleUpload = async () => {
+    if (!academicYear || !term || !file) {
+      toast({ title: "กรุณากรอกข้อมูลให้ครบถ้วนและเลือกไฟล์", variant: "destructive" });
+      return;
+    }
+    setUploading(true);
+    const formData = new FormData();
+    formData.append("action", "upload-workload");
+    formData.append("academic_year", academicYear);
+    formData.append("term", term);
+    formData.append("file", file);
+    try {
+      const res = await api.post("/index.php?page=manage-faculty-extras", formData, {
+        headers: { "Content-Type": "multipart/form-data" }
+      });
+      if (res.data.status === "success") {
+        toast({ title: "อัปโหลดเรียบร้อยแล้ว" });
+        setAcademicYear("");
+        setTerm("");
+        setFile(null);
+        onUpdate();
+      } else {
+        toast({ title: res.data.message || "เกิดข้อผิดพลาด", variant: "destructive" });
+      }
+    } catch (e: any) {
+      toast({ title: e.response?.data?.message || "เกิดข้อผิดพลาดในการอัปโหลด", variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("ต้องการลบรายการนี้หรือไม่?")) return;
+    try {
+      const formData = new FormData();
+      formData.append("action", "delete-workload");
+      formData.append("id", id);
+      const res = await api.post("/index.php?page=manage-faculty-extras", formData);
+      if (res.data.status === "success") {
+        toast({ title: "ลบเรียบร้อยแล้ว" });
+        onUpdate();
+      }
+    } catch (e) {
+      toast({ title: "เกิดข้อผิดพลาดในการลบ", variant: "destructive" });
+    }
+  };
+
+  const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8080").replace(/\/$/, "");
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 mb-4">
+        <h3 className="font-semibold text-foreground text-base">ภาระงานสอน</h3>
+      </div>
+      <div className="bg-muted/20 p-4 rounded-xl border border-border space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Input placeholder="ปีการศึกษา เช่น 2566" value={academicYear} onChange={(e) => setAcademicYear(e.target.value)} />
+          <Input placeholder="เทอม เช่น 1" value={term} onChange={(e) => setTerm(e.target.value)} />
+          <Input type="file" accept=".xls,.xlsx,.csv,.pdf,.doc,.docx" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+        </div>
+        <Button onClick={handleUpload} disabled={uploading}>
+          {uploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+          อัปโหลดภาระงานสอน
+        </Button>
+      </div>
+      {workloads && workloads.length > 0 && (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>ปีการศึกษา</TableHead>
+              <TableHead>เทอม</TableHead>
+              <TableHead>วันที่อัปโหลด</TableHead>
+              <TableHead className="text-right">จัดการ</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {workloads.map((w: any) => (
+              <TableRow key={w.id}>
+                <TableCell>{w.academic_year}</TableCell>
+                <TableCell>{w.term}</TableCell>
+                <TableCell>{new Date(w.uploaded_at).toLocaleDateString('th-TH')}</TableCell>
+                <TableCell className="text-right flex justify-end gap-2">
+                  <Button variant="outline" size="sm" asChild>
+                    <a href={`${apiBaseUrl}/${w.file_path}`} target="_blank" rel="noopener noreferrer"><Download className="h-4 w-4" /></a>
+                  </Button>
+                  <Button variant="destructive" size="sm" onClick={() => handleDelete(w.id)}><Trash2 className="h-4 w-4" /></Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
+    </div>
+  );
+};
+
+const PersonnelDevelopmentsSection = ({ developments, onUpdate }: { developments: any[], onUpdate: () => void }) => {
+  const [trainingDate, setTrainingDate] = useState("");
+  const [trainingTopic, setTrainingTopic] = useState("");
+  const [learnings, setLearnings] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const { toast } = useToast();
+
+  const handleUpload = async () => {
+    if (!trainingDate || !trainingTopic) {
+      toast({ title: "กรุณากรอกวันที่และหัวข้อการอบรม", variant: "destructive" });
+      return;
+    }
+    setUploading(true);
+    const formData = new FormData();
+    formData.append("action", "add-development");
+    formData.append("training_date", trainingDate);
+    formData.append("training_topic", trainingTopic);
+    formData.append("learnings", learnings);
+    if (file) formData.append("file", file);
+    try {
+      const res = await api.post("/index.php?page=manage-faculty-extras", formData, {
+        headers: { "Content-Type": "multipart/form-data" }
+      });
+      if (res.data.status === "success") {
+        toast({ title: "บันทึกเรียบร้อยแล้ว" });
+        setTrainingDate("");
+        setTrainingTopic("");
+        setLearnings("");
+        setFile(null);
+        onUpdate();
+      } else {
+        toast({ title: res.data.message || "เกิดข้อผิดพลาด", variant: "destructive" });
+      }
+    } catch (e: any) {
+      toast({ title: e.response?.data?.message || "เกิดข้อผิดพลาดในการบันทึก", variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("ต้องการลบรายการนี้หรือไม่?")) return;
+    try {
+      const formData = new FormData();
+      formData.append("action", "delete-development");
+      formData.append("id", id);
+      const res = await api.post("/index.php?page=manage-faculty-extras", formData);
+      if (res.data.status === "success") {
+        toast({ title: "ลบเรียบร้อยแล้ว" });
+        onUpdate();
+      }
+    } catch (e) {
+      toast({ title: "เกิดข้อผิดพลาดในการลบ", variant: "destructive" });
+    }
+  };
+
+  const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8080").replace(/\/$/, "");
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 mb-4">
+        <h3 className="font-semibold text-foreground text-base">การพัฒนาบุคลากร</h3>
+      </div>
+      <div className="bg-muted/20 p-4 rounded-xl border border-border space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>วันที่อบรม</Label>
+            <Input type="date" value={trainingDate} onChange={(e) => setTrainingDate(e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label>หัวข้ออบรม/พัฒนาบุคลากร</Label>
+            <Input placeholder="กรอกหัวข้อ" value={trainingTopic} onChange={(e) => setTrainingTopic(e.target.value)} />
+          </div>
+          <div className="space-y-2 md:col-span-2">
+            <Label>สิ่งที่ได้จากการอบรม</Label>
+            <Textarea placeholder="กรอกรายละเอียด..." value={learnings} onChange={(e) => setLearnings(e.target.value)} rows={2} />
+          </div>
+          <div className="space-y-2 md:col-span-2">
+            <Label>อัปโหลดรูปเกียรติบัตร (ถ้ามี)</Label>
+            <Input type="file" accept=".jpg,.jpeg,.png,.webp,.pdf" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+          </div>
+        </div>
+        <Button onClick={handleUpload} disabled={uploading}>
+          {uploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+          บันทึกการพัฒนาบุคลากร
+        </Button>
+      </div>
+      {developments && developments.length > 0 && (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[120px]">วันที่</TableHead>
+              <TableHead>หัวข้อ</TableHead>
+              <TableHead>สิ่งที่ได้</TableHead>
+              <TableHead className="text-center">เกียรติบัตร</TableHead>
+              <TableHead className="text-right">จัดการ</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {developments.map((d: any) => (
+              <TableRow key={d.id}>
+                <TableCell>{new Date(d.training_date).toLocaleDateString('th-TH')}</TableCell>
+                <TableCell>{d.training_topic}</TableCell>
+                <TableCell className="max-w-[200px] truncate" title={d.learnings}>{d.learnings || "-"}</TableCell>
+                <TableCell className="text-center">
+                  {d.certificate_file ? (
+                    <a href={`${apiBaseUrl}/${d.certificate_file}`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                      เปิดดู
+                    </a>
+                  ) : "-"}
+                </TableCell>
+                <TableCell className="text-right">
+                  <Button variant="destructive" size="sm" onClick={() => handleDelete(d.id)}><Trash2 className="h-4 w-4" /></Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
     </div>
   );
 };

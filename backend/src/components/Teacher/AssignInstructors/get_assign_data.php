@@ -14,6 +14,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit();
 
 try {
     $db = new Connect();
+    if (!isset($_SESSION['user_id'])) {
+        http_response_code(401);
+        echo json_encode(['status' => 'error', 'message' => 'Unauthorized']);
+        exit();
+    }
+    $roleStmt = $db->prepare('SELECT role_id FROM users WHERE user_id = ? LIMIT 1');
+    $roleStmt->execute([$_SESSION['user_id']]);
+    if (!in_array((int)$roleStmt->fetchColumn(), [1, 2], true)) {
+        http_response_code(403);
+        echo json_encode(['status' => 'error', 'message' => 'ไม่มีสิทธิ์ดูข้อมูลการมอบหมายอาจารย์'], JSON_UNESCAPED_UNICODE);
+        exit();
+    }
 
     // 1. ดึงรายชื่ออาจารย์ทั้งหมดมาทำ Lookup
     $sql_faculty = "SELECT faculty_id as id, CONCAT(IFNULL(title,''), ' ', first_name_th, ' ', last_name_th) as name FROM faculty";
@@ -77,10 +89,10 @@ try {
     }
 
     // จำนวนวิชาของอาจารย์แต่ละคน นับเฉพาะวิชาที่แสดงในหน้านี้
-    $listedCodes = array_fill_keys(array_map(static fn(array $s): string => mb_strtolower((string)$s['subject_code']), $subjects), true);
+    $listedCodes = array_fill_keys(array_map(static fn(array $s): string => strtolower((string)$s['subject_code']), $subjects), true);
     $instructorCourseCounts = [];
     foreach ($instructorMap as $code => $fid) {
-        if (!empty($fid) && isset($listedCodes[mb_strtolower((string)$code)])) {
+        if (!empty($fid) && isset($listedCodes[strtolower((string)$code)])) {
             $instructorCourseCounts[$fid] = ($instructorCourseCounts[$fid] ?? 0) + 1;
         }
     }

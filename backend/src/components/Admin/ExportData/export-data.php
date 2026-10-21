@@ -8,6 +8,7 @@ require_once __DIR__ . '/../../../config/audit_helper.php';
 require_once __DIR__ . '/../Approvals/approval-schema.php';
 require_once __DIR__ . '/../../../config/active_curriculum.php';
 require_once __DIR__ . '/../CurriculumCycles/curriculum_cycles_helpers.php';
+require_once __DIR__ . '/../../../config/academic_helper.php';
 
 // นำเข้าเครื่องมือสร้าง Excel
 require_once __DIR__ . '/../../../vendor/autoload.php';
@@ -23,7 +24,12 @@ if (!$data || !isset($data['category'])) {
 }
 
 $category = $data['category'];
-$format = $data['format'] ?? 'csv';
+$format = $data['format'] ?? 'xlsx';
+if ($format !== 'xlsx') {
+    http_response_code(400);
+    echo json_encode(['status' => 'error', 'message' => 'รองรับเฉพาะไฟล์ Excel (.xlsx)'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
 $requestedFields = $data['fields'] ?? [];
 $academicYear = $data['academicYear'] ?? '';
 
@@ -42,13 +48,12 @@ function getExportSchema(): array
         'students' => [
             'table' => 'student',
             'order_by' => 'student_id ASC',
-            'select' => ['student_id', 'title', 'first_name_th', 'last_name_th', 'gender', 'year_level', 'gpa', 'status', 'email', 'phone', 'admission_year'],
+            'select' => ['student_id', 'title', 'first_name_th', 'last_name_th', 'gender', 'year_level', 'status', 'email', 'phone', 'admission_year'],
             'fields' => [
                 'student_id'        => ['label' => 'รหัสนักศึกษา',  'resolve' => fn($r) => $r['student_id']],
                 'full_name_th'      => ['label' => 'ชื่อ-นามสกุล',  'resolve' => $fullNameTh],
                 'gender'            => ['label' => 'เพศ',           'resolve' => fn($r) => $r['gender']],
                 'year_level'        => ['label' => 'ชั้นปี',         'resolve' => fn($r) => $r['year_level']],
-                'gpa'               => ['label' => 'GPA',           'resolve' => fn($r) => $r['gpa']],
                 'status'            => ['label' => 'สถานะ',         'resolve' => fn($r) => $r['status']],
                 'email'             => ['label' => 'อีเมล',         'resolve' => fn($r) => $r['email']],
                 'phone'             => ['label' => 'เบอร์โทร',      'resolve' => fn($r) => $r['phone']],
@@ -85,14 +90,21 @@ function getExportSchema(): array
         'projects' => [
             'table' => 'project',
             'order_by' => 'project_id ASC',
-            'select' => ['project_id', 'project_name_th', 'project_name_en', 'description', 'responsible_faculty_id', 'academic_year'],
+            'select' => ['project_id', 'project_name_th', 'project_name_en', 'description', 'project_type', 'strategy', 'responsible_name', 'academic_year', 'status', 'start_date', 'end_date', 'budget_allocated', 'budget_spent'],
             'fields' => [
                 'project_id'             => ['label' => 'รหัสโครงการ',         'resolve' => fn($r) => $r['project_id']],
                 'project_name_th'        => ['label' => 'ชื่อโครงการ (ไทย)',    'resolve' => fn($r) => $r['project_name_th']],
                 'project_name_en'        => ['label' => 'ชื่อโครงการ (อังกฤษ)', 'resolve' => fn($r) => $r['project_name_en']],
                 'description'            => ['label' => 'รายละเอียด',          'resolve' => fn($r) => $r['description']],
-                'responsible_faculty_id' => ['label' => 'อาจารย์ผู้รับผิดชอบ',  'resolve' => fn($r) => $r['responsible_faculty_id']],
+                'project_type'          => ['label' => 'ประเภทโครงการ',       'resolve' => fn($r) => $r['project_type']],
+                'strategy'              => ['label' => 'ยุทธศาสตร์',          'resolve' => fn($r) => $r['strategy']],
+                'responsible_name'      => ['label' => 'อาจารย์ผู้รับผิดชอบ',  'resolve' => fn($r) => $r['responsible_name']],
                 'academic_year'          => ['label' => 'ปีการศึกษา',          'resolve' => fn($r) => $r['academic_year']],
+                'status'                 => ['label' => 'สถานะ',              'resolve' => fn($r) => $r['status']],
+                'start_date'             => ['label' => 'วันที่เริ่ม',         'resolve' => fn($r) => $r['start_date']],
+                'end_date'               => ['label' => 'วันที่สิ้นสุด',       'resolve' => fn($r) => $r['end_date']],
+                'budget_allocated'       => ['label' => 'งบประมาณ',           'resolve' => fn($r) => $r['budget_allocated']],
+                'budget_spent'           => ['label' => 'ใช้จ่ายจริง',        'resolve' => fn($r) => $r['budget_spent']],
             ],
         ],
     ];
@@ -155,6 +167,23 @@ try {
 
     if ($category === 'courses') {
         [$sql, $params, $curriculum] = exportCoursesQuery($db);
+    } elseif ($category === 'projects') {
+        $sql = "SELECT p.project_id, p.project_name_th, p.project_name_en, p.description,
+                       p.project_type, p.strategy, p.academic_year, p.status, p.start_date, p.end_date,
+                       CONCAT_WS(' ', NULLIF(f.title, ''), NULLIF(f.first_name_th, ''), NULLIF(f.last_name_th, '')) AS responsible_name,
+                       COALESCE(pb.budget_allocated, 0) AS budget_allocated,
+                       COALESCE(pb.budget_spent, 0) AS budget_spent
+                FROM project p
+                LEFT JOIN faculty f ON f.faculty_id = p.responsible_faculty_id
+                LEFT JOIN (SELECT project_id, SUM(COALESCE(budget_allocated, 0)) AS budget_allocated,
+                                  SUM(COALESCE(budget_spent, 0)) AS budget_spent
+                           FROM project_budget_years GROUP BY project_id) pb ON pb.project_id = p.project_id";
+        $params = [];
+        if ($academicYear !== '' && $academicYear !== 'ทั้งหมด') {
+            $sql .= ' WHERE p.academic_year = :year';
+            $params[':year'] = $academicYear;
+        }
+        $sql .= ' ORDER BY p.project_id ASC';
     } else {
         $columns = implode(', ', array_map(fn($c) => "`$c`", $schema['select']));
         $whereClause = "";
@@ -163,9 +192,6 @@ try {
         if ($academicYear !== '' && $academicYear !== 'ทั้งหมด') {
             if ($category === 'students') {
                 $whereClause .= ($whereClause ? " AND " : " WHERE ") . "admission_year = :year";
-                $params[':year'] = $academicYear;
-            } elseif ($category === 'projects') {
-                $whereClause .= ($whereClause ? " AND " : " WHERE ") . "academic_year = :year";
                 $params[':year'] = $academicYear;
             }
         }
@@ -177,6 +203,9 @@ try {
 
     $exportData = [];
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        if ($category === 'students') {
+            $row['year_level'] = calculateRealtimeAcademicInfo($row['student_id'], $row['admission_year'], $db)['year_level'];
+        }
         $line = [];
         foreach ($selectedKeys as $key) {
             $value = $schema['fields'][$key]['resolve']($row);
@@ -194,10 +223,10 @@ try {
 
     $fileSuffix = $curriculum
         ? "_{$curriculum['start_year']}-{$curriculum['end_year']}"
-        : ($academicYear !== '' ? '_' . $academicYear : '');
+        : ($academicYear !== '' && $academicYear !== 'ทั้งหมด' ? '_' . $academicYear : '');
 
     // ส่งออก Excel (.xlsx)
-    if ($format === 'xlsx') {
+    {
         $spreadsheet = new Spreadsheet();
         $sheet = $spreadsheet->getActiveSheet();
 
@@ -227,21 +256,6 @@ try {
 
         $writer = new Xlsx($spreadsheet);
         $writer->save('php://output');
-        exit;
-    }
-    // ส่งออก CSV
-    else {
-        header('Content-Type: text/csv; charset=UTF-8');
-        header('Content-Disposition: attachment; filename="export_' . $category . $fileSuffix . '.csv"');
-
-        $output = fopen('php://output', 'w');
-        fputs($output, "\xEF\xBB\xBF");
-        fputcsv($output, $headers);
-
-        foreach ($exportData as $rowData) {
-            fputcsv($output, $rowData);
-        }
-        fclose($output);
         exit;
     }
 

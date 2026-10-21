@@ -133,3 +133,115 @@ function academicNextPromotionDate(?PDO $db = null): string
     }
     return $thisYear->format('Y-m-d');
 }
+
+/**
+ * ช่วงวันที่ของแต่ละภาคเรียน
+ *
+ * ระบบเดิมมีแต่ "ปีการศึกษา" (เริ่ม 1 เมษายน) กับ "วันตัดรอบเลื่อนชั้นปี"
+ * ยังไม่เคยระบุว่าช่วงวันไหนเป็นภาคเรียนไหน จึงเพิ่มค่าตั้งต้นตามปฏิทินที่คณะใช้
+ * และให้แอดมินแก้ได้ที่หน้า "ตั้งค่าปีการศึกษา"
+ *
+ * เก็บเป็นรูปแบบ MM-DD เพราะใช้ซ้ำได้ทุกปีการศึกษา
+ */
+const ACADEMIC_TERM_DEFAULTS = [
+    1 => ['start' => '08-15', 'end' => '12-31', 'label' => 'ภาคการศึกษาที่ 1'],
+    2 => ['start' => '01-01', 'end' => '05-16', 'label' => 'ภาคการศึกษาที่ 2'],
+    3 => ['start' => '05-17', 'end' => '08-14', 'label' => 'ภาคฤดูร้อน'],
+];
+
+function academicTermSettingKey(int $term, string $edge): string
+{
+    return "academic.term{$term}_{$edge}";
+}
+
+/** แปลง "MM-DD" เป็นเลข 4 หลัก (เช่น 06-01 -> 601) ใช้เทียบช่วงวันได้ตรง ๆ */
+function academicMonthDayValue(string $monthDay): ?int
+{
+    if (!preg_match('/^(\d{2})-(\d{2})$/', trim($monthDay), $m)) {
+        return null;
+    }
+    $month = (int)$m[1];
+    $day = (int)$m[2];
+    if ($month < 1 || $month > 12 || $day < 1 || $day > 31) {
+        return null;
+    }
+    return $month * 100 + $day;
+}
+
+/**
+ * ช่วงวันที่ของทุกภาคเรียน (อ่านจากค่าที่ตั้งไว้ ถ้าไม่มีใช้ค่าเริ่มต้น)
+ *
+ * @return array<int, array{term:int, start:string, end:string, label:string}>
+ */
+function academicTermRanges(?PDO $db = null): array
+{
+    $out = [];
+    foreach (ACADEMIC_TERM_DEFAULTS as $term => $default) {
+        $start = $default['start'];
+        $end = $default['end'];
+        if ($db instanceof PDO) {
+            $start = academicGetSetting($db, academicTermSettingKey($term, 'start'), $default['start']);
+            $end = academicGetSetting($db, academicTermSettingKey($term, 'end'), $default['end']);
+        }
+        if (academicMonthDayValue((string)$start) === null) {
+            $start = $default['start'];
+        }
+        if (academicMonthDayValue((string)$end) === null) {
+            $end = $default['end'];
+        }
+        $out[$term] = [
+            'term' => $term,
+            'start' => (string)$start,
+            'end' => (string)$end,
+            'label' => $default['label'],
+        ];
+    }
+    return $out;
+}
+
+/**
+ * ภาคเรียนปัจจุบันตามวันที่จริง (เวลาไทย)
+ *
+ * ช่วงที่คร่อมปีใหม่ (เช่น 1 พ.ย. – 31 มี.ค.) จะถูกตีความว่าเป็นช่วงเดียวกันอย่างถูกต้อง
+ * และถ้าวันปัจจุบันอยู่หลังปีใหม่ ปีการศึกษายังเป็นปีเดิมเพราะปีการศึกษาเริ่ม 1 เมษายน
+ *
+ * @return array{semester:?int, academic_year:int, label:string, today:string}
+ */
+function academicCurrentTerm(?PDO $db = null, ?DateTimeImmutable $now = null): array
+{
+    $now = ($now ?? new DateTimeImmutable('now'))->setTimezone(new DateTimeZone('Asia/Bangkok'));
+    $today = (int)$now->format('n') * 100 + (int)$now->format('j');
+
+    $ranges = academicTermRanges($db);
+
+    // ปีการศึกษาเริ่มนับที่วันเปิดภาคการศึกษาที่ 1 (เส้นแบ่งเดียวกับทั้งระบบ)
+    // ทำให้ภาคเรียนที่คร่อมปีปฏิทิน เช่น 1 ม.ค. – 16 พ.ค. ยังอยู่ในปีการศึกษาเดียวกันตลอดเทอม
+    $boundary = academicMonthDayValue($ranges[1]['start'] ?? ACADEMIC_TERM_DEFAULTS[1]['start'])
+        ?? academicMonthDayValue(ACADEMIC_TERM_DEFAULTS[1]['start']);
+    $academicYear = (int)$now->format('Y') + 543 - ($today < $boundary ? 1 : 0);
+
+    $semester = null;
+    $label = '';
+    foreach ($ranges as $range) {
+        $start = academicMonthDayValue($range['start']);
+        $end = academicMonthDayValue($range['end']);
+        if ($start === null || $end === null) {
+            continue;
+        }
+        $inRange = $start <= $end
+            ? ($today >= $start && $today <= $end)
+            : ($today >= $start || $today <= $end); // ช่วงที่ข้ามปีใหม่
+        if ($inRange) {
+            $semester = $range['term'];
+            $label = $range['label'];
+            break;
+        }
+    }
+
+    return [
+        'semester' => $semester,
+        'academic_year' => $academicYear,
+        'label' => $label !== '' ? "{$label} ปีการศึกษา {$academicYear}" : "ปีการศึกษา {$academicYear}",
+        'today' => $now->format('Y-m-d'),
+    ];
+}

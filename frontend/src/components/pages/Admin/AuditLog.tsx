@@ -123,9 +123,11 @@ export default function AuditLog() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">ทั้งหมด</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="teacher">อาจารย์</SelectItem>
-                  <SelectItem value="student">นักศึกษา</SelectItem>
+                  <SelectItem value="ผู้ดูแลระบบ">Admin</SelectItem>
+                  <SelectItem value="อาจารย์">อาจารย์</SelectItem>
+                  <SelectItem value="นักศึกษา">นักศึกษา</SelectItem>
+                  <SelectItem value="คณบดี">คณบดี</SelectItem>
+                  <SelectItem value="ไม่ทราบบทบาท">ไม่ทราบบทบาท</SelectItem>
                 </SelectContent>
               </Select>
             </div>

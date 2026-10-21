@@ -16,12 +16,14 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
+import * as XLSX from "xlsx";
 
 export interface ImportDataTypeOption {
   value: string;
   label: string;
   description: string;
   icon?: LucideIcon;
+  templateColumns?: string[];
 }
 
 interface ImportHistory {
@@ -181,6 +183,16 @@ export function ImportDataDialog({
   };
 
   const selectedTypeLabel = importTypes.find((type) => type.value === selectedType)?.label ?? "";
+  const selectedTemplate = importTypes.find((type) => type.value === selectedType)?.templateColumns;
+
+  const downloadTemplate = () => {
+    if (!selectedTemplate?.length) return;
+    const workbook = XLSX.utils.book_new();
+    const sheet = XLSX.utils.aoa_to_sheet([selectedTemplate]);
+    sheet['!cols'] = selectedTemplate.map((header) => ({ wch: Math.max(16, header.length + 2) }));
+    XLSX.utils.book_append_sheet(workbook, sheet, "Template");
+    XLSX.writeFile(workbook, `template_${selectedType}.xlsx`);
+  };
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !isUploading && onOpenChange(nextOpen)}>
@@ -221,6 +233,11 @@ export function ImportDataDialog({
           )}
 
           <div className="space-y-3">
+            {selectedTemplate && (
+              <Button type="button" variant="outline" onClick={downloadTemplate}>
+                <FileSpreadsheet className="mr-2 h-4 w-4" />ดาวน์โหลดแพทเทิร์น
+              </Button>
+            )}
             {importTypes.length === 1 && selectedTypeLabel && (
               <p className="text-sm font-medium text-foreground">{selectedTypeLabel}</p>
             )}

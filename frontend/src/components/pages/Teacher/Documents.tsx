@@ -315,7 +315,7 @@ export default function Documents() {
                           >
                             <Download className="h-4 w-4" />
                           </Button>
-                          <Button variant="outline" size="icon" className="h-8 w-8 hover:bg-red-100 hover:text-red-600 border-red-200" onClick={() => { setDeleteId(doc.id); setIsDeleteOpen(true); }}>
+                          <Button variant="outline" size="icon" className="h-8 w-8 hover:bg-red-100 hover:text-red-600" onClick={() => { setDeleteId(doc.id); setIsDeleteOpen(true); }}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>

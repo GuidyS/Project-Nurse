@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../../../config/audit_helper.php';
+require_once __DIR__ . '/../ManageUsers/admin_role_guard.php';
 
 function ensureApprovalRequestsSchema(PDO $db): void
 {
@@ -248,6 +249,9 @@ function approvalApplyRequest(PDO $db, array $request): void
         error_log("approvalApplyRequest: No automated action required for request_type '{$type}'");
     } catch (Throwable $e) {
         error_log("approvalApplyRequest notice (handled): " . $e->getMessage());
+        if ($type === 'permission_change') {
+            throw $e;
+        }
     }
 }
 
@@ -363,9 +367,19 @@ function approvalApplyPermissionChange(PDO $db, array $payload): void
     }
 
     if (isset($payload['role_id']) && in_array((int)$payload['role_id'], [1, 2, 3], true)) {
+        $newRoleId = (int)$payload['role_id'];
+        $actorUserId = isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null;
+        if ($actorUserId !== null && $targetUserId === $actorUserId) {
+            throw new DomainException('ผู้ดูแลระบบไม่สามารถเปลี่ยน Role ของบัญชีตัวเองได้');
+        }
+        $currentRoleStmt = $db->prepare("SELECT role_id FROM users WHERE user_id = :user_id FOR UPDATE");
+        $currentRoleStmt->execute([':user_id' => $targetUserId]);
+        if ((int)$currentRoleStmt->fetchColumn() === 1 && $newRoleId !== 1) {
+            assertCanRemoveActiveAdmin($db, $targetUserId, $actorUserId);
+        }
         $stmt = $db->prepare("UPDATE users SET role_id = :role_id WHERE user_id = :user_id");
         $stmt->execute([
-            ':role_id' => (int)$payload['role_id'],
+            ':role_id' => $newRoleId,
             ':user_id' => $targetUserId,
         ]);
     }

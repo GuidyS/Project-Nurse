@@ -144,7 +144,7 @@ export default function ProjectLinks() {
         </Button>
         <div>
           <h1 className="app-page-title">เชื่อมโยงผลลัพธ์โครงการ</h1>
-          <p className="app-page-description">จัดการความเชื่อมโยงโครงการกับ PLO, YLO และ CLO</p>
+          <p className="app-page-description">จัดการความเชื่อมโยงโครงการกับ PLO และ CLO</p>
         </div>
       </div>
 
@@ -191,16 +191,6 @@ export default function ProjectLinks() {
                   <div className="flex flex-wrap gap-1.5">
                     {currentLinks.plos.length > 0 ? (
                       currentLinks.plos.map(code => <Badge key={code} variant="secondary">{code}</Badge>)
-                    ) : (
-                      <span className="text-xs text-muted-foreground">ยังไม่มีการเชื่อมโยง</span>
-                    )}
-                  </div>
-                </div>
-                <div className="rounded-lg border p-3">
-                  <h4 className="text-xs font-semibold mb-2 text-muted-foreground">YLO</h4>
-                  <div className="flex flex-wrap gap-1.5">
-                    {currentLinks.ylos.length > 0 ? (
-                      currentLinks.ylos.map(code => <Badge key={code} variant="secondary">{code}</Badge>)
                     ) : (
                       <span className="text-xs text-muted-foreground">ยังไม่มีการเชื่อมโยง</span>
                     )}
@@ -264,28 +254,6 @@ export default function ProjectLinks() {
                               />
                               <label htmlFor={`plo-${plo.code}`} className="text-sm leading-tight cursor-pointer font-medium select-none text-foreground">
                                 {plo.description}
-                              </label>
-                            </div>
-                          ))}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-
-                    {/* YLO Row */}
-                    <TableRow>
-                      <TableCell className="font-bold align-top pt-4">YLO</TableCell>
-                      <TableCell>
-                        <div className="space-y-2">
-                          {ylos.map((ylo) => (
-                            <div key={ylo.code} className="flex items-start space-x-3 p-2 rounded hover:bg-muted/50 transition-colors">
-                              <Checkbox
-                                id={`ylo-${ylo.code}`}
-                                checked={currentLinks.ylos?.includes(ylo.code) || false}
-                                onCheckedChange={(checked) => handleCheckboxChange('ylos', ylo.code, !!checked)}
-                                className="mt-0.5"
-                              />
-                              <label htmlFor={`ylo-${ylo.code}`} className="text-sm leading-tight cursor-pointer font-medium select-none text-foreground">
-                                {ylo.description}
                               </label>
                             </div>
                           ))}

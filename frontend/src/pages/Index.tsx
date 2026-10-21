@@ -13,7 +13,7 @@ import LoginPage from "@/components/pages/Auth/LoginPage";
 import RegisterPage from "@/components/pages/Auth/RegisterPage";
 import Transcript from "@/components/pages/Student/Transcript";
 import Portfolio from "@/components/pages/Student/Portfolio";
-import FiveYearSummary from "@/components/pages/Teacher/FiveYearSummary";
+import FiveYearSummary from "@/components/pages/Teacher/FiveYearSummaryDashboard";
 import Documents from "@/components/pages/Teacher/Documents";
 import AdviseNotes from "@/components/pages/Teacher/AdviseNotes";
 import Advises from "@/components/pages/Teacher/Advises";
@@ -26,12 +26,10 @@ import Performance from "@/components/pages/Teacher/Performance";
 import ScheduleTasks from "@/components/pages/Teacher/ScheduleTasks";
 import ProjectReports from "@/components/pages/Teacher/ProjectReports";
 import ProjectLinks from "@/components/pages/Teacher/ProjectLinks";
-import Approvals from "@/components/pages/Admin/Approvals";
 import AuditLog from "@/components/pages/Admin/AuditLog";
 import ExportData from "@/components/pages/Admin/ExportData";
 import ImportData from "@/components/pages/Admin/ImportData";
 import Reports from "@/components/pages/Admin/Reports";
-import RolesManagement from "@/components/pages/Admin/RolesManagement";
 import UsersManagement from "@/components/pages/Admin/UsersManagement";
 import AssignStudents from "@/components/pages/Admin/AssignStudents";
 import ResearchSummary from "@/components/pages/Teacher/ResearchSummary";
@@ -43,9 +41,10 @@ import StudentVaccinationPage from "@/components/pages/Student/StudentVaccinatio
 import StudentHealthRecordsPage from "@/components/pages/Student/StudentHealthRecordsPage";
 import AdvisorHealthRecordsView from "@/components/pages/Teacher/AdvisorHealthRecordsView";
 import CompetencyItemsManagement from "@/components/pages/Admin/CompetencyItemsManagement";
-import StudentCompetencyView from "@/components/pages/Student/StudentCompetencyView"; 
+import StudentCompetencyView from "@/components/pages/Student/StudentCompetencyView";
 import CurriculumCycles from "@/components/pages/Admin/CurriculumCycles";
-import PracticeLocationsPage from "@/components/pages/Teacher/PracticeLocationsPage";
+import PracticeLocationsManage from "@/components/pages/Admin/PracticeLocationsManage";
+import PracticeLocationsView from "@/components/pages/Teacher/PracticeLocationsView";
 import { getPageFromUrl, navigateToPage } from "@/lib/projectNavigation";
 
 type LoginUserPayload = Record<string, unknown> & {
@@ -177,16 +176,15 @@ const Index = () => {
     if (activeItem === "my-projects") return <MyProjects />;
 
     // 3. 🔒 หมวดสิทธิ์ผู้ดูแลระบบ (Admin - Role 1)
-    const adminPages = ["approvals", "audit-log", "export-data", "import-data", "reports", "roles-management", "users-management", "competency-items-management"];
+    const adminPages = ["audit-log", "export-data", "import-data", "reports", "roles-management", "users-management", "competency-items-management"];
     if (adminPages.includes(activeItem)) {
       if (roleId !== 1 && !(roleId == 2 && positionId == 1)) return <UnauthorizedView />;
       switch (activeItem) {
-        case "approvals": return <Approvals />;                                 //*
         case "audit-log": return <AuditLog />;                                     //*
         case "export-data": return <ExportData />;                                 //*
         case "import-data": return <ImportData />;                                 //*
         case "reports": return <Reports />;
-        case "roles-management": return <RolesManagement />;                       //*
+        case "roles-management": return <UsersManagement />;
         case "users-management": return <UsersManagement />;                       //*
         case "competency-items-management": return <CompetencyItemsManagement />;
       }
@@ -202,6 +200,13 @@ const Index = () => {
     if (activeItem === "curriculum-cycles") {
       if (roleId !== 1) return <UnauthorizedView />;
       return <CurriculumCycles />;
+    }
+
+    // ✅ แทรกระบบหน้าแหล่งฝึกภาคปฏิบัติเข้าไปตรงนี้ (เช็ก Role)
+    if (activeItem === "practice-locations") {
+      if (roleId === 1) return <PracticeLocationsManage />; // Admin ไปหน้าจัดการ
+      if (roleId === 2) return <PracticeLocationsView />;   // Teacher ไปหน้าดู
+      return <UnauthorizedView />;
     }
 
     // 3.2 🔒 หมวดโครงการ — แอดมินจัดการคนเดียวทั้งหมด
@@ -245,7 +250,7 @@ const Index = () => {
       "evidence", "grades", "performance", "practical-students",
       "schedule-tasks", "advise-notes", "advisor-notifications", "advises",
       "students", "students-info", "my-research", "research-summary",
-      "advisor-health-records-view", "practice-locations"
+      "advisor-health-records-view"
     ];
     
     if (teacherPages.includes(activeItem)) {
@@ -270,7 +275,6 @@ const Index = () => {
         case "research-summary": return <ResearchSummary />;
         // หน้ารวม: ข้อมูลวัคซีน / ข้อมูลสุขภาพ / ประเมินสมรรถนะหลัก อยู่ในหน้าเดียว
         case "advisor-health-records-view": return <AdvisorHealthRecordsView />;
-        case "practice-locations": return <PracticeLocationsPage />;
       }
     }
 

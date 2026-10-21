@@ -5,9 +5,9 @@ import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FileText, Download, BarChart3, DollarSign, Filter } from 'lucide-react';
+import { FileText, Download, DollarSign, Filter } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -20,6 +20,12 @@ interface ProjectOption {
   id: number;
   name: string;
   project_type?: ProjectType;
+  description?: string;
+  responsible_faculty_id?: string;
+  academic_year?: string | number;
+  start_date?: string;
+  end_date?: string;
+  status?: string;
 }
 
 type ProjectType = 'academic_service' | 'culture' | 'other' | 'teaching' | 'research' | 'quality_assurance';;
@@ -50,19 +56,12 @@ interface ProjectStats {
   totalBudget: number;
   totalSpent: number;
   remaining: number;
-  progress: number;
 }
 
 interface BudgetRow {
   month: string;
   budget: number;
   spent: number;
-}
-
-interface ProgressRow {
-  week: string;
-  planned: number;
-  actual: number;
 }
 
 export default function ProjectReports() {
@@ -72,9 +71,8 @@ export default function ProjectReports() {
   const [isProjectSearchOpen, setIsProjectSearchOpen] = useState(false);
   const [projectTypeFilter, setProjectTypeFilter] = useState<ProjectTypeFilter>('all');
   
-  const [stats, setStats] = useState<ProjectStats>({ totalBudget: 0, totalSpent: 0, remaining: 0, progress: 0 });
+  const [stats, setStats] = useState<ProjectStats>({ totalBudget: 0, totalSpent: 0, remaining: 0 });
   const [budgetData, setBudgetData] = useState<BudgetRow[]>([]);
-  const [progressData, setProgressData] = useState<ProgressRow[]>([]);
   
   const [loading, setLoading] = useState(true);
   const activeFilterCount = Number(projectTypeFilter !== 'all');
@@ -92,7 +90,6 @@ export default function ProjectReports() {
         setSelectedProject(res.data.selectedProjectId ? res.data.selectedProjectId.toString() : '');
         setStats(res.data.stats);
         setBudgetData(res.data.budgetData);
-        setProgressData(res.data.progressData);
       } else {
         console.error(res.message);
       }
@@ -149,6 +146,8 @@ export default function ProjectReports() {
     : [];
 
   const selectedProjectName = projects.find(p => p.id.toString() === selectedProject)?.name || 'project-report';
+  const selectedProjectDetails = projects.find(p => p.id.toString() === selectedProject);
+  const safeProjectName = selectedProjectName.replace(/[\\/:*?"<>|]/g, '_');
 
   const handleExport = (format: 'excel' | 'pdf') => {
     if (!selectedProject) return;
@@ -156,19 +155,40 @@ export default function ProjectReports() {
     if (format === 'excel') {
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet([
-        { metric: 'totalBudget', value: stats.totalBudget },
-        { metric: 'totalSpent', value: stats.totalSpent },
-        { metric: 'remaining', value: stats.remaining },
-        { metric: 'progress', value: stats.progress },
+        { รายการ: 'ชื่อโครงการ', ข้อมูล: selectedProjectName },
+        { รายการ: 'รหัสโครงการ', ข้อมูล: selectedProject },
+        { รายการ: 'ประเภทโครงการ', ข้อมูล: projectTypeLabels[normalizeProjectType(selectedProjectDetails?.project_type)] },
+        { รายการ: 'รายละเอียด', ข้อมูล: selectedProjectDetails?.description || '' },
+        { รายการ: 'อาจารย์ผู้รับผิดชอบ', ข้อมูล: selectedProjectDetails?.responsible_faculty_id || '' },
+        { รายการ: 'ปีการศึกษา', ข้อมูล: selectedProjectDetails?.academic_year || '' },
+        { รายการ: 'วันที่เริ่ม', ข้อมูล: selectedProjectDetails?.start_date || '' },
+        { รายการ: 'วันที่สิ้นสุด', ข้อมูล: selectedProjectDetails?.end_date || '' },
+        { รายการ: 'สถานะ', ข้อมูล: selectedProjectDetails?.status || '' },
+        { รายการ: 'งบประมาณทั้งหมด', ข้อมูล: stats.totalBudget },
+        { รายการ: 'ใช้จ่ายจริง', ข้อมูล: stats.totalSpent },
+        { รายการ: 'งบประมาณคงเหลือ', ข้อมูล: stats.remaining },
       ]), 'Summary');
-      XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(budgetData), 'Budget');
-      XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(progressData), 'Progress');
-      XLSX.writeFile(workbook, `project-report-${selectedProject}.xlsx`);
+      XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(budgetData.map((row) => ({ ปีงบประมาณ: row.month, งบประมาณ: row.budget, ใช้จริง: row.spent }))), 'Budget');
+      XLSX.writeFile(workbook, `${safeProjectName}.xlsx`);
       return;
     }
 
     const doc = new jsPDF();
-    doc.text(`Project Report: ${selectedProjectName}`, 14, 16);
+    const titleCanvas = document.createElement('canvas');
+    const context = titleCanvas.getContext('2d');
+    if (context) {
+      const title = `รายงานโครงการ: ${selectedProjectName}`;
+      context.font = 'bold 24px Tahoma, sans-serif';
+      titleCanvas.width = Math.max(900, Math.ceil(context.measureText(title).width) + 24);
+      titleCanvas.height = 48;
+      context.font = 'bold 24px Tahoma, sans-serif';
+      context.fillStyle = '#111827';
+      context.fillText(title, 8, 32);
+      const titleWidth = Math.min(180, titleCanvas.width / 5);
+      doc.addImage(titleCanvas.toDataURL('image/png'), 'PNG', 14, 9, titleWidth, titleWidth * titleCanvas.height / titleCanvas.width);
+    } else {
+      doc.text(`Project Report: ${selectedProject}`, 14, 16);
+    }
     autoTable(doc, {
       startY: 24,
       head: [['Metric', 'Value']],
@@ -176,18 +196,13 @@ export default function ProjectReports() {
         ['Budget', formatCurrency(stats.totalBudget)],
         ['Spent', formatCurrency(stats.totalSpent)],
         ['Remaining', formatCurrency(stats.remaining)],
-        ['Progress', `${stats.progress}%`],
       ],
     });
     autoTable(doc, {
       head: [['Period', 'Budget', 'Spent']],
       body: budgetData.map(row => [row.month, formatCurrency(row.budget), formatCurrency(row.spent)]),
     });
-    autoTable(doc, {
-      head: [['Period', 'Planned', 'Actual']],
-      body: progressData.map(row => [row.week, `${row.planned}%`, `${row.actual}%`]),
-    });
-    doc.save(`project-report-${selectedProject}.pdf`);
+    doc.save(`${safeProjectName}.pdf`);
   };
 
   const formatCurrency = (num: number) => {
@@ -328,7 +343,7 @@ export default function ProjectReports() {
         </Card>
 
         {/* การ์ดแสดงตัวเลขสถิติสรุป */}
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-3">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">งบประมาณโครงการ</CardTitle>
@@ -356,19 +371,9 @@ export default function ProjectReports() {
               <div className="text-2xl font-bold text-green-600">฿{formatCurrency(stats.remaining)}</div>
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">ความคืบหน้าภาพรวม</CardTitle>
-              <BarChart3 className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.progress}%</div>
-            </CardContent>
-          </Card>
         </div>
 
-        {/* ส่วนแสดงผลกราฟสองฝั่ง */}
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -395,31 +400,6 @@ export default function ProjectReports() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="h-5 w-5" />
-                ความคืบหน้าโครงการประจำสัปดาห์
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {progressData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={progressData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="week" />
-                    <YAxis domain={[0, 100]} />
-                    <Tooltip formatter={(value) => `${value}%`} />
-                    <Legend />
-                    <Line type="monotone" dataKey="planned" name="แผนการปฏิบัติ" stroke="hsl(var(--primary))" strokeWidth={2} />
-                    <Line type="monotone" dataKey="actual" name="ผลงานจริง" stroke="#22c55e" strokeWidth={2} />
-                  </LineChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-[300px] flex items-center justify-center text-muted-foreground">ไม่มีข้อมูลความคืบหน้าสำหรับโครงการนี้</div>
-              )}
-            </CardContent>
-          </Card>
         </div>
       </div>
     </>

@@ -31,9 +31,13 @@ try {
 
     // 2. ลบไฟล์จริงบนเซิร์ฟเวอร์
     if (!empty($item['file_path'])) {
-        $fullPath = '/var/www/html/' . $item['file_path'];
-        if (file_exists($fullPath)) {
-            unlink($fullPath);
+        $relativePath = str_replace('\\', '/', (string)$item['file_path']);
+        $portfolioDir = realpath(__DIR__ . '/../../../uploads/portfolio');
+        if ($portfolioDir !== false && preg_match('~^uploads/portfolio/[^/]+$~', $relativePath)) {
+            $fullPath = realpath(__DIR__ . '/../../../' . $relativePath);
+            if ($fullPath !== false && dirname($fullPath) === $portfolioDir && is_file($fullPath)) {
+                unlink($fullPath);
+            }
         }
     }
 
