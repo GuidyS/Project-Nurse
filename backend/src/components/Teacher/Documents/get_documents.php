@@ -5,6 +5,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
 require_once __DIR__ . '/../../../config/active_curriculum.php';
 require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/document_access.php';
 
 try {
     if (!isset($_SESSION['user_id'])) {
@@ -14,9 +15,7 @@ try {
     }
 
     $pdo = new Connect();
-    $roleStmt = $pdo->prepare('SELECT role_id FROM users WHERE user_id = :user_id LIMIT 1');
-    $roleStmt->execute([':user_id' => $_SESSION['user_id']]);
-    if (!in_array((int) $roleStmt->fetchColumn(), [1, 2], true)) {
+    if (documentAccessRole($pdo, $_SESSION['user_id']) === null) {
         http_response_code(403);
         echo json_encode(['status' => 'error', 'message' => 'Forbidden']);
         exit();
@@ -39,6 +38,7 @@ try {
     $sql_docs = "SELECT * FROM tqf_documents ORDER BY created_at DESC";
     $stmt_docs = $pdo->query($sql_docs);
     $docs = $stmt_docs->fetchAll(PDO::FETCH_ASSOC);
+    $deleteIdentity = documentAccessDeleteIdentity($pdo, $_SESSION['user_id']);
 
     $all_documents = [];
     foreach ($docs as $doc) {
@@ -59,6 +59,7 @@ try {
             'course' => $doc['subject_code'],
             'academic_year' => $doc['academic_year'],
             'uploadedAt' => substr($doc['created_at'], 0, 10),
+            'canDelete' => documentAccessCanDelete($pdo, $_SESSION['user_id'], $doc, $deleteIdentity),
             'fileUrl' => $fileUrl,
             'downloadUrl' => '/api/index.php?page=download-document&id=' . rawurlencode((string) $doc['id'])
         ];

@@ -283,10 +283,22 @@ function getPloIdMap(PDO $pdo, int $frameworkId): array
     return $map;
 }
 
-function getSubPloIdMap(PDO $pdo, int $frameworkId): array
+/**
+ * แปลงรหัส Sub PLO เป็น id
+ *
+ * รหัสอย่าง "1.1" ซ้ำกันได้ระหว่างชั้นปี (PLO1 ของ YLO1 และ YLO2 ต่างก็มี 1.1)
+ * จึงต้องระบุชั้นปีด้วยทุกครั้งที่รู้ ไม่งั้นจะได้ id ของชั้นปีอื่นมาแทน
+ */
+function getSubPloIdMap(PDO $pdo, int $frameworkId, ?int $yearLevel = null): array
 {
-    $stmt = $pdo->prepare('SELECT id, code FROM curriculum_sub_plo WHERE framework_id = :fid');
-    $stmt->execute([':fid' => $frameworkId]);
+    $sql = 'SELECT id, code FROM curriculum_sub_plo WHERE framework_id = :fid';
+    $params = [':fid' => $frameworkId];
+    if ($yearLevel !== null) {
+        $sql .= ' AND year_level = :yl';
+        $params[':yl'] = $yearLevel;
+    }
+    $stmt = $pdo->prepare($sql . ' ORDER BY id ASC');
+    $stmt->execute($params);
     $map = [];
     foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
         $map[(string)$row['code']] = (int)$row['id'];
@@ -446,7 +458,8 @@ function addCurriculumClo(
     string $subjectCode,
     array $payload,
     array $mappedPlos,
-    array $subPlos
+    array $subPlos,
+    ?array $subPloIdMap = null
 ): int {
     ensureSubjectMeta($pdo, $frameworkId, $subjectCode);
     $sortStmt = $pdo->prepare(
@@ -478,7 +491,7 @@ function addCurriculumClo(
         $mappedPlos,
         $subPlos,
         getPloIdMap($pdo, $frameworkId),
-        getSubPloIdMap($pdo, $frameworkId),
+        $subPloIdMap ?? getSubPloIdMap($pdo, $frameworkId),
         $payload['plo_weights'] ?? []
     );
     return $cloId;
@@ -491,7 +504,8 @@ function updateCurriculumClo(
     array $payload,
     array $mappedPlos,
     array $subPlos,
-    ?string $subjectCode = null
+    ?string $subjectCode = null,
+    ?array $subPloIdMap = null
 ): bool {
     $sql = 'SELECT id, subject_code FROM curriculum_clo WHERE id = :id AND framework_id = :fid';
     $params = [':id' => $cloId, ':fid' => $frameworkId];
@@ -526,7 +540,7 @@ function updateCurriculumClo(
         $mappedPlos,
         $subPlos,
         getPloIdMap($pdo, $frameworkId),
-        getSubPloIdMap($pdo, $frameworkId),
+        $subPloIdMap ?? getSubPloIdMap($pdo, $frameworkId),
         $payload['plo_weights'] ?? []
     );
     return true;

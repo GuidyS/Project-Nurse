@@ -651,7 +651,7 @@ export default function UsersManagement() {
                 <ReadOnlyField label="อีเมล" value={detailForm.email} />
                 <ReadOnlyField label="เบอร์โทรศัพท์" value={detailForm.phone} />
 
-                <ReadOnlyField label="ปีที่รับเข้าศึกษา" value={detailForm.admission_year} note="กำหนดจากรหัสนักศึกษา แก้ไขไม่ได้" />
+                <ReadOnlyField label="ปีที่รับเข้าศึกษา" value={detailForm.admission_year} note="ใช้ปีที่บันทึกไว้ และใช้รหัสนักศึกษาเมื่อไม่มีข้อมูลปีเข้าศึกษา" />
                 <ReadOnlyField
                   label="ชั้นปี"
                   value={detailForm.year_level}

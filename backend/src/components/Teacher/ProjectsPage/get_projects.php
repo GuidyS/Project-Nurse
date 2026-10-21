@@ -21,8 +21,11 @@ try {
     }
 
     if ($search !== '') {
-        $where[] = '(p.project_name_th LIKE :search OR p.project_name_en LIKE :search)';
-        $params[':search'] = "%{$search}%";
+        $where[] = '(p.project_name_th LIKE :search_th OR p.project_name_en LIKE :search_en
+            OR CONCAT_WS(\' \', f.first_name_th, f.last_name_th) LIKE :search_faculty)';
+        $params[':search_th'] = "%{$search}%";
+        $params[':search_en'] = "%{$search}%";
+        $params[':search_faculty'] = "%{$search}%";
     }
 
     $sql = "

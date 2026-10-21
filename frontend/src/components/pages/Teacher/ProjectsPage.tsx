@@ -428,6 +428,7 @@ const ProjectsPage = () => {
   const [isDeletingDocument, setIsDeletingDocument] = useState(false);
   const [formData, setFormData] = useState<ProjectFormData>(() => createInitialFormData());
   const [facultyOptions, setFacultyOptions] = useState<FacultyOption[]>([]);
+  const [responsibleSearch, setResponsibleSearch] = useState("");
   const [memberSearch, setMemberSearch] = useState("");
   const currentUser = getCurrentUser();
   const canManageProjects = Number(currentUser?.role_id || 0) === 1;
@@ -1165,6 +1166,10 @@ const ProjectsPage = () => {
   };
 
   const normalizedMemberSearch = memberSearch.trim().toLowerCase();
+  const normalizedResponsibleSearch = responsibleSearch.trim().toLocaleLowerCase("th-TH");
+  const filteredResponsibleFacultyOptions = facultyOptions.filter((faculty) =>
+    `${faculty.name} ${faculty.faculty_id} ${faculty.email || ""}`
+      .toLocaleLowerCase("th-TH").includes(normalizedResponsibleSearch));
   const responsibleFacultyId = Number(formData.responsible_faculty_id || 0);
   const filteredFacultyOptions = facultyOptions.filter((faculty) => {
     const haystack = `${faculty.name} ${faculty.faculty_id} ${faculty.email || ""}`.toLowerCase();
@@ -1517,7 +1522,15 @@ const ProjectsPage = () => {
                   <SelectValue placeholder="เลือกผู้ดำเนินโครงการ" />
                 </SelectTrigger>
                 <SelectContent className="overflow-y-auto [&_[data-radix-select-viewport]]:!h-auto [&_[data-radix-select-viewport]]:max-h-72 [&_[data-radix-select-viewport]]:overflow-y-auto">
-                  {facultyOptions.map((faculty) => (
+                  <Input
+                    value={responsibleSearch}
+                    onChange={(event) => setResponsibleSearch(event.target.value)}
+                    onKeyDown={(event) => event.stopPropagation()}
+                    placeholder="ค้นหาชื่อหรือรหัสอาจารย์"
+                    className="mb-2"
+                  />
+                  {filteredResponsibleFacultyOptions.length === 0 && <p className="px-2 py-2 text-sm text-muted-foreground">ไม่พบรายชื่ออาจารย์</p>}
+                  {filteredResponsibleFacultyOptions.map((faculty) => (
                     <SelectItem key={faculty.faculty_id} value={String(faculty.faculty_id)}>
                       {faculty.name}
                     </SelectItem>

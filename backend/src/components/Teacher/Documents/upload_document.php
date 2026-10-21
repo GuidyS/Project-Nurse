@@ -7,15 +7,26 @@ if (session_status() === PHP_SESSION_NONE) {
 require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../config/academic_calendar.php';
 require_once __DIR__ . '/../../../config/audit_helper.php'; // นำเข้า Audit Helper
-
-$pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
+require_once __DIR__ . '/document_access.php';
 
 try {
+    if (empty($_SESSION['user_id'])) {
+        http_response_code(401);
+        echo json_encode(['status' => 'error', 'message' => 'Unauthorized']);
+        exit;
+    }
+    $pdo = new Connect();
     $input = json_decode(file_get_contents('php://input'), true);
 
-    if (!empty($input['name']) && !empty($input['course']) && !empty($input['type']) && !empty($input['google_drive_link'])) {
-        $courseCode = $input['course'];
-        $name = $input['name'];
+    if (!empty($input['course']) && !empty($input['type']) && !empty($input['google_drive_link'])) {
+        $courseCode = trim((string)$input['course']);
+        if (documentAccessRole($pdo, $_SESSION['user_id']) === null) {
+            http_response_code(403);
+            echo json_encode(['status' => 'error', 'message' => 'Forbidden']);
+            exit;
+        }
+        $name = trim((string)($input['name'] ?? ''));
+        if ($name === '') $name = trim((string)$input['type']) . ' - ' . $courseCode;
         $type = $input['type']; // e.g. 'มคอ.3'
         $academicYear = $input['academic_year'] ?? currentAcademicYear(null, $pdo);
         if (!is_scalar($academicYear) || !preg_match('/^\d{4}$/', (string)$academicYear) || (int)$academicYear < 2500 || (int)$academicYear > 2700) {
@@ -24,7 +35,12 @@ try {
             exit;
         }
         $semester = $input['semester'] ?? 1;
-        $googleDriveLink = trim($input['google_drive_link']);
+        $googleDriveLink = trim((string)$input['google_drive_link']);
+        if (!filter_var($googleDriveLink, FILTER_VALIDATE_URL) || !in_array(parse_url($googleDriveLink, PHP_URL_SCHEME), ['https', 'http'], true)) {
+            http_response_code(422);
+            echo json_encode(['status' => 'error', 'message' => 'ลิงก์เอกสารไม่ถูกต้อง'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
 
         // ชื่อวิชาตามหลักสูตรที่ใช้งานก่อน แล้วค่อยถอยไปใช้ตาราง subject
         require_once __DIR__ . '/../../../config/active_curriculum.php';
@@ -35,21 +51,14 @@ try {
             $stmt->execute([':code' => $courseCode]);
             $subjectName = $stmt->fetchColumn() ?: '';
         }
-
-        $teacherName = $_SESSION['username'] ?? '';
-        if (!empty($_SESSION['user_id'])) {
-            $teacherStmt = $pdo->prepare("
-                SELECT TRIM(CONCAT(COALESCE(title, ''), COALESCE(first_name_th, ''), ' ', COALESCE(last_name_th, ''))) AS full_name
-                FROM faculty
-                WHERE user_id = :user_id
-                LIMIT 1
-            ");
-            $teacherStmt->execute([':user_id' => $_SESSION['user_id']]);
-            $resolvedTeacherName = trim((string) ($teacherStmt->fetchColumn() ?: ''));
-            if ($resolvedTeacherName !== '') {
-                $teacherName = $resolvedTeacherName;
-            }
+        if ($subjectName === '') {
+            http_response_code(404);
+            echo json_encode(['status' => 'error', 'message' => 'ไม่พบรายวิชา'], JSON_UNESCAPED_UNICODE);
+            exit;
         }
+
+        // Store a stable owner identifier so teachers can delete only their own entries.
+        $teacherName = cloAccessFacultyId($pdo, $_SESSION['user_id']) ?? '';
         
         $insertSql = "INSERT INTO tqf_documents 
             (subject_code, subject_name, tqf_type, academic_year, semester, responsible_teacher, file_name, file_path) 
@@ -83,6 +92,8 @@ try {
     } else {
         echo json_encode(['status' => 'error', 'message' => 'ข้อมูลไม่ครบถ้วน']);
     }
-} catch (Exception $e) {
-    echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+} catch (Throwable $e) {
+    error_log('upload-document failed: ' . $e->getMessage());
+    http_response_code(500);
+    echo json_encode(['status' => 'error', 'message' => 'ไม่สามารถบันทึกเอกสารได้'], JSON_UNESCAPED_UNICODE);
 }

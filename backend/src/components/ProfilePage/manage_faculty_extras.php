@@ -23,23 +23,45 @@ if (!$user) {
 }
 
 $facultyId = $user['username'];
-$action = $_GET['action'] ?? '';
+$action = $_POST['action'] ?? $_GET['action'] ?? '';
+$safeFacultyId = preg_replace('/[^A-Za-z0-9_-]/', '_', (string)$facultyId);
+
+function facultyExtrasLocalFile(string $path): ?string
+{
+    $uploadsRoot = realpath(__DIR__ . '/../../uploads');
+    $file = realpath(__DIR__ . '/../../' . ltrim($path, '/\\'));
+    return $uploadsRoot !== false && $file !== false
+        && str_starts_with($file, $uploadsRoot . DIRECTORY_SEPARATOR)
+        && is_file($file) ? $file : null;
+}
 
 try {
     if ($action === 'upload-workload') {
-        if (!isset($_FILES['file'])) throw new Exception("No file uploaded");
+        if (!isset($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) throw new Exception("ไม่สามารถรับไฟล์ที่อัปโหลดได้");
         $academicYear = $_POST['academic_year'] ?? '';
         $term = $_POST['term'] ?? '';
-        if (!$academicYear || !$term) throw new Exception("Missing academic_year or term");
+        if (!preg_match('/^25\d{2}$/', (string)$academicYear) || !in_array((string)$term, ['1', '2', '3'], true)) throw new Exception("ปีการศึกษาหรือภาคเรียนไม่ถูกต้อง");
 
         $file = $_FILES['file'];
         $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-        if (!in_array($ext, ['xls', 'xlsx', 'csv', 'pdf', 'doc', 'docx'])) {
+        if (!in_array($ext, ['xls', 'xlsx', 'csv', 'pdf', 'doc', 'docx'], true)
+            || $file['size'] < 1 || $file['size'] > 10 * 1024 * 1024
+            || !is_uploaded_file($file['tmp_name'])) {
             throw new Exception("Invalid file type");
         }
+        $mime = (new finfo(FILEINFO_MIME_TYPE))->file($file['tmp_name']);
+        $allowedMime = [
+            'xls' => ['application/vnd.ms-excel', 'application/octet-stream'],
+            'xlsx' => ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/zip'],
+            'csv' => ['text/plain', 'text/csv', 'application/vnd.ms-excel'],
+            'pdf' => ['application/pdf'],
+            'doc' => ['application/msword', 'application/octet-stream'],
+            'docx' => ['application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/zip'],
+        ];
+        if (!in_array($mime, $allowedMime[$ext], true)) throw new Exception('ชนิดไฟล์ไม่ตรงกับนามสกุล');
 
-        $uploadDir = __DIR__ . '/../../uploads/faculty-extras/' . $facultyId . '/';
-        if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
+        $uploadDir = __DIR__ . '/../../uploads/faculty-extras/' . $safeFacultyId . '/';
+        if (!is_dir($uploadDir) && !mkdir($uploadDir, 0750, true)) throw new Exception('ไม่สามารถสร้างที่เก็บไฟล์ได้');
         
         $filename = uniqid('wl_') . '.' . $ext;
         $dest = $uploadDir . $filename;
@@ -47,7 +69,7 @@ try {
             throw new Exception("Failed to save file");
         }
         
-        $dbPath = 'uploads/faculty-extras/' . $facultyId . '/' . $filename;
+        $dbPath = 'uploads/faculty-extras/' . $safeFacultyId . '/' . $filename;
 
         $stmt = $db->prepare("INSERT INTO faculty_teaching_workloads (faculty_id, academic_year, term, file_path) VALUES (?, ?, ?, ?)");
         $stmt->execute([$facultyId, $academicYear, $term, $dbPath]);
@@ -60,8 +82,8 @@ try {
         $stmt->execute([$id, $facultyId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         if ($row) {
-            $fullPath = __DIR__ . '/../../' . $row['file_path'];
-            if (file_exists($fullPath)) unlink($fullPath);
+            $fullPath = facultyExtrasLocalFile((string)$row['file_path']);
+            if ($fullPath !== null) unlink($fullPath);
             $db->prepare("DELETE FROM faculty_teaching_workloads WHERE id = ?")->execute([$id]);
         }
         echo json_encode(["status" => "success"]);
@@ -76,17 +98,25 @@ try {
         if (isset($_FILES['file']) && $_FILES['file']['error'] === 0) {
             $file = $_FILES['file'];
             $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-            if (!in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'pdf'])) {
+            if (!in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'pdf'], true)
+                || $file['size'] < 1 || $file['size'] > 10 * 1024 * 1024
+                || !is_uploaded_file($file['tmp_name'])) {
                 throw new Exception("Invalid file type for certificate");
             }
-            $uploadDir = __DIR__ . '/../../uploads/faculty-extras/' . $facultyId . '/';
-            if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
+            $mime = (new finfo(FILEINFO_MIME_TYPE))->file($file['tmp_name']);
+            $certificateMimes = ['jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp', 'pdf' => 'application/pdf'];
+            if ($mime !== $certificateMimes[$ext]) {
+                throw new Exception('ชนิดไฟล์หลักฐานไม่ถูกต้อง');
+            }
+            $uploadDir = __DIR__ . '/../../uploads/faculty-extras/' . $safeFacultyId . '/';
+            if (!is_dir($uploadDir) && !mkdir($uploadDir, 0750, true)) throw new Exception('ไม่สามารถสร้างที่เก็บไฟล์ได้');
             
             $filename = uniqid('cert_') . '.' . $ext;
             $dest = $uploadDir . $filename;
-            if (move_uploaded_file($file['tmp_name'], $dest)) {
-                $dbPath = 'uploads/faculty-extras/' . $facultyId . '/' . $filename;
-            }
+            if (!move_uploaded_file($file['tmp_name'], $dest)) throw new Exception('ไม่สามารถบันทึกไฟล์หลักฐานได้');
+            $dbPath = 'uploads/faculty-extras/' . $safeFacultyId . '/' . $filename;
+        } elseif (isset($_FILES['file']) && $_FILES['file']['error'] !== UPLOAD_ERR_NO_FILE) {
+            throw new Exception('ไม่สามารถรับไฟล์หลักฐานที่อัปโหลดได้');
         }
 
         $stmt = $db->prepare("INSERT INTO faculty_personnel_development (faculty_id, training_date, training_topic, learnings, certificate_file) VALUES (?, ?, ?, ?, ?)");
@@ -100,8 +130,8 @@ try {
         $stmt->execute([$id, $facultyId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         if ($row && $row['certificate_file']) {
-            $fullPath = __DIR__ . '/../../' . $row['certificate_file'];
-            if (file_exists($fullPath)) unlink($fullPath);
+            $fullPath = facultyExtrasLocalFile((string)$row['certificate_file']);
+            if ($fullPath !== null) unlink($fullPath);
         }
         $db->prepare("DELETE FROM faculty_personnel_development WHERE id = ? AND faculty_id = ?")->execute([$id, $facultyId]);
         echo json_encode(["status" => "success"]);
@@ -109,6 +139,10 @@ try {
     else {
         throw new Exception("Invalid action");
     }
+} catch (PDOException $e) {
+    error_log('manage-faculty-extras database error: ' . $e->getCode());
+    http_response_code(500);
+    echo json_encode(['status' => 'error', 'message' => 'ไม่สามารถบันทึกข้อมูลได้'], JSON_UNESCAPED_UNICODE);
 } catch (Exception $e) {
     http_response_code(400);
     echo json_encode(["status" => "error", "message" => $e->getMessage()], JSON_UNESCAPED_UNICODE);

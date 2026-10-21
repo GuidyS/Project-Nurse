@@ -19,6 +19,9 @@ try {
     $stmt = $db->prepare('SELECT faculty_id FROM faculty WHERE faculty_id = ?');
     $stmt->execute([$facultyId]);
     if (!$stmt->fetchColumn()) researchFail(422, 'ไม่พบอาจารย์');
+    // academicEnsureSettingsTable issues CREATE TABLE IF NOT EXISTS, which implicitly
+    // commits MySQL transactions. Run it before add, remove, or update begins one.
+    academicEnsureSettingsTable($db);
     if ($action === 'add') {
         $year = filter_var($input['year'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 2500, 'max_range' => 2700]]);
         $mode = $input['year_mode'] ?? '';
@@ -183,6 +186,9 @@ try {
     if ($researchIdLockAcquired && isset($db)) {
         try { $db->query("SELECT RELEASE_LOCK('nurse_mis_research_id')"); } catch (Throwable $ignored) {}
     }
-    error_log('[ResearchSummary save] ' . get_class($e) . ' code=' . $e->getCode());
+    $sqlState = $e instanceof PDOException ? ($e->errorInfo[0] ?? (string)$e->getCode()) : (string)$e->getCode();
+    $driverCode = $e instanceof PDOException ? ($e->errorInfo[1] ?? 'n/a') : 'n/a';
+    error_log('[ResearchSummary save] action=' . $action . ' class=' . get_class($e)
+        . ' sqlstate=' . $sqlState . ' driver=' . $driverCode . ' line=' . $e->getLine());
     researchFail(500, 'ไม่สามารถบันทึกผลงานได้ กรุณาโหลดข้อมูลใหม่ก่อนลองอีกครั้ง');
 }

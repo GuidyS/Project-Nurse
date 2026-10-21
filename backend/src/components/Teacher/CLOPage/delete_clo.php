@@ -6,8 +6,9 @@ if (session_status() === PHP_SESSION_NONE) {
 require_once __DIR__ . '/../../../config/audit_helper.php';
 require_once __DIR__ . '/curriculum_repository.php';
 require_once __DIR__ . '/clo_access_helpers.php';
+require_once __DIR__ . '/../../../config/config.php';
 
-$pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
+$pdo = new Connect();
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 $input = json_decode(file_get_contents("php://input"), true);
 
