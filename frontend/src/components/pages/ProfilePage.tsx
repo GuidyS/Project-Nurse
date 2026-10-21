@@ -1363,6 +1363,11 @@ const WorkloadsSection = ({ workloads, onUpdate }: { workloads: any[], onUpdate:
       toast({ title: "กรุณากรอกข้อมูลให้ครบถ้วนและเลือกไฟล์", variant: "destructive" });
       return;
     }
+    const termNum = parseInt(term, 10);
+    if (isNaN(termNum) || termNum < 1 || termNum > 3) {
+      toast({ title: "เทอมต้องเป็น 1, 2 หรือ 3 เท่านั้น", variant: "destructive" });
+      return;
+    }
     setUploading(true);
     const formData = new FormData();
     formData.append("action", "upload-workload");
@@ -1415,7 +1420,16 @@ const WorkloadsSection = ({ workloads, onUpdate }: { workloads: any[], onUpdate:
       <div className="bg-muted/20 p-4 rounded-xl border border-border space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Input placeholder="ปีการศึกษา เช่น 2566" value={academicYear} onChange={(e) => setAcademicYear(e.target.value)} />
-          <Input placeholder="เทอม เช่น 1" value={term} onChange={(e) => setTerm(e.target.value)} />
+          <Select value={term} onValueChange={setTerm}>
+            <SelectTrigger>
+              <SelectValue placeholder="เลือกเทอม (1, 2, 3)" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1">ภาคเรียนที่ 1</SelectItem>
+              <SelectItem value="2">ภาคเรียนที่ 2</SelectItem>
+              <SelectItem value="3">ภาคเรียนที่ 3 (ภาคฤดูร้อน)</SelectItem>
+            </SelectContent>
+          </Select>
           <Input type="file" accept=".xls,.xlsx,.csv,.pdf,.doc,.docx" onChange={(e) => setFile(e.target.files?.[0] || null)} />
         </div>
         <Button onClick={handleUpload} disabled={uploading}>
