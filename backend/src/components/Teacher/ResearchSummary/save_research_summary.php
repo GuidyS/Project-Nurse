@@ -11,6 +11,7 @@ $facultyId = filter_var($input['faculty_id'] ?? null, FILTER_VALIDATE_INT, ['opt
 $action = $input['action'] ?? '';
 if (!$facultyId || !in_array($action, ['add', 'remove', 'update'], true)) researchFail(422, 'ข้อมูลไม่ถูกต้อง');
 $auditIdLockAcquired = false;
+$researchIdLockAcquired = false;
 try {
     $db = new Connect();
     $access = researchAccess($db, (int)$_SESSION['user_id']);
@@ -27,12 +28,23 @@ try {
         $boundary = academicYearBoundary($db);
         $academicStart = sprintf('-%02d-%02d', $boundary['month'], $boundary['day']);
         $date = ($year - 543) . ($mode === 'academic' ? $academicStart : '-01-01');
+        $researchIdColumn = $db->query("SHOW COLUMNS FROM faculty_research LIKE 'research_id'")->fetch(PDO::FETCH_ASSOC);
+        if (!$researchIdColumn) throw new RuntimeException('ไม่พบคอลัมน์รหัสผลงานวิจัย');
+        $needsExplicitResearchId = !str_contains(strtolower((string)($researchIdColumn['Extra'] ?? '')), 'auto_increment');
+        if ($needsExplicitResearchId) {
+            $researchIdLockAcquired = (int)$db->query("SELECT GET_LOCK('nurse_mis_research_id', 10)")->fetchColumn() === 1;
+            if (!$researchIdLockAcquired) throw new RuntimeException('ระบบกำลังบันทึกผลงานวิจัย กรุณาลองอีกครั้ง');
+        }
         $db->beginTransaction();
-        $stmt = $db->prepare('INSERT INTO faculty_research (faculty_id, title, publication_year, publication_date, article_type, work_category, funding_type, funding_amount, irb_approved, intellectual_property_status, first_author_id, co_author_ids) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
-        $stmt->execute([$facultyId, 'บันทึกจำนวนผลงาน' . ($kind === 'academic' ? 'วิชาการ/ตำรา' : 'วิจัย') . ' ปี ' . $year,
+        $id = $needsExplicitResearchId
+            ? (int)$db->query('SELECT COALESCE(MAX(research_id), 0) FROM faculty_research')->fetchColumn() + 1
+            : null;
+        $stmt = $db->prepare('INSERT INTO faculty_research (' . ($needsExplicitResearchId ? 'research_id, ' : '') . 'faculty_id, title, publication_year, publication_date, article_type, work_category, funding_type, funding_amount, irb_approved, intellectual_property_status, first_author_id, co_author_ids) VALUES (' . ($needsExplicitResearchId ? '?, ' : '') . '?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+        $params = [$facultyId, 'บันทึกจำนวนผลงาน' . ($kind === 'academic' ? 'วิชาการ/ตำรา' : 'วิจัย') . ' ปี ' . $year,
             $year, $date, $kind === 'academic' ? 'academic' : 'research', 'research', 'none', 0, 0, 'none', $kind === 'kpi' ? $facultyId : null,
-            json_encode($kind === 'kpi' ? [] : [$facultyId])]);
-        $id = (int)$db->lastInsertId();
+            json_encode($kind === 'kpi' ? [] : [$facultyId])];
+        $stmt->execute($needsExplicitResearchId ? array_merge([$id], $params) : $params);
+        if (!$needsExplicitResearchId) $id = (int)$db->lastInsertId();
     } elseif ($action === 'update') {
         $id = filter_var($input['publication_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
         $fields = [];
@@ -158,11 +170,18 @@ try {
         try { $db->query("SELECT RELEASE_LOCK('nurse_mis_audit_log_id')"); } catch (Throwable $ignored) {}
         $auditIdLockAcquired = false;
     }
+    if ($researchIdLockAcquired) {
+        try { $db->query("SELECT RELEASE_LOCK('nurse_mis_research_id')"); } catch (Throwable $ignored) {}
+        $researchIdLockAcquired = false;
+    }
     echo json_encode(['status' => 'success', 'message' => 'บันทึกอัตโนมัติแล้ว', 'data' => $data], JSON_UNESCAPED_UNICODE);
 } catch (Throwable $e) {
     if (isset($db) && $db->inTransaction()) $db->rollBack();
     if ($auditIdLockAcquired && isset($db)) {
         try { $db->query("SELECT RELEASE_LOCK('nurse_mis_audit_log_id')"); } catch (Throwable $ignored) {}
+    }
+    if ($researchIdLockAcquired && isset($db)) {
+        try { $db->query("SELECT RELEASE_LOCK('nurse_mis_research_id')"); } catch (Throwable $ignored) {}
     }
     error_log('[ResearchSummary save] ' . get_class($e) . ' code=' . $e->getCode());
     researchFail(500, 'ไม่สามารถบันทึกผลงานได้ กรุณาโหลดข้อมูลใหม่ก่อนลองอีกครั้ง');
