@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { BookOpen, Users, Edit, Loader2, Save, Search } from "lucide-react";
+import { Edit, Loader2, Save, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -476,36 +476,8 @@ const CoursesPage = () => {
       {/* Header */}
       <div className="app-page-header">
         <div>
-          <h1 className="app-page-title">รายวิชาที่สอน</h1>
+          <h1 className="app-page-title">รายวิชาที่สอน {courses.length} วิชา</h1>
           <p className="app-page-description">จัดการรายวิชาและบันทึกผลการเรียน</p>
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-card rounded-xl shadow-card p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-primary/10 rounded-lg">
-              <BookOpen className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-foreground">{courses.length}</p>
-              <p className="text-xs text-muted-foreground">รายวิชาทั้งหมด</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-card rounded-xl shadow-card p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-success/10 rounded-lg">
-              <Users className="h-5 w-5 text-success" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-foreground">
-                {courses.reduce((sum, c) => sum + c.students, 0)}
-              </p>
-              <p className="text-xs text-muted-foreground">นักศึกษาทั้งหมด</p>
-            </div>
-          </div>
         </div>
       </div>
 
