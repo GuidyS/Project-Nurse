@@ -21,7 +21,6 @@ interface ProjectOption {
 interface LinkMatrix {
   [projectId: string]: {
     plos: string[];
-    ylos: string[];
     clos: string[];
   };
 }
@@ -29,7 +28,6 @@ interface LinkMatrix {
 export default function ProjectLinks() {
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [plos, setPlos] = useState<TargetOption[]>([]);
-  const [ylos, setYlos] = useState<TargetOption[]>([]);
   const [clos, setClos] = useState<TargetOption[]>([]);
   const [links, setLinks] = useState<LinkMatrix>({});
   
@@ -51,7 +49,6 @@ export default function ProjectLinks() {
           const data = payload.data || {};
           setProjects(data.projects || []);
           setPlos(data.plos || []);
-          setYlos(data.ylos || []);
           setClos(data.clos || []);
           setLinks(data.links || {});
           
@@ -71,11 +68,11 @@ export default function ProjectLinks() {
       });
   }, []);
 
-  const handleCheckboxChange = (type: 'plos' | 'ylos' | 'clos', code: string, checked: boolean) => {
+  const handleCheckboxChange = (type: 'plos' | 'clos', code: string, checked: boolean) => {
     if (!selectedProjectId) return;
 
     setLinks(prev => {
-      const currentProjectLinks = prev[selectedProjectId] || { plos: [], ylos: [], clos: [] };
+      const currentProjectLinks = prev[selectedProjectId] || { plos: [], clos: [] };
       const currentList = Array.isArray(currentProjectLinks[type]) ? currentProjectLinks[type] : [];
       
       let updatedList = [...currentList];
@@ -102,7 +99,7 @@ export default function ProjectLinks() {
 
     const payloadData = {
       project_id: selectedProjectId,
-      links: links[selectedProjectId] || { plos: [], ylos: [], clos: [] }
+      links: links[selectedProjectId] || { plos: [], clos: [] }
     };
 
     api.post('/index.php?page=create-project-links', payloadData)
@@ -129,10 +126,9 @@ export default function ProjectLinks() {
 
   const currentProjectName = projects.find(p => p.id.toString() === selectedProjectId)?.name || '';
   
-  const rawLinks: LinkMatrix[string] = links[selectedProjectId] || { plos: [], ylos: [], clos: [] };
+  const rawLinks: LinkMatrix[string] = links[selectedProjectId] || { plos: [], clos: [] };
   const currentLinks = {
     plos: Array.isArray(rawLinks.plos) ? rawLinks.plos : [],
-    ylos: Array.isArray(rawLinks.ylos) ? rawLinks.ylos : [],
     clos: Array.isArray(rawLinks.clos) ? rawLinks.clos : []
   };
 
@@ -144,7 +140,7 @@ export default function ProjectLinks() {
         </Button>
         <div>
           <h1 className="app-page-title">เชื่อมโยงผลลัพธ์โครงการ</h1>
-          <p className="app-page-description">จัดการความเชื่อมโยงโครงการกับ PLO, YLO และ CLO</p>
+          <p className="app-page-description">จัดการความเชื่อมโยงโครงการกับ PLO และ CLO</p>
         </div>
       </div>
 
@@ -191,16 +187,6 @@ export default function ProjectLinks() {
                   <div className="flex flex-wrap gap-1.5">
                     {currentLinks.plos.length > 0 ? (
                       currentLinks.plos.map(code => <Badge key={code} variant="secondary">{code}</Badge>)
-                    ) : (
-                      <span className="text-xs text-muted-foreground">ยังไม่มีการเชื่อมโยง</span>
-                    )}
-                  </div>
-                </div>
-                <div className="rounded-lg border p-3">
-                  <h4 className="text-xs font-semibold mb-2 text-muted-foreground">YLO</h4>
-                  <div className="flex flex-wrap gap-1.5">
-                    {currentLinks.ylos.length > 0 ? (
-                      currentLinks.ylos.map(code => <Badge key={code} variant="secondary">{code}</Badge>)
                     ) : (
                       <span className="text-xs text-muted-foreground">ยังไม่มีการเชื่อมโยง</span>
                     )}
@@ -264,28 +250,6 @@ export default function ProjectLinks() {
                               />
                               <label htmlFor={`plo-${plo.code}`} className="text-sm leading-tight cursor-pointer font-medium select-none text-foreground">
                                 {plo.description}
-                              </label>
-                            </div>
-                          ))}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-
-                    {/* YLO Row */}
-                    <TableRow>
-                      <TableCell className="font-bold align-top pt-4">YLO</TableCell>
-                      <TableCell>
-                        <div className="space-y-2">
-                          {ylos.map((ylo) => (
-                            <div key={ylo.code} className="flex items-start space-x-3 p-2 rounded hover:bg-muted/50 transition-colors">
-                              <Checkbox
-                                id={`ylo-${ylo.code}`}
-                                checked={currentLinks.ylos?.includes(ylo.code) || false}
-                                onCheckedChange={(checked) => handleCheckboxChange('ylos', ylo.code, !!checked)}
-                                className="mt-0.5"
-                              />
-                              <label htmlFor={`ylo-${ylo.code}`} className="text-sm leading-tight cursor-pointer font-medium select-none text-foreground">
-                                {ylo.description}
                               </label>
                             </div>
                           ))}

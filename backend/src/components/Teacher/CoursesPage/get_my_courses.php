@@ -2,7 +2,6 @@
 if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../CLOPage/curriculum_repository.php';
-require_once __DIR__ . '/../AssignInstructors/subject_term_helpers.php';
 require_once __DIR__ . '/../../../config/active_curriculum.php';
 
 header('Access-Control-Allow-Origin: ' . (in_array($_SERVER['HTTP_ORIGIN'] ?? '', ['http://localhost:5173', 'http://127.0.0.1:5173'], true) ? ($_SERVER['HTTP_ORIGIN'] ?? '') : 'http://localhost:5173'));
@@ -62,8 +61,6 @@ try {
     // 3. รายละเอียดวิชา + จำนวนนักศึกษาที่ลงทะเบียน
     //    ใช้รายวิชาของหลักสูตรเป็นหลัก เพื่อให้วิชาที่มีเฉพาะในหน้า "จัดการหลักสูตร"
     //    (ยังไม่มีแถวในตาราง subject) แสดงให้อาจารย์เห็นด้วย ไม่หายไปจากรายการ
-    subjectTermEnsureColumn($db);
-
     $wanted = array_flip($my_subject_codes);
     $curriculumSubjects = activeCurriculumSubjects($db);
     $courses = [];
@@ -78,8 +75,6 @@ try {
                 'code' => $subject['subject_code'],
                 'name' => $subject['subject_name'],
                 'credits' => $subject['credit'],
-                'semester' => $subject['semester'],
-                'academic_year' => $subject['academic_year'],
                 'students' => 0,
                 'pass_score' => $subject['pass_score'],
             ];
@@ -87,8 +82,7 @@ try {
     } else {
         $inQuery = implode(',', array_fill(0, count($my_subject_codes), '?'));
         $stmt = $db->prepare("
-            SELECT s.subject_id as id, s.subject_code as code, s.subject_name_th as name, s.credit as credits,
-                   s.semester, s.academic_year
+            SELECT s.subject_id as id, s.subject_code as code, s.subject_name_th as name, s.credit as credits
             FROM subject s WHERE s.subject_code IN ($inQuery) AND s.is_active = 1
         ");
         $stmt->execute($my_subject_codes);
@@ -113,8 +107,6 @@ try {
         $course['cloCount'] = $cloCounts[$course['code']] ?? 0;
         $course['section'] = '01'; // Default
         $course['instructor'] = $instructor_name;
-        // ข้อความภาคเรียนคำนวณจากข้อมูลจริงที่เดียว ไม่ให้หน้าเว็บเดาค่าเอง
-        $course['term_label'] = subjectTermLabel($course['semester'], $course['academic_year']);
     }
     unset($course);
 

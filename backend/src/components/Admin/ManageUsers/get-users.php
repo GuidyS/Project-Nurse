@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/user_status_helpers.php';
 header("Content-Type: application/json");
 
 if (session_status() === PHP_SESSION_NONE) {
@@ -27,7 +28,9 @@ try {
     $sql = "SELECT u.user_id as id, u.username, u.role_id, u.created_at,
                    COALESCE(u.status, 'active') as status,
                    s.first_name_th as s_fname, s.last_name_th as s_lname,
+                   s.status as s_status,
                    f.first_name_th as f_fname, f.last_name_th as f_lname,
+                   f.status as f_status,
                    up.position_id
             FROM users u
             LEFT JOIN student s ON u.username = s.student_id
@@ -62,6 +65,11 @@ try {
         ];
         $teacherSubRole = isset($subRoleMap[$u['position_id']]) ? $subRoleMap[$u['position_id']] : null;
 
+        // สถานะการศึกษาของนักศึกษา (คงอยู่/พักการเรียน/ลาออก) แยกจากสถานะบัญชี (ใช้งาน/ระงับ)
+        // ถ้าพักการเรียนหรือลาออก หน้าเว็บจะแสดงสถานะนี้แทน และเจ้าตัวเข้าระบบไม่ได้
+        $personStatus = is_string($u['s_status'] ?? null) && $u['s_status'] !== '' ? $u['s_status'] : null;
+        $personLabels = studentStatusOptions();
+
         $result[] = [
             'id' => (string)$u['id'],
             'email' => $u['username'], // ใช้ username แทนอีเมลชั่วคราว
@@ -69,6 +77,9 @@ try {
             'role' => $roleStr,
             'teacherSubRole' => $teacherSubRole,
             'status' => ($u['status'] === 'inactive') ? 'inactive' : 'active',
+            'personStatus' => $personStatus,
+            'personStatusLabel' => $personStatus !== null ? ($personLabels[$personStatus] ?? $personStatus) : null,
+            'isBlocked' => $personStatus !== null && studentStatusBlocksLogin($personStatus),
             'createdAt' => date('Y-m-d', strtotime($u['created_at']))
         ];
     }

@@ -40,28 +40,13 @@ try {
         exit();
     }
 
-    // ตรวจค่าภาคเรียน/ปีการศึกษาให้ผ่านก่อน แล้วค่อยเขียนอะไรลงฐานข้อมูล
-    // (ไม่งั้นกรอกปีผิดแล้วอาจารย์จะถูกมอบหมายไปแล้วทั้งที่ขึ้น error)
-    $semester = array_key_exists('semester', $input) ? subjectTermNormalizeSemester($input['semester']) : null;
-    $academicYear = array_key_exists('academic_year', $input) ? subjectTermNormalizeYear($input['academic_year']) : null;
-
+    // ระบบไม่ผูกรายวิชากับภาคเรียน/ปีการศึกษาแล้ว หน้านี้จึงบันทึกเฉพาะอาจารย์ผู้รับผิดชอบ
     $msg = empty($faculty_id) ? "ยกเลิกการมอบหมายอาจารย์สำเร็จ" : "มอบหมายอาจารย์สำเร็จ";
     setSubjectInstructor($db, $frameworkId, (string)$subject_code, empty($faculty_id) ? null : (string)$faculty_id);
 
-    if (array_key_exists('semester', $input) || array_key_exists('academic_year', $input)) {
-        // ส่งคีย์มาแล้วแต่ค่าว่าง = ตั้งใจล้างค่า จึงเขียนทับด้วย NULL
-        subjectTermSave($db, (string)$subject_code, $semester, $academicYear, true);
-        $msg .= ' (ภาคเรียน ' . subjectTermLabel($semester, $academicYear) . ')';
-    }
-
-    // บันทึก Audit Log เมื่อมอบหมายอาจารย์หรืออัปเดตภาคเรียนสำเร็จ
-    $actionDesc = empty($faculty_id) 
-        ? "ยกเลิกมอบหมายอาจารย์ผู้สอน รายวิชา: {$subject_code}" 
+    $actionDesc = empty($faculty_id)
+        ? "ยกเลิกมอบหมายอาจารย์ผู้สอน รายวิชา: {$subject_code}"
         : "มอบหมายอาจารย์ผู้สอน (ID: {$faculty_id}) รายวิชา: {$subject_code}";
-    
-    if (array_key_exists('semester', $input) || array_key_exists('academic_year', $input)) {
-        $actionDesc .= " (ภาคเรียน " . subjectTermLabel($semester, $academicYear) . ")";
-    }
 
     logAudit(
         $db,
@@ -74,11 +59,6 @@ try {
     echo json_encode([
         "status" => "success",
         "message" => $msg,
-        "data" => [
-            "semester" => $semester,
-            "academic_year" => $academicYear,
-            "term_label" => subjectTermLabel($semester, $academicYear),
-        ],
     ], JSON_UNESCAPED_UNICODE);
 } catch (InvalidArgumentException $e) {
     http_response_code(400);

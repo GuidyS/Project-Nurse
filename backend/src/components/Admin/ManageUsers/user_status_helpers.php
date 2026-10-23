@@ -25,14 +25,35 @@ function facultyStatusOptions(): array
     ];
 }
 
-/** เหตุผลที่เลือกได้เมื่อนักศึกษาพักการเรียนหรือลาออก */
-function studentStatusReasons(): array
+/**
+ * เหตุผลที่เลือกได้เมื่อนักศึกษาพักการเรียนหรือลาออก (แยกรายการตามสถานะ)
+ * พักการเรียนเป็นการหยุดชั่วคราว จึงใช้ได้เฉพาะเหตุผลที่กลับมาเรียนต่อได้
+ */
+function studentStatusReasons(?string $status = null): array
 {
-    return ['ปัญหาการเงิน', 'ย้ายที่เรียน', 'ปัญหาสุขภาพ', 'โดนรีไทร์'];
+    $byStatus = [
+        'OnLeave'  => ['ปัญหาการเงิน', 'ปัญหาสุขภาพ'],
+        'Resigned' => ['ปัญหาการเงิน', 'ย้ายที่เรียน', 'ปัญหาสุขภาพ', 'โดนรีไทร์'],
+    ];
+
+    if ($status === null) {
+        return $byStatus; // ส่งทั้งแผนที่ให้หน้าเว็บไปใช้
+    }
+
+    return $byStatus[$status] ?? [];
 }
 
 /** สถานะที่ต้องระบุเหตุผล */
 function studentStatusNeedsReason(string $status): bool
+{
+    return in_array($status, ['OnLeave', 'Resigned'], true);
+}
+
+/**
+ * สถานะที่ทำให้นักศึกษาเข้าใช้งานระบบไม่ได้
+ * ตรวจจาก student.status โดยตรง ไม่ไปยุ่งกับ users.status เพื่อไม่ให้สองค่าขัดกัน
+ */
+function studentStatusBlocksLogin(string $status): bool
 {
     return in_array($status, ['OnLeave', 'Resigned'], true);
 }
@@ -108,8 +129,8 @@ function normalizeUserStatusInput(string $role, $statusInput, $reasonInput, ?str
             if ($reason === '') {
                 throw new InvalidArgumentException('กรุณาเลือกเหตุผลของสถานะ ' . $options[$status]);
             }
-            if (!in_array($reason, studentStatusReasons(), true)) {
-                throw new InvalidArgumentException('เหตุผลต้องเลือกจากรายการที่กำหนดไว้');
+            if (!in_array($reason, studentStatusReasons($status), true)) {
+                throw new InvalidArgumentException('เหตุผลต้องเลือกจากรายการของสถานะ ' . $options[$status]);
             }
         } else {
             $reason = ''; // คงอยู่ = ไม่มีเหตุผล

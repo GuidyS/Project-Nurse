@@ -2,6 +2,7 @@
 // ไม่ต้องประกาศ Header ซ้ำเพราะ index.php จัดการให้แล้ว
 require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/password_helpers.php';
+require_once __DIR__ . '/../Admin/ManageUsers/user_status_helpers.php';
  
 configureAuthSessionCookie();
 session_start();
@@ -35,6 +36,7 @@ try {
  
     $sql = "SELECT users.*,
                    up.position_id AS main_position_id,
+                   student.status AS student_status,
                    student.title AS s_title, student.first_name_th AS s_fname, student.last_name_th AS s_lname,
                    faculty.title AS f_title, faculty.first_name_th AS f_fname, faculty.last_name_th AS f_lname
             FROM users
@@ -62,6 +64,18 @@ try {
             exit;
         }
  
+        // นักศึกษาที่พักการเรียนหรือลาออกแล้ว ใช้งานระบบไม่ได้
+        // (อ่านจาก student.status โดยตรง ไม่ผูกกับ users.status เพื่อไม่ให้สองค่าขัดกัน)
+        $studentStatus = isset($user['student_status']) ? (string)$user['student_status'] : '';
+        if ($studentStatus !== '' && studentStatusBlocksLogin($studentStatus)) {
+            $statusLabel = studentStatusOptions()[$studentStatus] ?? $studentStatus;
+            echo json_encode([
+                "status" => "error",
+                "message" => "ไม่สามารถเข้าสู่ระบบได้ เนื่องจากสถานะปัจจุบันคือ \"{$statusLabel}\" กรุณาติดต่อเจ้าหน้าที่คณะ",
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
         if ($user['role_id'] === null || $user['role_id'] === '') {
             echo json_encode([
                 "status" => "error",

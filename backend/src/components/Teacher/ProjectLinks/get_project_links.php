@@ -56,7 +56,7 @@ try {
         $pid = $row['id'];
         $projects[] = ['id' => $pid, 'name' => $row['name'], 'project_type' => $row['project_type']];
 
-        $matrix[$pid] = ['plos' => [], 'ylos' => [], 'clos' => []];
+        $matrix[$pid] = ['plos' => [], 'clos' => []];
     }
 
     $linkStmt = $db->query("
@@ -64,12 +64,13 @@ try {
         FROM project_outcome_links l
         INNER JOIN project p ON p.project_id = l.project_id
         WHERE p.project_type = 'academic_service'
+          AND l.outcome_type <> 'ylo'
         ORDER BY l.project_id, l.outcome_type, l.outcome_code
     ");
     foreach ($linkStmt->fetchAll(PDO::FETCH_ASSOC) as $link) {
         $projectId = $link['project_id'];
         if (!isset($matrix[$projectId])) {
-            $matrix[$projectId] = ['plos' => [], 'ylos' => [], 'clos' => []];
+            $matrix[$projectId] = ['plos' => [], 'clos' => []];
         }
 
         $key = $link['outcome_type'] . 's';
@@ -79,7 +80,6 @@ try {
     }
 
     $plos = [];
-    $ylosByCode = [];
     $closByCode = [];
 
     $mappingData = loadActiveMappingData($db);
@@ -98,14 +98,6 @@ try {
             $plos[] = [
                 'code' => $code,
                 'description' => $plo['plo_name'] ?? $code
-            ];
-        }
-
-        foreach (($plo['ylo_descriptions'] ?? []) as $yearKey => $description) {
-            $code = strtoupper(str_replace('YEAR_', 'YLO', strtoupper($yearKey)));
-            $ylosByCode[$code] = [
-                'code' => $code,
-                'description' => $code . ': ' . $description
             ];
         }
     }
@@ -132,11 +124,9 @@ try {
         }
     }
 
-    $ylos = array_values($ylosByCode);
     $clos = array_values($closByCode);
 
     $ploCodes = array_column($plos, 'code');
-    $yloCodes = array_column($ylos, 'code');
     $cloCodes = array_column($clos, 'code');
 
     foreach ($matrix as $projectLinks) {
@@ -144,12 +134,6 @@ try {
             if (!in_array($code, $ploCodes, true)) {
                 $plos[] = ['code' => $code, 'description' => $code . ' (legacy mapping)'];
                 $ploCodes[] = $code;
-            }
-        }
-        foreach ($projectLinks['ylos'] as $code) {
-            if (!in_array($code, $yloCodes, true)) {
-                $ylos[] = ['code' => $code, 'description' => $code . ' (legacy mapping)'];
-                $yloCodes[] = $code;
             }
         }
         foreach ($projectLinks['clos'] as $code) {
@@ -167,7 +151,6 @@ try {
         "data" => [
             "projects" => $projects,
             "plos" => $plos,
-            "ylos" => $ylos,
             "clos" => $clos,
             "links" => empty($matrix) ? new stdClass() : $matrix,
             "curriculum" => activeCurriculumCycle($db),

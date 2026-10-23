@@ -54,17 +54,18 @@ try {
     }
     if ($projectType !== 'academic_service') {
         http_response_code(422);
-        throw new Exception("เชื่อม CLO/PLO/YLO ได้เฉพาะโครงการบริการวิชาการ");
+        throw new Exception("เชื่อม PLO/CLO ได้เฉพาะโครงการบริการวิชาการ");
     }
 
+    // ระบบไม่เชื่อมโครงการกับ YLO แล้ว เหลือเฉพาะ PLO และ CLO
+    // แถว outcome_type = 'ylo' ที่เคยบันทึกไว้จะถูกล้างออกตอนบันทึกครั้งถัดไป
     $normalizedLinks = [
         'plos' => array_values(array_unique(array_filter($links['plos'] ?? [], 'is_string'))),
-        'ylos' => array_values(array_unique(array_filter($links['ylos'] ?? [], 'is_string'))),
         'clos' => array_values(array_unique(array_filter($links['clos'] ?? [], 'is_string'))),
     ];
 
     $desiredLinks = [];
-    foreach (['plos' => 'plo', 'ylos' => 'ylo', 'clos' => 'clo'] as $payloadKey => $outcomeType) {
+    foreach (['plos' => 'plo', 'clos' => 'clo'] as $payloadKey => $outcomeType) {
         foreach ($normalizedLinks[$payloadKey] as $code) {
             $desiredLinks[$outcomeType . "\0" . $code] = true;
         }

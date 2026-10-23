@@ -631,11 +631,9 @@ try {
             foreach ($studentPdfFields as $fileField => $meta) {
                 // Handle file uploads if any (legacy compatibility)
                 $uploadedPaths = savePdfUploads($fileField, $u_info['username']);
-                
-                // Add google drive link from pdfLinks if provided
-                if (!empty($input['pdfLinks'][$fileField])) {
-                    $uploadedPaths[] = trim($input['pdfLinks'][$fileField]);
-                }
+
+                // ลิงก์ Google Drive ของนักศึกษาเป็นข้อมูลที่เจ้าตัวบันทึกเองที่หน้า Portfolio
+                // ผู้ดูแลระบบดูได้อย่างเดียว จึงไม่รับค่า pdfLinks ที่ส่งมาจากหน้าจัดการผู้ใช้
 
                 if (!empty($uploadedPaths)) {
                     $uploadedDocuments[$fileField] = $uploadedPaths;

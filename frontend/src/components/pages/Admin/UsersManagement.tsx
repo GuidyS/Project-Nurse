@@ -28,6 +28,11 @@ interface User {
   role: "admin" | "student" | "teacher" | "unassigned";
   teacherSubRole?: string;
   status: "active" | "inactive";
+  /** สถานะการศึกษาของนักศึกษา (Active/OnLeave/Resigned) — null ถ้าไม่ใช่นักศึกษา */
+  personStatus?: string | null;
+  personStatusLabel?: string | null;
+  /** true เมื่อสถานะการศึกษาทำให้เข้าใช้งานระบบไม่ได้ */
+  isBlocked?: boolean;
   createdAt: string;
 }
 
@@ -40,7 +45,12 @@ const STUDENT_STATUS_OPTIONS = [
   { value: "Resigned", label: "ลาออก" },
 ];
 const STUDENT_STATUS_NEEDS_REASON = ["OnLeave", "Resigned"];
-const STUDENT_STATUS_REASONS = ["ปัญหาการเงิน", "ย้ายที่เรียน", "ปัญหาสุขภาพ", "โดนรีไทร์"];
+// เหตุผลแยกตามสถานะ — พักการเรียนเป็นการหยุดชั่วคราว จึงเลือกได้เฉพาะเหตุผลที่กลับมาเรียนต่อได้
+const STUDENT_STATUS_REASONS: Record<string, string[]> = {
+  OnLeave: ["ปัญหาการเงิน", "ปัญหาสุขภาพ"],
+  Resigned: ["ปัญหาการเงิน", "ย้ายที่เรียน", "ปัญหาสุขภาพ", "โดนรีไทร์"],
+};
+const statusReasonOptions = (status: string): string[] => STUDENT_STATUS_REASONS[status] ?? [];
 const FACULTY_STATUS_OPTIONS = [
   { value: "Active", label: "คงอยู่" },
   { value: "Resigned", label: "ลาออก" },
@@ -345,46 +355,56 @@ export default function UsersManagement() {
   const selectedPdfLink = pdfLinks[selectedPdfField] || "";
   const selectedPdfLabel = pdfOptions.find((option) => option.value === selectedPdfField)?.label || "เอกสาร";
 
-  const PdfUploadSection = ({ description }: { description: string }) => (
+  // readOnly = เจ้าของข้อมูลเป็นคนกรอกเอง ผู้ดูแลระบบดูได้อย่างเดียว (ใช้กับนักศึกษา)
+  const PdfUploadSection = ({ description, readOnly = false }: { description: string; readOnly?: boolean }) => (
     <div className="col-span-2 rounded-lg border p-4 space-y-4">
       <div className="flex items-center gap-2">
         <Upload className="h-4 w-4 text-primary" />
-        <Label className="text-base font-semibold">บันทึกลิงก์เอกสาร Google Drive</Label>
+        <Label className="text-base font-semibold">
+          {readOnly ? "เอกสาร Google Drive" : "บันทึกลิงก์เอกสาร Google Drive"}
+        </Label>
       </div>
 
-      <div className="space-y-2">
-        <Label>ประเภทเอกสารที่ต้องการบันทึกลิงก์</Label>
-        <Select value={selectedPdfField} onValueChange={setSelectedPdfField}>
-          <SelectTrigger>
-            <SelectValue placeholder="เลือกประเภทเอกสาร" />
-          </SelectTrigger>
-          <SelectContent>
-            {pdfOptions.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="space-y-2">
-        <Label>ลิงก์ Google Drive (ต้องตั้งค่าเป็น Anyone with the link)</Label>
-        <Input 
-          type="url" 
-          placeholder="https://drive.google.com/file/d/..."
-          value={pdfLinks[selectedPdfField] || ""}
-          onChange={(e) => handlePdfLinkChange(selectedPdfField, e.target.value)}
-        />
-      </div>
-
-      {savedDocuments.length > 0 && (
+      {!readOnly && (
         <div className="space-y-2">
-          <p className="text-xs font-medium text-muted-foreground">เอกสารที่อัปโหลดแล้ว ({savedDocuments.length})</p>
+          <Label>ประเภทเอกสารที่ต้องการบันทึกลิงก์</Label>
+          <Select value={selectedPdfField} onValueChange={setSelectedPdfField}>
+            <SelectTrigger>
+              <SelectValue placeholder="เลือกประเภทเอกสาร" />
+            </SelectTrigger>
+            <SelectContent>
+              {pdfOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {!readOnly && (
+        <div className="space-y-2">
+          <Label>ลิงก์ Google Drive (ต้องตั้งค่าเป็น Anyone with the link)</Label>
+          <Input
+            type="url"
+            placeholder="https://drive.google.com/file/d/..."
+            value={pdfLinks[selectedPdfField] || ""}
+            onChange={(e) => handlePdfLinkChange(selectedPdfField, e.target.value)}
+          />
+        </div>
+      )}
+
+      {savedDocuments.length > 0 ? (
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-muted-foreground">
+            {readOnly ? `เอกสารที่บันทึกไว้ (${savedDocuments.length})` : `เอกสารที่อัปโหลดแล้ว (${savedDocuments.length})`}
+          </p>
           <div className="space-y-2">
             {savedDocuments.map((doc) => {
               const docKey = `${doc.portfolio_id || ""}:${doc.file_path}`;
               const isDeleting = deletingDocKey === docKey;
+              const isLink = typeof doc.file_path === "string" && doc.file_path.startsWith("http");
               return (
                 <div
                   key={docKey}
@@ -392,26 +412,41 @@ export default function UsersManagement() {
                 >
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-foreground">{doc.title}</p>
-                    <p className="truncate text-xs text-muted-foreground">{doc.file_name}</p>
+                    {isLink ? (
+                      <a
+                        href={doc.file_path}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="truncate block text-xs text-primary hover:underline"
+                      >
+                        {doc.file_path}
+                      </a>
+                    ) : (
+                      <p className="truncate text-xs text-muted-foreground">{doc.file_name}</p>
+                    )}
                     {!doc.available && (
                       <p className="text-[11px] text-amber-600">ไฟล์ไม่อยู่บนเซิร์ฟเวอร์แล้ว</p>
                     )}
                   </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                    disabled={isDeleting || isSaving}
-                    onClick={() => openDeleteDocConfirm(doc)}
-                  >
-                    {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                  </Button>
+                  {!readOnly && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      disabled={isDeleting || isSaving}
+                      onClick={() => openDeleteDocConfirm(doc)}
+                    >
+                      {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                    </Button>
+                  )}
                 </div>
               );
             })}
           </div>
         </div>
+      ) : (
+        readOnly && <p className="text-sm text-muted-foreground italic">ยังไม่มีเอกสารที่นักศึกษาบันทึกไว้</p>
       )}
 
       <p className="text-xs text-muted-foreground">{description}</p>
@@ -504,12 +539,19 @@ export default function UsersManagement() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge
-                          variant={user.status === "active" ? "default" : "destructive"}
-                          className={user.status === "active" ? "bg-success" : "bg-destructive text-destructive-foreground"}
-                        >
-                          {user.status === "active" ? "ใช้งาน" : "ระงับ"}
-                        </Badge>
+                        {/* นักศึกษาที่พักการเรียน/ลาออก ให้แสดงสถานะการศึกษาแทน เพราะเข้าใช้งานระบบไม่ได้แล้ว */}
+                        {user.isBlocked ? (
+                          <Badge variant="outline" className="border-amber-300 bg-amber-100 text-amber-900">
+                            {user.personStatusLabel}
+                          </Badge>
+                        ) : (
+                          <Badge
+                            variant={user.status === "active" ? "default" : "destructive"}
+                            className={user.status === "active" ? "bg-success" : "bg-destructive text-destructive-foreground"}
+                          >
+                            {user.status === "active" ? "ใช้งาน" : "ระงับ"}
+                          </Badge>
+                        )}
                       </TableCell>
                       <TableCell className="text-muted-foreground">{user.createdAt}</TableCell>
                       <TableCell className="text-right">
@@ -638,7 +680,10 @@ export default function UsersManagement() {
                       setDetailForm({
                         ...detailForm,
                         status: value,
-                        dropout_reason: value === "Active" ? "" : detailForm.dropout_reason,
+                        // เหตุผลเดิมอาจไม่มีในรายการของสถานะใหม่ ต้องล้างทิ้งไม่ให้ค้าง
+                        dropout_reason: statusReasonOptions(value).includes(detailForm.dropout_reason)
+                          ? detailForm.dropout_reason
+                          : "",
                       })
                     }
                   >
@@ -655,12 +700,12 @@ export default function UsersManagement() {
                   <div className="space-y-2">
                     <Label>เหตุผล</Label>
                     <Select
-                      value={STUDENT_STATUS_REASONS.includes(detailForm.dropout_reason) ? detailForm.dropout_reason : ""}
+                      value={statusReasonOptions(detailForm.status).includes(detailForm.dropout_reason) ? detailForm.dropout_reason : ""}
                       onValueChange={(value) => setDetailForm({ ...detailForm, dropout_reason: value })}
                     >
                       <SelectTrigger><SelectValue placeholder="เลือกเหตุผล" /></SelectTrigger>
                       <SelectContent>
-                        {STUDENT_STATUS_REASONS.map(reason => (
+                        {statusReasonOptions(detailForm.status).map(reason => (
                           <SelectItem key={reason} value={reason}>{reason}</SelectItem>
                         ))}
                       </SelectContent>
@@ -671,7 +716,10 @@ export default function UsersManagement() {
                 {STUDENT_STATUS_NEEDS_REASON.includes(detailForm.status) && detailForm.dropout_date && (
                   <ReadOnlyField label="วันที่เปลี่ยนสถานะ" value={detailForm.dropout_date} note="ระบบบันทึกให้อัตโนมัติ" />
                 )}
-                <PdfUploadSection description="ไฟล์จะถูกบันทึกเป็นรายการ Portfolio ของนักศึกษา และแสดงในหน้าโปรไฟล์" />
+                <PdfUploadSection
+                  readOnly
+                  description="นักศึกษาเป็นผู้บันทึกลิงก์เองที่หน้า Portfolio — ผู้ดูแลระบบดูได้อย่างเดียว"
+                />
               </>
             )}
           </div>

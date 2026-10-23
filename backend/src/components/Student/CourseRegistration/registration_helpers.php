@@ -92,6 +92,9 @@ function registrationEnsureSubjectRow(PDO $db, array $curriculumSubject): int
 /**
  * รายวิชาที่เปิดให้ลงทะเบียน พร้อมสถานะของนักศึกษาคนนี้
  *
+ * เปิดให้ลงทะเบียนเฉพาะรายวิชาที่มีอาจารย์ผู้รับผิดชอบแล้ว (หน้า "จัดอาจารย์ผู้สอน")
+ * ส่วนวิชาที่ลงทะเบียนไว้แล้วจะคงอยู่ในรายการเสมอ แม้ภายหลังจะถูกถอนอาจารย์ออก
+ *
  * @return array<int, array<string, mixed>>
  */
 function registrationAvailableSubjects(PDO $db, string $studentId): array
@@ -141,21 +144,21 @@ function registrationAvailableSubjects(PDO $db, string $studentId): array
         $row = $enrolled[$code] ?? null;
         $instructorId = $instructorByCode[$code] ?? null;
 
+        // ยังไม่มีอาจารย์ผู้รับผิดชอบ = ยังไม่เปิดให้ลงทะเบียน
+        if ($instructorId === null && $row === null) {
+            continue;
+        }
+
         $out[] = [
             'subject_code' => $code,
             'subject_name' => $subject['subject_name'],
             'credit' => $subject['credit'],
             'credit_desc' => $subject['credit_desc'],
-            'semester' => $subject['semester'],
-            'academic_year' => $subject['academic_year'],
-            'term_label' => subjectTermLabel($subject['semester'], $subject['academic_year']),
             'ylo' => $yloMap[$code] ?? null,
             'instructor_id' => $instructorId,
             'instructor_name' => $instructorId !== null ? ($facultyNames[(string)$instructorId] ?? null) : null,
             'is_enrolled' => $row !== null,
             'enrollment_id' => $row !== null ? (int)$row['enrollment_id'] : null,
-            'enrolled_semester' => $row !== null && $row['semester'] !== null ? (int)$row['semester'] : null,
-            'enrolled_year' => $row !== null && $row['academic_year'] !== null ? (int)$row['academic_year'] : null,
             'enrollment_status' => $row !== null ? (string)$row['status'] : null,
             // มีคะแนนแล้วห้ามถอน เพราะจะทำให้ผลประเมินหาย
             'has_scores' => false,

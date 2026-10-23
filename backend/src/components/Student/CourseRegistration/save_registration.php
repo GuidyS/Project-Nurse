@@ -75,6 +75,21 @@ try {
         exit;
     }
 
+    // ลงทะเบียนได้เฉพาะวิชาที่มีอาจารย์ผู้รับผิดชอบแล้ว (ตรวจที่ฝั่ง server ด้วย ไม่พึ่งแค่หน้าเว็บ)
+    // การถอนไม่ต้องตรวจ เพราะวิชาที่ลงไว้แล้วอาจถูกถอนอาจารย์ออกภายหลัง
+    if ($action !== 'withdraw') {
+        $frameworkId = getActiveFrameworkId($db);
+        $instructorByCode = $frameworkId ? getSubjectInstructorMap($db, $frameworkId) : [];
+        if (empty($instructorByCode[$subjectCode])) {
+            http_response_code(400);
+            echo json_encode([
+                "status" => "error",
+                "message" => "รายวิชา {$subjectCode} ยังไม่มีอาจารย์ผู้รับผิดชอบ จึงยังไม่เปิดให้ลงทะเบียน",
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+    }
+
     // เตรียมคอลัมน์/ตารางตั้งค่าให้ครบก่อนเปิด transaction
     // (ALTER TABLE และ CREATE TABLE ทำให้ MySQL commit transaction ที่เปิดค้างไว้ทันที)
     subjectTermEnsureColumn($db);

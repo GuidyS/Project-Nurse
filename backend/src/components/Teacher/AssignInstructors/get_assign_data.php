@@ -60,7 +60,6 @@ try {
 
     // 4. รายวิชา — ตามหลักสูตรที่ใช้งานในระบบ (ตั้งค่าที่หน้า "จัดการหลักสูตร")
     //    ถ้ายังไม่มีหลักสูตรในระบบ ใช้รายวิชาทั้งหมดจากตาราง subject แบบเดิม
-    subjectTermEnsureColumn($db);
     $curriculumSubjects = activeCurriculumSubjects($db);
     if ($curriculumSubjects !== null) {
         $subjects = array_map(static fn(array $subject): array => [
@@ -68,11 +67,9 @@ try {
             'subject_code' => $subject['subject_code'],
             'subject_name_th' => $subject['subject_name'],
             'credit' => $subject['credit'],
-            'semester' => $subject['semester'],
-            'academic_year' => $subject['academic_year'],
         ], $curriculumSubjects);
     } else {
-        $sql_subject = "SELECT subject_id, subject_code, subject_name_th, credit, semester, academic_year FROM subject WHERE is_active = 1 ORDER BY subject_code ASC";
+        $sql_subject = "SELECT subject_id, subject_code, subject_name_th, credit FROM subject WHERE is_active = 1 ORDER BY subject_code ASC";
         $subjects = $db->query($sql_subject)->fetchAll(PDO::FETCH_ASSOC);
     }
 
@@ -98,9 +95,6 @@ try {
             "credits" => (int)$s['credit'],
             // วิชาที่มีเฉพาะในหลักสูตรยังไม่มีข้อมูลลงทะเบียน
             "students" => $s['subject_id'] !== null ? ($enrollment[$s['subject_id']] ?? 0) : 0,
-            "semester" => $s['semester'] === null ? null : (int)$s['semester'],
-            "academic_year" => $s['academic_year'] === null ? null : (int)$s['academic_year'],
-            "term_label" => subjectTermLabel($s['semester'], $s['academic_year']),
             "instructor_id" => (string)$instructorId,
             "instructor" => $instructorName
         ];

@@ -36,7 +36,6 @@ interface Course {
   name: string;
   credits: number;
   students: number;
-  semester: string;
   section: string;
   cloCount: number;
   instructor?: string;
@@ -121,9 +120,6 @@ const CoursesPage = () => {
           name: course.name,
           credits: Number(course.credits),
           students: Number(course.students),
-          // backend คำนวณข้อความภาคเรียนให้แล้ว ("1/2567" หรือ "-" ถ้ายังไม่กำหนด)
-          // ห้าม fallback เป็นค่าคงที่ เพราะจะกลายเป็นข้อมูลปลอม
-          semester: course.term_label || "-",
           section: course.section || "1",
           cloCount: Number(course.cloCount || 0),
           instructor: course.instructor,
@@ -518,7 +514,6 @@ const CoursesPage = () => {
               <TableHead>ชื่อวิชา</TableHead>
               <TableHead>หน่วยกิต</TableHead>
               <TableHead>นักศึกษา</TableHead>
-              <TableHead>ภาคเรียน</TableHead>
               <TableHead>CLO</TableHead>
               <TableHead>อาจารย์ผู้รับผิดชอบ</TableHead>
               <TableHead className="text-right">การดำเนินการ</TableHead>
@@ -527,13 +522,13 @@ const CoursesPage = () => {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={8} className="py-10 text-center">
+                <TableCell colSpan={7} className="py-10 text-center">
                   <Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" />
                 </TableCell>
               </TableRow>
             ) : courses.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
+                <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
                   ไม่มีรายวิชาที่คุณรับผิดชอบ
                 </TableCell>
               </TableRow>
@@ -547,9 +542,6 @@ const CoursesPage = () => {
                   </TableCell>
                   <TableCell className="text-muted-foreground">{course.credits}</TableCell>
                   <TableCell className="text-muted-foreground">{course.students} คน</TableCell>
-                  <TableCell>
-                    <Badge variant="secondary">{course.semester}</Badge>
-                  </TableCell>
                   <TableCell>
                     <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">
                       {course.cloCount} CLO
@@ -615,7 +607,7 @@ const CoursesPage = () => {
               </Select>
               {scoringCourse && (
                 <span className="text-sm font-normal text-muted-foreground">
-                  กลุ่ม {scoringCourse.section} · ภาคเรียน {scoringCourse.semester} · เกณฑ์ผ่าน {formatScore(passScore)} คะแนน
+                  กลุ่ม {scoringCourse.section} · เกณฑ์ผ่าน {formatScore(passScore)} คะแนน
                 </span>
               )}
             </DialogTitle>
