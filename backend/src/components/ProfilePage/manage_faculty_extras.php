@@ -23,16 +23,22 @@ if (!$user) {
 }
 
 $facultyId = $user['username'];
-$action = $_GET['action'] ?? '';
+$rawInput = file_get_contents('php://input');
+$jsonBody = !empty($rawInput) ? json_decode($rawInput, true) : null;
+$action = $_POST['action'] ?? $_GET['action'] ?? ($jsonBody['action'] ?? '');
 
 try {
     if ($action === 'upload-workload') {
         if (!isset($_FILES['file'])) throw new Exception("No file uploaded");
-        $academicYear = $_POST['academic_year'] ?? '';
-        $term = $_POST['term'] ?? '';
+        $academicYear = trim($_POST['academic_year'] ?? ($jsonBody['academic_year'] ?? ''));
+        $term = trim($_POST['term'] ?? ($jsonBody['term'] ?? ''));
         if (!$academicYear || !$term) throw new Exception("Missing academic_year or term");
 
         $file = $_FILES['file'];
+        if ($file['error'] !== UPLOAD_ERR_OK) {
+            throw new Exception("เกิดข้อผิดพลาดในการอัปโหลดไฟล์ (รหัส: " . $file['error'] . ")");
+        }
+
         $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
         if (!in_array($ext, ['xls', 'xlsx', 'csv', 'pdf', 'doc', 'docx'])) {
             throw new Exception("Invalid file type");
@@ -52,28 +58,29 @@ try {
         $stmt = $db->prepare("INSERT INTO faculty_teaching_workloads (faculty_id, academic_year, term, file_path) VALUES (?, ?, ?, ?)");
         $stmt->execute([$facultyId, $academicYear, $term, $dbPath]);
         
-        echo json_encode(["status" => "success", "message" => "อัปโหลดเรียบร้อยแล้ว", "path" => $dbPath]);
+        echo json_encode(["status" => "success", "message" => "อัปโหลดเรียบร้อยแล้ว", "path" => $dbPath], JSON_UNESCAPED_UNICODE);
     } 
     elseif ($action === 'delete-workload') {
-        $id = $_POST['id'] ?? '';
+        $id = $_POST['id'] ?? $_GET['id'] ?? ($jsonBody['id'] ?? '');
+        if (!$id) throw new Exception("Missing ID");
         $stmt = $db->prepare("SELECT file_path FROM faculty_teaching_workloads WHERE id = ? AND faculty_id = ?");
         $stmt->execute([$id, $facultyId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         if ($row) {
             $fullPath = __DIR__ . '/../../' . $row['file_path'];
-            if (file_exists($fullPath)) unlink($fullPath);
-            $db->prepare("DELETE FROM faculty_teaching_workloads WHERE id = ?")->execute([$id]);
+            if (file_exists($fullPath)) @unlink($fullPath);
+            $db->prepare("DELETE FROM faculty_teaching_workloads WHERE id = ? AND faculty_id = ?")->execute([$id, $facultyId]);
         }
-        echo json_encode(["status" => "success"]);
+        echo json_encode(["status" => "success", "message" => "ลบเรียบร้อยแล้ว"], JSON_UNESCAPED_UNICODE);
     }
     elseif ($action === 'add-development') {
-        $trainingDate = $_POST['training_date'] ?? '';
-        $trainingTopic = $_POST['training_topic'] ?? '';
-        $learnings = $_POST['learnings'] ?? '';
+        $trainingDate = trim($_POST['training_date'] ?? ($jsonBody['training_date'] ?? ''));
+        $trainingTopic = trim($_POST['training_topic'] ?? ($jsonBody['training_topic'] ?? ''));
+        $learnings = trim($_POST['learnings'] ?? ($jsonBody['learnings'] ?? ''));
         if (!$trainingDate || !$trainingTopic) throw new Exception("ข้อมูลไม่ครบถ้วน");
 
         $dbPath = null;
-        if (isset($_FILES['file']) && $_FILES['file']['error'] === 0) {
+        if (isset($_FILES['file']) && $_FILES['file']['error'] === UPLOAD_ERR_OK) {
             $file = $_FILES['file'];
             $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
             if (!in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'pdf'])) {
@@ -92,19 +99,20 @@ try {
         $stmt = $db->prepare("INSERT INTO faculty_personnel_development (faculty_id, training_date, training_topic, learnings, certificate_file) VALUES (?, ?, ?, ?, ?)");
         $stmt->execute([$facultyId, $trainingDate, $trainingTopic, $learnings, $dbPath]);
         
-        echo json_encode(["status" => "success", "message" => "บันทึกเรียบร้อยแล้ว"]);
+        echo json_encode(["status" => "success", "message" => "บันทึกเรียบร้อยแล้ว"], JSON_UNESCAPED_UNICODE);
     }
     elseif ($action === 'delete-development') {
-        $id = $_POST['id'] ?? '';
+        $id = $_POST['id'] ?? $_GET['id'] ?? ($jsonBody['id'] ?? '');
+        if (!$id) throw new Exception("Missing ID");
         $stmt = $db->prepare("SELECT certificate_file FROM faculty_personnel_development WHERE id = ? AND faculty_id = ?");
         $stmt->execute([$id, $facultyId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         if ($row && $row['certificate_file']) {
             $fullPath = __DIR__ . '/../../' . $row['certificate_file'];
-            if (file_exists($fullPath)) unlink($fullPath);
+            if (file_exists($fullPath)) @unlink($fullPath);
         }
         $db->prepare("DELETE FROM faculty_personnel_development WHERE id = ? AND faculty_id = ?")->execute([$id, $facultyId]);
-        echo json_encode(["status" => "success"]);
+        echo json_encode(["status" => "success", "message" => "ลบเรียบร้อยแล้ว"], JSON_UNESCAPED_UNICODE);
     }
     else {
         throw new Exception("Invalid action");
