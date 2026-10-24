@@ -87,22 +87,20 @@ try {
         $studentAdvisorInfo = $advStmt->fetch(PDO::FETCH_ASSOC) ?: null;
 
         // หากมีข้อมูลอาจารย์ แต่ยังไม่เคยมีแจ้งเตือนเรื่องอาจารย์เลย ให้สร้างแจ้งเตือนเริ่มต้น 1 รายการ
-        if ($studentAdvisorInfo && (!empty($studentAdvisorInfo['advisor_name']) || !empty($studentAdvisorInfo['practical_advisor_name']))) {
+        if ($studentAdvisorInfo && !empty($studentAdvisorInfo['advisor_name'])) {
             $checkNotif = $pdo->prepare("
                 SELECT COUNT(*) FROM notifications
-                WHERE user_id = :uid AND (title LIKE '%อาจารย์ที่ปรึกษา%' OR title LIKE '%อาจารย์ปฏิบัติ%' OR title LIKE '%อาจารย์ผู้ดูแล%')
+                WHERE user_id = :uid AND (title LIKE '%อาจารย์ที่ปรึกษา%' OR title LIKE '%อาจารย์ผู้ดูแล%')
             ");
             $checkNotif->execute([':uid' => $user_id]);
             if ((int)$checkNotif->fetchColumn() === 0) {
                 $advText = !empty($studentAdvisorInfo['advisor_name']) ? $studentAdvisorInfo['advisor_name'] : 'ยังไม่มีการมอบหมาย';
-                $pracText = !empty($studentAdvisorInfo['practical_advisor_name']) ? $studentAdvisorInfo['practical_advisor_name'] : 'ยังไม่มีการมอบหมาย';
-                $initTitle = "แจ้งข้อมูลอาจารย์ผู้ดูแลคนปัจจุบัน";
-                $initMsg = "อาจารย์ที่ปรึกษา: {$advText} | อาจารย์ปฏิบัติ: {$pracText} (คลิกเพื่อดูรายละเอียดในใบแสดงผลการเรียน)";
+                $initTitle = "แจ้งข้อมูลอาจารย์ที่ปรึกษาคนปัจจุบัน";
+                $initMsg = "อาจารย์ที่ปรึกษา: {$advText} (คลิกเพื่อดูรายละเอียดในใบแสดงผลการเรียน)";
                 $initPayload = json_encode([
                     'action' => 'view_transcript',
                     'target' => 'transcript',
-                    'advisor_name' => $advText,
-                    'practical_advisor_name' => $pracText
+                    'advisor_name' => $advText
                 ], JSON_UNESCAPED_UNICODE);
 
                 $initNotif = $pdo->prepare("

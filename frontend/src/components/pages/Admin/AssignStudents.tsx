@@ -46,7 +46,9 @@ export default function AssignStudents() {
   const { toast } = useToast();
 
   const [advisorType, setAdvisorType] = useState('advisor');
-  const [types, setTypes] = useState<TypeOption[]>([]);
+  const [types, setTypes] = useState<TypeOption[]>([
+    { value: 'advisor', label: 'อาจารย์ที่ปรึกษา', limit: 12 },
+  ]);
   const [limit, setLimit] = useState(12);
   const [typeLabel, setTypeLabel] = useState('อาจารย์ที่ปรึกษา');
 
@@ -182,26 +184,20 @@ export default function AssignStudents() {
       <div className="app-page-header">
         <div>
           <h1 className="app-page-title">ระบบอาจารย์ที่ปรึกษา</h1>
-          <p className="app-page-description">มอบหมายนักศึกษาในความดูแลให้อาจารย์ที่ปรึกษาและอาจารย์ปฏิบัติ</p>
+          <p className="app-page-description">มอบหมายนักศึกษาในความดูแลให้อาจารย์ที่ปรึกษา (สูงสุด 12 คน)</p>
         </div>
       </div>
 
-      {/* เลือกประเภทอาจารย์ + ตัวอาจารย์ */}
+      {/* ประเภทอาจารย์ + ตัวอาจารย์ */}
       <div className="grid gap-4 md:grid-cols-2">
         <div className="grid gap-2">
           <Label className="font-semibold">ประเภทอาจารย์</Label>
-          <Select value={advisorType} onValueChange={setAdvisorType}>
-            <SelectTrigger className="border-border bg-card shadow-sm hover:border-primary/50">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {types.map((t) => (
-                <SelectItem key={t.value} value={t.value}>
-                  {t.label} (สูงสุด {t.limit} คน)
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex h-10 w-full items-center justify-between rounded-md border border-border bg-muted/30 px-3 py-2 text-sm text-foreground shadow-sm">
+            <span className="font-medium">{typeLabel || 'อาจารย์ที่ปรึกษา'}</span>
+            <Badge variant="outline" className="font-normal text-xs bg-background text-muted-foreground border-border">
+              สูงสุด {limit} คน
+            </Badge>
+          </div>
         </div>
 
         <div className="grid gap-2">
