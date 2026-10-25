@@ -609,11 +609,6 @@ const NotificationsPage = () => {
                     <strong className="text-foreground font-medium">อาจารย์ที่ปรึกษา:</strong>{" "}
                     <span className="text-foreground">{advisorInfo.advisor_name || "ยังไม่มีข้อมูล"}</span>
                   </span>
-                  <span className="text-muted-foreground/40">•</span>
-                  <span className="flex items-center gap-1.5">
-                    <strong className="text-foreground font-medium">อาจารย์ปฏิบัติ:</strong>{" "}
-                    <span className="text-foreground">{advisorInfo.practical_advisor_name || "ยังไม่มีข้อมูล"}</span>
-                  </span>
                 </div>
               </div>
             </div>

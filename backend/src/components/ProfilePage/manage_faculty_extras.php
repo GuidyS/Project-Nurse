@@ -27,12 +27,55 @@ $rawInput = file_get_contents('php://input');
 $jsonBody = !empty($rawInput) ? json_decode($rawInput, true) : null;
 $action = $_POST['action'] ?? $_GET['action'] ?? ($jsonBody['action'] ?? '');
 
+function ensureFacultyExtrasSchema(PDO $db): void {
+    try {
+        $db->exec("CREATE TABLE IF NOT EXISTS `faculty_teaching_workloads` (
+          `id` bigint NOT NULL AUTO_INCREMENT,
+          `faculty_id` bigint NOT NULL,
+          `academic_year` int NOT NULL,
+          `term` varchar(20) NOT NULL,
+          `file_path` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+          `uploaded_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+          PRIMARY KEY (`id`),
+          KEY `idx_faculty` (`faculty_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        $db->exec("CREATE TABLE IF NOT EXISTS `faculty_personnel_development` (
+          `id` bigint NOT NULL AUTO_INCREMENT,
+          `faculty_id` bigint NOT NULL,
+          `training_date` date NOT NULL,
+          `training_topic` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+          `learnings` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+          `certificate_file` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+          `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+          PRIMARY KEY (`id`),
+          KEY `idx_faculty` (`faculty_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        $checkCol = $db->query("SHOW COLUMNS FROM `faculty_teaching_workloads` LIKE 'academic_year'")->fetch(PDO::FETCH_ASSOC);
+        if ($checkCol && strtolower((string)$checkCol['Type']) === 'year') {
+            $db->exec("ALTER TABLE `faculty_teaching_workloads` MODIFY COLUMN `academic_year` INT NOT NULL");
+        }
+        $checkTerm = $db->query("SHOW COLUMNS FROM `faculty_teaching_workloads` LIKE 'term'")->fetch(PDO::FETCH_ASSOC);
+        if ($checkTerm && stripos((string)$checkTerm['Type'], 'bit') !== false) {
+            $db->exec("ALTER TABLE `faculty_teaching_workloads` MODIFY COLUMN `term` VARCHAR(20) NOT NULL");
+        }
+    } catch (Throwable $e) {
+        // ignore schema auto-migration errors
+    }
+}
+
+ensureFacultyExtrasSchema($db);
+
 try {
     if ($action === 'upload-workload') {
         if (!isset($_FILES['file'])) throw new Exception("No file uploaded");
         $academicYear = trim($_POST['academic_year'] ?? ($jsonBody['academic_year'] ?? ''));
         $term = trim($_POST['term'] ?? ($jsonBody['term'] ?? ''));
         if (!$academicYear || !$term) throw new Exception("Missing academic_year or term");
+        if (!in_array((string)$term, ['1', '2', '3'], true)) {
+            throw new Exception("เทอมต้องเป็น 1, 2 หรือ 3 เท่านั้น");
+        }
 
         $file = $_FILES['file'];
         if ($file['error'] !== UPLOAD_ERR_OK) {
