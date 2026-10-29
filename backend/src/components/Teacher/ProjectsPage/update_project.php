@@ -121,15 +121,6 @@ try {
         }
     }
 
-    if ($status === 'completed') {
-        $progressStmt = $db->prepare("SELECT COALESCE(MAX(actual_percent), 0) FROM project_progress_logs WHERE project_id = :project_id");
-        $progressStmt->execute([':project_id' => $projectId]);
-        if ((float)$progressStmt->fetchColumn() < 100) {
-            project_json(["status" => "error", "message" => "ต้องมีความคืบหน้า 100% ก่อนเปลี่ยนเป็นเสร็จสิ้น"], 400);
-            exit;
-        }
-    }
-
     $db->beginTransaction();
 
     $stmt = $db->prepare("

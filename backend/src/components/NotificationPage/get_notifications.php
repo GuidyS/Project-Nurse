@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../../config/config.php';
 session_start();
 
 header('Access-Control-Allow-Origin: ' . (in_array($_SERVER['HTTP_ORIGIN'] ?? '', ['http://localhost:5173', 'http://127.0.0.1:5173'], true) ? ($_SERVER['HTTP_ORIGIN'] ?? '') : 'http://localhost:5173'));
@@ -13,7 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit();
 }
 
-$pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
+$pdo = new Connect();
 
 // สร้างตารางเก็บ "ใบที่ผู้ใช้ลบออกจากรายการตัวเอง" ถ้ายังไม่มี (ครั้งแรกเท่านั้น)
 require_once __DIR__ . '/notification_hidden_helper.php';
@@ -161,7 +162,7 @@ try {
             LEFT JOIN faculty f_sender ON CAST(sender_u.username AS CHAR) = f_sender.faculty_id
             LEFT JOIN student s_sender ON CAST(sender_u.username AS UNSIGNED) = s_sender.student_id
             
-            WHERE (n.user_id = :filter_user_id OR n.sender_user_id = :filter_user_id)
+            WHERE (n.user_id = :recipient_user_id OR n.sender_user_id = :sender_user_id)
               -- ไม่แสดงใบที่ผู้ใช้คนนี้ลบออกจากรายการของตัวเองแล้ว (อีกฝ่ายยังเห็นอยู่)
               AND NOT EXISTS (
                     SELECT 1 FROM notification_hidden nh
@@ -172,7 +173,8 @@ try {
     $stmt = $pdo->prepare($sql);
     $stmt->execute([
         ':current_user_id' => $user_id,
-        ':filter_user_id' => $user_id,
+        ':recipient_user_id' => $user_id,
+        ':sender_user_id' => $user_id,
         ':hidden_user_id' => $user_id,
     ]);
     $notifications = $stmt->fetchAll(PDO::FETCH_ASSOC);

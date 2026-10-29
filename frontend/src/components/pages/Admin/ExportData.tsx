@@ -6,10 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
-import { Download, FileSpreadsheet, FileText, Users, BookOpen, FolderKanban, GraduationCap, Calendar, Library } from "lucide-react";
+import { Download, FileSpreadsheet, Users, BookOpen, FolderKanban, GraduationCap, Calendar, Library } from "lucide-react";
 import api from "@/lib/axios";
-import { useAcademicYearSelection } from "@/hooks/use-academic-year";
-import { academicYearOptions } from "@/lib/academicYear";
 
 type ExportField = { key: string; label: string };
 
@@ -28,7 +26,6 @@ const exportCategories: {
       { key: "full_name_th", label: "ชื่อ-นามสกุล" },
       { key: "gender", label: "เพศ" },
       { key: "year_level", label: "ชั้นปี" },
-      { key: "gpa", label: "GPA" },
       { key: "status", label: "สถานะ" },
       { key: "email", label: "อีเมล" },
       { key: "phone", label: "เบอร์โทร" },
@@ -73,8 +70,15 @@ const exportCategories: {
       { key: "project_name_th", label: "ชื่อโครงการ (ไทย)" },
       { key: "project_name_en", label: "ชื่อโครงการ (อังกฤษ)" },
       { key: "description", label: "รายละเอียด" },
-      { key: "responsible_faculty_id", label: "อาจารย์ผู้รับผิดชอบ" },
+      { key: "project_type", label: "ประเภทโครงการ" },
+      { key: "strategy", label: "ยุทธศาสตร์" },
+      { key: "responsible_name", label: "อาจารย์ผู้รับผิดชอบ" },
       { key: "academic_year", label: "ปีการศึกษา" },
+      { key: "status", label: "สถานะ" },
+      { key: "start_date", label: "วันที่เริ่ม" },
+      { key: "end_date", label: "วันที่สิ้นสุด" },
+      { key: "budget_allocated", label: "งบประมาณ" },
+      { key: "budget_spent", label: "ใช้จ่ายจริง" },
     ],
   },
 ];
@@ -93,10 +97,10 @@ interface ActiveCurriculum {
 export default function ExportData() {
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedFields, setSelectedFields] = useState<string[]>([]);
-  const [format, setFormat] = useState("xlsx");
-  const { currentYear, academicYear, setAcademicYear } = useAcademicYearSelection();
+  const format = "xlsx";
+  const [academicYear, setAcademicYear] = useState("ทั้งหมด");
   const [availableYears, setAvailableYears] = useState<Record<string, number[]>>({});
-  const academicYears = academicYearOptions([...(availableYears[selectedCategory] ?? []), academicYear], currentYear);
+  const academicYears = (availableYears[selectedCategory] ?? []).map(String);
   const [semester, setSemester] = useState("ทั้งหมด");
   // undefined = กำลังโหลด, null = ยังไม่มีหลักสูตรในระบบ
   const [activeCurriculum, setActiveCurriculum] = useState<ActiveCurriculum | null | undefined>(undefined);
@@ -180,9 +184,9 @@ export default function ExportData() {
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
-      // ตั้งชื่อไฟล์ เช่น ข้อมูลนักศึกษา_2568.csv, ข้อมูลรายวิชา_2572-2577.xlsx, ข้อมูลอาจารย์.xlsx
+      // ตั้งชื่อไฟล์ตามประเภทและปีที่เลือก
       const suffix = showFilters
-        ? `_${academicYear}`
+        ? academicYear === "ทั้งหมด" ? "" : `_${academicYear}`
         : selectedCategory === "courses" && activeCurriculum
           ? `_${activeCurriculum.start_year}-${activeCurriculum.end_year}`
           : "";
@@ -233,6 +237,7 @@ export default function ExportData() {
                     onClick={() => {
                       setSelectedCategory(category.value);
                       setSelectedFields([]);
+                      setAcademicYear("ทั้งหมด");
                     }}
                   >
                     <category.icon className="h-5 w-5 text-primary" />
@@ -276,6 +281,7 @@ export default function ExportData() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="ทั้งหมด">ทั้งหมด</SelectItem>
                       {academicYears.map((year) => (
                         <SelectItem key={year} value={year}>{year}</SelectItem>
                       ))}
@@ -343,17 +349,11 @@ export default function ExportData() {
                 <CardTitle className="text-base">รูปแบบไฟล์</CardTitle>
               </CardHeader>
               <CardContent>
-                <RadioGroup value={format} onValueChange={setFormat} className="flex gap-4">
+                <RadioGroup value={format} className="flex gap-4">
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="xlsx" id="xlsx" />
                     <Label htmlFor="xlsx" className="flex items-center gap-2 cursor-pointer">
                       <FileSpreadsheet className="h-4 w-4" /> Excel (.xlsx)
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="csv" id="csv" />
-                    <Label htmlFor="csv" className="flex items-center gap-2 cursor-pointer">
-                      <FileText className="h-4 w-4" /> CSV (.csv)
                     </Label>
                   </div>
                 </RadioGroup>

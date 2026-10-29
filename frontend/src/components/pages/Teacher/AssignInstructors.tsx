@@ -28,19 +28,6 @@ export default function AssignInstructors() {
   const [instructorSearch, setInstructorSearch] = useState('');
   const [instructorPickerOpen, setInstructorPickerOpen] = useState(false);
 
-  // ค่าตั้งต้นระดับหน้า — กำหนดครั้งเดียวแล้วทุกวิชาที่มอบหมายจะใช้ค่านี้
-  // จำไว้ในเครื่องผู้ใช้ จะได้ไม่ต้องกรอกใหม่ทุกครั้งที่เปิดหน้า
-  const [defaultSemester, setDefaultSemester] = useState<string>(
-    () => localStorage.getItem('assignDefaultSemester') || ''
-  );
-  const [defaultAcademicYear, setDefaultAcademicYear] = useState<string>(
-    () => localStorage.getItem('assignDefaultAcademicYear') || ''
-  );
-
-  // ค่าของวิชาที่กำลังมอบหมาย (เริ่มจากค่าตั้งต้น แต่แก้รายวิชาได้)
-  const [formSemester, setFormSemester] = useState<string>('');
-  const [formAcademicYear, setFormAcademicYear] = useState<string>('');
-
   const [coursesList, setCoursesList] = useState<any[]>([]);
   const [instructorsList, setInstructorsList] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -114,23 +101,11 @@ export default function AssignInstructors() {
       return;
     }
 
-    if (formSemester && !['1', '2', '3'].includes(formSemester)) {
-      toast({ title: "แจ้งเตือน", description: "ภาคเรียนต้องเป็น 1, 2 หรือ 3", variant: "destructive" });
-      return;
-    }
-
-    if (formAcademicYear && !/^25\d{2}$/.test(formAcademicYear)) {
-      toast({ title: "แจ้งเตือน", description: "ปีการศึกษาต้องเป็น พ.ศ. 4 หลัก เช่น 2567", variant: "destructive" });
-      return;
-    }
-
     try {
       setIsSaving(true);
       const response = await api.post('/index.php?page=save-assign-instructor', {
         subject_code: selectedCourse,
         faculty_id: selectedInstructor,
-        semester: formSemester || null,
-        academic_year: formAcademicYear || null
       });
 
       if (response.data.status === 'success') {
@@ -206,11 +181,6 @@ export default function AssignInstructors() {
     setSelectedInstructor(currentCourse?.instructor_id || '');
     setInstructorSearch('');
     setInstructorPickerOpen(false);
-    // ใช้ค่าที่วิชานั้นเคยบันทึกไว้ก่อน ถ้ายังไม่เคยตั้งค่อยใช้ค่าตั้งต้นของหน้า
-    setFormSemester(currentCourse?.semester ? String(currentCourse.semester) : defaultSemester);
-    setFormAcademicYear(
-      currentCourse?.academic_year ? String(currentCourse.academic_year) : defaultAcademicYear
-    );
     setIsDialogOpen(true);
   };
 
@@ -406,35 +376,6 @@ export default function AssignInstructors() {
                   {coursesList.find(c => c.id === selectedCourse)?.code} - {coursesList.find(c => c.id === selectedCourse)?.name}
                 </p>
               </div>
-              {/* ภาคเรียน/ปีการศึกษาของวิชานี้ — เริ่มจากค่าตั้งต้นด้านบน แก้รายวิชาได้ */}
-              <div className="grid gap-2">
-                <Label className="font-semibold">ภาคเรียน / ปีการศึกษา</Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    type="number"
-                    min="1"
-                    max="3"
-                    placeholder="เทอม"
-                    value={formSemester}
-                    onChange={(e) => setFormSemester(e.target.value)}
-                    className="w-24 text-center"
-                  />
-                  <span className="text-muted-foreground">/</span>
-                  <Input
-                    type="number"
-                    min="2500"
-                    max="2600"
-                    placeholder="ปีการศึกษา (พ.ศ.)"
-                    value={formAcademicYear}
-                    onChange={(e) => setFormAcademicYear(e.target.value)}
-                    className="flex-1 text-center"
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  เว้นว่างได้ถ้ายังไม่กำหนด — ระบบจะแสดงเป็น "-" แทนการเดาค่า
-                </p>
-              </div>
-
               <div className="grid gap-2">
                 <Label className="font-semibold">อาจารย์ประจำวิชา</Label>
                 {/*

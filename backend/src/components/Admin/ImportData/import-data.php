@@ -23,7 +23,7 @@ function getImportSchema($importType) {
             'row_key' => 'student_id',
             'optional_columns' => [],
             'date_columns' => ['birth_date', 'graduation_date', 'dropout_date'],
-            'columns' => ['student_id', 'title', 'first_name_th', 'last_name_th', 'first_name_en', 'last_name_en', 'gender', 'birth_date', 'email', 'phone', 'year_level', 'gpa', 'hometown_province', 'height', 'weight', 'bmi', 'home_phone', 'home_address', 'status', 'graduation_date', 'dropout_date', 'dropout_reason', 'admission_year']
+            'columns' => ['student_id', 'title', 'first_name_th', 'last_name_th', 'first_name_en', 'last_name_en', 'gender', 'birth_date', 'email', 'phone', 'year_level', 'hometown_province', 'height', 'weight', 'bmi', 'home_phone', 'home_address', 'status', 'graduation_date', 'dropout_date', 'dropout_reason', 'admission_year']
         ],
         'teachers' => [
             'table' => 'faculty',
@@ -256,6 +256,7 @@ function processExcelToDatabase($filePath, $importType, $db, $fileExt) {
     $schema = getImportSchema($importType);
     $sql = buildUpsertSql($schema);
     $rowKeyIndex = array_search($schema['row_key'], $schema['columns'], true);
+    $birthDateIndex = array_search('birth_date', $schema['columns'], true);
 
     if ($fileExt === 'csv') {
         if (($handle = fopen($filePath, "r")) === false) {
@@ -279,6 +280,9 @@ function processExcelToDatabase($filePath, $importType, $db, $fileExt) {
                 $rowNumber++;
                 $values = getRowValuesBySchema($data, $headerMap, $schema, $rowNumber);
                 if (empty($values[$rowKeyIndex])) continue;
+                if ($importType === 'students' && ($birthDateIndex === false || empty($values[$birthDateIndex]))) {
+                    throw new Exception("แถว {$rowNumber}: ต้องระบุวันเกิดนักศึกษาเพื่อสร้างบัญชีผู้ใช้");
+                }
 
                 $rowKeys[] = (string)$values[$rowKeyIndex];
                 $values = prepareExistingLookupValues($db, $values, $schema);
@@ -326,6 +330,9 @@ function processExcelToDatabase($filePath, $importType, $db, $fileExt) {
 
             $values = getRowValuesBySchema($rowData, $headerMap, $schema, $row, $rowCells);
             if (empty($values[$rowKeyIndex])) continue;
+            if ($importType === 'students' && ($birthDateIndex === false || empty($values[$birthDateIndex]))) {
+                throw new Exception("แถว {$row}: ต้องระบุวันเกิดนักศึกษาเพื่อสร้างบัญชีผู้ใช้");
+            }
 
             $rowKeys[] = (string)$values[$rowKeyIndex];
             $values = prepareExistingLookupValues($db, $values, $schema);

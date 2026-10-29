@@ -5,11 +5,9 @@ if (session_status() === PHP_SESSION_NONE) {
 
 require_once __DIR__ . '/../CLOPage/clo_mapping_helpers.php';
 require_once __DIR__ . '/../CLOPage/curriculum_repository.php';
+require_once __DIR__ . '/../CLOPage/clo_access_helpers.php';
 require_once __DIR__ . '/../../../config/active_curriculum.php';
-require_once __DIR__ . '/../../../config/curriculum_outcomes.php';
-
-$pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
-$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+require_once __DIR__ . '/../../../config/config.php';
 
 try {
     if (!isset($_SESSION['user_id'])) {
@@ -17,6 +15,8 @@ try {
         echo json_encode(["status" => "error", "message" => "Unauthorized"]);
         exit();
     }
+
+    $pdo = new Connect();
 
     // รายวิชาตามหลักสูตรที่ใช้งานในระบบ (หน้า "จัดการหลักสูตร") — ยังไม่มีหลักสูตรใช้ตาราง subject แบบเดิม
     $curriculumSubjects = activeCurriculumSubjects($pdo);
@@ -32,9 +32,21 @@ try {
         $courses = $stmt_subjects->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    // YLO ของแต่ละรายวิชา (ตั้งค่าที่หน้า "จัดการหลักสูตร") — ใช้กรองในหน้า CLO Map
-    outcomesEnsureSchema($pdo);
-    $yloMap = outcomesSubjectYloMap($pdo);
+    if (!cloAccessIsAdmin($pdo, $_SESSION['user_id'])) {
+        $myCodeSet = array_fill_keys(array_map('strtolower', cloAccessMySubjectCodes($pdo, $_SESSION['user_id'])), true);
+        $courses = array_values(array_filter($courses, static fn(array $course): bool => isset($myCodeSet[strtolower((string)$course['code'])])));
+    }
+
+    // Reading a map must not run schema migrations on a production database.
+    $yloMap = [];
+    $cycle = activeCurriculumCycle($pdo);
+    if ($cycle !== null && activeCurriculumColumnExists($pdo, 'curriculum_cycle_subject', 'ylo')) {
+        $yloStmt = $pdo->prepare('SELECT subject_code, ylo FROM curriculum_cycle_subject WHERE cycle_id = ? AND ylo IS NOT NULL');
+        $yloStmt->execute([$cycle['id']]);
+        foreach ($yloStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $yloMap[(string)$row['subject_code']] = (int)$row['ylo'];
+        }
+    }
     foreach ($courses as &$course) {
         $course['ylo'] = $yloMap[(string)$course['code']] ?? null;
     }
@@ -85,8 +97,9 @@ try {
             "curriculum" => activeCurriculumCycle($pdo),
         ],
     ], JSON_UNESCAPED_UNICODE);
-} catch (PDOException $e) {
+} catch (Throwable $e) {
+    error_log('get-clo-map failed: ' . $e->getMessage());
     http_response_code(500);
-    echo json_encode(["status" => "error", "message" => $e->getMessage()]);
+    echo json_encode(["status" => "error", "message" => "ไม่สามารถดึงข้อมูล CLO Map ได้"], JSON_UNESCAPED_UNICODE);
 }
 ?>

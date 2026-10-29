@@ -140,20 +140,10 @@ try {
 
     if ($method === 'DELETE') {
         $id = $_GET['id'] ?? null;
-        $action = $_GET['action'] ?? '';
-
-        if ($action === 'delete_all') {
-            $db->beginTransaction();
-            try {
-                $db->exec("DELETE FROM practice_locations");
-                logAudit($db, $userId, 'delete', 'practice_locations', "ลบข้อมูลแหล่งฝึกภาคปฏิบัติทั้งหมดในระบบ");
-                $db->commit();
-                echo json_encode(["status" => "success", "message" => "ลบข้อมูลทั้งหมดเรียบร้อยแล้ว"], JSON_UNESCAPED_UNICODE);
-                exit;
-            } catch (Throwable $e) {
-                if ($db->inTransaction()) { $db->rollBack(); }
-                throw $e;
-            }
+        if (($_GET['action'] ?? '') === 'delete_all') {
+            http_response_code(405);
+            echo json_encode(["status" => "error", "message" => "ไม่รองรับการลบข้อมูลทั้งหมด"], JSON_UNESCAPED_UNICODE);
+            exit;
         }
 
         if (!$id) {

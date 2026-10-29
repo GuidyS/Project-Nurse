@@ -4,6 +4,12 @@ require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../config/academic_calendar.php';
 require_once __DIR__ . '/../Approvals/approval-schema.php';
 
+function sortExportYears(array $values): array {
+    $years = array_values(array_unique(array_filter(array_map('intval', $values), static fn(int $year): bool => $year >= 2500 && $year <= 2700)));
+    rsort($years, SORT_NUMERIC);
+    return $years;
+}
+
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     http_response_code(405);
     echo json_encode(['status' => 'error', 'message' => 'Method not allowed']);

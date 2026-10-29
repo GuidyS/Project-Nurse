@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../../config/config.php';
 session_start();
 require_once __DIR__ . '/../../config/audit_helper.php';
 
@@ -99,7 +100,7 @@ function resolveChannel(string $requestedChannel, array $settings): ?string
 }
 
 try {
-    $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
+    $pdo = new Connect();
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
     $roleStmt = $pdo->prepare("SELECT role_id FROM users WHERE user_id = :user_id LIMIT 1");

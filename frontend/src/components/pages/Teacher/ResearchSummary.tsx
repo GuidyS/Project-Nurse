@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { getAcademicYear, academicYearOptions, academicNow } from "@/lib/academicYear";
+import { getAcademicBoundary, academicYearOptions, academicNow } from "@/lib/academicYear";
 import { useAcademicYear } from "@/hooks/use-academic-year";
 import {
   BarChart3,
@@ -26,7 +26,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 
 type AuthorRole = "first_author" | "corresponding" | "co_author";
@@ -116,34 +116,23 @@ const formatCurrency = (value: number) => new Intl.NumberFormat("th-TH", {
 }).format(value);
 
 const getBuddhistYear = (dateValue: string, mode: YearMode) => {
-  const date = new Date(`${dateValue}T00:00:00+07:00`);
-  if (Number.isNaN(date.getTime())) return 0;
-  const christianYear = Number(dateValue.slice(0, 4));
-  if (mode === "academic") {
-    return getAcademicYear(date);
-  }
-  return christianYear + 543;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateValue);
+  if (!match) return 0;
+  const christianYear = Number(match[1]);
+  if (mode === "calendar") return christianYear + 543;
+  const { month, day } = getAcademicBoundary();
+  const publicationDay = Number(match[2]) * 100 + Number(match[3]);
+  return christianYear + 543 - (publicationDay < month * 100 + day ? 1 : 0);
 };
 
-const authorCountsForYear = (publications: Publication[], facultyId: number, year: number, mode: YearMode) => {
-  return publications.reduce(
-    (acc, publication) => {
-      if (getBuddhistYear(publication.publication_date, mode) !== year) return acc;
-      const author = publication.authors.find((item) => item.faculty_id === facultyId);
-      if (!author) return acc;
+interface AuthorCounts {
+  kpi: number;
+  coAuthor: number;
+  academic: number;
+}
 
-      if (publication.publication_type === "academic" || publication.publication_type === "textbook") {
-        acc.academic += 1;
-      } else if (author.role === "first_author" || author.role === "corresponding") {
-        acc.kpi += 1;
-      } else {
-        acc.coAuthor += 1;
-      }
-      return acc;
-    },
-    { kpi: 0, coAuthor: 0, academic: 0 }
-  );
-};
+const emptyAuthorCounts: Readonly<AuthorCounts> = { kpi: 0, coAuthor: 0, academic: 0 };
+const facultyPageSize = 20;
 
 const formatCell = (counts: { kpi: number; coAuthor: number; academic: number }) => {
   const parts = [];
@@ -155,16 +144,22 @@ const formatCell = (counts: { kpi: number; coAuthor: number; academic: number })
 
 export default function ResearchSummary() {
   const currentAcademicYear = useAcademicYear();
+  const [activeTab, setActiveTab] = useState<"summary" | "dashboard" | "records">("summary");
   const [yearMode, setYearMode] = useState<YearMode>("calendar");
   const [availableYears, setYears] = useState<number[]>([]);
   const [faculty, setFaculty] = useState<Faculty[]>([]);
   const [publications, setPublications] = useState<Publication[]>([]);
   const currentYear = yearMode === "academic" ? currentAcademicYear : Number(new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Bangkok", year: "numeric" }).format(academicNow())) + 543;
+  const publicationYears = useMemo(() => new Map(
+    publications.map((publication) => [publication, getBuddhistYear(publication.publication_date, yearMode)] as const)
+  ), [publications, yearMode]);
   const years = useMemo(() => academicYearOptions([
     ...availableYears,
-    ...publications.map((publication) => getBuddhistYear(publication.publication_date, yearMode)),
-  ], currentYear).map(Number).reverse(), [availableYears, publications, yearMode, currentYear]);
+    ...publicationYears.values(),
+  ], currentYear).map(Number).reverse(), [availableYears, publicationYears, currentYear]);
   const [search, setSearch] = useState("");
+  const [publicationSearch, setPublicationSearch] = useState("");
+  const [facultyPage, setFacultyPage] = useState(1);
   const [workCategoryFilter, setWorkCategoryFilter] = useState<"all" | WorkCategory>("all");
   const [fundingTypeFilter, setFundingTypeFilter] = useState<"all" | FundingType>("all");
   const [irbFilter, setIrbFilter] = useState<"all" | "approved" | "not_approved">("all");
@@ -176,6 +171,7 @@ export default function ResearchSummary() {
   const [canManageResearch, setCanManageResearch] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
+  const [quickSaveError, setQuickSaveError] = useState('');
   const [saveFailed, setSaveFailed] = useState(false);
   const savingRef = useRef(false);
   const [editingPublication, setEditingPublication] = useState<Publication | null>(null);
@@ -225,6 +221,42 @@ export default function ResearchSummary() {
     if (!query) return faculty;
     return faculty.filter((item) => item.name.toLowerCase().includes(query));
   }, [faculty, search]);
+  const facultyPageCount = Math.max(1, Math.ceil(filteredFaculty.length / facultyPageSize));
+  const currentFacultyPage = Math.min(facultyPage, facultyPageCount);
+  const paginatedFaculty = useMemo(() => filteredFaculty.slice(
+    (currentFacultyPage - 1) * facultyPageSize,
+    currentFacultyPage * facultyPageSize
+  ), [filteredFaculty, currentFacultyPage]);
+
+  const countsByFacultyAndYear = useMemo(() => {
+    const counts = new Map<number, Map<number, AuthorCounts>>();
+    publications.forEach((publication) => {
+      const year = publicationYears.get(publication) ?? 0;
+      const seenFaculty = new Set<number>();
+      publication.authors.forEach((author) => {
+        if (seenFaculty.has(author.faculty_id)) return;
+        seenFaculty.add(author.faculty_id);
+        let facultyCounts = counts.get(author.faculty_id);
+        if (!facultyCounts) {
+          facultyCounts = new Map();
+          counts.set(author.faculty_id, facultyCounts);
+        }
+        let yearCounts = facultyCounts.get(year);
+        if (!yearCounts) {
+          yearCounts = { kpi: 0, coAuthor: 0, academic: 0 };
+          facultyCounts.set(year, yearCounts);
+        }
+        if (publication.publication_type === "academic" || publication.publication_type === "textbook") {
+          yearCounts.academic += 1;
+        } else if (author.role === "first_author" || author.role === "corresponding") {
+          yearCounts.kpi += 1;
+        } else {
+          yearCounts.coAuthor += 1;
+        }
+      });
+    });
+    return counts;
+  }, [publications, publicationYears]);
 
   const summary = useMemo(() => {
     let kpi = 0;
@@ -252,7 +284,7 @@ export default function ResearchSummary() {
     return years.map((year) => {
       const totals = faculty.reduce(
         (acc, person) => {
-          const counts = authorCountsForYear(publications, person.faculty_id, year, yearMode);
+          const counts = countsByFacultyAndYear.get(person.faculty_id)?.get(year) ?? emptyAuthorCounts;
           acc.kpi += counts.kpi;
           acc.coAuthor += counts.coAuthor;
           acc.academic += counts.academic;
@@ -267,7 +299,7 @@ export default function ResearchSummary() {
         "วิชาการ/ตำรา": totals.academic,
       };
     });
-  }, [faculty, publications, years, yearMode]);
+  }, [faculty, countsByFacultyAndYear, years]);
 
   const publicationsMatchingResearchFilters = useMemo(() => publications.filter((publication) => {
     if (workCategoryFilter !== "all" && publication.work_category !== workCategoryFilter) return false;
@@ -278,19 +310,27 @@ export default function ResearchSummary() {
     return true;
   }), [publications, workCategoryFilter, fundingTypeFilter, irbFilter, intellectualPropertyFilter]);
 
-  const fundingChartData = useMemo(() => years.map((year) => {
-    const yearPublications = publicationsMatchingResearchFilters.filter(
-      (publication) => getBuddhistYear(publication.publication_date, yearMode) === year
-    );
-    return {
+  const fundingChartData = useMemo(() => {
+    const totalsByYear = new Map<number, { internal: number; external: number }>();
+    publicationsMatchingResearchFilters.forEach((publication) => {
+      const year = publicationYears.get(publication) ?? 0;
+      let totals = totalsByYear.get(year);
+      if (!totals) {
+        totals = { internal: 0, external: 0 };
+        totalsByYear.set(year, totals);
+      }
+      if (publication.funding_type === "internal") totals.internal += publication.funding_amount;
+      if (publication.funding_type === "external") totals.external += publication.funding_amount;
+    });
+    return years.map((year) => ({
       year: String(year),
-      "ทุนภายใน": yearPublications.reduce((total, publication) => total + (publication.funding_type === "internal" ? publication.funding_amount : 0), 0),
-      "ทุนภายนอก": yearPublications.reduce((total, publication) => total + (publication.funding_type === "external" ? publication.funding_amount : 0), 0),
-    };
-  }), [publicationsMatchingResearchFilters, years, yearMode]);
+      "ทุนภายใน": totalsByYear.get(year)?.internal ?? 0,
+      "ทุนภายนอก": totalsByYear.get(year)?.external ?? 0,
+    }));
+  }, [publicationsMatchingResearchFilters, publicationYears, years]);
 
   const fundingSummary = useMemo(() => publicationsMatchingResearchFilters.reduce((summary, publication) => {
-    if (yearFilter !== "all" && getBuddhistYear(publication.publication_date, yearMode) !== Number(yearFilter)) return summary;
+    if (yearFilter !== "all" && publicationYears.get(publication) !== Number(yearFilter)) return summary;
     summary.total += publication.funding_amount;
     if (publication.funding_type === "internal") summary.internal += publication.funding_amount;
     if (publication.funding_type === "external") summary.external += publication.funding_amount;
@@ -298,25 +338,26 @@ export default function ResearchSummary() {
     if (publication.work_category === "research") summary.research += 1;
     if (publication.work_category === "innovation") summary.innovation += 1;
     return summary;
-  }, { total: 0, internal: 0, external: 0, irb: 0, research: 0, innovation: 0 }), [publicationsMatchingResearchFilters, yearFilter, yearMode]);
+  }, { total: 0, internal: 0, external: 0, irb: 0, research: 0, innovation: 0 }), [publicationsMatchingResearchFilters, yearFilter, publicationYears]);
 
   const visiblePublications = useMemo(() => {
-    const query = search.trim().toLowerCase();
+    const query = publicationSearch.trim().toLowerCase();
     return publicationsMatchingResearchFilters.filter(
       (publication) =>
-        (yearFilter === "all" || getBuddhistYear(publication.publication_date, yearMode) === Number(yearFilter)) &&
+        (yearFilter === "all" || publicationYears.get(publication) === Number(yearFilter)) &&
         (!query || publication.title.toLowerCase().includes(query) ||
           publication.journal.toLowerCase().includes(query) ||
           publication.funding_source.toLowerCase().includes(query) ||
           publication.authors.some((author) => author.name.toLowerCase().includes(query)))
     );
-  }, [publicationsMatchingResearchFilters, search, yearFilter, yearMode]);
+  }, [publicationsMatchingResearchFilters, publicationSearch, yearFilter, publicationYears]);
 
   const saveChange = async (payload: Record<string, string | number | boolean | number[]>) => {
     if (savingRef.current || saveFailed || !canManageResearch) return false;
     savingRef.current = true;
     setIsSaving(true);
     setSaveFailed(false);
+    setQuickSaveError('');
     setEditError('');
     setSaveMessage('กำลังบันทึก...');
     try {
@@ -337,8 +378,24 @@ export default function ResearchSummary() {
         setSaveMessage('ยังไม่ได้บันทึกการแก้ไข');
         return false;
       }
-      setSaveFailed(true);
-      setSaveMessage('ยืนยันการบันทึกไม่สำเร็จ กรุณาโหลดข้อมูลใหม่เพื่อตรวจสอบก่อนทำรายการต่อ');
+      const failureMessage = response?.data?.message || 'บันทึกไม่สำเร็จ';
+      if (payload.action !== 'update') setQuickSaveError(failureMessage);
+      // The request might have reached the server even when its response was lost.
+      // Reconcile with the server before allowing another click, so a retry
+      // cannot accidentally remove a second publication.
+      try {
+        const latest = await api.get<ResearchSummaryResponse>('/index.php?page=get-research-summary');
+        if (latest.data.status !== 'success' || !latest.data.data) throw new Error('Reload failed');
+        setPublications(latest.data.data.publications);
+        setFaculty(latest.data.data.faculty);
+        setYears(latest.data.data.years);
+        setCanManageResearch(latest.data.data.can_manage);
+        setSaveFailed(false);
+        setSaveMessage(`${failureMessage} ตรวจสอบข้อมูลล่าสุดแล้ว สามารถลองอีกครั้งได้`);
+      } catch {
+        setSaveFailed(true);
+        setSaveMessage(`${failureMessage} กรุณาโหลดข้อมูลใหม่เพื่อตรวจสอบก่อนทำรายการต่อ`);
+      }
       return false;
     } finally {
       savingRef.current = false;
@@ -392,6 +449,8 @@ export default function ResearchSummary() {
 
   const showAuthorInFacultyTable = (author: PublicationAuthor) => {
     setSearch(author.name);
+    setFacultyPage(1);
+    setActiveTab("summary");
     window.requestAnimationFrame(() => {
       window.requestAnimationFrame(() => {
         document.getElementById(`research-faculty-${author.faculty_id}`)?.scrollIntoView({
@@ -595,73 +654,21 @@ export default function ResearchSummary() {
           <h1 className="app-page-title">สรุปผลงานวิจัย 5 ปี</h1>
           <p className="app-page-description">บันทึกและตรวจสอบผลงานวิจัยสำหรับอาจารย์งานวิจัย</p>
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <Tabs value={yearMode} onValueChange={(value) => setYearMode(value as YearMode)}>
-            <TabsList>
-              <TabsTrigger value="calendar">ปีปฏิทิน</TabsTrigger>
-              <TabsTrigger value="academic">ปีการศึกษา</TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </div>
+        <Tabs value={yearMode} onValueChange={(value) => setYearMode(value as YearMode)}>
+          <TabsList>
+            <TabsTrigger value="calendar">ปีปฏิทิน</TabsTrigger>
+            <TabsTrigger value="academic">ปีการศึกษา</TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
 
-      <Card>
-        <CardHeader className="space-y-4">
-          <div>
-            <CardTitle>ตัวกรองงานวิจัยและนวัตกรรม</CardTitle>
-            <CardDescription>ใช้กรองรายการผลงานและข้อมูลสรุปทุนวิจัยรายปี</CardDescription>
-          </div>
-          <Tabs value={workCategoryFilter} onValueChange={(value) => setWorkCategoryFilter(value as "all" | WorkCategory)}>
-            <TabsList className="grid w-full max-w-md grid-cols-3">
-              <TabsTrigger value="all">ทั้งหมด</TabsTrigger>
-              <TabsTrigger value="research">งานวิจัย</TabsTrigger>
-              <TabsTrigger value="innovation">งานนวัตกรรม</TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-            <div className="space-y-2">
-              <Label htmlFor="funding-filter">ประเภททุน</Label>
-              <select id="funding-filter" className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={fundingTypeFilter} onChange={(event) => setFundingTypeFilter(event.target.value as "all" | FundingType)}>
-                <option value="all">ทุกประเภททุน</option>
-                {Object.entries(fundingTypeLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-              </select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="irb-filter">สถานะ IRB</Label>
-              <select id="irb-filter" className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={irbFilter} onChange={(event) => setIrbFilter(event.target.value as typeof irbFilter)}>
-                <option value="all">ทุกสถานะ IRB</option>
-                <option value="approved">ผ่าน IRB</option>
-                <option value="not_approved">ยังไม่ผ่าน IRB</option>
-              </select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="ip-filter">ทรัพย์สินทางปัญญา</Label>
-              <select id="ip-filter" className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={intellectualPropertyFilter} onChange={(event) => setIntellectualPropertyFilter(event.target.value as "all" | IntellectualPropertyStatus)}>
-                <option value="all">ทุกสถานะ</option>
-                {Object.entries(intellectualPropertyLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-              </select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="research-year-filter">ปี</Label>
-              <select id="research-year-filter" className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={yearFilter} onChange={(event) => setYearFilter(event.target.value)}>
-                <option value="all">ทุกปี</option>
-                {years.map((year) => <option key={year} value={String(year)}>{year}</option>)}
-              </select>
-            </div>
-            <div className="flex items-end">
-              <Button type="button" variant="outline" className="w-full" onClick={() => {
-                setWorkCategoryFilter("all");
-                setFundingTypeFilter("all");
-                setIrbFilter("all");
-                setIntellectualPropertyFilter("all");
-                setYearFilter("all");
-              }}>ล้างตัวกรอง</Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "summary" | "dashboard" | "records")} className="space-y-6">
+        <TabsList className="grid w-full max-w-xl grid-cols-3">
+          <TabsTrigger value="summary">สรุปผลงาน 5 ปี</TabsTrigger>
+          <TabsTrigger value="dashboard">กราฟและทุนวิจัย</TabsTrigger>
+          <TabsTrigger value="records">รายงานผลบันทึก</TabsTrigger>
+        </TabsList>
+        <TabsContent value="summary" className="space-y-6">
 
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
@@ -707,63 +714,6 @@ export default function ResearchSummary() {
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <BarChart3 className="h-5 w-5" />
-            แนวโน้มผลงานตามรอบปี
-          </CardTitle>
-          <CardDescription>
-            {yearMode === "calendar" ? "ปีปฏิทิน: 1 มกราคม - 31 ธันวาคม" : "ปีการศึกษา: 1 เมษายน - 31 มีนาคม"}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="year" />
-              <YAxis allowDecimals={false} />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="นับ KPI" fill="#dc2626" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="ชื่อร่วม" fill="#27272a" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="วิชาการ/ตำรา" fill="#0284c7" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Banknote className="h-5 w-5" />
-            Dashboard สรุปทุนวิจัยรายปี
-          </CardTitle>
-          <CardDescription>ตัวเลขสรุปใช้ทุกตัวกรองที่เลือก ส่วนกราฟคงการเปรียบเทียบรายปีและแยกทุนภายในกับทุนภายนอก</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-            <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">ทุนรวม</p><p className="mt-1 font-semibold">{formatCurrency(fundingSummary.total)}</p></div>
-            <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">ทุนภายใน</p><p className="mt-1 font-semibold">{formatCurrency(fundingSummary.internal)}</p></div>
-            <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">ทุนภายนอก</p><p className="mt-1 font-semibold">{formatCurrency(fundingSummary.external)}</p></div>
-            <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">งานวิจัย</p><p className="mt-1 font-semibold">{fundingSummary.research} ผลงาน</p></div>
-            <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">นวัตกรรม</p><p className="mt-1 font-semibold">{fundingSummary.innovation} ผลงาน</p></div>
-            <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">ผ่าน IRB</p><p className="mt-1 font-semibold">{fundingSummary.irb} ผลงาน</p></div>
-          </div>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={fundingChartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="year" />
-              <YAxis tickFormatter={(value) => new Intl.NumberFormat("th-TH", { notation: "compact" }).format(Number(value))} />
-              <Tooltip formatter={(value) => formatCurrency(Number(value))} />
-              <Legend />
-              <Bar dataKey="ทุนภายใน" fill="#7c3aed" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="ทุนภายนอก" fill="#0d9488" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
-
-      <Card>
         <CardHeader className="space-y-4">
           <div>
             <CardTitle>ตารางจำนวนผลงานวิจัยและวิชาการตีพิมพ์ของอาจารย์</CardTitle>
@@ -777,10 +727,10 @@ export default function ResearchSummary() {
             <div className="relative w-full min-w-0 lg:max-w-sm lg:flex-1">
               <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                aria-label="ค้นหาอาจารย์หรือบทความ"
+                aria-label="ค้นหาอาจารย์"
                 value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="ค้นหาอาจารย์ / บทความ"
+                onChange={(event) => { setSearch(event.target.value); setFacultyPage(1); }}
+                placeholder="ค้นหาอาจารย์"
                 className="h-10 bg-background pl-9"
               />
             </div>
@@ -792,7 +742,7 @@ export default function ResearchSummary() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="overflow-auto rounded-md border">
+          <div className="max-h-[38rem] overflow-auto rounded-md border">
             <Table>
               <TableHeader className="bg-muted/60">
                 <TableRow>
@@ -805,14 +755,15 @@ export default function ResearchSummary() {
               </TableHeader>
               <TableBody>
                 {filteredFaculty.length === 0 && <TableRow><TableCell colSpan={years.length + 4} className="text-center text-muted-foreground">ไม่พบอาจารย์</TableCell></TableRow>}
-                {filteredFaculty.map((person, index) => {
-                  const totalKpi = years.reduce((acc, year) => acc + authorCountsForYear(publications, person.faculty_id, year, yearMode).kpi, 0);
+                {paginatedFaculty.map((person, index) => {
+                  const facultyCounts = countsByFacultyAndYear.get(person.faculty_id);
+                  const totalKpi = years.reduce((acc, year) => acc + (facultyCounts?.get(year)?.kpi ?? 0), 0);
                   return (
                     <TableRow key={person.faculty_id} id={`research-faculty-${person.faculty_id}`}>
-                      <TableCell className="text-center text-muted-foreground">{index + 1}</TableCell>
+                      <TableCell className="text-center text-muted-foreground">{(currentFacultyPage - 1) * facultyPageSize + index + 1}</TableCell>
                       <TableCell className="font-medium">{person.name}</TableCell>
                       {years.map((year) => {
-                        const counts = authorCountsForYear(publications, person.faculty_id, year, yearMode);
+                        const counts = facultyCounts?.get(year) ?? emptyAuthorCounts;
                         const parts = formatCell(counts);
                         return (
                           <TableCell key={year} className="text-center">
@@ -842,6 +793,9 @@ export default function ResearchSummary() {
                                       <p className="text-sm font-medium">{person.name}</p>
                                       <p className="text-xs text-muted-foreground">เพิ่มหรือลดจำนวนในปี {year}</p>
                                     </div>
+                                    {quickSaveError && <p role="alert" className="text-xs text-destructive">{quickSaveError}</p>}
+                                    {saveFailed && <Button type="button" variant="outline" size="sm" onClick={() => window.location.reload()}>โหลดข้อมูลใหม่</Button>}
+                                    {isSaving && <p role="status" className="text-xs text-muted-foreground">กำลังบันทึก...</p>}
                                     <div className="grid gap-2">
                                       <div className="grid grid-cols-[1fr_auto_auto] items-center gap-2">
                                         <span className="text-sm font-medium text-red-500">ผลงานนับ KPI</span>
@@ -944,18 +898,156 @@ export default function ResearchSummary() {
               </TableBody>
             </Table>
           </div>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm">
+            <p className="text-muted-foreground">
+              {filteredFaculty.length === 0
+                ? "ไม่พบอาจารย์"
+                : `แสดง ${(currentFacultyPage - 1) * facultyPageSize + 1}-${Math.min(currentFacultyPage * facultyPageSize, filteredFaculty.length)} จาก ${filteredFaculty.length} คน`}
+            </p>
+            {facultyPageCount > 1 && <div className="flex items-center gap-2" aria-label="หน้ารายชื่ออาจารย์">
+              <Button type="button" variant="outline" size="sm" disabled={currentFacultyPage === 1} onClick={() => setFacultyPage(currentFacultyPage - 1)}>ก่อนหน้า</Button>
+              <span>หน้า {currentFacultyPage} / {facultyPageCount}</span>
+              <Button type="button" variant="outline" size="sm" disabled={currentFacultyPage === facultyPageCount} onClick={() => setFacultyPage(currentFacultyPage + 1)}>ถัดไป</Button>
+            </div>}
+          </div>
         </CardContent>
       </Card>
 
-      <Card id="recorded-research-publications">
+        </TabsContent>
+        <TabsContent value="dashboard" className="space-y-6">
+      <Card>
         <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BarChart3 className="h-5 w-5" />
+            แนวโน้มผลงานตามรอบปี
+          </CardTitle>
+          <CardDescription>
+            {yearMode === "calendar" ? "ปีปฏิทิน: 1 มกราคม - 31 ธันวาคม" : "ปีการศึกษา: นับตามวันเริ่มปีการศึกษาที่ผู้ดูแลตั้งค่า"}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="year" />
+              <YAxis allowDecimals={false} />
+              <Tooltip />
+              <Legend />
+              <Bar dataKey="นับ KPI" fill="#dc2626" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="ชื่อร่วม" fill="#27272a" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="วิชาการ/ตำรา" fill="#0284c7" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Banknote className="h-5 w-5" />
+            Dashboard สรุปทุนวิจัยรายปี
+          </CardTitle>
+          <CardDescription>ตัวเลขสรุปใช้ทุกตัวกรองที่เลือก ส่วนกราฟคงการเปรียบเทียบรายปีและแยกทุนภายในกับทุนภายนอก</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+            <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">ทุนรวม</p><p className="mt-1 font-semibold">{formatCurrency(fundingSummary.total)}</p></div>
+            <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">ทุนภายใน</p><p className="mt-1 font-semibold">{formatCurrency(fundingSummary.internal)}</p></div>
+            <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">ทุนภายนอก</p><p className="mt-1 font-semibold">{formatCurrency(fundingSummary.external)}</p></div>
+            <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">งานวิจัย</p><p className="mt-1 font-semibold">{fundingSummary.research} ผลงาน</p></div>
+            <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">นวัตกรรม</p><p className="mt-1 font-semibold">{fundingSummary.innovation} ผลงาน</p></div>
+            <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">ผ่าน IRB</p><p className="mt-1 font-semibold">{fundingSummary.irb} ผลงาน</p></div>
+          </div>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={fundingChartData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="year" />
+              <YAxis tickFormatter={(value) => new Intl.NumberFormat("th-TH", { notation: "compact" }).format(Number(value))} />
+              <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+              <Legend />
+              <Bar dataKey="ทุนภายใน" fill="#7c3aed" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="ทุนภายนอก" fill="#0d9488" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+        </TabsContent>
+        <TabsContent value="records" className="space-y-6">
+      <Card id="recorded-research-publications">
+        <CardHeader className="space-y-4">
+          <div>
+            <CardTitle>ตัวกรองงานวิจัยและนวัตกรรม</CardTitle>
+            <CardDescription>ใช้กรองรายการผลงานและข้อมูลสรุปทุนวิจัยรายปี</CardDescription>
+          </div>
+          <Tabs value={workCategoryFilter} onValueChange={(value) => setWorkCategoryFilter(value as "all" | WorkCategory)}>
+            <TabsList className="grid w-full max-w-md grid-cols-3">
+              <TabsTrigger value="all">ทั้งหมด</TabsTrigger>
+              <TabsTrigger value="research">งานวิจัย</TabsTrigger>
+              <TabsTrigger value="innovation">งานนวัตกรรม</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </CardHeader>
+        <CardContent>
+          <div className="relative mb-4 w-full max-w-sm">
+            <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              aria-label="ค้นหารายการผลงานที่บันทึก"
+              value={publicationSearch}
+              onChange={(event) => setPublicationSearch(event.target.value)}
+              placeholder="ค้นหาชื่อผลงานหรือผู้รับผิดชอบ"
+              className="h-10 bg-background pl-9"
+            />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+            <div className="space-y-2">
+              <Label htmlFor="funding-filter">ประเภททุน</Label>
+              <select id="funding-filter" className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={fundingTypeFilter} onChange={(event) => setFundingTypeFilter(event.target.value as "all" | FundingType)}>
+                <option value="all">ทุกประเภททุน</option>
+                {Object.entries(fundingTypeLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="irb-filter">สถานะ IRB</Label>
+              <select id="irb-filter" className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={irbFilter} onChange={(event) => setIrbFilter(event.target.value as typeof irbFilter)}>
+                <option value="all">ทุกสถานะ IRB</option>
+                <option value="approved">ผ่าน IRB</option>
+                <option value="not_approved">ยังไม่ผ่าน IRB</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="ip-filter">ทรัพย์สินทางปัญญา</Label>
+              <select id="ip-filter" className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={intellectualPropertyFilter} onChange={(event) => setIntellectualPropertyFilter(event.target.value as "all" | IntellectualPropertyStatus)}>
+                <option value="all">ทุกสถานะ</option>
+                {Object.entries(intellectualPropertyLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="research-year-filter">ปี</Label>
+              <select id="research-year-filter" className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={yearFilter} onChange={(event) => setYearFilter(event.target.value)}>
+                <option value="all">ทุกปี</option>
+                {years.map((year) => <option key={year} value={String(year)}>{year}</option>)}
+              </select>
+            </div>
+            <div className="flex items-end">
+              <Button type="button" variant="outline" className="w-full" onClick={() => {
+                setWorkCategoryFilter("all");
+                setFundingTypeFilter("all");
+                setIrbFilter("all");
+                setIntellectualPropertyFilter("all");
+                setYearFilter("all");
+              }}>ล้างตัวกรอง</Button>
+            </div>
+          </div>
+        </CardContent>
+        <CardHeader className="border-t">
           <CardTitle>รายการผลงานที่บันทึก</CardTitle>
           <CardDescription>
             ข้อมูลที่บันทึกในฐานข้อมูลและใช้คำนวณตัวเลขในตาราง เปิดป้ายผู้รับผิดชอบแล้วเลือกชื่อเพื่อไปยังแถวของอาจารย์คนนั้น รายการที่เพิ่มด้วยปุ่ม + เป็นบันทึกจำนวนผลงาน โดยใช้วันเริ่มต้นของปีที่เลือกเป็นวันที่อ้างอิง
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
+          <div className="max-h-[38rem] space-y-3 overflow-y-auto pr-2">
             {visiblePublications.length === 0 && <p className="text-sm text-muted-foreground">ยังไม่มีผลงานที่ตรงกับเงื่อนไข</p>}
             {visiblePublications.map((publication) => {
               const isAcademic = publication.publication_type === "academic" || publication.publication_type === "textbook";
@@ -1071,6 +1163,8 @@ export default function ResearchSummary() {
           </div>
         </CardContent>
       </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

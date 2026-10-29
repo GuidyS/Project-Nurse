@@ -3,6 +3,7 @@ if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../config/audit_helper.php'; // นำเข้า Audit Helper
 require_once __DIR__ . '/../CLOPage/curriculum_repository.php';
+require_once __DIR__ . '/../../../config/active_curriculum.php';
 require_once __DIR__ . '/subject_term_helpers.php';
 
 header('Access-Control-Allow-Origin: ' . (in_array($_SERVER['HTTP_ORIGIN'] ?? '', ['http://localhost:5173', 'http://127.0.0.1:5173'], true) ? ($_SERVER['HTTP_ORIGIN'] ?? '') : 'http://localhost:5173'));
@@ -16,6 +17,18 @@ $input = json_decode(file_get_contents("php://input"), true);
 
 try {
     $db = new Connect();
+    if (!isset($_SESSION['user_id'])) {
+        http_response_code(401);
+        echo json_encode(['status' => 'error', 'message' => 'Unauthorized']);
+        exit();
+    }
+    $roleStmt = $db->prepare('SELECT role_id FROM users WHERE user_id = ? LIMIT 1');
+    $roleStmt->execute([$_SESSION['user_id']]);
+    if (!in_array((int)$roleStmt->fetchColumn(), [1, 2], true)) {
+        http_response_code(403);
+        echo json_encode(['status' => 'error', 'message' => 'ไม่มีสิทธิ์มอบหมายอาจารย์'], JSON_UNESCAPED_UNICODE);
+        exit();
+    }
 
     if (empty($input['subject_code']) || !isset($input['faculty_id'])) {
         echo json_encode(["status" => "error", "message" => "ข้อมูลไม่ครบถ้วน"], JSON_UNESCAPED_UNICODE);
@@ -24,6 +37,23 @@ try {
 
     $subject_code = $input['subject_code'];
     $faculty_id = $input['faculty_id'];
+
+    $activeSubjects = activeCurriculumSubjects($db);
+    if ($activeSubjects !== null && !in_array((string)$subject_code, array_column($activeSubjects, 'subject_code'), true)) {
+        http_response_code(422);
+        echo json_encode(['status' => 'error', 'message' => 'รายวิชาไม่อยู่ในหลักสูตรที่ใช้งาน'], JSON_UNESCAPED_UNICODE);
+        exit();
+    }
+    if (!empty($faculty_id)) {
+        $facultyStmt = $db->prepare('SELECT f.faculty_id, u.role_id FROM faculty f LEFT JOIN users u ON u.username = f.faculty_id WHERE f.faculty_id = ? LIMIT 1');
+        $facultyStmt->execute([$faculty_id]);
+        $facultyAccount = $facultyStmt->fetch(PDO::FETCH_ASSOC);
+        if (!$facultyAccount || (int)($facultyAccount['role_id'] ?? 0) !== 2) {
+            http_response_code(409);
+            echo json_encode(['status' => 'error', 'message' => 'อาจารย์ต้องมีบัญชีผู้ใช้และ Role อาจารย์ก่อนมอบหมายรายวิชา'], JSON_UNESCAPED_UNICODE);
+            exit();
+        }
+    }
 
     $frameworkId = getActiveFrameworkId($db);
     if (!$frameworkId) {

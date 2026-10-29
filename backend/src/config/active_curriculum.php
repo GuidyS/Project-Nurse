@@ -133,15 +133,15 @@ function activeCurriculumFilterCodes(PDO $db, array $codes): array
     if ($activeCodes === null) {
         return array_values($codes);
     }
-    $allowed = array_fill_keys(array_map('mb_strtolower', $activeCodes), true);
-    return array_values(array_filter($codes, static fn($code): bool => isset($allowed[mb_strtolower((string)$code)])));
+    $allowed = array_fill_keys(array_map('strtolower', $activeCodes), true);
+    return array_values(array_filter($codes, static fn($code): bool => isset($allowed[strtolower((string)$code)])));
 }
 
 /** ชื่อวิชาตามหลักสูตรที่ใช้งาน (null = ไม่อยู่ในหลักสูตร หรือยังไม่มีหลักสูตร) */
 function activeCurriculumSubjectName(PDO $db, string $code): ?string
 {
     foreach (activeCurriculumSubjects($db) ?? [] as $subject) {
-        if (mb_strtolower($subject['subject_code']) === mb_strtolower($code)) {
+        if (strtolower($subject['subject_code']) === strtolower($code)) {
             return $subject['subject_name'];
         }
     }
@@ -157,10 +157,10 @@ function activeCurriculumApplyNames(PDO $db, array $rows, string $codeKey, strin
     }
     $names = [];
     foreach ($subjects as $subject) {
-        $names[mb_strtolower($subject['subject_code'])] = $subject['subject_name'];
+        $names[strtolower($subject['subject_code'])] = $subject['subject_name'];
     }
     foreach ($rows as &$row) {
-        $code = mb_strtolower((string)($row[$codeKey] ?? ''));
+        $code = strtolower((string)($row[$codeKey] ?? ''));
         if (isset($names[$code])) {
             $row[$nameKey] = $names[$code];
         }

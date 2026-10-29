@@ -26,12 +26,10 @@ import Performance from "@/components/pages/Teacher/Performance";
 import ScheduleTasks from "@/components/pages/Teacher/ScheduleTasks";
 import ProjectReports from "@/components/pages/Teacher/ProjectReports";
 import ProjectLinks from "@/components/pages/Teacher/ProjectLinks";
-import Approvals from "@/components/pages/Admin/Approvals";
 import AuditLog from "@/components/pages/Admin/AuditLog";
 import ExportData from "@/components/pages/Admin/ExportData";
 import ImportData from "@/components/pages/Admin/ImportData";
 import Reports from "@/components/pages/Admin/Reports";
-import RolesManagement from "@/components/pages/Admin/RolesManagement";
 import UsersManagement from "@/components/pages/Admin/UsersManagement";
 import AssignStudents from "@/components/pages/Admin/AssignStudents";
 import ResearchSummary from "@/components/pages/Teacher/ResearchSummary";
@@ -179,16 +177,15 @@ const Index = () => {
     if (activeItem === "my-projects") return <MyProjects />;
 
     // 3. 🔒 หมวดสิทธิ์ผู้ดูแลระบบ (Admin - Role 1)
-    const adminPages = ["approvals", "audit-log", "export-data", "import-data", "reports", "roles-management", "users-management", "competency-items-management"];
+    const adminPages = ["audit-log", "export-data", "import-data", "reports", "roles-management", "users-management", "competency-items-management"];
     if (adminPages.includes(activeItem)) {
       if (roleId !== 1 && !(roleId == 2 && positionId == 1)) return <UnauthorizedView />;
       switch (activeItem) {
-        case "approvals": return <Approvals />;                                 //*
         case "audit-log": return <AuditLog />;                                     //*
         case "export-data": return <ExportData />;                                 //*
         case "import-data": return <ImportData />;                                 //*
         case "reports": return <Reports />;
-        case "roles-management": return <RolesManagement />;                       //*
+        case "roles-management": return <UsersManagement />;
         case "users-management": return <UsersManagement />;                       //*
         case "competency-items-management": return <CompetencyItemsManagement />;
       }

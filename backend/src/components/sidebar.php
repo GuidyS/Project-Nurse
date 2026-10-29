@@ -39,7 +39,8 @@ $roleId = (int)($roleStmt->fetchColumn() ?: 0);
 // 2. SQL Query ดึงเมนูตามระบบสิทธิ์
 $sql = "SELECT m.* FROM system_sidebar_menus m 
         WHERE m.is_active = 1
-        AND m.url NOT IN ('import-data', 'project-docs', 'project-links', 'my-courses', 'students', 'students-info', 'advisor-notifications', 'advise-notes', 'course-report', 'plo-ylo-report', 'program-reports', 'transfer-requests')
+        AND m.url NOT IN ('import-data', 'roles-management', 'project-docs', 'project-links', 'my-courses', 'students', 'students-info', 'advisor-notifications', 'advise-notes', 'course-report', 'plo-ylo-report', 'program-reports', 'transfer-requests')
+        AND m.title <> 'จัดการสิทธิ์/ตำแหน่ง'
         AND (m.permission_required IN (
             SELECT p.permission_name FROM permissions p
             JOIN position_permission pp ON p.permission_id = pp.permission_id
@@ -88,7 +89,7 @@ foreach ($menu_items as $item) {
     }
 
     $sections[$sectionName]['items'][] = [
-        'title' => $item['title'],
+        'title' => $item['url'] === 'users-management' ? 'จัดการข้อมูลผู้ใช้' : $item['title'],
         'url'   => $item['url'],
         'icon'  => $item['icon']
     ];

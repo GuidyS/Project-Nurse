@@ -1370,7 +1370,7 @@ const WorkloadsSection = ({ workloads, onUpdate }: { workloads: any[], onUpdate:
     formData.append("term", term);
     formData.append("file", file);
     try {
-      const res = await api.post("/index.php?page=manage-faculty-extras&action=upload-workload", formData, {
+      const res = await api.post("/index.php?page=manage-faculty-extras", formData, {
         headers: { "Content-Type": "multipart/form-data" }
       });
       if (res.data.status === "success") {
@@ -1395,7 +1395,7 @@ const WorkloadsSection = ({ workloads, onUpdate }: { workloads: any[], onUpdate:
       const formData = new FormData();
       formData.append("action", "delete-workload");
       formData.append("id", id);
-      const res = await api.post("/index.php?page=manage-faculty-extras&action=delete-workload", formData);
+      const res = await api.post("/index.php?page=manage-faculty-extras", formData);
       if (res.data.status === "success") {
         toast({ title: "ลบเรียบร้อยแล้ว" });
         onUpdate();
@@ -1475,7 +1475,7 @@ const PersonnelDevelopmentsSection = ({ developments, onUpdate }: { developments
     formData.append("learnings", learnings);
     if (file) formData.append("file", file);
     try {
-      const res = await api.post("/index.php?page=manage-faculty-extras&action=add-development", formData, {
+      const res = await api.post("/index.php?page=manage-faculty-extras", formData, {
         headers: { "Content-Type": "multipart/form-data" }
       });
       if (res.data.status === "success") {
@@ -1501,7 +1501,7 @@ const PersonnelDevelopmentsSection = ({ developments, onUpdate }: { developments
       const formData = new FormData();
       formData.append("action", "delete-development");
       formData.append("id", id);
-      const res = await api.post("/index.php?page=manage-faculty-extras&action=delete-development", formData);
+      const res = await api.post("/index.php?page=manage-faculty-extras", formData);
       if (res.data.status === "success") {
         toast({ title: "ลบเรียบร้อยแล้ว" });
         onUpdate();

@@ -15,7 +15,8 @@ try {
         SELECT
             project_id AS id,
             COALESCE(NULLIF(project_name_th, ''), NULLIF(project_name_en, ''), CONCAT('Project #', project_id)) AS name,
-            COALESCE(project_type, 'other') AS project_type
+            COALESCE(project_type, 'other') AS project_type,
+            description, responsible_faculty_id, academic_year, start_date, end_date, status
         FROM project
         ORDER BY project_id DESC
     ");
@@ -27,10 +28,9 @@ try {
             "data" => [
                 "projects" => [],
                 "selectedProjectId" => null,
-                "stats" => ["totalBudget" => 0, "totalSpent" => 0, "remaining" => 0, "progress" => 0],
+                "stats" => ["totalBudget" => 0, "totalSpent" => 0, "remaining" => 0],
                 "budgetData" => [],
-                "progressData" => [],
-                "source" => "project_budget_years/project_progress_logs",
+                "source" => "project_budget_years",
                 "schema_version" => "2026-08-11.db-completeness-v1",
             ],
         ]);
@@ -65,26 +65,8 @@ try {
         ];
     }, $budgetRows);
 
-    $progressStmt = $db->prepare("
-        SELECT period_label, planned_percent, actual_percent
-        FROM project_progress_logs
-        WHERE project_id = :project_id
-        ORDER BY COALESCE(logged_at, created_at) ASC, id ASC
-    ");
-    $progressStmt->execute([':project_id' => $selectedProjectId]);
-    $progressRows = $progressStmt->fetchAll(PDO::FETCH_ASSOC);
-
-    $progressData = array_map(function (array $row): array {
-        return [
-            "week" => $row['period_label'],
-            "planned" => (float) $row['planned_percent'],
-            "actual" => (float) $row['actual_percent'],
-        ];
-    }, $progressRows);
-
     $totalBudget = array_reduce($budgetData, fn($sum, $row) => $sum + $row['budget'], 0);
     $totalSpent = array_reduce($budgetData, fn($sum, $row) => $sum + $row['spent'], 0);
-    $progress = empty($progressData) ? 0 : max(array_map(fn($row) => $row['actual'], $progressData));
 
     project_json([
         "status" => "success",
@@ -95,11 +77,9 @@ try {
                 "totalBudget" => $totalBudget,
                 "totalSpent" => $totalSpent,
                 "remaining" => $totalBudget - $totalSpent,
-                "progress" => (int) round($progress),
             ],
             "budgetData" => $budgetData,
-            "progressData" => $progressData,
-            "source" => "project_budget_years/project_progress_logs",
+            "source" => "project_budget_years",
             "schema_version" => "2026-08-11.db-completeness-v1",
         ],
     ]);

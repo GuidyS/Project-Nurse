@@ -54,17 +54,17 @@ try {
     }
     if ($projectType !== 'academic_service') {
         http_response_code(422);
-        throw new Exception("เชื่อม CLO/PLO/YLO ได้เฉพาะโครงการบริการวิชาการ");
+        throw new Exception("เชื่อม CLO/PLO ได้เฉพาะโครงการบริการวิชาการ");
     }
 
     $normalizedLinks = [
         'plos' => array_values(array_unique(array_filter($links['plos'] ?? [], 'is_string'))),
-        'ylos' => array_values(array_unique(array_filter($links['ylos'] ?? [], 'is_string'))),
+        'ylos' => [],
         'clos' => array_values(array_unique(array_filter($links['clos'] ?? [], 'is_string'))),
     ];
 
     $desiredLinks = [];
-    foreach (['plos' => 'plo', 'ylos' => 'ylo', 'clos' => 'clo'] as $payloadKey => $outcomeType) {
+    foreach (['plos' => 'plo', 'clos' => 'clo'] as $payloadKey => $outcomeType) {
         foreach ($normalizedLinks[$payloadKey] as $code) {
             $desiredLinks[$outcomeType . "\0" . $code] = true;
         }
@@ -79,6 +79,11 @@ try {
     ");
     $existingStmt->execute([':project_id' => $projectId]);
     $existingLinks = $existingStmt->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($existingLinks as $existingLink) {
+        if ($existingLink['outcome_type'] === 'ylo') {
+            $normalizedLinks['ylos'][] = (string)$existingLink['outcome_code'];
+        }
+    }
 
     $deleteResultsStmt = $db->prepare("
         DELETE FROM student_project_outcome_results
@@ -86,6 +91,9 @@ try {
     ");
     $deleteLinkStmt = $db->prepare("DELETE FROM project_outcome_links WHERE id = :link_id");
     foreach ($existingLinks as $existingLink) {
+        if ($existingLink['outcome_type'] === 'ylo') {
+            continue;
+        }
         $key = $existingLink['outcome_type'] . "\0" . $existingLink['outcome_code'];
         if (isset($desiredLinks[$key])) {
             unset($desiredLinks[$key]);
@@ -122,7 +130,7 @@ try {
 
     $db->commit();
 
-    logAudit($db, $_SESSION['user_id'], 'update', 'project_links', "บันทึกการเชื่อมโยง CLO/PLO/YLO ของโครงการ ID: {$projectId}");
+    logAudit($db, $_SESSION['user_id'], 'update', 'project_links', "บันทึกการเชื่อมโยง CLO/PLO ของโครงการ ID: {$projectId}");
 
     echo json_encode([
         "status" => "success",

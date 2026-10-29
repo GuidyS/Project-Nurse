@@ -11,7 +11,6 @@ import { Check, UserCog } from "lucide-react";
 import { cn } from "@/lib/utils";
 import api from "@/lib/axios";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PageHeader } from "@/components/shared/PageHeader";
 import { SearchInput } from "@/components/shared/SearchInput";
 import { TableStateRow } from "@/components/shared/TableStateRow";
 
@@ -21,6 +20,7 @@ interface UserWithRole {
   fullName: string;
   currentRole: string;
   teacherSubRole?: string;
+  secondaryPositions?: string[];
 }
 
 type RoleTab = "teacher" | "student" | "admin" | "unassigned";
@@ -92,9 +92,10 @@ export default function RolesManagement() {
     try {
       const response = await api.get("/index.php?page=get-users");
       // Map ให้ตรงกับ Interface UserWithRole
-      setUsers(response.data.map((u: any) => ({
+      setUsers(response.data.filter((u: any) => !u.accountMissing).map((u: any) => ({
         id: u.id, email: u.email, fullName: u.fullName, 
-        currentRole: u.role, teacherSubRole: u.teacherSubRole
+        currentRole: u.role, teacherSubRole: u.teacherSubRole,
+        secondaryPositions: Array.isArray(u.secondaryPositions) ? u.secondaryPositions : []
       })));
     } catch (error) {
       console.error(error);
@@ -107,28 +108,20 @@ export default function RolesManagement() {
 
   const handleAssignRole = async () => {
     if (!selectedUser || !newRole) return;
-    if (isSelfUser(selectedUser.id)) {
-      toast({
-        title: "ไม่สามารถแก้ไขบัญชีตัวเองได้",
-        description: "กรุณาให้ผู้ดูแลระบบคนอื่นเปลี่ยน Role หรือตำแหน่งแทน",
-        variant: "destructive",
-      });
-      return;
-    }
     if (newRole === "teacher" && !primaryPosition) {
       toast({ title: "กรุณาเลือกตำแหน่งหลัก", variant: "destructive" });
       return;
     }
     
     try {
-      await api.post("/index.php?page=manage-role", {
+      const response = await api.post("/index.php?page=manage-role", {
         userId: selectedUser.id,
         newRole: newRole,
         primaryPosition: newRole === "teacher" ? primaryPosition : null,
-        secondaryPositions: newRole === "teacher" ? secondaryPositions.filter((position) => position !== primaryPosition) : []
+        secondaryPositions: secondaryPositions.filter((position) => position !== primaryPosition)
       });
 
-      toast({ title: "มอบหมาย Role สำเร็จ" });
+      toast({ title: response.data?.message || "มอบหมาย Role สำเร็จ" });
       setIsDialogOpen(false);
       fetchUsers(); // โหลดข้อมูลใหม่เพื่อให้ UI อัปเดต
     } catch (error: any) {
@@ -167,22 +160,13 @@ export default function RolesManagement() {
   };
 
   const openAssignDialog = async (user: UserWithRole) => {
-    if (isSelfUser(user.id)) {
-      toast({
-        title: "ไม่สามารถแก้ไขบัญชีตัวเองได้",
-        description: "กรุณาให้ผู้ดูแลระบบคนอื่นเปลี่ยน Role หรือตำแหน่งแทน",
-        variant: "destructive",
-      });
-      return;
-    }
-
     setSelectedUser(user);
     setNewRole(user.currentRole === "unassigned" ? "" : user.currentRole);
     setPrimaryPosition(user.teacherSubRole || "");
     setSecondaryPositions([]);
     setIsDialogOpen(true);
 
-    if (user.currentRole === "teacher") {
+    if (user.currentRole === "teacher" || user.currentRole === "admin") {
       try {
         const response = await api.get(`/index.php?page=manage-role&userId=${user.id}`);
         if (response.data.status === "success") {
@@ -197,12 +181,7 @@ export default function RolesManagement() {
 
   return (
     <>
-      <div className="app-page">
-        <PageHeader
-          title="จัดการ Role"
-          description="มอบหมายและถอด Role ของผู้ใช้ในระบบ"
-        />
-
+      <div className="w-full">
         <Card className="app-section-card">
           <CardHeader className="space-y-4">
             <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -266,17 +245,16 @@ export default function RolesManagement() {
                           {user.teacherSubRole && (
                             <Badge variant="secondary" className="text-xs">{subRoleLabels[user.teacherSubRole]}</Badge>
                           )}
+                          {user.currentRole === "admin" && user.secondaryPositions?.map((position) => (
+                            <Badge key={position} variant="secondary" className="text-xs">{subRoleLabels[position] || position}</Badge>
+                          ))}
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
-                        {isSelfUser(user.id) ? (
-                          <Badge variant="secondary">ผู้ดูแลระบบ</Badge>
-                        ) : (
-                          <Button variant="outline" size="sm" onClick={() => openAssignDialog(user)} className="gap-2">
-                            <UserCog className="h-4 w-4" />
-                            จัดการ Role
-                          </Button>
-                        )}
+                        <Button variant="outline" size="sm" onClick={() => openAssignDialog(user)} className="gap-2">
+                          <UserCog className="h-4 w-4" />
+                          {isSelfUser(user.id) ? "จัดการตำแหน่งรอง" : "จัดการ Role"}
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))
@@ -299,11 +277,11 @@ export default function RolesManagement() {
                 <Label>Role หลัก</Label>
                 <Select
                   value={newRole}
+                  disabled={selectedUser ? isSelfUser(selectedUser.id) : false}
                   onValueChange={(value) => {
                     setNewRole(value);
                     if (value !== "teacher") {
                       setPrimaryPosition("");
-                      setSecondaryPositions([]);
                     }
                   }}
                 >
@@ -318,7 +296,6 @@ export default function RolesManagement() {
                 </Select>
               </div>
               {newRole === "teacher" && (
-                <>
                   <div className="space-y-2.5">
                     <Label>ตำแหน่งหลัก</Label>
                     <Select value={primaryPosition} onValueChange={handlePrimaryPositionChange}>
@@ -332,7 +309,8 @@ export default function RolesManagement() {
                       </SelectContent>
                     </Select>
                   </div>
-
+              )}
+              {(newRole === "teacher" || newRole === "admin") && (
                   <div className="space-y-3 rounded-lg border border-border/80 bg-muted/10 p-3">
                     <div className="flex items-center justify-between gap-3">
                       <Label>ตำแหน่งรอง</Label>
@@ -376,9 +354,8 @@ export default function RolesManagement() {
                         );
                       })}
                     </div>
-                    <p className="text-xs leading-relaxed text-muted-foreground">เลือกได้หลายตำแหน่ง ตำแหน่งหลักจะไม่ถูกเลือกซ้ำเป็นตำแหน่งรอง</p>
+                    <p className="text-xs leading-relaxed text-muted-foreground">{newRole === "admin" ? "Admin สามารถควบตำแหน่งรองได้หลายตำแหน่ง" : "เลือกได้หลายตำแหน่ง ตำแหน่งหลักจะไม่ถูกเลือกซ้ำเป็นตำแหน่งรอง"}</p>
                   </div>
-                </>
               )}
             </div>
             <DialogFooter className="gap-2 border-t border-border/70 pt-4">

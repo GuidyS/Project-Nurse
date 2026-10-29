@@ -97,14 +97,14 @@ function calculateRealtimeAcademicInfo($studentId, $entryYearCandidate = null, ?
     $cutOffDate = new DateTime(sprintf('%s-%02d-%02d 00:00:00', $now->format('Y'), $cutoff['month'], $cutoff['day']));
     $academicYear = ($now >= $cutOffDate) ? $currentYearBE : ($currentYearBE - 1);
 
-    // ดึงปีที่เข้าศึกษาจาก 2 ตัวแรกของรหัสนักศึกษาเป็นหลัก (เช่น 6603400001 -> 2566)
+    // ปีที่บันทึกในประวัตินักศึกษาต้องมาก่อนการเดาจากรหัสนักศึกษา
     $cleanId = trim((string)$studentId);
     $entryYear = 0;
 
-    if (strlen($cleanId) >= 2 && is_numeric(substr($cleanId, 0, 2))) {
-        $entryYear = 2500 + (int)substr($cleanId, 0, 2);
-    } elseif (!empty($entryYearCandidate) && is_numeric($entryYearCandidate) && (int)$entryYearCandidate >= 2500) {
+    if (!empty($entryYearCandidate) && is_numeric($entryYearCandidate) && (int)$entryYearCandidate >= 2500 && (int)$entryYearCandidate <= 2700) {
         $entryYear = (int)$entryYearCandidate;
+    } elseif (strlen($cleanId) >= 2 && ctype_digit(substr($cleanId, 0, 2))) {
+        $entryYear = 2500 + (int)substr($cleanId, 0, 2);
     } else {
         $entryYear = $academicYear; // Fallback
     }

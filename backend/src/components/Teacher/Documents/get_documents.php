@@ -1,10 +1,26 @@
 <?php
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 require_once __DIR__ . '/../../../config/active_curriculum.php';
-
-$pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
+require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/document_access.php';
 
 try {
+    if (!isset($_SESSION['user_id'])) {
+        http_response_code(401);
+        echo json_encode(['status' => 'error', 'message' => 'Unauthorized']);
+        exit();
+    }
+
+    $pdo = new Connect();
+    if (documentAccessRole($pdo, $_SESSION['user_id']) === null) {
+        http_response_code(403);
+        echo json_encode(['status' => 'error', 'message' => 'Forbidden']);
+        exit();
+    }
+
     // 1. รายวิชาทำ Dropdown — ตามหลักสูตรที่ใช้งานในระบบ (ยังไม่มีหลักสูตรใช้ตาราง subject แบบเดิม)
     $curriculumSubjects = activeCurriculumSubjects($pdo);
     if ($curriculumSubjects !== null) {
@@ -22,6 +38,7 @@ try {
     $sql_docs = "SELECT * FROM tqf_documents ORDER BY created_at DESC";
     $stmt_docs = $pdo->query($sql_docs);
     $docs = $stmt_docs->fetchAll(PDO::FETCH_ASSOC);
+    $deleteIdentity = documentAccessDeleteIdentity($pdo, $_SESSION['user_id']);
 
     $all_documents = [];
     foreach ($docs as $doc) {
@@ -31,7 +48,7 @@ try {
             if (preg_match('/^https?:\/\//', $doc['file_path'])) {
                 $fileUrl = $doc['file_path'];
             } else {
-                $fileUrl = 'http://localhost:8080/' . ltrim($doc['file_path'], '/');
+                $fileUrl = '/api/index.php?page=download-document&id=' . rawurlencode((string) $doc['id']);
             }
         }
 
@@ -42,8 +59,9 @@ try {
             'course' => $doc['subject_code'],
             'academic_year' => $doc['academic_year'],
             'uploadedAt' => substr($doc['created_at'], 0, 10),
+            'canDelete' => documentAccessCanDelete($pdo, $_SESSION['user_id'], $doc, $deleteIdentity),
             'fileUrl' => $fileUrl,
-            'downloadUrl' => 'http://localhost:8080/index.php?page=download-document&id=' . $doc['id']
+            'downloadUrl' => '/api/index.php?page=download-document&id=' . rawurlencode((string) $doc['id'])
         ];
     }
 
@@ -55,8 +73,9 @@ try {
         ]
     ]);
 
-} catch (PDOException $e) {
+} catch (Throwable $e) {
+    error_log('get-documents failed: ' . $e->getMessage());
     http_response_code(500);
-    echo json_encode(["status" => "error", "message" => $e->getMessage()]);
+    echo json_encode(["status" => "error", "message" => "ไม่สามารถดึงข้อมูลเอกสารได้"], JSON_UNESCAPED_UNICODE);
 }
 ?>

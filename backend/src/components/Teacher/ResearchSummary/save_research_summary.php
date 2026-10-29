@@ -10,6 +10,8 @@ if (!is_array($input)) researchFail(422, 'ข้อมูลไม่ถูก�
 $facultyId = filter_var($input['faculty_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
 $action = $input['action'] ?? '';
 if (!$facultyId || !in_array($action, ['add', 'remove', 'update'], true)) researchFail(422, 'ข้อมูลไม่ถูกต้อง');
+$auditIdLockAcquired = false;
+$researchIdLockAcquired = false;
 try {
     $db = new Connect();
     $access = researchAccess($db, (int)$_SESSION['user_id']);
@@ -17,6 +19,9 @@ try {
     $stmt = $db->prepare('SELECT faculty_id FROM faculty WHERE faculty_id = ?');
     $stmt->execute([$facultyId]);
     if (!$stmt->fetchColumn()) researchFail(422, 'ไม่พบอาจารย์');
+    // academicEnsureSettingsTable issues CREATE TABLE IF NOT EXISTS, which implicitly
+    // commits MySQL transactions. Run it before add, remove, or update begins one.
+    academicEnsureSettingsTable($db);
     if ($action === 'add') {
         $year = filter_var($input['year'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 2500, 'max_range' => 2700]]);
         $mode = $input['year_mode'] ?? '';
@@ -26,12 +31,23 @@ try {
         $boundary = academicYearBoundary($db);
         $academicStart = sprintf('-%02d-%02d', $boundary['month'], $boundary['day']);
         $date = ($year - 543) . ($mode === 'academic' ? $academicStart : '-01-01');
+        $researchIdColumn = $db->query("SHOW COLUMNS FROM faculty_research LIKE 'research_id'")->fetch(PDO::FETCH_ASSOC);
+        if (!$researchIdColumn) throw new RuntimeException('ไม่พบคอลัมน์รหัสผลงานวิจัย');
+        $needsExplicitResearchId = !str_contains(strtolower((string)($researchIdColumn['Extra'] ?? '')), 'auto_increment');
+        if ($needsExplicitResearchId) {
+            $researchIdLockAcquired = (int)$db->query("SELECT GET_LOCK('nurse_mis_research_id', 10)")->fetchColumn() === 1;
+            if (!$researchIdLockAcquired) throw new RuntimeException('ระบบกำลังบันทึกผลงานวิจัย กรุณาลองอีกครั้ง');
+        }
         $db->beginTransaction();
-        $stmt = $db->prepare('INSERT INTO faculty_research (faculty_id, title, publication_year, publication_date, article_type, work_category, funding_type, funding_amount, irb_approved, intellectual_property_status, first_author_id, co_author_ids) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
-        $stmt->execute([$facultyId, 'บันทึกจำนวนผลงาน' . ($kind === 'academic' ? 'วิชาการ/ตำรา' : 'วิจัย') . ' ปี ' . $year,
+        $id = $needsExplicitResearchId
+            ? (int)$db->query('SELECT COALESCE(MAX(research_id), 0) FROM faculty_research')->fetchColumn() + 1
+            : null;
+        $stmt = $db->prepare('INSERT INTO faculty_research (' . ($needsExplicitResearchId ? 'research_id, ' : '') . 'faculty_id, title, publication_year, publication_date, article_type, work_category, funding_type, funding_amount, irb_approved, intellectual_property_status, first_author_id, co_author_ids) VALUES (' . ($needsExplicitResearchId ? '?, ' : '') . '?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+        $params = [$facultyId, 'บันทึกจำนวนผลงาน' . ($kind === 'academic' ? 'วิชาการ/ตำรา' : 'วิจัย') . ' ปี ' . $year,
             $year, $date, $kind === 'academic' ? 'academic' : 'research', 'research', 'none', 0, 0, 'none', $kind === 'kpi' ? $facultyId : null,
-            json_encode($kind === 'kpi' ? [] : [$facultyId])]);
-        $id = (int)$db->lastInsertId();
+            json_encode($kind === 'kpi' ? [] : [$facultyId])];
+        $stmt->execute($needsExplicitResearchId ? array_merge([$id], $params) : $params);
+        if (!$needsExplicitResearchId) $id = (int)$db->lastInsertId();
     } elseif ($action === 'update') {
         $id = filter_var($input['publication_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
         $fields = [];
@@ -136,13 +152,43 @@ try {
         }
     }
     // Data and audit must commit together; do not log names or publication titles.
-    $stmt = $db->prepare('INSERT INTO audit_log (user_id, action_type, resource, details, ip_address) VALUES (?, ?, ?, ?, ?)');
-    $stmt->execute([(int)$_SESSION['user_id'], $action === 'add' ? 'create' : ($action === 'update' ? 'update' : 'delete'), 'research_summary',
-        'publication_id=' . $id . '; faculty_id=' . $facultyId, $_SERVER['REMOTE_ADDR'] ?? null]);
+    $auditColumn = $db->query("SHOW COLUMNS FROM audit_log LIKE 'audit_log_id'")->fetch(PDO::FETCH_ASSOC);
+    if (!$auditColumn) throw new RuntimeException('ไม่พบคอลัมน์รหัสประวัติการใช้งาน');
+    $needsExplicitAuditId = !str_contains(strtolower((string)($auditColumn['Extra'] ?? '')), 'auto_increment');
+    $auditParams = [(int)$_SESSION['user_id'], $action === 'add' ? 'create' : ($action === 'update' ? 'update' : 'delete'),
+        'research_summary', 'publication_id=' . $id . '; faculty_id=' . $facultyId, $_SERVER['REMOTE_ADDR'] ?? null];
+    if ($needsExplicitAuditId) {
+        $auditIdLockAcquired = (int)$db->query("SELECT GET_LOCK('nurse_mis_audit_log_id', 10)")->fetchColumn() === 1;
+        if (!$auditIdLockAcquired) throw new RuntimeException('ระบบกำลังบันทึกประวัติการใช้งาน กรุณาลองอีกครั้ง');
+        $nextAuditId = (int)$db->query('SELECT COALESCE(MAX(audit_log_id), 0) FROM audit_log')->fetchColumn() + 1;
+        $stmt = $db->prepare('INSERT INTO audit_log (audit_log_id, user_id, action_type, resource, details, ip_address) VALUES (?, ?, ?, ?, ?, ?)');
+        $stmt->execute(array_merge([$nextAuditId], $auditParams));
+    } else {
+        $stmt = $db->prepare('INSERT INTO audit_log (user_id, action_type, resource, details, ip_address) VALUES (?, ?, ?, ?, ?)');
+        $stmt->execute($auditParams);
+    }
     $data = researchSummaryData($db, true);
     $db->commit();
+    if ($auditIdLockAcquired) {
+        try { $db->query("SELECT RELEASE_LOCK('nurse_mis_audit_log_id')"); } catch (Throwable $ignored) {}
+        $auditIdLockAcquired = false;
+    }
+    if ($researchIdLockAcquired) {
+        try { $db->query("SELECT RELEASE_LOCK('nurse_mis_research_id')"); } catch (Throwable $ignored) {}
+        $researchIdLockAcquired = false;
+    }
     echo json_encode(['status' => 'success', 'message' => 'บันทึกอัตโนมัติแล้ว', 'data' => $data], JSON_UNESCAPED_UNICODE);
 } catch (Throwable $e) {
     if (isset($db) && $db->inTransaction()) $db->rollBack();
+    if ($auditIdLockAcquired && isset($db)) {
+        try { $db->query("SELECT RELEASE_LOCK('nurse_mis_audit_log_id')"); } catch (Throwable $ignored) {}
+    }
+    if ($researchIdLockAcquired && isset($db)) {
+        try { $db->query("SELECT RELEASE_LOCK('nurse_mis_research_id')"); } catch (Throwable $ignored) {}
+    }
+    $sqlState = $e instanceof PDOException ? ($e->errorInfo[0] ?? (string)$e->getCode()) : (string)$e->getCode();
+    $driverCode = $e instanceof PDOException ? ($e->errorInfo[1] ?? 'n/a') : 'n/a';
+    error_log('[ResearchSummary save] action=' . $action . ' class=' . get_class($e)
+        . ' sqlstate=' . $sqlState . ' driver=' . $driverCode . ' line=' . $e->getLine());
     researchFail(500, 'ไม่สามารถบันทึกผลงานได้ กรุณาโหลดข้อมูลใหม่ก่อนลองอีกครั้ง');
 }

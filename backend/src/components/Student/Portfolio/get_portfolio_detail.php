@@ -46,7 +46,8 @@ function portfolio_detail_file_url(?string $path): ?string
 
     $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
     $host = $_SERVER['HTTP_HOST'] ?? 'localhost:8080';
-    return $scheme . '://' . $host . '/' . ltrim($path, '/');
+    $apiPath = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/index.php')), '/');
+    return $scheme . '://' . $host . $apiPath . '/' . ltrim($path, '/');
 }
 
 try {

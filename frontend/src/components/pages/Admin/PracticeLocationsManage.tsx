@@ -59,15 +59,21 @@ export default function PracticeLocationsManage() {
 
   useEffect(() => { fetchData(); }, []);
 
- const handleDownloadTemplate = () => {
-  const link = document.createElement("a");
-  // ใช้ import.meta.env.BASE_URL เพื่ออ้างอิง path ที่ถูกต้องของ public folder
-  link.href = `${import.meta.env.BASE_URL}template_practice_locations.xlsx`; 
-  link.download = "แบบฟอร์มนำเข้าแหล่งฝึกภาคปฏิบัติ.xlsx"; 
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-};
+  const handleDownloadTemplate = () => {
+    const workbook = XLSX.utils.book_new();
+    const sheet = XLSX.utils.aoa_to_sheet([["ประเภท", "ชื่อสถานที่", "สถานะ MOU", "รายวิชา"]]);
+    sheet['!cols'] = [{ wch: 26 }, { wch: 42 }, { wch: 22 }, { wch: 34 }];
+    XLSX.utils.book_append_sheet(workbook, sheet, "แหล่งฝึก");
+    const help = XLSX.utils.aoa_to_sheet([
+      ["วิธีกรอกแพทเทิร์น"],
+      ["กรอกหนึ่งสถานที่ต่อหนึ่งแถวในชีต แหล่งฝึก"],
+      ["ประเภทที่ใช้ได้: โรงพยาบาล, โรงพยาบาลส่งเสริมสุขภาพตำบล, ศูนย์สุขภาพ"],
+      ["ชื่อสถานที่ต้องไม่ว่าง; สถานะ MOU และรายวิชาเว้นว่างได้"],
+    ]);
+    help['!cols'] = [{ wch: 85 }];
+    XLSX.utils.book_append_sheet(workbook, help, "คำแนะนำ");
+    XLSX.writeFile(workbook, "แบบฟอร์มนำเข้าแหล่งฝึกภาคปฏิบัติ.xlsx");
+  };
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -80,8 +86,24 @@ export default function PracticeLocationsManage() {
         const worksheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json<ExcelRow>(worksheet, { header: 1 });
         const newLocations: LocationItem[] = [];
+        const isNewTemplate = String(jsonData[0]?.[0] ?? "").trim() === "ประเภท";
         for (let i = 1; i < jsonData.length; i++) {
           const row = jsonData[i];
+          if (isNewTemplate && row?.some((cell) => String(cell ?? "").trim() !== "")) {
+            const type = String(row[0] ?? "").trim();
+            const name = String(row[1] ?? "").trim();
+            if (!name || !["โรงพยาบาล", "โรงพยาบาลส่งเสริมสุขภาพตำบล", "ศูนย์สุขภาพ"].includes(type)) {
+              throw new Error(`แถว ${i + 1}: กรุณาระบุประเภทและชื่อสถานที่ให้ถูกต้อง`);
+            }
+            newLocations.push({
+              hospital_name: type === "โรงพยาบาล" ? name : "",
+              sub_district_hospital: type === "โรงพยาบาลส่งเสริมสุขภาพตำบล" ? name : "",
+              health_center: type === "ศูนย์สุขภาพ" ? name : "",
+              mou_status: String(row[2] ?? "").trim(),
+              subject_name: String(row[3] ?? "").trim(),
+            });
+            continue;
+          }
           if (row && row.length > 0 && (row[0] || row[1] || row[2])) {
             newLocations.push({
               hospital_name: row[0] ? String(row[0]).trim() : "",
@@ -99,7 +121,7 @@ export default function PracticeLocationsManage() {
           toast({ title: "ไฟล์ว่างเปล่า", description: "ไม่พบข้อมูลในไฟล์ Excel", variant: "destructive" });
         }
       } catch (err) {
-        toast({ title: "เกิดข้อผิดพลาด", description: "ไฟล์ Excel ไม่ถูกต้องตามรูปแบบ", variant: "destructive" });
+        toast({ title: "เกิดข้อผิดพลาด", description: err instanceof Error ? err.message : "ไฟล์ Excel ไม่ถูกต้องตามรูปแบบ", variant: "destructive" });
       }
       if (fileInputRef.current) fileInputRef.current.value = "";
     };

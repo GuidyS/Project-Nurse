@@ -21,8 +21,11 @@ try {
     }
 
     if ($search !== '') {
-        $where[] = '(p.project_name_th LIKE :search OR p.project_name_en LIKE :search)';
-        $params[':search'] = "%{$search}%";
+        $where[] = '(p.project_name_th LIKE :search_th OR p.project_name_en LIKE :search_en
+            OR CONCAT_WS(\' \', f.first_name_th, f.last_name_th) LIKE :search_faculty)';
+        $params[':search_th'] = "%{$search}%";
+        $params[':search_en'] = "%{$search}%";
+        $params[':search_faculty'] = "%{$search}%";
     }
 
     $sql = "
@@ -50,8 +53,7 @@ try {
             COALESCE(pb.spent, 0) AS budget_spent,
             pb.project_budget_years_id,
             pb.fiscal_year,
-            pb.budget_note,
-            COALESCE(pl.progress, 0) AS progress
+            pb.budget_note
         FROM project p
         LEFT JOIN faculty f ON f.faculty_id = p.responsible_faculty_id
         LEFT JOIN (
@@ -69,11 +71,6 @@ try {
             FROM project_budget_years
             GROUP BY project_id
         ) pb ON pb.project_id = p.project_id
-        LEFT JOIN (
-            SELECT project_id, MAX(actual_percent) AS progress
-            FROM project_progress_logs
-            GROUP BY project_id
-        ) pl ON pl.project_id = p.project_id
     ";
 
     if (!empty($where)) {
