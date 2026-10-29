@@ -40,7 +40,7 @@ function projectReminderEnsureSchema(PDO $db): void
     $db->exec("
         CREATE TABLE IF NOT EXISTS project_end_reminders (
             id BIGINT NOT NULL AUTO_INCREMENT,
-            project_id BIGINT NOT NULL,
+            project_id VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_as_ci NOT NULL,
             end_date DATE NOT NULL,
             stage_days SMALLINT NOT NULL COMMENT 'จำนวนวันก่อนสิ้นสุด (30 หรือ 14)',
             admin_notified INT NOT NULL DEFAULT 0 COMMENT 'จำนวนแอดมินที่ได้รับแจ้งเตือนในระบบ',
@@ -100,10 +100,10 @@ function projectReminderStatusLabel(string $status): string
 {
     // ใช้คำเดียวกับหน้าจัดการโครงการ (ProjectsPage.tsx)
     return match ($status) {
-        'pending' => 'รออนุมัติ',
+        'pending' => 'รอดำเนินการ',
         'active' => 'กำลังดำเนินการ',
         'completed' => 'เสร็จสิ้น',
-        'cancelled' => 'ไม่อนุมัติ/ยกเลิก',
+        'cancelled' => 'ยกเลิก',
         default => $status !== '' ? $status : '-',
     };
 }
@@ -111,7 +111,7 @@ function projectReminderStatusLabel(string $status): string
 function projectReminderContent(array $row, int $daysLeft): array
 {
     $name = trim((string)($row['project_name_th'] ?? ''))
-        ?: (trim((string)($row['project_name_en'] ?? '')) ?: 'โครงการ #' . $row['project_id']);
+        ?: 'โครงการ #' . $row['project_id'];
     $type = projectReminderTypeLabel((string)($row['project_type'] ?? 'other'));
     $status = projectReminderStatusLabel((string)($row['status'] ?? ''));
     $year = !empty($row['academic_year']) ? (string)$row['academic_year'] : '-';
@@ -204,7 +204,7 @@ function projectReminderDeliverEmail(PDO $db, array $reminder, array $content, a
  * เช็กและส่งแจ้งเตือน — ส่ง project_id มาเพื่อเช็กเฉพาะโครงการเดียว
  * @return array สรุปผล เช่น ['checked' => 2, 'notified_projects' => 1, 'admin_notifications' => 1, 'emails_sent' => 1]
  */
-function projectReminderProcess(PDO $db, ?int $onlyProjectId = null): array
+function projectReminderProcess(PDO $db, ?string $onlyProjectId = null): array
 {
     projectReminderEnsureSchema($db);
     $maxDays = max(PROJECT_REMINDER_STAGES_DAYS);
@@ -220,7 +220,7 @@ function projectReminderProcess(PDO $db, ?int $onlyProjectId = null): array
 
     // วันที่ใช้ CURDATE() ของ MySQL (Asia/Bangkok)
     $sql = "
-        SELECT p.project_id, p.project_name_th, p.project_name_en, {$typeSelect}, p.academic_year, p.status,
+        SELECT p.project_id, p.project_name_th, {$typeSelect}, p.academic_year, p.status,
                p.start_date, p.end_date, DATEDIFF(p.end_date, CURDATE()) AS days_left,
                TRIM(CONCAT(COALESCE(f.title, ''), COALESCE(f.first_name_th, ''), ' ', COALESCE(f.last_name_th, ''))) AS responsible_name
         FROM project p
@@ -228,6 +228,7 @@ function projectReminderProcess(PDO $db, ?int $onlyProjectId = null): array
         WHERE p.end_date IS NOT NULL
           AND p.end_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL {$maxDays} DAY)
           AND p.status NOT IN ({$skipStatuses})
+          AND NOT EXISTS (SELECT 1 FROM project_report_periods period WHERE period.academic_year=p.academic_year AND period.status='closed')
     ";
     $params = [];
     if ($onlyProjectId !== null) {
@@ -290,7 +291,7 @@ function projectReminderProcess(PDO $db, ?int $onlyProjectId = null): array
 
         $payload = json_encode([
             'kind' => 'project_end',
-            'project_id' => (int)$row['project_id'],
+            'project_id' => (string) $row['project_id'],
             'stage_days' => $stage,
             'end_date' => $row['end_date'],
             'days_left' => $daysLeft,

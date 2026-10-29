@@ -5,12 +5,12 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 require_once __DIR__ . '/../../../config/config.php';
-require_once __DIR__ . '/../Approvals/approval-schema.php';
+require_once __DIR__ . '/../../../config/admin_access.php';
 header("Content-Type: application/json");
 
 try {
     $db = new Connect();
-    approvalRequireAdmin($db);
+    adminRequireAccess($db);
 
     $allowedTypes = ['students', 'teachers', 'courses', 'projects'];
     $requestedTypes = [];

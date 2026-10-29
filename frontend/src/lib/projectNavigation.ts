@@ -36,17 +36,18 @@ export const navigateToPage = (
 
 export const navigateToProject = (
   page: ProjectTargetPage,
-  projectId: number | string,
+  projectId: string,
   action: ProjectNavigationAction
 ) => {
   sessionStorage.setItem(PROJECT_ID_KEY, String(projectId));
   sessionStorage.setItem(PROJECT_ACTION_KEY, action);
-  window.dispatchEvent(new CustomEvent("app:navigate", { detail: { page } }));
+  navigateToPage(page, { project_id: projectId, action });
 };
 
 export const consumePendingProjectNavigation = (): PendingProjectNavigation | null => {
-  const projectId = sessionStorage.getItem(PROJECT_ID_KEY);
-  const action = sessionStorage.getItem(PROJECT_ACTION_KEY) as ProjectNavigationAction | null;
+  const params = new URLSearchParams(window.location.search);
+  const projectId = params.get("project_id") ?? sessionStorage.getItem(PROJECT_ID_KEY);
+  const action = (params.get("action") ?? sessionStorage.getItem(PROJECT_ACTION_KEY)) as ProjectNavigationAction | null;
 
   if (!projectId) return null;
 

@@ -21,7 +21,6 @@ type EvidenceItem = {
   title: string;
   url: string;
   date: string;
-  verified: boolean;
 };
 
 type StudentItem = {
@@ -93,8 +92,6 @@ export default function Evidence() {
 
   const stats = {
     total: evidenceList.length,
-    verified: evidenceList.filter(e => e.verified).length,
-    pending: evidenceList.filter(e => !e.verified).length,
     photos: evidenceList.filter(e => e.type === 'photo').length,
   };
 
@@ -131,20 +128,6 @@ export default function Evidence() {
     }
   };
 
-  const handleVerify = async (id: string) => {
-    try {
-      const response = await api.post('/index.php?page=verify-evidence', { id });
-      if (response.data.status === 'success') {
-        toast({ title: "สำเร็จ", description: "ยืนยันการตรวจสอบหลักฐานเรียบร้อย" });
-        fetchEvidence();
-      } else {
-        toast({ title: "ข้อผิดพลาด", description: response.data.message || "ไม่สามารถยืนยันได้", variant: "destructive" });
-      }
-    } catch (error) {
-      toast({ title: "ข้อผิดพลาด", description: "ไม่สามารถยืนยันหลักฐานได้", variant: "destructive" });
-    }
-  };
-  
   const openDeleteConfirm = (id: string) => {
     setPendingDeleteId(id);
     setIsConfirmOpen(true);
@@ -301,7 +284,7 @@ export default function Evidence() {
         </div>
 
         {/* Stats */}
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">หลักฐานทั้งหมด</CardTitle>
@@ -309,24 +292,6 @@ export default function Evidence() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stats.total}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">ตรวจสอบแล้ว</CardTitle>
-              <CheckSquare className="h-4 w-4 text-green-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">{stats.verified}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">รอตรวจสอบ</CardTitle>
-              <CheckSquare className="h-4 w-4 text-yellow-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-yellow-600">{stats.pending}</div>
             </CardContent>
           </Card>
           <Card>
@@ -364,7 +329,6 @@ export default function Evidence() {
                   <TableHead>หลักฐาน</TableHead>
                   <TableHead>ประเภท</TableHead>
                   <TableHead>วันที่</TableHead>
-                  <TableHead>สถานะ</TableHead>
                   <TableHead>การดำเนินการ</TableHead>
                 </TableRow>
               </TableHeader>
@@ -377,13 +341,6 @@ export default function Evidence() {
                     <TableCell>{getTypeBadge(evidence.type)}</TableCell>
                     <TableCell>{evidence.date}</TableCell>
                     <TableCell>
-                      {evidence.verified ? (
-                        <Badge className="bg-green-500">ตรวจสอบแล้ว</Badge>
-                      ) : (
-                        <Badge className="bg-yellow-500">รอตรวจสอบ</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
                       <div className="flex gap-2">
                         <Button variant="outline" size="sm" onClick={() => handleView(evidence.url)}>
                           <Eye className="mr-1 h-3 w-3" />
@@ -393,12 +350,6 @@ export default function Evidence() {
                           <Download className="mr-1 h-3 w-3" />
                           ดาวน์โหลด
                         </Button>
-                        {!evidence.verified && (
-                          <Button size="sm" onClick={() => handleVerify(evidence.id)}>
-                            <CheckSquare className="mr-1 h-3 w-3" />
-                            ยืนยัน
-                          </Button>
-                        )}
                         <Button variant="destructive" size="sm" onClick={() => openDeleteConfirm(evidence.id)}>
                           <Trash2 className="mr-1 h-3 w-3" />
                           ลบ

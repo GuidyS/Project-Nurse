@@ -121,9 +121,9 @@ interface DashboardData {
     budget: number;
     spent: number;
     burn_rate: number;
-    average_progress: number;
+    difference: number | null;
     over_budget: number;
-    top_projects: { name: string; budget: number; spent: number; progress: number }[];
+    top_projects: { name: string; budget: number; spent: number; progress?: number }[];
   };
   curriculum_qa: {
     active_cycle: { id: number; start_year: number; end_year: number } | null;
@@ -167,13 +167,13 @@ interface FiveYearData {
 const COLORS = ["#4f46e5", "#0ea5e9", "#10b981", "#f59e0b", "#ec4899", "#8b5cf6"];
 
 const formatNumber = (value: number) => new Intl.NumberFormat("th-TH").format(Number(value || 0));
-const formatCurrency = (value: number) =>
+const formatCurrency = (value: number | null) => value == null ? "ยังไม่ระบุ" :
   new Intl.NumberFormat("th-TH", {
     style: "currency",
     currency: "THB",
     maximumFractionDigits: 0,
   }).format(Number(value || 0));
-const formatCompactCurrency = (value: number) =>
+const formatCompactCurrency = (value: number | null) => value == null ? "ยังไม่ระบุ" :
   new Intl.NumberFormat("th-TH", { notation: "compact", maximumFractionDigits: 1 }).format(Number(value || 0));
 
 function EmptyState({ label }: { label: string }) {
@@ -457,7 +457,7 @@ export default function DeanDashboard() {
           <KpiCard icon={GraduationCap} label="นักศึกษาปัจจุบัน" value={`${formatNumber(data.stats.total_students)} คน`} detail={`จากระเบียนทั้งหมด ${formatNumber(data.stats.total_student_records)} คน`} tone="bg-blue-500/10 text-blue-600" />
           <KpiCard icon={TrendingUp} label="อัตราคงอยู่" value={`${data.stats.retention_rate}%`} detail={`สำเร็จการศึกษารวม ${data.stats.graduation_rate}%`} tone="bg-emerald-500/10 text-emerald-600" />
           <KpiCard icon={Users} label="อาจารย์ประจำ" value={`${formatNumber(data.stats.total_faculty)} คน`} detail={`มีเลขใบอนุญาต ${data.faculty_license.coverage_rate}%`} tone="bg-violet-500/10 text-violet-600" />
-          <KpiCard icon={WalletCards} label="งบประมาณโครงการ" value={formatCompactCurrency(data.stats.total_budget)} detail={`ใช้แล้ว ${data.projects.burn_rate}%`} tone="bg-amber-500/10 text-amber-600" />
+          <KpiCard icon={WalletCards} label="งบเสนอโครงการ" value={formatCompactCurrency(data.stats.total_budget)} detail={data.projects.burn_rate == null ? "งบใช้จริงยังไม่ระบุ" : `สัดส่วนใช้จริงต่องบเสนอ ${data.projects.burn_rate}%`} tone="bg-amber-500/10 text-amber-600" />
           <KpiCard icon={BriefcaseBusiness} label="โครงการปีนี้" value={`${formatNumber(data.projects.total)} โครงการ`} detail={`ดำเนินการ ${data.projects.active} · เสร็จ ${data.projects.completed}`} tone="bg-sky-500/10 text-sky-600" />
           <KpiCard icon={AlertTriangle} label="รายการเฝ้าระวัง" value={`${formatNumber(data.stats.alerts)} รายการ`} detail={`นักศึกษาต้องติดตาม ${data.stats.student_attention} คน`} tone="bg-rose-500/10 text-rose-600" />
         </div>
@@ -635,11 +635,11 @@ export default function DeanDashboard() {
           </div>
         </SectionCard>
 
-        <SectionCard id="projects" icon={BriefcaseBusiness} title="8. โครงการและงบประมาณ" description="Burn rate และความก้าวหน้า S-Curve จากข้อมูลงบประมาณและ progress logs">
+        <SectionCard id="projects" icon={BriefcaseBusiness} title="8. โครงการและงบประมาณ" description="ยอดโครงการรวมกิจกรรมแล้ว ใช้ข้อมูลร่วมกับหน้ารายงานโครงการ">
           <div className="grid gap-3 sm:grid-cols-3">
-            <MiniMetric label="งบประมาณ" value={formatCurrency(data.projects.budget)} />
-            <MiniMetric label="เบิกจ่าย" value={formatCurrency(data.projects.spent)} detail={`Burn rate ${data.projects.burn_rate}%`} />
-            <MiniMetric label="ความก้าวหน้าเฉลี่ย" value={`${data.projects.average_progress}%`} detail={`เกินงบ ${data.projects.over_budget} โครงการ`} />
+            <MiniMetric label="งบเสนอ" value={formatCurrency(data.projects.budget)} />
+            <MiniMetric label="งบใช้จริง" value={formatCurrency(data.projects.spent)} />
+            <MiniMetric label="ส่วนต่างงบเสนอ − ใช้จริง" value={formatCurrency(data.projects.difference)} detail={`เกินงบ ${data.projects.over_budget} โครงการ`} />
           </div>
           <div className="mt-4 h-[280px]">
             {data.projects.top_projects.length === 0 ? <EmptyState label={`ยังไม่มีโครงการในปีการศึกษา ${data.academic_year}`} /> : (
@@ -650,7 +650,7 @@ export default function DeanDashboard() {
                   <YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 10 }} />
                   <Tooltip formatter={(value) => formatCurrency(Number(value))} />
                   <Legend />
-                  <Bar dataKey="budget" name="งบประมาณ" fill="#4f46e5" radius={[0, 5, 5, 0]} />
+                  <Bar dataKey="budget" name="งบเสนอ" fill="#4f46e5" radius={[0, 5, 5, 0]} />
                   <Bar dataKey="spent" name="เบิกจ่าย" fill="#f59e0b" radius={[0, 5, 5, 0]} />
                 </BarChart>
               </ResponsiveContainer>

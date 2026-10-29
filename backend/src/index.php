@@ -29,6 +29,20 @@
 
     switch ($page) {
 
+            case 'get-approval-requests':
+            case 'create-approval-request':
+            case 'approve-request':
+            case 'reject-request':
+            case 'approve-budget':
+            case 'verify-evidence':
+            case 'get-performance':
+            case 'save-performance':
+            case 'get-grading-data':
+            case 'save-grading-data':
+            case 'performance':
+                require_once 'config/feature_removed.php';
+                break;
+
             case 'academic-calendar':
                 require_once 'components/AcademicCalendar/get_academic_calendar.php';
                 break;
@@ -136,18 +150,6 @@
             case 'get-audit-logs':
                 require_once 'components/Admin/AuditLogs/get-audit-logs.php';
                 break;
-            case 'get-approval-requests':
-                require_once 'components/Admin/Approvals/get-approval-requests.php';
-                break;
-            case 'create-approval-request':
-                require_once 'components/Admin/Approvals/create-approval-request.php';
-                break;
-            case 'approve-request':
-                require_once 'components/Admin/Approvals/approve-request.php';
-                break;
-            case 'reject-request':
-                require_once 'components/Admin/Approvals/reject-request.php';
-                break;
             case 'export-data':
                 require_once 'components/Admin/ExportData/export-data.php'; 
                 break;
@@ -157,17 +159,20 @@
             case 'get-import-history':
                 require_once 'components/Admin/ImportData/get-import-history.php';
                 break;
+            case 'project-merge-queue':
+            case 'commit-project-merge':
+            case 'get-project-details':
+            case 'save-project-details':
+            case 'activate-project-year':
+            case 'close-project-year':
+            case 'finalize-project-merge':
+                require_once 'components/Admin/Reports/project_management.php';
+                break;
             case 'admin-reports':
                 require_once 'components/Admin/Reports/get-reports.php';
                 break;
             case 'schema-audit':
                 require_once 'components/Admin/SchemaAudit/schema_audit.php';
-                break;
-            case 'approve-budget':
-                require_once 'components/Admin/Reports/approve-budget.php';
-                break;
-            case 'performance':
-                require_once 'components/Performance.php';
                 break;
             case 'projectspage':
                 require_once 'components/Teacher/ProjectsPage.php';
@@ -332,9 +337,6 @@
             case 'upload-evidence':
                 require_once 'components/Teacher/Evidence/upload_evidence.php';
                 break;
-            case 'verify-evidence':
-                require_once 'components/Teacher/Evidence/verify_evidence.php';
-                break;
             case 'delete-evidence':
                 require_once 'components/Teacher/Evidence/delete_evidence.php';
                 break;
@@ -348,12 +350,6 @@
                 break;
 
             // Grades
-            case 'get-grading-data':
-                require_once 'components/Teacher/grading/get_grading_data.php';
-                break;
-            case 'save-grading-data':
-                require_once 'components/Teacher/grading/save_grading_data.php';
-                break;
 
             // Dashboard
             case 'teacher-dashboard':
@@ -399,12 +395,6 @@
                 break;
 
             // Performance
-            case 'get-performance':
-                require_once 'components/Teacher/Performance/get_performance.php';
-                break;  
-            case 'save-performance':
-                require_once 'components/Teacher/Performance/save_performance.php';
-                break;  
 
             // PracticalStudents (นักศึกษาฝึกปฏิบัติ)
             case 'get-practical-students':

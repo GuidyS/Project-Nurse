@@ -14,6 +14,14 @@ try {
     }
 
     $db = new Connect();
+    $actorRoleStmt = $db->prepare("SELECT role_id FROM users WHERE user_id = :user_id LIMIT 1");
+    $actorRoleStmt->execute([':user_id' => $_SESSION['user_id']]);
+    if ((int)$actorRoleStmt->fetchColumn() !== 1) {
+        http_response_code(403);
+        echo json_encode(["status" => "error", "message" => "ไม่มีสิทธิ์จัดการ Role หรือตำแหน่งผู้ใช้"], JSON_UNESCAPED_UNICODE);
+        exit();
+    }
+
     $method = $_SERVER['REQUEST_METHOD'];
     $actorUserId = (int)$_SESSION['user_id'];
     $positionMap = [

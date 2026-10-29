@@ -1,109 +1,28 @@
 <?php
 require_once __DIR__ . '/../ProjectShared/project_helpers.php';
-
-$db = project_db();
-project_require_auth($db, ['PROJECT_REPORTS_VIEW']);
-
+$db=project_db();project_require_auth($db,['PROJECT_REPORTS_VIEW']);
 try {
-    $requestedProjectId = project_request_int('project_id');
-    if (isset($_GET['project_id']) && $_GET['project_id'] !== '' && $requestedProjectId === null) {
-        project_json(["status" => "error", "message" => "รหัสโครงการไม่ถูกต้อง"], 400);
-        exit;
+    $projects=project_u_rows($db,"SELECT p.id,p.project_id,p.project_name_th,p.academic_year,p.project_type FROM project p JOIN project_report_links l ON l.project_id=p.project_id ORDER BY p.created_at DESC,p.id DESC");
+    $projects=array_values(array_filter($projects,fn($p)=>!project_u_code_pending($db,(string)$p['project_id']) && project_u_period($db,(int)$p['academic_year'])!=='review'));
+    foreach ($projects as &$p) {
+        $p['project_id']=(string)$p['project_id'];$snapshot=project_u_snapshot($db,(int)$p['academic_year']);
+        $p['name']=$snapshot['catalogue'][$p['project_id']]['project_name_th'] ?? $p['project_name_th'];
+        $p['name']=trim((string)$p['name']) ?: 'โครงการ #'.$p['project_id'];unset($p['project_name_th']);
+    } unset($p);
+    $requested=project_request_code();$selected=null;
+    if ($requested!==null) {
+        $canonical=project_u_project($db,$requested)['project_id'];
+        foreach ($projects as $p) if ($p['project_id']===$canonical) $selected=$p;
+        if ($selected===null) throw new ProjectConflict('โครงการนี้ยังรอตรวจจับคู่และกระทบยอด');
+    } elseif ($projects) $selected=$projects[0];
+    $stats=['totalBudget'=>null,'totalProposed'=>null,'totalSpent'=>null,'remaining'=>null];$budget=[];$details=null;$period='open';
+    if ($selected) {
+        $year=(int)$selected['academic_year'];$bundle=project_u_bundle($db,$year);$period=$bundle['periodStatus'];
+        foreach ($bundle['rows'] as $row) if ($row['project_id']===$selected['project_id'] && $row['rowType']==='project') {
+            $stats=['totalBudget'=>$row['proposedTotal'],'totalProposed'=>$row['proposedTotal'],'totalSpent'=>$row['actualTotal'],'remaining'=>$row['proposedTotal']===null||$row['actualTotal']===null?null:$row['proposedTotal']-$row['actualTotal']];
+            $budget[]=['month'=>(string)$year,'budget'=>$stats['totalProposed'],'spent'=>$stats['totalSpent']];
+        }
+        $details=project_u_details($db,$selected['project_id']);
     }
-
-    $stmt = $db->query("
-        SELECT
-            project_id AS id,
-            COALESCE(NULLIF(project_name_th, ''), NULLIF(project_name_en, ''), CONCAT('Project #', project_id)) AS name,
-            COALESCE(project_type, 'other') AS project_type
-        FROM project
-        ORDER BY project_id DESC
-    ");
-    $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-    if (empty($projects)) {
-        project_json([
-            "status" => "success",
-            "data" => [
-                "projects" => [],
-                "selectedProjectId" => null,
-                "stats" => ["totalBudget" => 0, "totalSpent" => 0, "remaining" => 0, "progress" => 0],
-                "budgetData" => [],
-                "progressData" => [],
-                "source" => "project_budget_years/project_progress_logs",
-                "schema_version" => "2026-08-11.db-completeness-v1",
-            ],
-        ]);
-        exit;
-    }
-
-    $validProjectIds = array_map(fn($project) => (int) $project['id'], $projects);
-    if ($requestedProjectId !== null && !in_array($requestedProjectId, $validProjectIds, true)) {
-        project_json(["status" => "error", "message" => "ไม่พบโครงการที่เลือก"], 404);
-        exit;
-    }
-
-    $selectedProjectId = $requestedProjectId ?? (int) $projects[0]['id'];
-
-    $budgetStmt = $db->prepare("
-        SELECT
-            COALESCE(fiscal_year, 0) AS fiscal_year,
-            COALESCE(budget_allocated, 0) AS budget,
-            COALESCE(budget_spent, 0) AS spent
-        FROM project_budget_years
-        WHERE project_id = :project_id
-        ORDER BY fiscal_year ASC, project_budget_years_id ASC
-    ");
-    $budgetStmt->execute([':project_id' => $selectedProjectId]);
-    $budgetRows = $budgetStmt->fetchAll(PDO::FETCH_ASSOC);
-
-    $budgetData = array_map(function (array $row): array {
-        return [
-            "month" => $row['fiscal_year'] ? (string) $row['fiscal_year'] : "-",
-            "budget" => (float) $row['budget'],
-            "spent" => (float) $row['spent'],
-        ];
-    }, $budgetRows);
-
-    $progressStmt = $db->prepare("
-        SELECT period_label, planned_percent, actual_percent
-        FROM project_progress_logs
-        WHERE project_id = :project_id
-        ORDER BY COALESCE(logged_at, created_at) ASC, id ASC
-    ");
-    $progressStmt->execute([':project_id' => $selectedProjectId]);
-    $progressRows = $progressStmt->fetchAll(PDO::FETCH_ASSOC);
-
-    $progressData = array_map(function (array $row): array {
-        return [
-            "week" => $row['period_label'],
-            "planned" => (float) $row['planned_percent'],
-            "actual" => (float) $row['actual_percent'],
-        ];
-    }, $progressRows);
-
-    $totalBudget = array_reduce($budgetData, fn($sum, $row) => $sum + $row['budget'], 0);
-    $totalSpent = array_reduce($budgetData, fn($sum, $row) => $sum + $row['spent'], 0);
-    $progress = empty($progressData) ? 0 : max(array_map(fn($row) => $row['actual'], $progressData));
-
-    project_json([
-        "status" => "success",
-        "data" => [
-            "projects" => $projects,
-            "selectedProjectId" => $selectedProjectId,
-            "stats" => [
-                "totalBudget" => $totalBudget,
-                "totalSpent" => $totalSpent,
-                "remaining" => $totalBudget - $totalSpent,
-                "progress" => (int) round($progress),
-            ],
-            "budgetData" => $budgetData,
-            "progressData" => $progressData,
-            "source" => "project_budget_years/project_progress_logs",
-            "schema_version" => "2026-08-11.db-completeness-v1",
-        ],
-    ]);
-} catch (Exception $e) {
-    project_json(["status" => "error", "message" => "เกิดข้อผิดพลาดฐานข้อมูล: " . $e->getMessage()], 500);
-}
-?>
+    project_json(['status'=>'success','data'=>['projects'=>$projects,'selectedProjectId'=>$selected['project_id'] ?? null,'stats'=>$stats,'budgetData'=>$budget,'details'=>$details,'periodStatus'=>$period,'source'=>'unified_projects']]);
+} catch (Throwable $e) {project_json(['status'=>'error','message'=>$e->getMessage()],project_error_status($e));}

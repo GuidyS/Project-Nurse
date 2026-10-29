@@ -10,7 +10,11 @@ try {
     my_project_ensure_member_table($db);
 
     $search = trim((string) ($_GET['search'] ?? ''));
-    $projectId = project_request_int('project_id');
+    $projectId = project_request_code();
+    if (isset($_GET['project_id']) && $_GET['project_id'] !== '' && $projectId === null) {
+        project_json(["status" => "error", "message" => "รหัสโครงการไม่ถูกต้อง"], 400);
+        exit;
+    }
 
     $where = [];
     $params = [];
@@ -21,16 +25,15 @@ try {
     }
 
     if ($search !== '') {
-        $where[] = '(p.project_name_th LIKE :search OR p.project_name_en LIKE :search)';
+        $where[] = 'p.project_name_th LIKE :search';
         $params[':search'] = "%{$search}%";
     }
 
     $sql = "
         SELECT
+            p.id,
             p.project_id,
             p.project_name_th,
-            p.project_name_en,
-            p.description,
             p.project_type,
             p.strategy,
             p.responsible_faculty_id,
@@ -46,12 +49,11 @@ try {
             END AS members,
             COALESCE(pb.budget, 0) AS budget,
             COALESCE(pb.spent, 0) AS spent,
-            COALESCE(pb.budget, 0) AS budget_allocated,
+            COALESCE(pb.budget, 0) AS budget_proposed,
             COALESCE(pb.spent, 0) AS budget_spent,
             pb.project_budget_years_id,
             pb.fiscal_year,
-            pb.budget_note,
-            COALESCE(pl.progress, 0) AS progress
+            pb.budget_note
         FROM project p
         LEFT JOIN faculty f ON f.faculty_id = p.responsible_faculty_id
         LEFT JOIN (
@@ -63,17 +65,12 @@ try {
             SELECT project_id,
                    MAX(project_budget_years_id) AS project_budget_years_id,
                    MAX(fiscal_year) AS fiscal_year,
-                   SUM(COALESCE(budget_allocated, 0)) AS budget,
+                   SUM(COALESCE(budget_proposed, 0)) AS budget,
                    SUM(COALESCE(budget_spent, 0)) AS spent,
                    MAX(result) AS budget_note
             FROM project_budget_years
             GROUP BY project_id
         ) pb ON pb.project_id = p.project_id
-        LEFT JOIN (
-            SELECT project_id, MAX(actual_percent) AS progress
-            FROM project_progress_logs
-            GROUP BY project_id
-        ) pl ON pl.project_id = p.project_id
     ";
 
     if (!empty($where)) {
@@ -89,7 +86,7 @@ try {
     $plosByProject = [];
     $membersByProject = [];
     $projectIds = array_values(array_filter(array_map(
-        static fn(array $project): int => (int) $project['project_id'],
+        static fn(array $project): string => (string) $project['project_id'],
         $projects
     )));
 
@@ -230,10 +227,12 @@ try {
     }
     unset($project);
 
+    $projects = project_u_catalogue($db, $projects);
+
     // PROJECT_VIEW already authorizes this catalogue; search must not hide historical filter options.
     $availableYears = $db->query('SELECT DISTINCT academic_year FROM project WHERE academic_year IS NOT NULL')->fetchAll(PDO::FETCH_COLUMN);
     project_json(["status" => "success", "data" => $projects, "academicYears" => academicYearOptions($availableYears, currentAcademicYear(null, $db))]);
 } catch (Exception $e) {
-    project_json(["status" => "error", "message" => $e->getMessage()], 500);
+    project_json(["status" => "error", "message" => $e->getMessage()], project_error_status($e));
 }
 ?>

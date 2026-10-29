@@ -20,18 +20,14 @@ import Advises from "@/components/pages/Teacher/Advises";
 import AssignInstructors from "@/components/pages/Teacher/AssignInstructors";
 import CLOMap from "@/components/pages/Teacher/CLOMap";
 import Evidence from "@/components/pages/Teacher/Evidence";
-import Grades from "@/components/pages/Teacher/Grades";
 import MyProjects from "@/components/pages/Teacher/MyProjects";
-import Performance from "@/components/pages/Teacher/Performance";
 import ScheduleTasks from "@/components/pages/Teacher/ScheduleTasks";
 import ProjectReports from "@/components/pages/Teacher/ProjectReports";
 import ProjectLinks from "@/components/pages/Teacher/ProjectLinks";
-import Approvals from "@/components/pages/Admin/Approvals";
 import AuditLog from "@/components/pages/Admin/AuditLog";
 import ExportData from "@/components/pages/Admin/ExportData";
 import ImportData from "@/components/pages/Admin/ImportData";
 import Reports from "@/components/pages/Admin/Reports";
-import RolesManagement from "@/components/pages/Admin/RolesManagement";
 import UsersManagement from "@/components/pages/Admin/UsersManagement";
 import AssignStudents from "@/components/pages/Admin/AssignStudents";
 import ResearchSummary from "@/components/pages/Teacher/ResearchSummary";
@@ -121,6 +117,9 @@ const Index = () => {
   );
 
   const renderPage = () => {
+    if (["approvals", "grades", "performance"].includes(activeItem)) {
+      return <p className="p-6 text-muted-foreground">ฟังก์ชันนี้ยุติการใช้งานแล้ว</p>;
+    }
     // 1. ดึงข้อมูลสิทธิ์ปัจจุบันเสมอ เมื่อมีการเรนเดอร์หน้าใหม่
     const savedUser = localStorage.getItem('user');
     const userObj = savedUser ? JSON.parse(savedUser) : null;
@@ -179,16 +178,15 @@ const Index = () => {
     if (activeItem === "my-projects") return <MyProjects />;
 
     // 3. 🔒 หมวดสิทธิ์ผู้ดูแลระบบ (Admin - Role 1)
-    const adminPages = ["approvals", "audit-log", "export-data", "import-data", "reports", "roles-management", "users-management", "competency-items-management"];
+    const adminPages = ["audit-log", "export-data", "import-data", "reports", "roles-management", "users-management", "competency-items-management"];
     if (adminPages.includes(activeItem)) {
       if (roleId !== 1 && !(roleId == 2 && positionId == 1)) return <UnauthorizedView />;
       switch (activeItem) {
-        case "approvals": return <Approvals />;                                 //*
         case "audit-log": return <AuditLog />;                                     //*
         case "export-data": return <ExportData />;                                 //*
         case "import-data": return <ImportData />;                                 //*
         case "reports": return <Reports />;
-        case "roles-management": return <RolesManagement />;                       //*
+        case "roles-management": return <UsersManagement />;
         case "users-management": return <UsersManagement />;                       //*
         case "competency-items-management": return <CompetencyItemsManagement />;
       }
@@ -251,7 +249,7 @@ const Index = () => {
     const teacherPages = [
       "courses", "five-year-summary", "clos",
       "course-students", "documents", "assign-instructors", "clo-map",
-      "evidence", "grades", "performance", "practical-students",
+      "evidence", "practical-students",
       "schedule-tasks", "advise-notes", "advisor-notifications", "advises",
       "students", "students-info", "my-research", "research-summary",
       "advisor-health-records-view"
@@ -269,9 +267,7 @@ const Index = () => {
         case "assign-instructors": return <AssignInstructors />;                    //*
         case "clo-map": return <CLOMap />;                                          //*
         case "evidence": return <Evidence />;                                       //*
-        case "grades": return <Grades />;                                           //*
-        case "performance": return <Performance />;
-        case "practical-students": return <PracticalPage />;                    //* /* ดูรายชื่อนศ.และประเมินผลการฝึกปฏิบัติของเด็กได้*/ /* อจ.ปฏิบัติ */
+        case "practical-students": return <PracticalPage />;
         case "schedule-tasks": return <ScheduleTasks />;                            //*
         case "advise-notes": return <AdviseNotes />;                                      //*
         case "advises": return <Advises />;

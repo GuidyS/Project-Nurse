@@ -2,7 +2,7 @@
 require_once __DIR__ . '/../../middlewares/auth_middleware.php';
 require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../config/academic_calendar.php';
-require_once __DIR__ . '/../Approvals/approval-schema.php';
+require_once __DIR__ . '/../../../config/admin_access.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     http_response_code(405);
@@ -12,7 +12,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 
 try {
     $db = new Connect();
-    approvalRequireAdmin($db);
+    adminRequireAccess($db);
     $currentYear = currentAcademicYear(null, $db);
     // Same admin scope and columns as export-data; no student records are returned.
     $admissionYears = $db->query('SELECT DISTINCT admission_year FROM student WHERE admission_year IS NOT NULL')->fetchAll(PDO::FETCH_COLUMN);

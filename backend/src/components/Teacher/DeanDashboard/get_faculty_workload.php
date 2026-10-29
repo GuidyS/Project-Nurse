@@ -5,6 +5,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
 require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../config/academic_calendar.php';
+require_once __DIR__ . '/../ProjectShared/unified_projects.php';
 
 header('Content-Type: application/json; charset=UTF-8');
 
@@ -22,7 +23,7 @@ function uniqueCount(array $values): int
 function summarizeProjectRecords(array $records): array
 {
     return [
-        'projects' => uniqueCount(array_column($records, 'project_name')),
+        'projects' => uniqueCount(array_column($records, 'project_code')),
         'activities' => count(array_filter($records, fn($record) => ($record['row_type'] ?? '') === 'activity')),
         'items' => count($records),
         'records' => array_values($records),
@@ -234,43 +235,18 @@ try {
         ];
     }
 
-    $projectStmt = $db->prepare(
-        "SELECT
-            p.project_id,
-            p.project_name_th,
-            p.project_name_en,
-            p.project_type,
-            p.responsible_faculty_id,
-            TRIM(CONCAT(COALESCE(f.title, ''), COALESCE(f.first_name_th, ''), ' ', COALESCE(f.last_name_th, ''))) AS responsible_person
-         FROM project p
-         LEFT JOIN faculty f ON f.faculty_id = p.responsible_faculty_id
-         WHERE p.academic_year = :academic_year
-           AND p.project_type IN ('academic_service', 'culture')
-         ORDER BY p.project_id DESC"
-    );
-    $projectStmt->execute([':academic_year' => $academicYear]);
-
-    foreach ($projectStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-        $facultyId = (string)($row['responsible_faculty_id'] ?? '');
-        if ($facultyId === '' || !isset($faculty[$facultyId])) {
-            continue;
-        }
-
-        $category = (string)$row['project_type'];
-        $projectName = trim((string)($row['project_name_th'] ?? ''));
-        if ($projectName === '') {
-            $projectName = trim((string)($row['project_name_en'] ?? '')) ?: ('Project #' . $row['project_id']);
-        }
-
-        $faculty[$facultyId][$category][] = [
-            'id' => (string)$row['project_id'],
-            'project_code' => '',
-            'project_name' => $projectName,
-            'activity_name' => null,
-            'row_type' => 'project',
-            'strategy' => '',
-            'responsible_person' => trim((string)$row['responsible_person']),
-        ];
+    project_u_ready($db);
+    $projectRows=project_u_catalogue($db,project_u_rows($db,"SELECT p.*,CONCAT_WS(' ',f.title,f.first_name_th,f.last_name_th) AS responsible_name FROM project p LEFT JOIN faculty f ON f.faculty_id=p.responsible_faculty_id WHERE p.academic_year=?",[$academicYear]));
+    $byCode=[]; foreach ($projectRows as $p) if (!$p['merge_pending']) $byCode[$p['project_id']]=$p;
+    foreach (project_u_bundle($db,$academicYear)['rows'] as $row) {
+        $master=$byCode[$row['project_id']] ?? null; if (!$master) continue;
+        $facultyId=(string)($master['responsible_faculty_id'] ?? ''); $category=$master['project_type'];
+        if (!isset($faculty[$facultyId]) || !in_array($category,['academic_service','culture'],true)) continue;
+        $faculty[$facultyId][$category][]=[
+            'id'=>$row['id'],'project_code'=>$row['project_id'],
+            'project_name'=>trim((string)$master['project_name_th']) ?: 'โครงการ #'.$row['project_id'],
+            'activity_name'=>$row['activityName'],'row_type'=>$row['rowType'],
+            'strategy'=>$row['strategy'],'responsible_person'=>$row['responsiblePerson']];
     }
 
     $totalCourses = 0;
@@ -317,11 +293,11 @@ try {
 
         foreach ($person['academic_service']['records'] as $record) {
             $serviceRecordIds[$record['id']] = true;
-            $serviceProjectNames[$record['project_name']] = true;
+            $serviceProjectNames[$record['project_code']] = true;
         }
         foreach ($person['culture']['records'] as $record) {
             $cultureRecordIds[$record['id']] = true;
-            $cultureProjectNames[$record['project_name']] = true;
+            $cultureProjectNames[$record['project_code']] = true;
         }
 
         unset($person['first_name']);

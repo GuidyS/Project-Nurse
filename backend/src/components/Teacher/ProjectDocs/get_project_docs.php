@@ -5,7 +5,7 @@ $db = project_db();
 project_require_auth($db, ['PROJECT_DOCS_MANAGE']);
 
 try {
-    $projectId = project_request_int('project_id');
+    $projectId = project_request_code();
     if (isset($_GET['project_id']) && $_GET['project_id'] !== '' && $projectId === null) {
         project_json(["status" => "error", "message" => "รหัสโครงการไม่ถูกต้อง"], 400);
         exit;
@@ -20,11 +20,12 @@ try {
             d.id,
             d.project_id,
             d.name,
-            COALESCE(NULLIF(p.project_name_th, ''), NULLIF(p.project_name_en, ''), d.project) AS project,
+            d.report_item_id,
+            d.report_document_type,
+            COALESCE(NULLIF(TRIM(p.project_name_th), ''), CASE WHEN d.project_id IS NOT NULL THEN CONCAT('โครงการ #', d.project_id) ELSE d.project END) AS project,
             d.project AS legacy_project_name,
             d.type,
             d.date,
-            d.status,
             d.file_path,
             d.file_name,
             d.mime_type,
@@ -43,12 +44,13 @@ try {
 
     $docsStmt = $db->prepare($docsSql);
     $docsStmt->execute($params);
-    $docs = $docsStmt->fetchAll(PDO::FETCH_ASSOC);
+    $docs = project_u_documents($docsStmt->fetchAll(PDO::FETCH_ASSOC));
 
     $projects = $db->query("
         SELECT
-            project_id AS id,
-            COALESCE(NULLIF(project_name_th, ''), NULLIF(project_name_en, ''), CONCAT('Project #', project_id)) AS name
+            id,
+            project_id,
+            COALESCE(NULLIF(TRIM(project_name_th), ''), CONCAT('โครงการ #', project_id)) AS name
         FROM project
         ORDER BY project_id DESC
     ")->fetchAll(PDO::FETCH_ASSOC);
@@ -64,6 +66,6 @@ try {
         ],
     ]);
 } catch (Exception $e) {
-    project_json(["status" => "error", "message" => "ไม่สามารถดึงข้อมูลเอกสารจากระบบได้: " . $e->getMessage()], 500);
+    project_json(["status" => "error", "message" => "ไม่สามารถดึงข้อมูลเอกสารจากระบบได้: " . $e->getMessage()], project_error_status($e));
 }
 ?>

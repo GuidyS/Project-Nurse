@@ -70,9 +70,7 @@ const exportCategories: {
     icon: FolderKanban,
     fields: [
       { key: "project_id", label: "รหัสโครงการ" },
-      { key: "project_name_th", label: "ชื่อโครงการ (ไทย)" },
-      { key: "project_name_en", label: "ชื่อโครงการ (อังกฤษ)" },
-      { key: "description", label: "รายละเอียด" },
+      { key: "project_name_th", label: "ชื่อโครงการ" },
       { key: "responsible_faculty_id", label: "อาจารย์ผู้รับผิดชอบ" },
       { key: "academic_year", label: "ปีการศึกษา" },
     ],

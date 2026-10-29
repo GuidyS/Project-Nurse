@@ -10,7 +10,7 @@ $input = project_payload();
 
 try {
     $name = trim((string) ($input['name'] ?? ''));
-    $projectId = isset($input['project_id']) ? (int) $input['project_id'] : 0;
+    $projectId = project_validate_code($input['project_id'] ?? null);
     $type = trim((string) ($input['type'] ?? 'summary'));
     $date = trim((string) ($input['date'] ?? ''));
     $attachmentType = trim((string) ($input['attachment_type'] ?? ''));
@@ -26,7 +26,7 @@ try {
     }
 
     $allowedTypes = ['proposal', 'progress', 'financial', 'summary'];
-    if ($name === '' || $projectId <= 0 || $type === '' || $date === '') {
+    if ($name === '' || $projectId === '' || $type === '' || $date === '') {
         project_json(["status" => "error", "message" => "กรุณากรอกข้อมูลเอกสารให้ครบถ้วน"], 400);
         exit;
     }
@@ -50,11 +50,11 @@ try {
     }
 
     $project = project_require_existing_project($db, $projectId);
-    $projectName = $project['project_name_th'] ?: ($project['project_name_en'] ?: 'Project #' . $projectId);
+    $projectName = trim((string) ($project['project_name_th'] ?? '')) ?: 'โครงการ #' . $projectId;
 
     $stmt = $db->prepare("
         INSERT INTO project_documents (project_id, name, project, type, date, status, file_path, file_name)
-        VALUES (:project_id, :name, :project, :type, :date, 'pending', :file_path, :file_name)
+        VALUES (:project_id, :name, :project, :type, :date, 'available', :file_path, :file_name)
     ");
     $stmtParams = [
         ':project_id' => $projectId,
@@ -65,7 +65,13 @@ try {
         ':file_path' => $filePath,
         ':file_name' => $fileName,
     ];
+    $db->beginTransaction();
+    project_u_guard($db, $projectId);
     $stmt->execute($stmtParams);
+    $documentId = (int) $db->lastInsertId();
+
+    project_u_document_link($db, $projectId, $documentId, $input);
+    $db->commit();
 
     // บันทึก Log เมื่อสร้างรายการเอกสารใหม่
     logAudit($db, $auth['user_id'], 'create', 'project_documents', "เพิ่มรายการเอกสารโครงการใหม่ (ชื่อ: {$name}, โครงการ: {$projectName})");
@@ -73,9 +79,10 @@ try {
     project_json([
         "status" => "success",
         "message" => "บันทึกเอกสารเข้าสู่ระบบสำเร็จแล้ว",
-        "doc_id" => (int) $db->lastInsertId(),
+        "doc_id" => $documentId,
     ]);
 } catch (Exception $e) {
-    project_json(["status" => "error", "message" => $e->getMessage()], 400);
+    if ($db->inTransaction()) $db->rollBack();
+    project_json(["status" => "error", "message" => $e->getMessage()], project_error_status($e));
 }
 ?>

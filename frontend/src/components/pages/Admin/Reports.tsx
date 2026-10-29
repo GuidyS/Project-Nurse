@@ -1,3 +1,4 @@
+import ProjectMergeWorkbench from '@/components/pages/Admin/ProjectMergeWorkbench';
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -32,6 +33,17 @@ type BudgetCell = {
 
 type BudgetBySource = Partial<Record<BudgetSource, BudgetCell>>;
 
+type ReportDocument = {
+  id: number | string;
+  name: string;
+  date?: string | null;
+  file_path?: string | null;
+  report_document_type?: string;
+};
+
+type AttachmentKind = "url" | "file";
+type ReportAttachment = ReportDocument & { href: string; kind: AttachmentKind };
+
 type AnnualProjectReportRow = {
   id: string;
   academicYear: string;
@@ -45,25 +57,86 @@ type AnnualProjectReportRow = {
   responsiblePerson?: string;
   proposedBudget?: BudgetBySource;
   actualBudget?: BudgetBySource;
-  approvalStatus?: string;
-  approvedBudgetUrl?: string;
+  budgetDocumentUrl?: string;
   summaryReportUrl?: string;
+  documents?: ReportDocument[] | null;
   parentProjectCode?: string;
   rowType: "project" | "activity";
-  proposedTotal?: number;
-  actualTotal?: number;
+  proposedTotal?: number | null;
+  actualTotal?: number | null;
   documentStatus?: {
     label: string;
     code: string;
   };
 };
 
+const hasControlCharacters = (value: string) => Array.from(value).some(character => {
+  const code = character.charCodeAt(0);
+  return code < 32 || code === 127;
+});
+
+const getReportAttachment = (path?: string | null): { href: string; kind: AttachmentKind } | null => {
+  const value = path?.trim();
+  if (!value || value.includes("\\") || hasControlCharacters(value)) return null;
+  try {
+    if (/^https?:\/\//i.test(value)) {
+      return { href: new URL(value).href, kind: "url" };
+    }
+    // Only resolve uploaded document paths against the API, never against the SPA.
+    if (!/^\/?uploads\//.test(value)) return null;
+    const segments = value.replace(/^\//, "").split("/").map(decodeURIComponent);
+    if (segments[1] === "imports" || segments.some(segment =>
+      !segment || segment === "." || segment === ".." || /[\\/?#%]/.test(segment) || hasControlCharacters(segment)
+    )) return null;
+    if (!/\.(pdf|docx?|png|jpe?g)$/i.test(segments[segments.length - 1])) return null;
+    const baseUrl = api.defaults.baseURL || "http://localhost:8080";
+    const href = new URL(segments.map(encodeURIComponent).join("/"), `${baseUrl.replace(/\/+$/, "")}/`).href;
+    return { href, kind: "file" };
+  } catch {
+    return null;
+  }
+};
+
+const isGoogleDriveHref = (href: string) => {
+  try {
+    return ["drive.google.com", "docs.google.com"].includes(new URL(href).hostname.replace(/\.$/, "").toLowerCase());
+  } catch {
+    return false;
+  }
+};
+
+const getReportAttachments = (row: AnnualProjectReportRow): ReportAttachment[] => {
+  const documents = row.documents ?? [
+    { id: "legacy-summary", name: "สรุปโครงการ", file_path: row.summaryReportUrl, report_document_type: "summary_report" },
+    { id: "legacy-budget", name: "เอกสารงบประมาณ", file_path: row.budgetDocumentUrl, report_document_type: "budget_document" },
+  ];
+  const seen = new Set<string>();
+  return documents.flatMap(document => {
+    const attachment = getReportAttachment(document.file_path);
+    // Google Drive is a separate attachment source, not a website URL.
+    const isGoogleDrive = attachment?.kind === "url" && isGoogleDriveHref(attachment.href);
+    if (!attachment || isGoogleDrive || seen.has(attachment.href)) return [];
+    seen.add(attachment.href);
+    return [{ ...document, ...attachment }];
+  });
+};
+
+const getSummaryGoogleDriveAttachment = (row: AnnualProjectReportRow) => {
+  const summaryDocument = (row.documents ?? []).find(document => {
+    if (document.report_document_type !== "summary_report") return false;
+    const attachment = getReportAttachment(document.file_path);
+    return attachment?.kind === "url" && isGoogleDriveHref(attachment.href);
+  });
+  const attachment = getReportAttachment(summaryDocument?.file_path ?? row.summaryReportUrl);
+  return attachment?.kind === "url" && isGoogleDriveHref(attachment.href) ? attachment : null;
+};
+
 type SummaryStats = {
   totalProjects: number;
   totalActivities: number;
-  proposedTotal: number;
-  actualTotal: number;
-  balance: number;
+  proposedTotal: number | null;
+  actualTotal: number | null;
+  balance: number | null;
   completeDocuments: number;
 };
 
@@ -71,16 +144,16 @@ type StrategySummary = {
   strategy: string;
   projects: number;
   activities: number;
-  proposedTotal: number;
-  actualTotal: number;
+  proposedTotal: number | null;
+  actualTotal: number | null;
   documents: number;
 };
 
 type BudgetBreakdownItem = {
   key: BudgetSource;
   label: string;
-  proposedTotal: number;
-  actualTotal: number;
+  proposedTotal: number | null;
+  actualTotal: number | null;
 };
 
 type AvailableFilters = {
@@ -90,6 +163,7 @@ type AvailableFilters = {
 };
 
 type ReportsApiData = {
+  periodStatus?: string;
   academicYear: string;
   availableFilters: AvailableFilters;
   budgetSources: { key: BudgetSource; label: string }[];
@@ -108,150 +182,9 @@ const fallbackBudgetSources: { key: BudgetSource; label: string }[] = [
   { key: "thonburiHospital", label: "โรงพยาบาลธนบุรี" },
   { key: "nursingFaculty", label: "คณะพยาบาลศาสตร์" },
   { key: "external", label: "หน่วยงานภายนอก" },
+  { key: "unspecified", label: "ยังไม่ระบุแหล่งเงิน" },
 ];
 
-const reportRows: AnnualProjectReportRow[] = [
-  {
-    id: "2568-p1",
-    academicYear: "2568",
-    strategy: "ยุทธศาสตร์ที่ 1: Future Research & Innovation",
-    projectCode: "2091101 - 68001",
-    projectName: "โครงการพัฒนางานวิจัยและนวัตกรรมแต่ละสาขา",
-    responsiblePerson: "ผศ.ดร.รอญ.วิภานันท์",
-    rowType: "project",
-  },
-  {
-    id: "2568-p1-a1",
-    academicYear: "2568",
-    strategy: "ยุทธศาสตร์ที่ 1: Future Research & Innovation",
-    projectName: "ก.1 วิจัยและนวัตกรรมสาขาสูติศาสตร์",
-    responsiblePerson: "อ.สุกฤตา",
-    summaryReportUrl: "https://drive.google.com/file/d/18W_0OGkrBf78IV2pj50IOB62eCK-z7IT/view?usp=sharing",
-    parentProjectCode: "2091101 - 68001",
-    rowType: "activity",
-  },
-  {
-    id: "2568-p4",
-    academicYear: "2568",
-    strategy: "ยุทธศาสตร์ที่ 1: Future Research & Innovation",
-    projectCode: "2091101 - 68004",
-    projectName: "โครงการ สนับสนุนการตีพิมพ์ผลงานใน SCOPUS",
-    responsiblePerson: "ผศ.ดร.จรัสดาว",
-    approvedBudgetUrl: "https://drive.google.com/file/d/1bLSv6NYhO1scqotgWDbNF0WA8WAs7jix/view?usp=sharing",
-    rowType: "project",
-  },
-  {
-    id: "2568-p5",
-    academicYear: "2568",
-    strategy: "ยุทธศาสตร์ที่ 1: Future Research & Innovation",
-    projectCode: "2091101 - 68005",
-    projectName: "โครงการ ตีพิมพ์เผยแพร่งานวิจัยและนวัตกรรม",
-    responsiblePerson: "ผศ.ดร.ชนิดา",
-    proposedBudget: { nursingFaculty: { amount: 0, note: "รออนุมัติ" } },
-    summaryReportUrl: "https://drive.google.com/file/d/1w94FLnEqdbksj52cHMV9MsVdR-6_E_Kw/view?usp=sharing",
-    rowType: "project",
-  },
-  {
-    id: "2568-p9",
-    academicYear: "2568",
-    strategy: "ยุทธศาสตร์ที่ 2: Future Education",
-    projectCode: "2091101 - 68009",
-    projectName: "โครงการ ติดตามผลการดำเนินงานและพัฒนาแผนหลักสูตร",
-    responsiblePerson: "ผศ.ดร.วััฒนีย์",
-    approvedBudgetUrl: "https://drive.google.com/file/d/1Y-krdhtTnro_xrqtJ2KHtyWKwIGE7uBP/view?usp=sharing",
-    summaryReportUrl: "https://drive.google.com/file/d/1hZ-7gOiTpa70_3Q4XFudbV2zNPgHFgPp/view?usp=sharing",
-    rowType: "project",
-  },
-  {
-    id: "2568-p12-a1",
-    academicYear: "2568",
-    strategy: "ยุทธศาสตร์ที่ 2: Future Education",
-    projectName: "ก.1 พัฒนาทักษะภาษา ปี 1",
-    responsiblePerson: "ผศ.ดร.วััฒนีย์",
-    proposedBudget: { nursingFaculty: { amount: 0, note: "ไม่ใช้งบ" } },
-    summaryReportUrl: "https://drive.google.com/file/d/1amSXDm9LbIryttJrEtrxsYQ2k7Wmql1F/view?usp=sharing",
-    parentProjectCode: "2091101 - 68012",
-    rowType: "activity",
-  },
-  {
-    id: "2568-p27",
-    academicYear: "2568",
-    strategy: "ยุทธศาสตร์ที่ 4: Future System for Management",
-    projectCode: "2091101 - 68027",
-    projectName: "โครงการ พัฒนาระบบคุณภาพและประสิทธิภาพด้านการจัดการ MIS",
-    responsiblePerson: "พจอ.ดร.ภูมเดชา",
-    rowType: "project",
-  },
-  {
-    id: "2567-p28",
-    academicYear: "2567",
-    strategy: "ยุทธศาสตร์ที่ 1: Future Research & Innovation",
-    kpi: "KPI 1 จำนวนโครงการ วิจัย นวัตกรรมที่มีความร่วมมือและบูรณาการศาสตร์ระหว่างคณะวิชา",
-    projectCode: "2091101 - 67028",
-    projectName: "โครงการพัฒนางานวิจัยและนวัตกรรมแต่ละสาขา",
-    responsiblePerson: "ผศ.ดร.รอญ.วิภานันท์",
-    actualBudget: { university: { amount: 0 }, thonburiHospital: { amount: 0 }, nursingFaculty: { amount: 0 }, external: { amount: 12000 } },
-    rowType: "project",
-  },
-  {
-    id: "2567-p28-a1",
-    academicYear: "2567",
-    strategy: "ยุทธศาสตร์ที่ 1: Future Research & Innovation",
-    projectName: "ก.1 วิจัยและนวัตกรรมสาขาสูติศาสตร์",
-    responsiblePerson: "อ.สุกฤตา",
-    actualBudget: { university: { amount: 0 }, thonburiHospital: { amount: 0 }, nursingFaculty: { amount: 0 }, external: { amount: 12000 } },
-    parentProjectCode: "2091101 - 67028",
-    rowType: "activity",
-  },
-  {
-    id: "2567-p28-a2",
-    academicYear: "2567",
-    strategy: "ยุทธศาสตร์ที่ 1: Future Research & Innovation",
-    projectName: "ก.2 วิจัยและนวัตกรรมสาขาผู้ใหญ่",
-    responsiblePerson: "อ.รัตนาภรณ์",
-    actualBudget: { university: { amount: 0, note: "ไม่ใช้งบ" } },
-    parentProjectCode: "2091101 - 67028",
-    rowType: "activity",
-  },
-  {
-    id: "2566-p001",
-    academicYear: "2566",
-    strategy: "ยุทธศาสตร์ที่ 1: บัณฑิตดี มีคุณภาพ",
-    planName: "แผนงานที่ 1. ด้านหลักสูตร",
-    objective: "เพื่อให้หลักสูตรและการจัดการเรียนการสอนได้รับการพัฒนาอย่างต่อเนื่อง",
-    kpi: "ติดตามประเมินหลักสูตรทุกรายวิชาชีพทุกภาคการศึกษา ร้อยละ 100",
-    projectCode: "66.1-001",
-    projectName: "ติดตามผลการดำเนินงานตามแผนหลักสูตร",
-    responsiblePerson: "ผศ.ดร.วัฒนีย์",
-    proposedBudget: { university: { amount: 20000 }, thonburiHospital: { amount: 0 }, nursingFaculty: { amount: 0 }, external: { amount: 0 } },
-    actualBudget: { university: { amount: 18500 }, thonburiHospital: { amount: 0 }, nursingFaculty: { amount: 0 }, external: { amount: 0 } },
-    rowType: "project",
-  },
-  {
-    id: "2566-p002",
-    academicYear: "2566",
-    strategy: "ยุทธศาสตร์ที่ 1: บัณฑิตดี มีคุณภาพ",
-    planName: "แผนงานที่ 1. ด้านหลักสูตร",
-    projectCode: "66.1-002",
-    projectName: "ประกันคุณภาพหลักสูตรเน้นผลลัพธ์ PLOs",
-    responsiblePerson: "ผศ.ดร.สุสารี",
-    proposedBudget: { university: { amount: 5720 }, thonburiHospital: { amount: 0 }, nursingFaculty: { amount: 0 }, external: { amount: 0 } },
-    actualBudget: { university: { amount: 7000 }, thonburiHospital: { amount: 0 }, nursingFaculty: { amount: 0 }, external: { amount: 0 } },
-    rowType: "project",
-  },
-  {
-    id: "2566-p003",
-    academicYear: "2566",
-    strategy: "ยุทธศาสตร์ที่ 1: บัณฑิตดี มีคุณภาพ",
-    planName: "แผนงานที่ 1. ด้านหลักสูตร",
-    projectCode: "66.1-003",
-    projectName: "คัดเลือกสรรหาและการเตรียมความพร้อมนักศึกษาใหม่",
-    responsiblePerson: "ผศ.วารุณี",
-    proposedBudget: { university: { amount: 2000 } },
-    actualBudget: { university: { amount: 2000 } },
-    rowType: "project",
-  },
-];
 
 const upcomingApiDesign = [
   "GET /index.php?page=admin-reports&year=<year>",
@@ -259,7 +192,7 @@ const upcomingApiDesign = [
   "GET /index.php?page=export-report&year=<year>&format=xlsx",
 ];
 
-const formatCurrency = (value: number) =>
+const formatCurrency = (value: number | null | undefined) => value === null || value === undefined ? "ยังไม่ระบุ" :
   new Intl.NumberFormat("th-TH", {
     style: "currency",
     currency: "THB",
@@ -280,9 +213,9 @@ const getBudgetNotes = (row: AnnualProjectReportRow) =>
 const getDocumentStatus = (row: AnnualProjectReportRow) => {
   const notes = getBudgetNotes(row);
   if (notes.some((note) => note?.includes("ไม่ใช้งบ"))) return { label: "ไม่ใช้งบ", variant: "secondary" as const };
-  const hasApprovedBudget = row.approvedBudgetUrl || row.approvalStatus === 'approved';
-  if (hasApprovedBudget && row.summaryReportUrl) return { label: "เอกสารครบ", variant: "default" as const };
-  if (hasApprovedBudget) return { label: "มีอนุมัติงบ", variant: "outline" as const };
+  const hasBudgetDocument = Boolean(row.budgetDocumentUrl);
+  if (hasBudgetDocument && row.summaryReportUrl) return { label: "เอกสารครบ", variant: "default" as const };
+  if (hasBudgetDocument) return { label: "มีเอกสารงบประมาณ", variant: "outline" as const };
   if (row.summaryReportUrl) return { label: "มีสรุปโครงการ", variant: "outline" as const };
   return { label: "รอดำเนินการ", variant: "destructive" as const };
 };
@@ -290,7 +223,7 @@ const getDocumentStatus = (row: AnnualProjectReportRow) => {
 const getDocumentVariant = (code?: string) => {
   if (code === "complete") return "default" as const;
   if (code === "no_budget") return "secondary" as const;
-  if (code === "approved_only" || code === "summary_only") return "outline" as const;
+  if (code === "budget_only" || code === "summary_only") return "outline" as const;
   return "destructive" as const;
 };
 
@@ -303,7 +236,7 @@ const downloadCsv = (rows: AnnualProjectReportRow[], academicYear: string) => {
     "ผู้รับผิดชอบ",
     "งบเสนอรวม",
     "งบใช้จริงรวม",
-    "ลิงก์อนุมัติงบ",
+    "สถานะเอกสาร",
     "ลิงก์สรุปโครงการ",
   ];
 
@@ -313,9 +246,9 @@ const downloadCsv = (rows: AnnualProjectReportRow[], academicYear: string) => {
     row.projectCode || row.parentProjectCode || "",
     row.projectName,
     row.responsiblePerson || "",
-    sumBudget(row.proposedBudget),
-    sumBudget(row.actualBudget),
-    row.approvalStatus === 'approved' ? 'อนุมัติแล้ว' : 'รอดำเนินการ',
+    row.proposedTotal ?? "ยังไม่ระบุ",
+    row.actualTotal ?? "ยังไม่ระบุ",
+    getDocumentStatus(row).label,
     row.summaryReportUrl || "",
   ]);
 
@@ -333,33 +266,16 @@ const downloadCsv = (rows: AnnualProjectReportRow[], academicYear: string) => {
 
 export default function Reports() {
   const { currentYear, academicYear, setAcademicYear } = useAcademicYearSelection();
+  const [refreshVersion, setRefreshVersion] = useState(0);
   const [selectedStrategy, setSelectedStrategy] = useState("ทั้งหมด");
   const [selectedResponsible, setSelectedResponsible] = useState("ทั้งหมด");
   const [searchTerm, setSearchTerm] = useState("");
   const debouncedSearch = useDebouncedValue(searchTerm);
-  const requestKey = JSON.stringify([academicYear, selectedStrategy, selectedResponsible, searchTerm]);
+  const requestKey = JSON.stringify([academicYear, selectedStrategy, selectedResponsible, searchTerm, refreshVersion]);
   const [loadedKey, setLoadedKey] = useState<string | null>(null);
   const [reportData, setReportData] = useState<ReportsApiData | null>(null);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
-
-  const handleApproveBudget = async (projectId: string) => {
-    try {
-      const res = await api.post("/index.php?page=approve-budget", { project_id: projectId });
-      if (res.data.status === "success") {
-        toast({ title: "อนุมัติสำเร็จ", description: "อนุมัติงบโครงการเรียบร้อยแล้ว" });
-        setReportData(prev => {
-          if (!prev) return prev;
-          const updatedRows = prev.rows.map(row => 
-            row.id === projectId ? { ...row, approvalStatus: 'approved', documentStatus: { label: 'มีอนุมัติงบ', code: 'approved_only' } } : row
-          );
-          return { ...prev, rows: updatedRows };
-        });
-      }
-    } catch (error: any) {
-      toast({ title: "เกิดข้อผิดพลาด", description: error.response?.data?.message || "ไม่สามารถอนุมัติได้", variant: "destructive" });
-    }
-  };
 
   useEffect(() => {
     const controller = new AbortController();
@@ -402,7 +318,7 @@ export default function Reports() {
     loadReports();
 
     return () => controller.abort();
-  }, [academicYear, selectedStrategy, selectedResponsible, searchTerm, debouncedSearch, requestKey, toast]);
+  }, [academicYear, selectedStrategy, selectedResponsible, searchTerm, debouncedSearch, requestKey, toast, refreshVersion]);
 
   const resultsPending = loading || requestKey !== loadedKey;
 
@@ -426,8 +342,8 @@ export default function Reports() {
     : budgetSources.map((source) => ({
         key: source.key,
         label: source.label,
-        proposedTotal: sumBudgetSource(filteredRows, "proposedBudget", source.key),
-        actualTotal: sumBudgetSource(filteredRows, "actualBudget", source.key),
+        proposedTotal: sumBudgetSource(filteredRows.filter(r => r.rowType === "project"), "proposedBudget", source.key),
+        actualTotal: sumBudgetSource(filteredRows.filter(r => r.rowType === "project"), "actualBudget", source.key),
       }));
 
   const groupedRows = useMemo(() => {
@@ -451,6 +367,8 @@ export default function Reports() {
           ส่งออก CSV
         </Button>
       </div>
+
+      <ProjectMergeWorkbench year={academicYear} onChanged={() => setRefreshVersion(v => v + 1)} />
 
       <Card className="app-section-card">
         <CardHeader>
@@ -548,7 +466,7 @@ export default function Reports() {
         <Card className="app-stat-card">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">ส่วนต่างงบ</p>
+              <p className="text-sm text-muted-foreground">ส่วนต่างงบเสนอ − ใช้จริง</p>
               <TrendingDown className="h-4 w-4 text-primary" />
             </div>
             <p className="mt-2 text-xl font-bold">{formatCurrency(summaryStats.balance)}</p>
@@ -581,7 +499,7 @@ export default function Reports() {
                       {item.projects} โครงการ / {item.activities} กิจกรรมย่อย / {item.documents} รายการมีเอกสาร
                     </p>
                   </div>
-                  <Badge variant="secondary">{formatCurrency(item.actualTotal || item.proposedTotal)}</Badge>
+                  <Badge variant="secondary">{formatCurrency(item.actualTotal ?? item.proposedTotal)}</Badge>
                 </div>
               </div>
             ))}
@@ -623,7 +541,7 @@ export default function Reports() {
           <div>
             <CardTitle className="text-base">ตารางโครงการและกิจกรรมย่อย</CardTitle>
             <CardDescription>
-              แสดงแบบ grouped table โดยกิจกรรมย่อยจะเยื้องใต้โครงการหลัก และแสดงสถานะเอกสารตามลิงก์ในไฟล์
+              กิจกรรมย่อยแสดงใต้โครงการหลัก สถานะเอกสารอ่านจากเอกสารโครงการร่วม
             </CardDescription>
           </div>
         </CardHeader>
@@ -649,6 +567,8 @@ export default function Reports() {
                     </tr>
                     {group.rows.map((row) => {
                       const docStatus = row.documentStatus ?? getDocumentStatus(row);
+                      const attachments = getReportAttachments(row);
+                      const summaryAttachment = getSummaryGoogleDriveAttachment(row);
                       return (
                         <tr key={row.id} className="border-b align-top last:border-0">
                           <td className="py-3 pr-3 font-medium whitespace-nowrap">
@@ -666,8 +586,8 @@ export default function Reports() {
                             </div>
                           </td>
                           <td className="py-3 pr-3 whitespace-nowrap">{row.responsiblePerson || "-"}</td>
-                          <td className="py-3 px-3 text-right whitespace-nowrap">{formatCurrency(sumBudget(row.proposedBudget))}</td>
-                          <td className="py-3 px-3 text-right whitespace-nowrap">{formatCurrency(sumBudget(row.actualBudget))}</td>
+                          <td className="py-3 px-3 text-right whitespace-nowrap">{formatCurrency(row.proposedTotal ?? null)}</td>
+                          <td className="py-3 px-3 text-right whitespace-nowrap">{formatCurrency(row.actualTotal ?? null)}</td>
                           <td className="py-3 px-3 text-center whitespace-nowrap">
                             <Badge variant={"variant" in docStatus ? docStatus.variant : getDocumentVariant(docStatus.code)}>
                               {docStatus.label}
@@ -676,25 +596,31 @@ export default function Reports() {
                           <td className="py-3 pl-3">
                             <div className="flex flex-wrap justify-center gap-2">
                               <Button
-                                variant={row.approvalStatus === 'approved' ? 'default' : 'outline'}
-                                size="sm"
-                                className="h-8 gap-1"
-                                disabled={resultsPending || row.approvalStatus === 'approved'}
-                                onClick={() => handleApproveBudget(row.id)}
-                              >
-                                <CheckCircle2 className="h-3 w-3" />
-                                {row.approvalStatus === 'approved' ? 'อนุมัติแล้ว' : 'อนุมัติงบ'}
-                              </Button>
-                              <Button
                                 variant="outline"
                                 size="sm"
                                 className="h-8 gap-1"
-                                disabled={!row.summaryReportUrl}
-                                onClick={() => row.summaryReportUrl && window.open(row.summaryReportUrl, "_blank", "noopener,noreferrer")}
+                                disabled={resultsPending || !summaryAttachment}
+                                onClick={() => summaryAttachment && window.open(summaryAttachment.href, "_blank", "noopener,noreferrer")}
                               >
                                 <FileText className="h-3 w-3" />
                                 สรุป
                               </Button>
+                              {(["url", "file"] as const).map(kind => {
+                                const attachment = attachments.find(document => document.kind === kind);
+                                return (
+                                  <Button
+                                    key={kind}
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 gap-1 whitespace-nowrap"
+                                    disabled={resultsPending || !attachment}
+                                    onClick={() => attachment && window.open(attachment.href, "_blank", "noopener,noreferrer")}
+                                  >
+                                    {kind === "url" ? <ExternalLink className="h-3 w-3" /> : <FileText className="h-3 w-3" />}
+                                    {kind === "url" ? "ดู URL" : "ดูไฟล์แนบ"}
+                                  </Button>
+                                );
+                              })}
                             </div>
                           </td>
                         </tr>

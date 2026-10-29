@@ -4,7 +4,7 @@ export const PROJECT_ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
 
 interface UploadProjectAttachmentParams {
   api: AxiosInstance;
-  projectId: number | string;
+  projectId: string;
   projectName: string;
   file: File;
 }

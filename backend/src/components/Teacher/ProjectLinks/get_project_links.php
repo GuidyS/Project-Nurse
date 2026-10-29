@@ -15,6 +15,7 @@ foreach ($possible_paths as $path) {
     }
 }
 require_once __DIR__ . '/../CLOPage/curriculum_repository.php';
+require_once __DIR__ . '/../ProjectShared/project_helpers.php';
 require_once __DIR__ . '/../../../config/active_curriculum.php';
 
 $origin = $_SERVER['HTTP_ORIGIN'] ?? 'http://localhost:5173';
@@ -36,12 +37,16 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 try {
-    $db = new Connect();
+    $db = project_db();
+    project_require_auth($db,['PROJECT_VIEW']);
 
     $stmt = $db->query("
         SELECT
-            project_id AS id,
-            COALESCE(NULLIF(project_name_th, ''), NULLIF(project_name_en, ''), CONCAT('Project #', project_id)) AS name,
+            id,
+            project_id,
+            academic_year,
+            project_name_th,
+            COALESCE(NULLIF(TRIM(project_name_th), ''), CONCAT('โครงการ #', project_id)) AS name,
             project_type
         FROM project
         WHERE project_type = 'academic_service'
@@ -52,15 +57,15 @@ try {
     $projects = [];
     $matrix = [];
 
-    foreach ($projects_raw as $row) {
-        $pid = $row['id'];
-        $projects[] = ['id' => $pid, 'name' => $row['name'], 'project_type' => $row['project_type']];
+    foreach (project_u_catalogue($db,$projects_raw) as $row) {
+        $pid = $row['project_id'];
+        $projects[] = ['id' => $row['id'], 'project_id' => $pid, 'name' => trim((string)$row['project_name_th']) ?: 'โครงการ #'.$pid, 'project_type' => $row['project_type'], 'read_only' => $row['read_only'] || $row['merge_pending']];
 
         $matrix[$pid] = ['plos' => [], 'clos' => []];
     }
 
     $linkStmt = $db->query("
-        SELECT l.project_id, l.outcome_type, l.outcome_code
+        SELECT p.project_id, l.outcome_type, l.outcome_code
         FROM project_outcome_links l
         INNER JOIN project p ON p.project_id = l.project_id
         WHERE p.project_type = 'academic_service'
@@ -152,7 +157,7 @@ try {
             "projects" => $projects,
             "plos" => $plos,
             "clos" => $clos,
-            "links" => empty($matrix) ? new stdClass() : $matrix,
+            "links" => (object)$matrix,
             "curriculum" => activeCurriculumCycle($db),
         ]
     ], JSON_UNESCAPED_UNICODE);

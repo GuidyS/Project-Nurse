@@ -22,7 +22,7 @@ interface ConfirmActionDialogProps {
   cancelLabel?: string;
   onConfirm: () => void | Promise<void>;
   isLoading?: boolean;
-  /** destructive = ลบ/ปฏิเสธ/ระงับ, default = อนุมัติ/เปิดใช้งาน */
+  /** destructive = ลบ/ปฏิเสธ/ระงับ, default = ยืนยัน/เปิดใช้งาน */
   variant?: "destructive" | "default";
   children?: ReactNode;
   showCloseButton?: boolean;

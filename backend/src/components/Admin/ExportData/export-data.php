@@ -5,7 +5,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
 require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../config/audit_helper.php';
-require_once __DIR__ . '/../Approvals/approval-schema.php';
+require_once __DIR__ . '/../../../config/admin_access.php';
 require_once __DIR__ . '/../../../config/active_curriculum.php';
 require_once __DIR__ . '/../CurriculumCycles/curriculum_cycles_helpers.php';
 
@@ -85,12 +85,11 @@ function getExportSchema(): array
         'projects' => [
             'table' => 'project',
             'order_by' => 'project_id ASC',
-            'select' => ['project_id', 'project_name_th', 'project_name_en', 'description', 'responsible_faculty_id', 'academic_year'],
+            'select' => ['project_id', 'project_name_th', 'responsible_faculty_id', 'academic_year'],
             'fields' => [
                 'project_id'             => ['label' => 'รหัสโครงการ',         'resolve' => fn($r) => $r['project_id']],
-                'project_name_th'        => ['label' => 'ชื่อโครงการ (ไทย)',    'resolve' => fn($r) => $r['project_name_th']],
-                'project_name_en'        => ['label' => 'ชื่อโครงการ (อังกฤษ)', 'resolve' => fn($r) => $r['project_name_en']],
-                'description'            => ['label' => 'รายละเอียด',          'resolve' => fn($r) => $r['description']],
+                'project_name_th'        => ['label' => 'ชื่อโครงการ',    'resolve' => fn($r) => $r['project_name_th']],
+
                 'responsible_faculty_id' => ['label' => 'อาจารย์ผู้รับผิดชอบ',  'resolve' => fn($r) => $r['responsible_faculty_id']],
                 'academic_year'          => ['label' => 'ปีการศึกษา',          'resolve' => fn($r) => $r['academic_year']],
             ],
@@ -127,7 +126,7 @@ function exportCoursesQuery(PDO $db): array
 try {
     $schemas = getExportSchema();
     $db = new Connect();
-    $adminUserId = approvalRequireAdmin($db);
+    $adminUserId = adminRequireAccess($db);
 
     if (!isset($schemas[$category])) {
         http_response_code(400);

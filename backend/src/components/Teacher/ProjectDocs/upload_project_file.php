@@ -43,7 +43,7 @@ function project_document_faculty_id(PDO $db, array $auth, ?int $responsibleFacu
 
 try {
     $documentId = project_request_int('document_id', 'post');
-    $projectId = project_request_int('project_id', 'post');
+    $projectId = project_request_code('post');
 
     if (!isset($_FILES['file'])) {
         project_json(["status" => "error", "message" => "กรุณาแนบไฟล์เอกสาร"], 400);
@@ -71,11 +71,13 @@ try {
             exit;
         }
 
-        if (empty($document['joined_project_id'])) {
+        if ($document['joined_project_id'] === null) {
             project_json(["status" => "error", "message" => "ไม่พบโครงการที่ผูกกับเอกสารนี้"], 404);
             exit;
         }
 
+        $db->beginTransaction();
+        project_u_guard($db, (string)$document['project_id']);
         $facultyId = project_document_faculty_id(
             $db,
             $auth,
@@ -102,6 +104,8 @@ try {
             ':id' => $documentId,
         ]);
 
+        project_u_document_link($db, (string)$document['project_id'], $documentId, $_POST);
+        $db->commit();
         $uploadedPathForCleanup = null;
         try {
             project_document_delete_file($document['file_path'] ?? null);
@@ -131,7 +135,7 @@ try {
     project_document_validate_upload_form($name, $type, $date);
 
     $project = project_require_existing_project($db, $projectId);
-    $projectName = $project['project_name_th'] ?: ($project['project_name_en'] ?: 'Project #' . $projectId);
+    $projectName = trim((string) ($project['project_name_th'] ?? '')) ?: 'โครงการ #' . $projectId;
     $facultyId = project_document_faculty_id(
         $db,
         $auth,
@@ -139,10 +143,12 @@ try {
     );
 
     $db->beginTransaction();
+    project_u_guard($db, $projectId);
+    project_u_require_root($db, $projectId);
 
     $insertStmt = $db->prepare("
         INSERT INTO project_documents (project_id, name, project, type, date, status)
-        VALUES (:project_id, :name, :project, :type, :date, 'pending')
+        VALUES (:project_id, :name, :project, :type, :date, 'available')
     ");
     $insertStmt->execute([
         ':project_id' => $projectId,
@@ -174,6 +180,7 @@ try {
         ':id' => $newDocumentId,
     ]);
 
+    project_u_document_link($db, $projectId, $newDocumentId, $_POST);
     $db->commit();
     $uploadedPathForCleanup = null;
 
@@ -194,6 +201,6 @@ try {
         project_document_delete_file($uploadedPathForCleanup);
     }
 
-    project_json(["status" => "error", "message" => $e->getMessage()], 400);
+    project_json(["status" => "error", "message" => $e->getMessage()], project_error_status($e));
 }
 ?>

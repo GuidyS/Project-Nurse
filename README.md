@@ -2,6 +2,11 @@
 
 คู่มือนี้เป็นเอกสารสำหรับผู้ที่จะมาพัฒนาต่อเฉพาะส่วน Frontend ของระบบ Nurse Management System
 
+ขอบเขตล่าสุด (26 ตุลาคม 2569): ระบบไม่มีขั้นตอนอนุมัติคำขอ อนุมัติงบ หรือยืนยันรับรองหลักฐานภายในแล้ว
+API เดิมตอบ HTTP 410 และคงข้อมูลประวัติเดิมไว้โดยไม่ต้องรัน migration เพิ่ม
+รายงานตรวจความครบจากเอกสารงบประมาณและสรุปโครงการที่แนบจริง ข้อมูลผ่าน IRB เป็นผลรับรองภายนอกเท่านั้น
+ทดสอบการยุติ workflow และสิทธิ์ import/export ด้วย `php backend/tests/no_approval_test.php`
+
 ## ภาพรวม
 
 Frontend ใช้ Vite + React + TypeScript เป็นโครงหลัก และใช้ Tailwind CSS ร่วมกับ shadcn/ui, Radix UI, lucide-react, axios, React Query และ sonner สำหรับ toast notification

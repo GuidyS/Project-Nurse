@@ -5,6 +5,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
 require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../config/academic_calendar.php';
+require_once __DIR__ . '/../ProjectShared/unified_projects.php';
 
 header('Content-Type: application/json; charset=UTF-8');
 
@@ -392,76 +393,26 @@ try {
         'budget' => 0.0,
         'spent' => 0.0,
         'burn_rate' => 0.0,
-        'average_progress' => 0.0,
         'over_budget' => 0,
         'top_projects' => [],
     ];
-    if (deanDashboardTableExists($db, 'project')) {
-        $hasBudgets = deanDashboardTableExists($db, 'project_budget_years');
-        $hasProgress = deanDashboardTableExists($db, 'project_progress_logs');
-        $budgetJoin = $hasBudgets
-            ? "LEFT JOIN (
-                    SELECT project_id,
-                           SUM(COALESCE(budget_allocated, 0)) AS budget,
-                           SUM(COALESCE(budget_spent, 0)) AS spent
-                    FROM project_budget_years
-                    GROUP BY project_id
-               ) pb ON pb.project_id = p.project_id"
-            : '';
-        $progressJoin = $hasProgress
-            ? "LEFT JOIN (
-                    SELECT project_id, MAX(COALESCE(actual_percent, 0)) AS progress
-                    FROM project_progress_logs
-                    GROUP BY project_id
-               ) pl ON pl.project_id = p.project_id"
-            : '';
-        $budgetSelect = $hasBudgets ? 'COALESCE(pb.budget, 0)' : '0';
-        $spentSelect = $hasBudgets ? 'COALESCE(pb.spent, 0)' : '0';
-        $progressSelect = $hasProgress ? 'COALESCE(pl.progress, 0)' : '0';
-        $projectStmt = $db->prepare(
-            "SELECT p.project_id,
-                    COALESCE(NULLIF(p.project_name_th, ''), NULLIF(p.project_name_en, ''), CONCAT('Project #', p.project_id)) AS name,
-                    COALESCE(NULLIF(TRIM(p.status), ''), 'pending') AS status,
-                    {$budgetSelect} AS budget,
-                    {$spentSelect} AS spent,
-                    {$progressSelect} AS progress
-             FROM project p
-             {$budgetJoin}
-             {$progressJoin}
-             WHERE p.academic_year = :academic_year
-             ORDER BY budget DESC, p.project_id DESC"
-        );
-        $projectStmt->execute([':academic_year' => $academicYear]);
-        $projectRows = $projectStmt->fetchAll();
-        $progressTotal = 0.0;
-        foreach ($projectRows as $index => $row) {
-            $status = strtolower((string)$row['status']);
-            $budget = (float)$row['budget'];
-            $spent = (float)$row['spent'];
-            $progress = (float)$row['progress'];
-            $projects['total']++;
-            if ($status === 'completed') $projects['completed']++;
-            if (in_array($status, ['active', 'in_progress', 'approved'], true)) $projects['active']++;
-            if ($spent > $budget && $budget > 0) $projects['over_budget']++;
-            $projects['budget'] += $budget;
-            $projects['spent'] += $spent;
-            $progressTotal += $progress;
-            if ($index < 6) {
-                $projects['top_projects'][] = [
-                    'name' => (string)$row['name'],
-                    'budget' => $budget,
-                    'spent' => $spent,
-                    'progress' => round($progress, 1),
-                ];
-            }
-        }
-        $projects['budget'] = round($projects['budget'], 2);
-        $projects['spent'] = round($projects['spent'], 2);
-        $projects['burn_rate'] = deanDashboardPercent($projects['spent'], $projects['budget']);
-        $projects['average_progress'] = count($projectRows) > 0
-            ? round($progressTotal / count($projectRows), 1)
-            : 0.0;
+    project_u_ready($db);
+    $projectRows=project_u_catalogue($db,project_u_rows($db,'SELECT * FROM project WHERE academic_year=?',[$academicYear]));
+    $projectRows=array_values(array_filter($projectRows,fn($p)=>!$p['merge_pending']));
+    $summary=project_u_bundle($db,$academicYear)['summary'];
+    $projects['budget']=$summary['proposedTotal']; $projects['spent']=$summary['actualTotal'];
+    $projects['difference']=$summary['balance'];
+    foreach ($projectRows as $row) {
+        $projects['total']++;
+        if ($row['status']==='completed') $projects['completed']++;
+        if (in_array($row['status'],['active','in_progress'],true)) $projects['active']++;
+        if ($row['budget_proposed']!==null && $row['budget_spent']!==null && $row['budget_spent']>$row['budget_proposed']) $projects['over_budget']++;
     }
+    usort($projectRows,fn($a,$b)=>($b['budget_proposed']??-1)<=>($a['budget_proposed']??-1));
+    foreach (array_slice($projectRows,0,6) as $row) $projects['top_projects'][]=[
+        'name'=>trim((string)$row['project_name_th']) ?: 'โครงการ #'.$row['project_id'],
+        'budget'=>$row['budget_proposed'],'spent'=>$row['budget_spent']];
+    $projects['burn_rate']=$projects['budget']===null || $projects['spent']===null ? null : deanDashboardPercent($projects['spent'],$projects['budget']);
 
     // 7) หลักสูตรและเอกสาร QA: นับความครอบคลุมรายวิชาที่มีเอกสาร มคอ.
     $curriculumQa = [

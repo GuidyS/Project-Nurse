@@ -4,8 +4,10 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/../../Teacher/ProjectShared/project_helpers.php';
+require_once __DIR__ . '/../../Teacher/MyProjects/my_project_member_helpers.php';
 require_once __DIR__ . '/../../../config/audit_helper.php';
-require_once __DIR__ . '/../Approvals/approval-schema.php';
+require_once __DIR__ . '/../../../config/admin_access.php';
 require_once __DIR__ . '/../ManageUsers/user-account-import-helper.php';
 header("Content-Type: application/json; charset=UTF-8");
 
@@ -14,6 +16,7 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Cell\Cell;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
+require_once __DIR__ . '/project-import.php';
 
 function getImportSchema($importType) {
     $schemas = [
@@ -40,14 +43,6 @@ function getImportSchema($importType) {
             'optional_columns' => ['subject_id'],
             'generated_id' => ['column' => 'subject_id', 'lookup' => 'subject_code'],
             'columns' => ['subject_id', 'subject_code', 'subject_name_th', 'subject_name_en', 'credit', 'credit_desc', 'description', 'is_active', 'program_id', 'department', 'subject_type', 'year_level', 'semester']
-        ],
-        'projects' => [
-            'table' => 'project',
-            'key' => 'project_id',
-            'row_key' => 'project_name_th',
-            'optional_columns' => ['project_id'],
-            'lookup_existing' => ['column' => 'project_id', 'by' => ['project_name_th']],
-            'columns' => ['project_id', 'project_name_th', 'project_name_en', 'description', 'mapping_json', 'responsible_faculty_id', 'academic_year']
         ]
     ];
 
@@ -165,6 +160,18 @@ function getRowValuesBySchema(array $row, array $headerMap, array $schema, int $
         $value = $rawValue === null ? '' : trim((string)$rawValue);
         $values[] = $value === '' ? null : $value;
     }
+    if ($schema['table'] === 'project' && count(array_filter($values, static fn($value) => $value !== null)) > 0) {
+        $codeIndex = array_search('project_id', $schema['columns'], true);
+        try {
+            $values[$codeIndex] = project_validate_code($values[$codeIndex]);
+        } catch (InvalidArgumentException $e) {
+            throw new InvalidArgumentException("project_id แถว {$rowNumber}: " . $e->getMessage());
+        }
+        $nameIndex = array_search('project_name_th', $schema['columns'], true);
+        if ($values[$nameIndex] === null) {
+            throw new InvalidArgumentException("project_name_th แถว {$rowNumber}: กรุณาระบุชื่อโครงการ");
+        }
+    }
     return $values;
 }
 
@@ -251,6 +258,7 @@ function prepareExistingLookupValues(PDO $db, array $values, array $schema) {
 }
 
 function processExcelToDatabase($filePath, $importType, $db, $fileExt) {
+    if ($importType === 'projects') return processProjectWorkbook($filePath, $db, $fileExt);
     $rowCount = 0;
     $rowKeys = [];
     $schema = getImportSchema($importType);
@@ -278,7 +286,7 @@ function processExcelToDatabase($filePath, $importType, $db, $fileExt) {
             while (($data = fgetcsv($handle, 1000, ",")) !== false) {
                 $rowNumber++;
                 $values = getRowValuesBySchema($data, $headerMap, $schema, $rowNumber);
-                if (empty($values[$rowKeyIndex])) continue;
+                if ($values[$rowKeyIndex] === null || $values[$rowKeyIndex] === '') continue;
 
                 $rowKeys[] = (string)$values[$rowKeyIndex];
                 $values = prepareExistingLookupValues($db, $values, $schema);
@@ -325,7 +333,7 @@ function processExcelToDatabase($filePath, $importType, $db, $fileExt) {
             }
 
             $values = getRowValuesBySchema($rowData, $headerMap, $schema, $row, $rowCells);
-            if (empty($values[$rowKeyIndex])) continue;
+            if ($values[$rowKeyIndex] === null || $values[$rowKeyIndex] === '') continue;
 
             $rowKeys[] = (string)$values[$rowKeyIndex];
             $values = prepareExistingLookupValues($db, $values, $schema);
@@ -344,7 +352,7 @@ function processExcelToDatabase($filePath, $importType, $db, $fileExt) {
 
 try {
     $db = new Connect();
-    $adminUserId = approvalRequireAdmin($db);
+    $adminUserId = adminRequireAccess($db);
 
     if (!isset($_FILES['file']) || !isset($_POST['importType'])) {
         throw new Exception("ข้อมูลไม่ครบถ้วน (ขาดไฟล์หรือประเภทการนำเข้า)");
@@ -398,6 +406,12 @@ try {
                 $update->execute([':count' => $finalCount, ':id' => $importId]);
 
                 $message = "นำเข้าข้อมูลสำเร็จจำนวน $finalCount รายการ";
+                if ($importType === 'projects' && isset($importResult['counts']) && is_array($importResult['counts'])) {
+                    $projectCount = (int) ($importResult['counts']['projects'] ?? 0);
+                    $activityCount = (int) ($importResult['counts']['activities'] ?? 0);
+                    $budgetCount = (int) ($importResult['counts']['budgets'] ?? 0);
+                    $message = "นำเข้าข้อมูลสำเร็จ: โครงการ $projectCount รายการ, กิจกรรม $activityCount รายการ, งบประมาณ $budgetCount รายการ";
+                }
                 if ($accountSummary !== null) {
                     $message .= " และ" . buildUserAccountCreationMessage($accountSummary);
                 }
@@ -428,7 +442,11 @@ try {
     }
 
 } catch (Exception $e) {
-    http_response_code(400);
-    echo json_encode(["status" => "error", "message" => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    $isConstraintConflict = $e instanceof PDOException && (string)$e->getCode() === '23000';
+    http_response_code($isConstraintConflict ? 409 : project_error_status($e));
+    echo json_encode([
+        "status" => "error",
+        "message" => $e instanceof PDOException ? "ไม่สามารถนำเข้าข้อมูล กรุณาตรวจรหัสซ้ำและความสัมพันธ์ของข้อมูล" : $e->getMessage(),
+    ], JSON_UNESCAPED_UNICODE);
 }
 ?>

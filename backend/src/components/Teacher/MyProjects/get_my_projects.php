@@ -34,12 +34,10 @@ try {
 
     $stmt = $db->prepare("
         SELECT
-            p.project_id AS id,
+            p.id,
             p.project_id,
             p.project_name_th,
-            p.project_name_en,
-            p.description,
-            COALESCE(NULLIF(p.project_name_th, ''), NULLIF(p.project_name_en, ''), CONCAT('Project #', p.project_id)) AS name,
+            COALESCE(NULLIF(TRIM(p.project_name_th), ''), CONCAT('โครงการ #', p.project_id)) AS name,
             COALESCE(p.project_type, 'other') AS project_type,
             p.responsible_faculty_id,
             CONCAT_WS(' ', NULLIF(f.title, ''), NULLIF(f.first_name_th, ''), NULLIF(f.last_name_th, '')) AS responsible_name,
@@ -53,12 +51,11 @@ try {
             END AS members,
             pb.budget AS budget,
             pb.spent AS spent,
-            pb.budget AS budget_allocated,
+            pb.budget AS budget_proposed,
             pb.spent AS budget_spent,
             pb.project_budget_years_id,
             pb.fiscal_year,
-            pb.budget_note,
-            COALESCE(pl.progress, 0) AS progress
+            pb.budget_note
         FROM project p
         LEFT JOIN faculty f ON f.faculty_id = p.responsible_faculty_id
         LEFT JOIN (
@@ -71,17 +68,12 @@ try {
                 project_id,
                 MAX(project_budget_years_id) AS project_budget_years_id,
                 MAX(fiscal_year) AS fiscal_year,
-                SUM(budget_allocated) AS budget,
+                SUM(budget_proposed) AS budget,
                 SUM(budget_spent) AS spent,
                 MAX(result) AS budget_note
             FROM project_budget_years
             GROUP BY project_id
         ) pb ON pb.project_id = p.project_id
-        LEFT JOIN (
-            SELECT project_id, MAX(actual_percent) AS progress
-            FROM project_progress_logs
-            GROUP BY project_id
-        ) pl ON pl.project_id = p.project_id
         WHERE p.responsible_faculty_id = :responsible_faculty_id
            OR EXISTS (
                 SELECT 1
@@ -103,7 +95,7 @@ try {
     }
 
     $projectIds = array_values(array_map(
-        static fn(array $project): int => (int) $project['id'],
+        static fn(array $project): string => (string) $project['project_id'],
         $projectsRaw
     ));
     $placeholders = [];
@@ -224,13 +216,14 @@ try {
         ];
     }
 
+    $projectsRaw = project_u_catalogue($db, $projectsRaw);
     $myProjects = [];
     foreach ($projectsRaw as $project) {
-        $projectId = (int) $project['id'];
+        $projectId = (string) $project['project_id'];
         $projectKey = (string) $projectId;
         $projectType = (string) ($project['project_type'] ?? 'other');
         $responsibleFacultyId = (int) ($project['responsible_faculty_id'] ?? 0);
-        $members = $membersByProject[$projectKey] ?? [];
+        $members = $project['member_details'] ?? $membersByProject[$projectKey] ?? [];
         $memberFacultyIds = array_values(array_map(
             static fn(array $member): int => (int) $member['faculty_id'],
             array_filter(
@@ -241,21 +234,20 @@ try {
         ));
 
         $myProjects[] = [
-            "id" => (string) $projectId,
+            "id" => (int) $project['id'],
             "project_id" => $projectId,
-            "name" => $project['name'],
+            "name" => trim((string)($project['project_name_th'] ?? '')) ?: 'โครงการ #'.$projectId,
+            "merge_pending" => $project['merge_pending'] ?? false,
+            "read_only" => $project['read_only'] ?? false,
             "project_name_th" => $project['project_name_th'] ?? '',
-            "project_name_en" => $project['project_name_en'] ?? '',
-            "description" => $project['description'] ?? '',
             "project_type" => $projectType,
             "responsible_faculty_id" => $responsibleFacultyId > 0 ? $responsibleFacultyId : null,
             "responsible_name" => trim((string) ($project['responsible_name'] ?? '')),
             "type" => my_project_type_label($projectType),
             "status" => strtolower((string) ($project['status'] ?? 'pending')),
-            "progress" => (int) round((float) ($project['progress'] ?? 0)),
             "budget" => $project['budget'] !== null ? (float) $project['budget'] : null,
             "spent" => $project['spent'] !== null ? (float) $project['spent'] : null,
-            "budget_allocated" => $project['budget_allocated'] !== null ? (float) $project['budget_allocated'] : null,
+            "budget_proposed" => $project['budget_proposed'] !== null ? (float) $project['budget_proposed'] : null,
             "budget_spent" => $project['budget_spent'] !== null ? (float) $project['budget_spent'] : null,
             "project_budget_years_id" => $project['project_budget_years_id'] !== null ? (int) $project['project_budget_years_id'] : null,
             "fiscal_year" => $project['fiscal_year'] !== null ? (int) $project['fiscal_year'] : null,
@@ -265,8 +257,8 @@ try {
             "academic_year" => $project['academic_year'] !== null ? (int) $project['academic_year'] : null,
             "start_date" => $project['start_date'] ?? null,
             "end_date" => $project['end_date'] ?? null,
-            "documents" => $documentsByProject[$projectKey] ?? [],
-            "plos" => array_values(array_unique($plosByProject[$projectKey] ?? [])),
+            "documents" => $project['documents'] ?? $documentsByProject[$projectKey] ?? [],
+            "plos" => $project['plos'] ?? array_values(array_unique($plosByProject[$projectKey] ?? [])),
             "member_faculty_ids" => $memberFacultyIds,
             "member_faculties" => $members,
             "member_details" => $members,
@@ -276,6 +268,6 @@ try {
 
     project_json(["status" => "success", "data" => $myProjects]);
 } catch (Exception $e) {
-    project_json(["status" => "error", "message" => $e->getMessage()], 500);
+    project_json(["status" => "error", "message" => $e->getMessage()], project_error_status($e));
 }
 ?>

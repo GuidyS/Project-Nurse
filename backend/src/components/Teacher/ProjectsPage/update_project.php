@@ -56,10 +56,10 @@ function update_project_page_responsible_faculty_id(PDO $db, array $input): int
 }
 
 try {
-    $projectId = isset($input['project_id']) ? (int)$input['project_id'] : 0;
+    $projectId = project_validate_code($input['project_id'] ?? null);
     $nameTh = trim((string)($input['project_name_th'] ?? ''));
 
-    if ($projectId <= 0 || $nameTh === '') {
+    if ($projectId === '' || $nameTh === '') {
         project_json(["status" => "error", "message" => "ข้อมูลไม่ครบถ้วน"], 400);
         exit;
     }
@@ -84,9 +84,9 @@ try {
         exit;
     }
 
-    $budgetAllocated = update_project_page_nullable_number($input['budget_allocated'] ?? null, 'งบเสนอ');
+    $budgetProposed = update_project_page_nullable_number($input['budget_proposed'] ?? null, 'งบเสนอ');
     $budgetSpent = update_project_page_nullable_number($input['budget_spent'] ?? null, 'งบใช้จริง');
-    if ($budgetAllocated !== null && $budgetAllocated < 0) {
+    if ($budgetProposed !== null && $budgetProposed < 0) {
         project_json(["status" => "error", "message" => "งบเสนอต้องไม่ติดลบ"], 400);
         exit;
     }
@@ -121,22 +121,17 @@ try {
         }
     }
 
-    if ($status === 'completed') {
-        $progressStmt = $db->prepare("SELECT COALESCE(MAX(actual_percent), 0) FROM project_progress_logs WHERE project_id = :project_id");
-        $progressStmt->execute([':project_id' => $projectId]);
-        if ((float)$progressStmt->fetchColumn() < 100) {
-            project_json(["status" => "error", "message" => "ต้องมีความคืบหน้า 100% ก่อนเปลี่ยนเป็นเสร็จสิ้น"], 400);
-            exit;
-        }
-    }
-
     $db->beginTransaction();
+    $currentProject = project_u_guard($db, $projectId);
+    $projectId = (string)$currentProject['project_id'];
+    project_u_require_root($db, $projectId);
+    if (isset($input['academic_year']) && (int)$input['academic_year'] !== (int)$currentProject['academic_year']) {
+        throw new ProjectConflict('โครงการของปีใหม่ต้องสร้างเป็นรายการใหม่');
+    }
 
     $stmt = $db->prepare("
         UPDATE project
         SET project_name_th = :name_th,
-            project_name_en = :name_en,
-            description = :description,
             project_type = :project_type,
             responsible_faculty_id = :responsible_faculty_id,
             academic_year = :academic_year,
@@ -148,8 +143,6 @@ try {
     ");
     $stmt->execute([
         ':name_th' => $nameTh,
-        ':name_en' => trim((string)($input['project_name_en'] ?? '')),
-        ':description' => trim((string)($input['description'] ?? '')),
         ':project_type' => $projectType,
         ':responsible_faculty_id' => $responsibleFacultyId,
         ':academic_year' => $academicYear,
@@ -162,34 +155,8 @@ try {
 
     my_project_replace_faculty_members($db, $projectId, $memberFacultyIds);
 
-    $budgetResult = update_project_page_budget_result($input);
-    $deleteBudgetStmt = $db->prepare('DELETE FROM project_budget_years WHERE project_id = :project_id');
-    $deleteBudgetStmt->execute([':project_id' => $projectId]);
-
-    if ($budgetAllocated !== null || $budgetSpent !== null || $budgetResult !== null) {
-        $budgetStmt = $db->prepare("
-            INSERT INTO project_budget_years (
-                project_id,
-                fiscal_year,
-                budget_allocated,
-                budget_spent,
-                result
-            ) VALUES (
-                :project_id,
-                :fiscal_year,
-                :budget_allocated,
-                :budget_spent,
-                :result
-            )
-        ");
-        $budgetStmt->execute([
-            ':project_id' => $projectId,
-            ':fiscal_year' => $academicYear,
-            ':budget_allocated' => $budgetAllocated ?? 0,
-            ':budget_spent' => $budgetSpent ?? 0,
-            ':result' => $budgetResult,
-        ]);
-    }
+    project_u_metadata($db, $projectId, $input);
+    project_u_save_flat_budget($db, $projectId, $input);
 
     $db->commit();
 
@@ -215,6 +182,6 @@ try {
         $db->rollBack();
     }
 
-    project_json(["status" => "error", "message" => $e->getMessage()], 500);
+    project_json(["status" => "error", "message" => $e->getMessage()], project_error_status($e));
 }
 ?>

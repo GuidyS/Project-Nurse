@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Search, Filter, Upload, Eye, MoreVertical, Star, Calendar } from "lucide-react";
+import { Search, Filter, Upload, Eye, MoreVertical, Calendar } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -39,23 +39,15 @@ import {
 import api from "@/lib/axios";
 import { Student } from "@/components/pages/Teacher/PracticalStudents";
 import { StudentDetailsDialog } from "@/components/ui/StudentDetailsDialog";
-import { StudentEvaluateDialog } from "@/components/ui/StudentEvaluateDialog";
 import { useToast } from "@/hooks/use-toast";
 
 export interface PracticalStudent extends Student {
   hospital: string;
   ward: string;
-  performance: number | null;
-  hasPerformanceEval: boolean;
-  performanceComment: string;
   totalTasks: number;
 }
 
-type PracticalStudentApiRow = Student &
-  Partial<Omit<PracticalStudent, "performance" | "performanceComment">> & {
-    performance?: number | string | null;
-    performanceComment?: string | null;
-  };
+type PracticalStudentApiRow = Student & Partial<PracticalStudent>;
 
 const PracticalPage = () => {
   const { toast } = useToast();
@@ -66,13 +58,10 @@ const PracticalPage = () => {
 
   const [selectedStudent, setSelectedStudent] = useState<PracticalStudent | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
-  const [isEvaluateOpen, setIsEvaluateOpen] = useState(false);
   const [isAssignOpen, setIsAssignOpen] = useState(false);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  const [evaluateScore, setEvaluateScore] = useState("");
-  const [evaluateComment, setEvaluateComment] = useState("");
 
   const [taskName, setTaskName] = useState("");
   const [taskDueDate, setTaskDueDate] = useState("");
@@ -98,11 +87,6 @@ const PracticalPage = () => {
           const totalTasks = Number(s.totalTasks ?? tasksCompleted + tasksPending);
           const progress = Number(s.progress ?? 0);
           const hospital = s.hospital || s.workplace || "โรงพยาบาลเครือข่ายฝึกปฏิบัติ";
-          const rawPerformance = s.performance;
-          const performance =
-            rawPerformance === null || rawPerformance === undefined || rawPerformance === ""
-              ? null
-              : Number(rawPerformance);
           return {
             ...s,
             id: String(s.id ?? s.studentId ?? ""),
@@ -111,9 +95,6 @@ const PracticalPage = () => {
             hospital,
             workplace: s.workplace || hospital,
             ward: s.ward || "—",
-            performance: Number.isFinite(performance) ? performance : null,
-            hasPerformanceEval: Boolean(s.hasPerformanceEval),
-            performanceComment: String(s.performanceComment ?? ""),
             totalTasks,
             tasksCompleted,
             tasksPending,
@@ -136,31 +117,6 @@ const PracticalPage = () => {
     fetchStudents();
   }, []);
 
-  const handleScoreChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    if (val === "") {
-      setEvaluateScore("");
-      return;
-    }
-    const num = parseInt(val, 10);
-    if (!isNaN(num)) {
-      if (num > 100) setEvaluateScore("100");
-      else if (num < 0) setEvaluateScore("0");
-      else setEvaluateScore(num.toString());
-    }
-  };
-
-  const openEvaluate = (student: PracticalStudent) => {
-    setSelectedStudent(student);
-    setEvaluateScore(
-      student.hasPerformanceEval && student.performance !== null
-        ? String(student.performance)
-        : ""
-    );
-    setEvaluateComment(student.performanceComment || "");
-    setIsEvaluateOpen(true);
-  };
-
   const openAssign = (student: PracticalStudent) => {
     setSelectedStudent(student);
     setTaskName("");
@@ -176,37 +132,6 @@ const PracticalPage = () => {
     setEvidenceType("photo");
     setEvidenceFile(null);
     setIsUploadOpen(true);
-  };
-
-  const handleSaveEvaluation = async () => {
-    if (!selectedStudent) return;
-    if (evaluateScore === "") {
-      toast({ title: "แจ้งเตือน", description: "กรุณาระบุคะแนน", variant: "destructive" });
-      return;
-    }
-    try {
-      setIsSaving(true);
-      const response = await api.post("/index.php?page=save-performance", {
-        selectedStudent: selectedStudent.studentId,
-        score: Number(evaluateScore),
-        comment: evaluateComment,
-      });
-      if (response.data.status === "success") {
-        toast({ title: "สำเร็จ", description: "บันทึกผลการประเมินเรียบร้อย" });
-        setIsEvaluateOpen(false);
-        fetchStudents();
-      } else {
-        toast({
-          title: "ข้อผิดพลาด",
-          description: response.data.message || "บันทึกไม่สำเร็จ",
-          variant: "destructive",
-        });
-      }
-    } catch {
-      toast({ title: "ข้อผิดพลาด", description: "เชื่อมต่อ API ไม่ได้", variant: "destructive" });
-    } finally {
-      setIsSaving(false);
-    }
   };
 
   const handleAssignTask = async () => {
@@ -287,22 +212,6 @@ const PracticalPage = () => {
       )
     : students;
 
-  const getPerformanceBadge = (score: number) => {
-    if (score >= 90) return <Badge className="bg-success text-success-foreground">ดีเยี่ยม</Badge>;
-    if (score >= 80) return <Badge className="border-primary/25 bg-primary/15 text-primary">ดี</Badge>;
-    if (score >= 70) return <Badge variant="secondary">พอใช้</Badge>;
-    return <Badge variant="destructive">ต้องปรับปรุง</Badge>;
-  };
-
-  const evaluatedStudents = students.filter((s) => s.hasPerformanceEval && s.performance !== null);
-  const avgPerformance =
-    evaluatedStudents.length > 0
-      ? Math.round(
-          evaluatedStudents.reduce((sum, s) => sum + (s.performance ?? 0), 0) /
-            evaluatedStudents.length
-        )
-      : 0;
-
   return (
     <div className="space-y-6">
       <div className="app-page-header">
@@ -320,28 +229,10 @@ const PracticalPage = () => {
         <div className="p-4 bg-red-50 text-red-600 rounded-md">Error: {error}</div>
       )}
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-4">
         <div className="bg-card rounded-xl shadow-card p-4 text-center">
           <p className="text-2xl font-bold text-foreground">{students.length}</p>
           <p className="text-xs text-muted-foreground">นักศึกษาทั้งหมด</p>
-        </div>
-        <div className="bg-card rounded-xl shadow-card p-4 text-center">
-          <p className="text-2xl font-bold text-success">
-            {evaluatedStudents.filter((s) => (s.performance ?? 0) >= 80).length}
-          </p>
-          <p className="text-xs text-muted-foreground">คะแนนดี</p>
-        </div>
-        <div className="bg-card rounded-xl shadow-card p-4 text-center">
-          <p className="text-2xl font-bold text-warning">
-            {students.length - evaluatedStudents.length}
-          </p>
-          <p className="text-xs text-muted-foreground">ยังไม่ประเมิน</p>
-        </div>
-        <div className="bg-card rounded-xl shadow-card p-4 text-center">
-          <p className="text-2xl font-bold text-primary">
-            {evaluatedStudents.length > 0 ? `${avgPerformance}%` : "-"}
-          </p>
-          <p className="text-xs text-muted-foreground">เฉลี่ยคะแนนประเมิน</p>
         </div>
       </div>
 
@@ -369,20 +260,19 @@ const PracticalPage = () => {
               <TableHead>สถานที่ฝึก</TableHead>
               <TableHead>หอผู้ป่วย</TableHead>
               <TableHead>ความคืบหน้า</TableHead>
-              <TableHead>คะแนนประเมิน</TableHead>
               <TableHead className="text-right">การดำเนินการ</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={6} className="h-24 text-center">
+                <TableCell colSpan={5} className="h-24 text-center">
                   กำลังโหลดข้อมูล...
                 </TableCell>
               </TableRow>
             ) : filteredStudents.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
                   ไม่พบข้อมูลนักศึกษา
                 </TableCell>
               </TableRow>
@@ -419,18 +309,6 @@ const PracticalPage = () => {
                       />
                     </div>
                   </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      {student.hasPerformanceEval && student.performance !== null ? (
-                        <>
-                          <span className="font-medium">{student.performance}%</span>
-                          {getPerformanceBadge(student.performance)}
-                        </>
-                      ) : (
-                        <Badge variant="outline">ยังไม่ประเมิน</Badge>
-                      )}
-                    </div>
-                  </TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -447,9 +325,6 @@ const PracticalPage = () => {
                           }}
                         >
                           <Eye className="h-4 w-4" /> ดูข้อมูล
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="gap-2" onClick={() => openEvaluate(student)}>
-                          <Star className="h-4 w-4" /> บันทึกการประเมิน
                         </DropdownMenuItem>
                         <DropdownMenuItem className="gap-2" onClick={() => openAssign(student)}>
                           <Calendar className="h-4 w-4" /> มอบหมายงาน
@@ -473,17 +348,6 @@ const PracticalPage = () => {
         student={selectedStudent}
       />
 
-      <StudentEvaluateDialog
-        isOpen={isEvaluateOpen}
-        onOpenChange={setIsEvaluateOpen}
-        student={selectedStudent}
-        score={evaluateScore}
-        onScoreChange={handleScoreChange}
-        comment={evaluateComment}
-        onCommentChange={(e) => setEvaluateComment(e.target.value)}
-        onSave={handleSaveEvaluation}
-        isSaving={isSaving}
-      />
 
       <Dialog open={isAssignOpen} onOpenChange={setIsAssignOpen}>
         <DialogContent className="app-dialog-lg">

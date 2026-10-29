@@ -13,6 +13,7 @@ foreach ($possible_paths as $path) {
         break;
     }
 }
+require_once __DIR__ . '/../ProjectShared/project_helpers.php';
 require_once __DIR__ . '/../../../config/audit_helper.php'; // นำเข้า Audit Helper
 
 $origin = $_SERVER['HTTP_ORIGIN'] ?? 'http://localhost:5173';
@@ -34,7 +35,9 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 try {
-    $db = new Connect();
+    $db = project_db();
+    $auth = project_require_auth($db, ['PROJECT_VIEW']);
+    project_require_admin_write($auth);
     
     $input = json_decode(file_get_contents('php://input'), true);
 
@@ -42,7 +45,7 @@ try {
         throw new Exception("ข้อมูลไม่ครบถ้วนสำหรับการบันทึก");
     }
 
-    $projectId = (int)$input['project_id'];
+    $projectId = project_validate_code($input['project_id']);
     $links = $input['links'];
 
     $projectStmt = $db->prepare("SELECT project_type FROM project WHERE project_id = :project_id LIMIT 1");
@@ -72,6 +75,8 @@ try {
     }
 
     $db->beginTransaction();
+    $projectId = project_u_guard($db, $projectId)['project_id'];
+    project_u_require_root($db, $projectId);
 
     $existingStmt = $db->prepare("
         SELECT id, outcome_type, outcome_code
@@ -81,10 +86,6 @@ try {
     $existingStmt->execute([':project_id' => $projectId]);
     $existingLinks = $existingStmt->fetchAll(PDO::FETCH_ASSOC);
 
-    $deleteResultsStmt = $db->prepare("
-        DELETE FROM student_project_outcome_results
-        WHERE project_id = :project_id AND project_outcome_link_id = :link_id
-    ");
     $deleteLinkStmt = $db->prepare("DELETE FROM project_outcome_links WHERE id = :link_id");
     foreach ($existingLinks as $existingLink) {
         $key = $existingLink['outcome_type'] . "\0" . $existingLink['outcome_code'];
@@ -93,10 +94,6 @@ try {
             continue;
         }
 
-        $deleteResultsStmt->execute([
-            ':project_id' => $projectId,
-            ':link_id' => $existingLink['id'],
-        ]);
         $deleteLinkStmt->execute([':link_id' => $existingLink['id']]);
     }
 
@@ -135,7 +132,7 @@ try {
         $db->rollBack();
     }
     if (http_response_code() < 400) {
-        http_response_code(500);
+        http_response_code(project_error_status($e));
     }
     echo json_encode(["status" => "error", "message" => $e->getMessage()]);
 }

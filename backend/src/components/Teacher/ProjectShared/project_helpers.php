@@ -12,7 +12,7 @@ function project_json(array $payload, int $statusCode = 200): void
 function project_db(): Connect
 {
     $db = new Connect();
-    project_ensure_schema($db);
+    project_u_ready($db);
 
     return $db;
 }
@@ -30,7 +30,7 @@ function project_ensure_schema(PDO $db): void
     $checked = true;
 
     $columns = [
-        'strategy' => "ALTER TABLE project ADD COLUMN strategy VARCHAR(255) NULL DEFAULT NULL AFTER description",
+        'strategy' => "ALTER TABLE project ADD COLUMN strategy VARCHAR(255) NULL DEFAULT NULL",
     ];
 
     foreach ($columns as $column => $alterSql) {
@@ -175,10 +175,30 @@ function project_payload(): array
     return is_array($input) ? $input : [];
 }
 
-function project_require_existing_project(PDO $db, int $projectId): array
+/** project_id is a user-assigned business key, never the auto-increment row id. */
+function project_validate_code(mixed $value): string
+{
+    if (!is_string($value) && !is_int($value)) throw new InvalidArgumentException('กรุณาระบุรหัสโครงการเป็นข้อความ');
+    $code = trim((string)$value);
+    if ($code === '' || mb_strlen($code, 'UTF-8') > 100 || !preg_match('/^[A-Za-z0-9\x{0E01}-\x{0E3A}\x{0E40}-\x{0E59} ._-]+$/uD', $code)
+        || !preg_match('/[A-Za-z0-9\x{0E01}-\x{0E2E}\x{0E50}-\x{0E59}]/u', $code)) {
+        throw new InvalidArgumentException('รหัสโครงการยาวไม่เกิน 100 ตัว รองรับไทย อังกฤษ ตัวเลข ขีด จุด ขีดล่าง และช่องว่าง');
+    }
+    return $code;
+}
+function project_request_code(string $source = 'get'): ?string
+{
+    $value = $source === 'post' ? ($_POST['project_id'] ?? null) : ($_GET['project_id'] ?? null);
+    return $value === null || $value === '' ? null : project_validate_code($value);
+}
+function project_error_status(Throwable $e): int {
+    return $e instanceof ProjectConflict ? 409 : ($e instanceof InvalidArgumentException ? 400 : 500);
+}
+
+function project_require_existing_project(PDO $db, string $projectId): array
 {
     $stmt = $db->prepare("
-        SELECT project_id, project_name_th, project_name_en, responsible_faculty_id, mapping_json
+        SELECT id, project_id, project_name_th, responsible_faculty_id, mapping_json
         FROM project
         WHERE project_id = :project_id
         LIMIT 1
@@ -218,4 +238,5 @@ function project_nullable_non_negative_int(array $input, string $key, string $la
 
     return (int) $value;
 }
+require_once __DIR__ . '/unified_projects.php';
 ?>

@@ -21,23 +21,11 @@ function my_project_nullable_number(mixed $value, string $label): ?float
     return (float) $value;
 }
 
-function my_project_nullable_percent(mixed $value): ?float
-{
-    if ($value === null || $value === '') {
-        return null;
-    }
-
-    if (!is_numeric($value)) {
-        throw new InvalidArgumentException("ความคืบหน้าต้องเป็นตัวเลข");
-    }
-
-    return max(0, min(100, (float) $value));
-}
-
 try {
+    $projectId = project_validate_code($input['project_id'] ?? null);
     $nameTh = trim((string) ($input['project_name_th'] ?? ''));
     if ($nameTh === '') {
-        project_json(["status" => "error", "message" => "กรุณากรอกชื่อโครงการภาษาไทย"], 400);
+        project_json(["status" => "error", "message" => "กรุณากรอกชื่อโครงการ"], 400);
         exit;
     }
 
@@ -59,10 +47,10 @@ try {
         exit;
     }
 
-    $budgetAllocated = my_project_nullable_number($input['budget_allocated'] ?? null, 'งบประมาณที่ได้รับ');
+    $budgetProposed = my_project_nullable_number($input['budget_proposed'] ?? null, 'งบเสนอ');
     $budgetSpent = my_project_nullable_number($input['budget_spent'] ?? null, 'งบที่ใช้จริง');
-    if ($budgetAllocated !== null && $budgetAllocated < 0) {
-        project_json(["status" => "error", "message" => "งบประมาณที่ได้รับต้องไม่ติดลบ"], 400);
+    if ($budgetProposed !== null && $budgetProposed < 0) {
+        project_json(["status" => "error", "message" => "งบเสนอต้องไม่ติดลบ"], 400);
         exit;
     }
     if ($budgetSpent !== null && $budgetSpent < 0) {
@@ -70,7 +58,6 @@ try {
         exit;
     }
 
-    $progressPercent = my_project_nullable_percent($input['progress_percent'] ?? null);
     $startDate = !empty($input['start_date']) ? (string) $input['start_date'] : null;
     $endDate = !empty($input['end_date']) ? (string) $input['end_date'] : null;
     if ($startDate !== null && $endDate !== null && $endDate < $startDate) {
@@ -79,12 +66,12 @@ try {
     }
 
     $db->beginTransaction();
+    project_u_lock_year($db, project_u_year($academicYear));
 
     $stmt = $db->prepare("
         INSERT INTO project (
+            project_id,
             project_name_th,
-            project_name_en,
-            description,
             mapping_json,
             responsible_faculty_id,
             academic_year,
@@ -92,9 +79,8 @@ try {
             start_date,
             end_date
         ) VALUES (
+            :project_id,
             :project_name_th,
-            :project_name_en,
-            :description,
             :mapping_json,
             :responsible_faculty_id,
             :academic_year,
@@ -104,9 +90,8 @@ try {
         )
     ");
     $stmt->execute([
+        ':project_id' => $projectId,
         ':project_name_th' => $nameTh,
-        ':project_name_en' => trim((string) ($input['project_name_en'] ?? '')),
-        ':description' => trim((string) ($input['description'] ?? '')),
         ':mapping_json' => json_encode(['member_count' => $memberCount], JSON_UNESCAPED_UNICODE),
         ':responsible_faculty_id' => $facultyId,
         ':academic_year' => $academicYear,
@@ -115,57 +100,14 @@ try {
         ':end_date' => $endDate,
     ]);
 
-    $projectId = (int) $db->lastInsertId();
+    $id = (int) $db->lastInsertId();
     $fiscalYear = $academicYear ?: ((int) date('Y') + 543);
 
     my_project_replace_faculty_members($db, $projectId, $memberFacultyIds);
 
-    if ($budgetAllocated !== null || $budgetSpent !== null) {
-        $budgetStmt = $db->prepare("
-            INSERT INTO project_budget_years (
-                project_id,
-                fiscal_year,
-                budget_allocated,
-                budget_spent
-            ) VALUES (
-                :project_id,
-                :fiscal_year,
-                :budget_allocated,
-                :budget_spent
-            )
-        ");
-        $budgetStmt->execute([
-            ':project_id' => $projectId,
-            ':fiscal_year' => $fiscalYear,
-            ':budget_allocated' => $budgetAllocated ?? 0,
-            ':budget_spent' => $budgetSpent ?? 0,
-        ]);
-    }
-
-    if ($progressPercent !== null) {
-        $progressStmt = $db->prepare("
-            INSERT INTO project_progress_logs (
-                project_id,
-                period_label,
-                planned_percent,
-                actual_percent,
-                logged_at
-            ) VALUES (
-                :project_id,
-                :period_label,
-                :planned_percent,
-                :actual_percent,
-                :logged_at
-            )
-        ");
-        $progressStmt->execute([
-            ':project_id' => $projectId,
-            ':period_label' => 'เริ่มต้นโครงการ',
-            ':planned_percent' => 100,
-            ':actual_percent' => $progressPercent,
-            ':logged_at' => $startDate ?: date('Y-m-d'),
-        ]);
-    }
+    project_u_link_new($db, $projectId);
+    project_u_metadata($db, $projectId, $input);
+    project_u_save_flat_budget($db, $projectId, $input);
 
     $db->commit();
 
@@ -175,6 +117,7 @@ try {
         "status" => "success",
         "message" => "สร้างโครงการสำเร็จ",
         "project_id" => $projectId,
+        "id" => $id,
     ]);
 } catch (InvalidArgumentException $e) {
     if ($db->inTransaction()) {
@@ -182,11 +125,20 @@ try {
     }
 
     project_json(["status" => "error", "message" => $e->getMessage()], 400);
+} catch (PDOException $e) {
+    if ($db->inTransaction()) {
+        $db->rollBack();
+    }
+    $duplicateCode = (int) ($e->errorInfo[1] ?? 0) === 1062;
+    project_json([
+        "status" => "error",
+        "message" => $duplicateCode ? "รหัสโครงการนี้มีอยู่แล้ว" : "ไม่สามารถสร้างโครงการได้",
+    ], $duplicateCode ? 409 : 500);
 } catch (Exception $e) {
     if ($db->inTransaction()) {
         $db->rollBack();
     }
 
-    project_json(["status" => "error", "message" => $e->getMessage()], 500);
+    project_json(["status" => "error", "message" => $e->getMessage()], project_error_status($e));
 }
 ?>

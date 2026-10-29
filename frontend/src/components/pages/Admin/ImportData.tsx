@@ -12,7 +12,7 @@ const importTypes = [
   { value: "students", label: "ข้อมูลนักศึกษา", icon: Users, description: "นำเข้ารายชื่อนักศึกษาใหม่" },
   { value: "teachers", label: "ข้อมูลอาจารย์", icon: Users, description: "นำเข้ารายชื่ออาจารย์" },
   { value: "courses", label: "ข้อมูลรายวิชา", icon: BookOpen, description: "นำเข้ารายวิชาและหลักสูตร" },
-  { value: "projects", label: "ข้อมูลโครงการ", icon: FolderKanban, description: "นำเข้าข้อมูลโครงการ" },
+  { value: "projects", label: "ข้อมูลโครงการ", icon: FolderKanban, description: "ต้องมีรหัสโครงการ (project_id) และใช้รหัสนี้จับคู่ข้อมูลเดิม" },
 ];
 
 interface ImportHistory {

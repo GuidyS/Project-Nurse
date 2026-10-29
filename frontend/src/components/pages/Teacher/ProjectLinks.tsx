@@ -15,6 +15,8 @@ interface TargetOption {
 
 interface ProjectOption {
   id: number;
+  project_id: string;
+  read_only?: boolean;
   name: string;
 }
 
@@ -53,10 +55,10 @@ export default function ProjectLinks() {
           setLinks(data.links || {});
           
           const pending = consumePendingProjectNavigation();
-          if (pending?.projectId && (data.projects || []).some((p: ProjectOption) => String(p.id) === pending.projectId)) {
+          if (pending?.projectId && (data.projects || []).some((p: ProjectOption) => String(p.project_id) === pending.projectId)) {
             setSelectedProjectId(pending.projectId);
           } else if (data.projects && data.projects.length > 0) {
-            setSelectedProjectId(data.projects[0].id.toString());
+            setSelectedProjectId(data.projects[0].project_id.toString());
           }
         }
       })
@@ -124,7 +126,8 @@ export default function ProjectLinks() {
     return <div className="p-6 text-center text-muted-foreground">กำลังโหลดโครงสร้างเมทริกซ์...</div>;
   }
 
-  const currentProjectName = projects.find(p => p.id.toString() === selectedProjectId)?.name || '';
+  const readOnly = Boolean(projects.find(p => p.project_id === selectedProjectId)?.read_only) || Number(JSON.parse(localStorage.getItem('user') || '{}').role_id) !== 1;
+  const currentProjectName = projects.find(p => p.project_id.toString() === selectedProjectId)?.name || '';
   
   const rawLinks: LinkMatrix[string] = links[selectedProjectId] || { plos: [], clos: [] };
   const currentLinks = {
@@ -160,10 +163,10 @@ export default function ProjectLinks() {
                 {projects.map((project) => (
                   <button
                     type="button"
-                    key={project.id}
-                    onClick={() => setSelectedProjectId(project.id.toString())}
+                    key={project.project_id}
+                    onClick={() => setSelectedProjectId(project.project_id.toString())}
                     className={`w-full rounded-md px-3 py-2.5 text-left text-sm font-medium transition-colors ${
-                      selectedProjectId === project.id.toString()
+                      selectedProjectId === project.project_id.toString()
                         ? 'bg-primary/10 text-primary'
                         : 'hover:bg-muted text-foreground'
                     }`}
@@ -220,7 +223,7 @@ export default function ProjectLinks() {
                   {currentProjectName || 'กรุณาเลือกโครงการด้านซ้าย'}
                 </CardDescription>
               </div>
-              <Button className="w-full shrink-0 sm:w-auto" onClick={handleSave} disabled={!selectedProjectId || isSaving}>
+              <Button className="w-full shrink-0 sm:w-auto" onClick={handleSave} disabled={!selectedProjectId || isSaving || readOnly}>
                 <Save className="mr-2 h-4 w-4" />
                 {isSaving ? 'กำลังบันทึก...' : 'บันทึกพิกัด'}
               </Button>
@@ -243,6 +246,7 @@ export default function ProjectLinks() {
                           {plos.map((plo) => (
                             <div key={plo.code} className="flex items-start space-x-3 p-2 rounded hover:bg-muted/50 transition-colors">
                               <Checkbox
+                              disabled={readOnly}
                                 id={`plo-${plo.code}`}
                                 checked={currentLinks.plos?.includes(plo.code) || false}
                                 onCheckedChange={(checked) => handleCheckboxChange('plos', plo.code, !!checked)}
@@ -265,6 +269,7 @@ export default function ProjectLinks() {
                           {clos.map((clo) => (
                             <div key={clo.code} className="flex items-start space-x-3 p-2 rounded hover:bg-muted/50 transition-colors">
                               <Checkbox
+                              disabled={readOnly}
                                 id={`clo-${clo.code}`}
                                 checked={currentLinks.clos?.includes(clo.code) || false}
                                 onCheckedChange={(checked) => handleCheckboxChange('clos', clo.code, !!checked)}

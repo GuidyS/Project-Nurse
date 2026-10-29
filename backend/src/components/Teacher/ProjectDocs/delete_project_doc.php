@@ -28,9 +28,12 @@ try {
         exit;
     }
 
+    $db->beginTransaction();
+    project_u_guard($db, (string)$document['project_id']);
     $deleteStmt = $db->prepare("DELETE FROM project_documents WHERE id = :document_id");
     $deleteStmt->execute([':document_id' => $documentId]);
 
+    $db->commit();
     project_document_delete_file($document['file_path'] ?? null);
 
     logAudit($db, $auth['user_id'], 'delete', 'project_documents', "ลบเอกสารโครงการ ID: {$documentId} ชื่อ: {$document['name']} (project_id: {$document['project_id']})");
@@ -40,6 +43,7 @@ try {
         "message" => "ลบเอกสารโครงการสำเร็จ",
     ]);
 } catch (Exception $e) {
-    project_json(["status" => "error", "message" => $e->getMessage()], 400);
+    if ($db->inTransaction()) $db->rollBack();
+    project_json(["status" => "error", "message" => $e->getMessage()], project_error_status($e));
 }
 ?>

@@ -1,3 +1,4 @@
+import { getProjectCodeError } from '@/lib/projectCode';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,7 +13,6 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
@@ -52,12 +52,10 @@ type ProjectTypeFilter = 'all' | ProjectType;
 type ProjectAttachmentType = 'google_drive' | 'website_url' | 'file';
 
 interface Project {
-  id: string;
-  project_id?: number;
+  id: number;
+  project_id: string;
   name: string;
   project_name_th?: string;
-  project_name_en?: string;
-  description?: string;
   project_type?: ProjectType | null;
   responsible_faculty_id?: number | string | null;
   responsible_name?: string | null;
@@ -65,7 +63,7 @@ interface Project {
   status: string;
   budget: number | null;
   spent: number | null;
-  budget_allocated?: number | string | null;
+  budget_proposed?: number | string | null;
   budget_spent?: number | string | null;
   project_budget_years_id?: number | null;
   fiscal_year?: number | null;
@@ -124,6 +122,7 @@ const formatProjectBudget = (amount: number | null) =>
   amount == null ? 'ยังไม่ระบุ' : `${amount.toLocaleString('th-TH', { maximumFractionDigits: 2 })} บาท`;
 
 const formatCurrency = (value?: string | number | null) => {
+  if (value === null || value === undefined || value === "") return "ยังไม่ระบุ";
   const amount = Number(value || 0);
   return amount.toLocaleString('th-TH', {
     minimumFractionDigits: 0,
@@ -143,33 +142,31 @@ const formatDate = (value?: string | null) => {
 };
 
 const statusLabels: Record<ProjectStatus, string> = {
-  pending: 'รออนุมัติ',
+  pending: 'รอดำเนินการ',
   active: 'กำลังดำเนินการ',
   completed: 'เสร็จสิ้น',
-  cancelled: 'ไม่อนุมัติ/ยกเลิก',
+  cancelled: 'ยกเลิก',
 };
 
 interface CreateProjectForm {
+  project_id: string;
   project_name_th: string;
-  project_name_en: string;
-  description: string;
   academic_year: string;
   status: ProjectStatus;
   start_date: string;
   end_date: string;
-  budget_allocated: string;
+  budget_proposed: string;
   budget_spent: string;
 }
 
 const createInitialForm = (): CreateProjectForm => ({
+  project_id: '',
   project_name_th: '',
-  project_name_en: '',
-  description: '',
   academic_year: '',
   status: 'active',
   start_date: '',
   end_date: '',
-  budget_allocated: '',
+  budget_proposed: '',
   budget_spent: '',
 });
 
@@ -210,7 +207,7 @@ const getAttachmentUrlType = (value: string): Exclude<ProjectAttachmentType, 'fi
   }
 };
 
-const uploadMyProjectAttachment = async (projectId: number | string, file: File) => {
+const uploadMyProjectAttachment = async (projectId: string, file: File) => {
   const uploadData = new FormData();
   uploadData.append('project_id', String(projectId));
   uploadData.append('file', file);
@@ -268,11 +265,11 @@ const normalizeStatus = (value?: string | null): ProjectStatus => {
   return 'active';
 };
 
-const projectBudgetAllocated = (project: Project) => project.budget_allocated ?? project.budget ?? 0;
-const projectBudgetSpent = (project: Project) => project.budget_spent ?? project.spent ?? 0;
+const projectBudgetProposed = (project: Project) => project.budget_proposed ?? project.budget ?? null;
+const projectBudgetSpent = (project: Project) => project.budget_spent ?? project.spent ?? null;
 const projectBudgetNote = (project: Project) => project.budget_note || '';
 
-const getProjectKey = (project: Project) => project.project_id ?? Number(project.id || 0);
+const getProjectKey = (project: Project) => project.project_id;
 
 const projectResponsibleName = (project: Project) => {
   const responsibleName = (project.responsible_name || '').trim();
@@ -374,17 +371,16 @@ export default function MyProjects() {
 
   const openEditDialog = (project: Project) => {
     setCreateForm({
+      project_id: String(project.project_id),
       project_name_th: project.project_name_th || project.name || '',
-      project_name_en: project.project_name_en || '',
-      description: project.description || '',
       academic_year: project.academic_year != null ? String(project.academic_year) : '',
       status: (project.status as ProjectStatus) || 'active',
       start_date: project.start_date || '',
       end_date: project.end_date || '',
-      budget_allocated: project.budget != null ? String(project.budget) : '',
+      budget_proposed: project.budget != null ? String(project.budget) : '',
       budget_spent: project.spent != null ? String(project.spent) : '',
     });
-    setEditingProjectId(project.id);
+    setEditingProjectId(String(project.project_id));
     setSelectedFacultyIds(project.member_faculty_ids || []);
     setMemberSearch('');
     setSelectedFiles([]);
@@ -509,20 +505,22 @@ export default function MyProjects() {
   };
 
   const validateCreateForm = () => {
+    const codeError = getProjectCodeError(createForm.project_id);
+    if (codeError) return codeError;
     if (!createForm.project_name_th.trim()) {
-      return 'กรุณากรอกชื่อโครงการภาษาไทย';
+      return 'กรุณากรอกชื่อโครงการ';
     }
 
     const academicYear = createForm.academic_year === '' ? null : Number(createForm.academic_year);
-    const budgetAllocated = createForm.budget_allocated === '' ? null : Number(createForm.budget_allocated);
+    const budgetProposed = createForm.budget_proposed === '' ? null : Number(createForm.budget_proposed);
     const budgetSpent = createForm.budget_spent === '' ? null : Number(createForm.budget_spent);
 
     if (academicYear !== null && (!Number.isFinite(academicYear) || academicYear <= 0)) {
       return 'ปีการศึกษาต้องเป็นตัวเลขมากกว่า 0';
     }
 
-    if (budgetAllocated !== null && (!Number.isFinite(budgetAllocated) || budgetAllocated < 0)) {
-      return 'งบประมาณที่ได้รับต้องไม่ติดลบ';
+    if (budgetProposed !== null && (!Number.isFinite(budgetProposed) || budgetProposed < 0)) {
+      return 'งบเสนอต้องไม่ติดลบ';
     }
 
     if (budgetSpent !== null && (!Number.isFinite(budgetSpent) || budgetSpent < 0)) {
@@ -552,14 +550,13 @@ export default function MyProjects() {
     }
 
     const payload = {
+      project_id: createForm.project_id.trim(),
       project_name_th: createForm.project_name_th.trim(),
-      project_name_en: createForm.project_name_en.trim(),
-      description: createForm.description.trim(),
       academic_year: createForm.academic_year ? Number(createForm.academic_year) : null,
       status: createForm.status,
       start_date: createForm.start_date || null,
       end_date: createForm.end_date || null,
-      budget_allocated: createForm.budget_allocated ? Number(createForm.budget_allocated) : null,
+      budget_proposed: createForm.budget_proposed ? Number(createForm.budget_proposed) : null,
       budget_spent: createForm.budget_spent ? Number(createForm.budget_spent) : null,
       member_faculty_ids: selectedFacultyIds,
     };
@@ -567,9 +564,7 @@ export default function MyProjects() {
     try {
       setIsSubmitting(true);
       const endpoint = editingProjectId ? '/index.php?page=update-my-project' : '/index.php?page=create-my-project';
-      const response = await api.post(endpoint, editingProjectId
-        ? { project_id: editingProjectId, ...payload }
-        : payload);
+      const response = await api.post(endpoint, payload);
       if (response.data.status !== 'success') {
         throw new Error(response.data.message || 'ไม่สามารถบันทึกโครงการได้');
       }
@@ -644,7 +639,7 @@ export default function MyProjects() {
     p => p.status === 'completed' || p.status === 'เสร็จสิ้น'
   ).length;
   const editingProject = editingProjectId
-    ? projects.find((project) => project.id === editingProjectId) || null
+    ? projects.find((project) => String(project.project_id) === editingProjectId) || null
     : null;
   const normalizedMemberSearch = memberSearch.trim().toLowerCase();
   const filteredFacultyOptions = facultyOptions.filter((faculty) => {
@@ -858,20 +853,8 @@ export default function MyProjects() {
                 )}
               </div>
               <div className="space-y-1">
-                <p className="text-muted-foreground">ชื่อโครงการ (ภาษาไทย)</p>
+                <p className="text-muted-foreground">ชื่อโครงการ</p>
                 <p className="font-medium text-foreground whitespace-pre-wrap">{viewProject.project_name_th || viewProject.name}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-muted-foreground">ชื่อโครงการ (ภาษาอังกฤษ)</p>
-                <p className="font-medium text-foreground whitespace-pre-wrap">
-                  {viewProject.project_name_en || '-'}
-                </p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-muted-foreground">คำอธิบาย</p>
-                <p className="font-medium text-foreground whitespace-pre-wrap rounded-lg border bg-muted/30 p-3">
-                  {viewProject.description || 'ไม่มีคำอธิบายโครงการ'}
-                </p>
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1 rounded-lg border bg-muted/30 p-3">
@@ -892,7 +875,7 @@ export default function MyProjects() {
                 </div>
                 <div className="space-y-1 rounded-lg border bg-muted/30 p-3">
                   <p className="text-muted-foreground">งบเสนอ</p>
-                  <p className="font-medium text-foreground">{formatCurrency(projectBudgetAllocated(viewProject))} บาท</p>
+                  <p className="font-medium text-foreground">{formatCurrency(projectBudgetProposed(viewProject))} บาท</p>
                 </div>
                 <div className="space-y-1 rounded-lg border bg-muted/30 p-3">
                   <p className="text-muted-foreground">งบใช้จริง</p>
@@ -937,35 +920,28 @@ export default function MyProjects() {
 
           <div className="grid gap-4 py-2">
             <div className="grid gap-2">
-              <Label htmlFor="project-name-th">ชื่อโครงการภาษาไทย <span className="text-destructive">*</span></Label>
+              <Label htmlFor="my-project-code">รหัสโครงการ <span className="text-destructive">*</span></Label>
+              <Input
+                id="my-project-code"
+                maxLength={100}
+                value={createForm.project_id}
+                readOnly={editingProjectId !== null}
+                onChange={(event) => updateCreateForm('project_id', event.target.value)}
+                placeholder="กรอกรหัสโครงการเป็นจำนวนเต็มบวก"
+              />
+              {editingProjectId && <p className="text-xs text-muted-foreground">รหัสโครงการไม่สามารถแก้ไขได้หลังสร้าง</p>}
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="project-name-th">ชื่อโครงการ <span className="text-destructive">*</span></Label>
               <Input
                 id="project-name-th"
                 value={createForm.project_name_th}
                 onChange={(event) => updateCreateForm('project_name_th', event.target.value)}
-                placeholder="กรอกชื่อโครงการภาษาไทย"
+                placeholder="กรอกชื่อโครงการ"
               />
             </div>
 
-            <div className="grid gap-2">
-              <Label htmlFor="project-name-en">ชื่อโครงการภาษาอังกฤษ</Label>
-              <Input
-                id="project-name-en"
-                value={createForm.project_name_en}
-                onChange={(event) => updateCreateForm('project_name_en', event.target.value)}
-                placeholder="Project name"
-              />
-            </div>
 
-            <div className="grid gap-2">
-              <Label htmlFor="project-description">รายละเอียด</Label>
-              <Textarea
-                id="project-description"
-                value={createForm.description}
-                onChange={(event) => updateCreateForm('description', event.target.value)}
-                placeholder="อธิบายรายละเอียดโครงการ"
-                rows={3}
-              />
-            </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
@@ -974,7 +950,7 @@ export default function MyProjects() {
                   id="project-academic-year"
                   type="number"
                   min="1"
-                  inputMode="numeric"
+                  maxLength={100}
                   value={createForm.academic_year}
                   onChange={(event) => updateCreateForm('academic_year', event.target.value)}
                   placeholder="2569"
@@ -1078,14 +1054,14 @@ export default function MyProjects() {
 
             <div className="grid gap-4 sm:grid-cols-3">
                 <div className="grid gap-2">
-                  <Label htmlFor="project-budget-allocated">งบประมาณที่ได้รับ</Label>
+                  <Label htmlFor="project-budget-proposed">งบเสนอ</Label>
                   <Input
-                    id="project-budget-allocated"
+                    id="project-budget-proposed"
                     type="number"
                     min="0"
                     step="0.01"
-                    value={createForm.budget_allocated}
-                    onChange={(event) => updateCreateForm('budget_allocated', event.target.value)}
+                    value={createForm.budget_proposed}
+                    onChange={(event) => updateCreateForm('budget_proposed', event.target.value)}
                     placeholder="0.00"
                   />
                 </div>
