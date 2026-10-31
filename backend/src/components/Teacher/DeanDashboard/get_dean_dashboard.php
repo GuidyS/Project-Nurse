@@ -339,6 +339,12 @@ try {
         'scopus' => 0,
         'tci' => 0,
         'by_database' => [],
+        'summary' => [
+            'kpi' => 0,
+            'co_author' => 0,
+            'academic' => 0,
+        ],
+        'trend' => [],
     ];
     if (deanDashboardTableExists($db, 'faculty_research')) {
         $gregorianYear = $academicYear - 543;
@@ -382,6 +388,65 @@ try {
             'scopus' => $scopus,
             'tci' => $tci,
         ]);
+
+        // ใช้หลักการนับเดียวกับหน้าสรุปงานวิจัย: Head = KPI, ผู้ร่วมเขียน = ชื่อร่วม
+        // และบทความวิชาการ/ตำราจะแยกออกจาก KPI งานวิจัย
+        $trendByYear = [];
+        foreach (range($academicYear - 4, $academicYear) as $year) {
+            $trendByYear[$year] = [
+                'year' => (string)$year,
+                'kpi' => 0,
+                'co_author' => 0,
+                'academic' => 0,
+            ];
+        }
+
+        $publicationRows = $db->query(
+            'SELECT faculty_id, publication_year, publication_date, article_type,
+                    first_author_id, corresponding_author_id, co_author_ids
+             FROM faculty_research'
+        )->fetchAll();
+
+        foreach ($publicationRows as $publication) {
+            $roles = [];
+            $coAuthorIds = json_decode((string)($publication['co_author_ids'] ?? '[]'), true);
+            if (!is_array($coAuthorIds)) {
+                $coAuthorIds = preg_split('/\s*,\s*/', (string)($publication['co_author_ids'] ?? ''), -1, PREG_SPLIT_NO_EMPTY);
+            }
+            foreach ($coAuthorIds as $facultyId) {
+                if (is_scalar($facultyId) && ctype_digit((string)$facultyId) && (int)$facultyId > 0) {
+                    $roles[(int)$facultyId] = 'co_author';
+                }
+            }
+            if (!empty($publication['corresponding_author_id'])) {
+                $roles[(int)$publication['corresponding_author_id']] = 'head';
+            }
+            if (!empty($publication['first_author_id'])) {
+                $roles[(int)$publication['first_author_id']] = 'head';
+            }
+            if (!$roles && !empty($publication['faculty_id'])) {
+                $roles[(int)$publication['faculty_id']] = 'co_author';
+            }
+
+            $publicationYear = (int)($publication['publication_year'] ?? 0);
+            $publicationDate = (string)($publication['publication_date'] ?? '');
+            if (preg_match('/^(\d{4})-\d{2}-\d{2}$/', $publicationDate, $dateParts)) {
+                $publicationYear = (int)$dateParts[1] + 543;
+            } elseif ($publicationYear > 0 && $publicationYear < 2400) {
+                $publicationYear += 543;
+            }
+
+            $articleType = trim((string)($publication['article_type'] ?? ''));
+            $isAcademic = in_array($articleType, ['academic', 'บทความวิชาการ', 'textbook', 'ตำรา'], true);
+            foreach ($roles as $role) {
+                $metric = $isAcademic ? 'academic' : ($role === 'head' ? 'kpi' : 'co_author');
+                $research['summary'][$metric]++;
+                if (isset($trendByYear[$publicationYear])) {
+                    $trendByYear[$publicationYear][$metric]++;
+                }
+            }
+        }
+        $research['trend'] = array_values($trendByYear);
     }
 
     // 6) โครงการ งบประมาณ การเบิกจ่าย และความคืบหน้า (S-Curve Actual ล่าสุด)
