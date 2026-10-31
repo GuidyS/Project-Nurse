@@ -13,7 +13,7 @@ import {
   Users,
 } from "lucide-react";
 import api from "@/lib/axios";
-import StudentLearningOutcomesPage from "@/components/pages/Teacher/StudentLearningOutcomesPage";
+import FacultyDirectoryPage from "@/components/pages/Teacher/FacultyDirectoryPage";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -205,8 +205,9 @@ function facultyHasWorkload(faculty: FacultyWorkload, dimension: FacultyDimensio
 }
 
 export default function FacultyDimensionPage({ dimension }: { dimension: FacultyDimension }) {
+  // เมนู "บุคลากรภายในคณะ" ใช้ช่องเดียวกับมิติการเรียนการสอนเดิม
   if (dimension === "teaching") {
-    return <StudentLearningOutcomesPage />;
+    return <FacultyDirectoryPage />;
   }
 
   return <FacultyDimensionContent dimension={dimension} />;
