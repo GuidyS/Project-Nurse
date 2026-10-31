@@ -15,7 +15,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit();
 }
 
+require_once __DIR__ . '/../../../config/academic_calendar.php';
+
 define('APP_DEBUG', true);
+
+/** กราฟอัตราคงอยู่แสดงแค่ชั้นปีที่ 1-4 ชั้นปีที่เกินจากนี้ไม่นำมาแสดง */
+const RETENTION_MAX_YEAR_LEVEL = 4;
 
 if (!isset($_SESSION['user_id'])) {
     http_response_code(401);
@@ -45,33 +50,64 @@ try {
 }
 
 /**
- * จัดกลุ่มสถานะนักศึกษาให้สอดคล้องกับ DeanDashboard
- * NULL / Active / Studying → กำลังศึกษา
- * Graduated (+ typo Graduted) → สำเร็จการศึกษา
- * อื่นๆ → พ้นสภาพ/ลาออก
+ * แปลงค่า student.status ให้เป็นคีย์มาตรฐานชุดเดียว
+ *
+ * ฐานข้อมูลมีค่าสถานะอยู่ 2 ชุด จึงต้องรองรับทั้งคู่
+ *   ชุดอังกฤษ (เดิม) : Active, Graduted, Dropout, Retired, OnLeave, Resigned
+ *   ชุดไทย (ใหม่)    : คงอยู่, จบการศึกษา, พักการเรียน, ลาออก
  */
-function classifyStudentStatus(?string $status): string
+function retentionStatusKey(?string $status): string
 {
-    $normalized = trim((string)$status);
-    if ($normalized === '' || $normalized === 'Active' || $normalized === 'Studying') {
-        return 'studying';
+    $raw = trim((string)$status);
+    if ($raw === '') {
+        return 'active';
     }
-    if ($normalized === 'Graduated' || $normalized === 'Graduted') {
-        return 'graduated';
-    }
-    return 'dropped';
+
+    $map = [
+        'active'        => 'active',
+        'studying'      => 'active',
+        'คงอยู่'         => 'active',
+        'กำลังศึกษา'     => 'active',
+        'graduated'     => 'graduated',
+        'graduted'      => 'graduated', // สะกดผิดที่ค้างมาจากข้อมูลเดิม
+        'จบการศึกษา'    => 'graduated',
+        'สำเร็จการศึกษา' => 'graduated',
+        'onleave'       => 'onleave',
+        'พักการเรียน'    => 'onleave',
+        'resigned'      => 'resigned',
+        'ลาออก'         => 'resigned',
+        'dropout'       => 'dropped',
+        'retired'       => 'dropped',
+        'พ้นสภาพ'       => 'dropped',
+    ];
+
+    return $map[mb_strtolower($raw, 'UTF-8')] ?? 'other';
 }
 
-function statusLabelTh(string $bucket, ?string $rawStatus = null): string
+/** ป้ายภาษาไทยของแต่ละสถานะ — ใช้คำชุดเดียวกันทั้งตาราง กราฟโดนัท และหน้าจัดการผู้ใช้ */
+function retentionStatusLabel(string $key, ?string $rawStatus = null): string
 {
-    if ($bucket === 'studying') {
-        return 'กำลังศึกษา';
+    $labels = [
+        'active'    => 'คงอยู่',
+        'graduated' => 'จบการศึกษา',
+        'onleave'   => 'พักการเรียน',
+        'resigned'  => 'ลาออก',
+        'dropped'   => 'พ้นสภาพ',
+    ];
+
+    if (isset($labels[$key])) {
+        return $labels[$key];
     }
-    if ($bucket === 'graduated') {
-        return 'สำเร็จการศึกษา';
-    }
+
+    // ค่าที่ไม่รู้จัก แสดงค่าดิบไปตรง ๆ จะได้เห็นว่าข้อมูลผิดปกติตรงไหน
     $raw = trim((string)$rawStatus);
-    return $raw !== '' ? $raw : 'พ้นสภาพ/ลาออก';
+    return $raw !== '' ? $raw : 'ไม่ระบุ';
+}
+
+/** สถานะที่ถือว่ายังคงอยู่ในระบบ (ใช้คำนวณอัตราคงอยู่ — คงพฤติกรรมเดิมไว้) */
+function retentionIsRetained(string $key): bool
+{
+    return $key === 'active' || $key === 'graduated';
 }
 
 try {
@@ -83,35 +119,44 @@ try {
     ");
     $statusRows = $stmtStatus->fetchAll();
 
+    // แยกกราฟโดนัทตามสถานะจริง ไม่รวบเป็นกลุ่มใหญ่ จะได้ใช้คำเดียวกับคอลัมน์ "สถานะ"
     $studying = 0;
     $graduated = 0;
     $dropped = 0;
-    $retentionPie = [];
-    $pieBuckets = [
-        'studying' => 0,
-        'graduated' => 0,
-        'dropped' => 0,
-    ];
+    $byStatus = [];
 
     foreach ($statusRows as $row) {
-        $bucket = classifyStudentStatus($row['status'] ?? null);
+        $key = retentionStatusKey($row['status'] ?? null);
         $count = (int)$row['count'];
-        $pieBuckets[$bucket] += $count;
+        $label = retentionStatusLabel($key, $row['status'] ?? null);
 
-        if ($bucket === 'studying') {
+        if (!isset($byStatus[$label])) {
+            $byStatus[$label] = ['key' => $key, 'value' => 0];
+        }
+        $byStatus[$label]['value'] += $count;
+
+        if ($key === 'active') {
             $studying += $count;
-        } elseif ($bucket === 'graduated') {
+        } elseif ($key === 'graduated') {
             $graduated += $count;
         } else {
             $dropped += $count;
         }
     }
 
-    foreach (['studying' => 'กำลังศึกษา', 'graduated' => 'สำเร็จการศึกษา', 'dropped' => 'พ้นสภาพ/ลาออก'] as $key => $label) {
-        if ($pieBuckets[$key] > 0) {
+    // เรียงให้คงที่ทุกครั้ง หน้าเว็บจะได้ล็อกสีตามสถานะได้
+    $statusOrder = ['active' => 1, 'graduated' => 2, 'onleave' => 3, 'resigned' => 4, 'dropped' => 5, 'other' => 6];
+    uasort($byStatus, static function (array $a, array $b) use ($statusOrder): int {
+        return ($statusOrder[$a['key']] ?? 99) <=> ($statusOrder[$b['key']] ?? 99);
+    });
+
+    $retentionPie = [];
+    foreach ($byStatus as $label => $info) {
+        if ($info['value'] > 0) {
             $retentionPie[] = [
-                "name"  => $label,
-                "value" => $pieBuckets[$key],
+                "name"       => $label,
+                "statusKey"  => $info['key'],
+                "value"      => $info['value'],
             ];
         }
     }
@@ -142,49 +187,66 @@ try {
             $byYear[$level] = ['total' => 0, 'retained' => 0];
         }
         $count = (int)$row['count'];
-        $bucket = classifyStudentStatus($row['status'] ?? null);
         $byYear[$level]['total'] += $count;
-        if ($bucket === 'studying' || $bucket === 'graduated') {
+        if (retentionIsRetained(retentionStatusKey($row['status'] ?? null))) {
             $byYear[$level]['retained'] += $count;
         }
     }
 
+    // ปีการศึกษาปัจจุบันมาจากการตั้งค่าของผู้ดูแลระบบ (หน้า "ตั้งค่าปีการศึกษา")
+    // พอระบบเลื่อนชั้นปี ป้ายรหัสรุ่นบนแกน X จะขยับตามเองโดยไม่ต้องแก้โค้ด
+    $currentAcademicYear = currentAcademicYear(null, $pdo);
+
+    // แสดงเฉพาะชั้นปีที่ 1-4 เสมอ (ชั้นปีเกิน 4 ไม่นำมาแสดงในกราฟ)
     $retentionByYearLevel = [];
-    ksort($byYear);
-    foreach ($byYear as $level => $agg) {
-        $total = $agg['total'];
-        $retained = $agg['retained'];
+    for ($level = 1; $level <= RETENTION_MAX_YEAR_LEVEL; $level++) {
+        $agg = $byYear[$level] ?? ['total' => 0, 'retained' => 0];
+        $admissionYear = $currentAcademicYear - ($level - 1);
+
         $retentionByYearLevel[] = [
-            "level"    => "ปี " . $level,
-            "total"    => $total,
-            "retained" => $retained,
-            "rate"     => $total > 0 ? round($retained / $total * 100, 1) : 0.0,
+            "level"         => "ปี " . $level,
+            "label"         => sprintf("ปี %d (รหัส %s)", $level, substr((string)$admissionYear, -2)),
+            "admissionYear" => $admissionYear,
+            "total"         => $agg['total'],
+            "retained"      => $agg['retained'],
+            "rate"          => $agg['total'] > 0 ? round($agg['retained'] / $agg['total'] * 100, 1) : 0.0,
         ];
     }
 
-    // 3) รายชื่อออกกลางคันล่าสุด (สถานะที่ไม่ใช่กำลังศึกษา/สำเร็จการศึกษา)
+    // 3) รายชื่อออกกลางคันล่าสุด — คัดสถานะในฝั่ง PHP เพราะค่าสถานะมีทั้งชุดอังกฤษและชุดไทย
+    //    สถานะและสาเหตุแยกคนละคอลัมน์ ให้ตรงกับหน้า "จัดการผู้ใช้" ของผู้ดูแลระบบ
     $stmtDropouts = $pdo->query("
         SELECT
             student_id,
             CONCAT(IFNULL(title, ''), IFNULL(first_name_th, ''), ' ', IFNULL(last_name_th, '')) AS name,
             IFNULL(year_level, '-') AS year,
-            status
+            status,
+            dropout_reason
         FROM student
-        WHERE status IS NOT NULL
-          AND TRIM(status) <> ''
-          AND status NOT IN ('Active', 'Studying', 'Graduated', 'Graduted')
+        WHERE status IS NOT NULL AND TRIM(status) <> ''
         ORDER BY student_id DESC
-        LIMIT 50
     ");
 
     $recentDropouts = [];
     foreach ($stmtDropouts->fetchAll() as $row) {
+        $key = retentionStatusKey($row['status'] ?? null);
+        if (retentionIsRetained($key)) {
+            continue; // ยังคงอยู่หรือจบการศึกษาแล้ว ไม่ใช่รายการออกกลางคัน
+        }
+
+        $reason = trim((string)($row['dropout_reason'] ?? ''));
         $recentDropouts[] = [
-            "studentId" => (string)$row['student_id'],
-            "name"      => trim((string)$row['name']),
-            "year"      => $row['year'],
-            "reason"    => statusLabelTh('dropped', $row['status'] ?? null),
+            "studentId"   => (string)$row['student_id'],
+            "name"        => trim((string)$row['name']),
+            "year"        => $row['year'],
+            "statusKey"   => $key,
+            "statusLabel" => retentionStatusLabel($key, $row['status'] ?? null),
+            "reason"      => $reason !== '' ? $reason : null,
         ];
+
+        if (count($recentDropouts) >= 50) {
+            break;
+        }
     }
 
     echo json_encode([
@@ -199,6 +261,7 @@ try {
                 "dropped"          => $dropped,
                 "graduated"        => $graduated,
             ],
+            "academicYear"          => $currentAcademicYear,
             "retention"             => $retentionPie,
             "retentionByYearLevel"  => $retentionByYearLevel,
             "recentDropouts"        => $recentDropouts,
