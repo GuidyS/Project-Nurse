@@ -1459,12 +1459,24 @@ const WorkloadsSection = ({ workloads, onUpdate, readOnly = false }: { workloads
                 <TableCell>{w.academic_year}</TableCell>
                 <TableCell>{w.term}</TableCell>
                 <TableCell>{new Date(w.uploaded_at).toLocaleDateString('th-TH')}</TableCell>
-                <TableCell className="text-right flex justify-end gap-2">
-                  <Button variant="outline" size="sm" asChild>
-                    <a href={`${apiBaseUrl}/${w.file_path}`} target="_blank" rel="noopener noreferrer"><Download className="h-4 w-4" /></a>
-                  </Button>
-                  {!readOnly && (
-                    <Button variant="destructive" size="sm" onClick={() => handleDelete(w.id)}><Trash2 className="h-4 w-4" /></Button>
+                <TableCell className="text-right flex justify-end items-center gap-2">
+                  {/* โหมดดูอย่างเดียวให้เปิดดูได้อย่างเดียว ไม่มีปุ่มดาวน์โหลด */}
+                  {readOnly ? (
+                    <a
+                      href={`${apiBaseUrl}/${w.file_path}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline"
+                    >
+                      เปิดดู
+                    </a>
+                  ) : (
+                    <>
+                      <Button variant="outline" size="sm" asChild>
+                        <a href={`${apiBaseUrl}/${w.file_path}`} target="_blank" rel="noopener noreferrer"><Download className="h-4 w-4" /></a>
+                      </Button>
+                      <Button variant="destructive" size="sm" onClick={() => handleDelete(w.id)}><Trash2 className="h-4 w-4" /></Button>
+                    </>
                   )}
                 </TableCell>
               </TableRow>
