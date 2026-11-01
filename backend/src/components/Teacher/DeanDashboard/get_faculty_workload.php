@@ -334,8 +334,9 @@ try {
         if ($person['teaching']['courses'] > 0) $teachingFaculty++;
 
         $totalResearch += $researchCount + $person['research']['academic'];
-        // อาจารย์ที่มีงานวิจัย = มีผลงานสีแดงหรือสีฟ้าอย่างน้อย 1 ชิ้น (นับหัวคน)
-        if ($researchCount > 0 || $person['research']['academic'] > 0) $researchFaculty++;
+        // อาจารย์ที่มีงานวิจัย = มีผลงานสีแดง (นับ KPI) อย่างน้อย 1 ชิ้น
+        // ใช้เกณฑ์เดียวกับคอลัมน์สถานะในตาราง จะได้ไม่ขัดกันเอง
+        if ($researchCount > 0) $researchFaculty++;
         if ($person['research']['meets_criterion']) $meetingTarget++;
         if ($person['academic_service']['items'] > 0) $serviceFaculty++;
         if ($person['culture']['items'] > 0) $cultureFaculty++;
