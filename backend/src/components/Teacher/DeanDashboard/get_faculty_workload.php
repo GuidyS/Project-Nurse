@@ -5,6 +5,8 @@ if (session_status() === PHP_SESSION_NONE) {
 
 require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../config/academic_calendar.php';
+// ใช้ตัวแยกบทบาทผู้แต่งชุดเดียวกับหน้า "สรุปผลงานวิจัย 5 ปี"
+require_once __DIR__ . '/../ResearchSummary/research_summary_helpers.php';
 
 header('Content-Type: application/json; charset=UTF-8');
 
@@ -101,7 +103,9 @@ try {
                 'subjects' => [],
             ],
             'research' => [
-                'count' => 0,
+                'count' => 0,            // งานวิจัยที่นับ KPI (เจ้าของผลงานหลัก)
+                'co_author' => 0,        // ผลงานที่เป็นชื่อร่วม
+                'academic' => 0,         // วิชาการ/ตำรา
                 'meets_criterion' => false,
                 'records' => [],
             ],
@@ -211,8 +215,13 @@ try {
         ];
     }
 
+    // แยกประเภทผลงานด้วยกติกาเดียวกับหน้า "สรุปผลงานวิจัย 5 ปี" ของอาจารย์วิจัย
+    //   วิชาการ/ตำรา            -> academic (สีฟ้า)
+    //   เป็นเจ้าของผลงานหลัก      -> count    (สีแดง นับ KPI)
+    //   นอกนั้น                  -> co_author (สีดำ ชื่อร่วม)
     $researchStmt = $db->prepare(
-        'SELECT research_id, faculty_id, title, publication_year, category
+        'SELECT research_id, faculty_id, title, publication_year, category, article_type,
+                first_author_id, corresponding_author_id, co_author_ids
          FROM faculty_research
          WHERE publication_year IN (:academic_year, :gregorian_year)
          ORDER BY publication_year DESC, research_id DESC'
@@ -222,16 +231,31 @@ try {
         ':gregorian_year' => $gregorianYear,
     ]);
     foreach ($researchStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-        $facultyId = (string)$row['faculty_id'];
-        if (!isset($faculty[$facultyId])) {
-            continue;
+        $isAcademic = in_array($row['article_type'] ?? '', ['academic', 'บทความวิชาการ', 'textbook', 'ตำรา'], true);
+
+        foreach (researchAuthorRoles($row) as $authorId => $role) {
+            $facultyId = (string)$authorId;
+            if (!isset($faculty[$facultyId])) {
+                continue;
+            }
+
+            if ($isAcademic) {
+                $kind = 'academic';
+            } elseif ($role === 'first_author' || $role === 'corresponding') {
+                $kind = 'count';
+            } else {
+                $kind = 'co_author';
+            }
+            $faculty[$facultyId]['research'][$kind]++;
+
+            $faculty[$facultyId]['research']['records'][] = [
+                'id' => (string)$row['research_id'],
+                'title' => (string)$row['title'],
+                'year' => (int)$row['publication_year'],
+                'category' => (string)($row['category'] ?? 'ไม่ระบุประเภท'),
+                'kind' => $kind,
+            ];
         }
-        $faculty[$facultyId]['research']['records'][] = [
-            'id' => (string)$row['research_id'],
-            'title' => (string)$row['title'],
-            'year' => (int)$row['publication_year'],
-            'category' => (string)($row['category'] ?? 'ไม่ระบุประเภท'),
-        ];
     }
 
     $projectStmt = $db->prepare(
@@ -289,9 +313,9 @@ try {
     $cultureProjectNames = [];
 
     foreach ($faculty as &$person) {
-        $researchCount = count($person['research']['records']);
-        $person['research']['count'] = $researchCount;
-        $person['research']['meets_criterion'] = $researchCount >= $researchTarget;
+        // "ผ่านเกณฑ์" ดูจากคอลัมน์งานวิจัย (สีแดง นับ KPI) ว่ามีมากกว่า 0 ในปีนั้นหรือไม่
+        $researchCount = $person['research']['count'];
+        $person['research']['meets_criterion'] = $researchCount > 0;
 
         $person['academic_service'] = summarizeProjectRecords($person['academic_service']);
         $person['culture'] = summarizeProjectRecords($person['culture']);
@@ -309,8 +333,9 @@ try {
         $totalYlo += $person['teaching']['ylo'];
         if ($person['teaching']['courses'] > 0) $teachingFaculty++;
 
-        $totalResearch += $researchCount;
-        if ($researchCount > 0) $researchFaculty++;
+        $totalResearch += $researchCount + $person['research']['academic'];
+        // อาจารย์ที่มีงานวิจัย = มีผลงานสีแดงหรือสีฟ้าอย่างน้อย 1 ชิ้น (นับหัวคน)
+        if ($researchCount > 0 || $person['research']['academic'] > 0) $researchFaculty++;
         if ($person['research']['meets_criterion']) $meetingTarget++;
         if ($person['academic_service']['items'] > 0) $serviceFaculty++;
         if ($person['culture']['items'] > 0) $cultureFaculty++;
