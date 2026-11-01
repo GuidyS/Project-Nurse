@@ -5,6 +5,7 @@ require_once __DIR__ . '/../Teacher/LicenseReminder/license_reminder_helpers.php
 require_once __DIR__ . '/../../config/audit_helper.php';
 require_once __DIR__ . '/../../config/academic_helper.php';
 require_once __DIR__ . '/../../config/name_validation.php';
+require_once __DIR__ . '/../../config/student_license_helper.php';
 
 if (!isset($_SESSION['user_id'])) {
     http_response_code(401);
@@ -119,116 +120,7 @@ const FACULTY_PROFILE_IMAGE_MIME_EXTENSIONS = [
     'image/webp' => 'webp',
 ];
 
-const STUDENT_LICENSE_EVIDENCE_MAX_BYTES = 5 * 1024 * 1024;
-const STUDENT_LICENSE_EVIDENCE_MIME_EXTENSIONS = [
-    'application/pdf' => 'pdf',
-    'application/x-pdf' => 'pdf',
-    'application/octet-stream' => 'pdf',
-    'image/jpeg' => 'jpg',
-    'image/png' => 'png',
-];
-
-function studentLicenseEnsureSchema(PDO $db): void
-{
-    $columns = [
-        'license_first_attempt_passed' => "ALTER TABLE student ADD COLUMN license_first_attempt_passed TINYINT(1) NOT NULL DEFAULT 0 COMMENT 'ผ่านสอบใบประกอบวิชาชีพครั้งแรก'",
-        'license_first_attempt_passed_at' => "ALTER TABLE student ADD COLUMN license_first_attempt_passed_at DATETIME DEFAULT NULL COMMENT 'วันที่บันทึกว่าผ่านสอบใบประกอบวิชาชีพครั้งแรก'",
-        'license_first_attempt_evidence_path' => "ALTER TABLE student ADD COLUMN license_first_attempt_evidence_path VARCHAR(255) DEFAULT NULL COMMENT 'ไฟล์หลักฐานผ่านสอบใบประกอบวิชาชีพครั้งแรก'",
-        'license_first_attempt_evidence_name' => "ALTER TABLE student ADD COLUMN license_first_attempt_evidence_name VARCHAR(255) DEFAULT NULL COMMENT 'ชื่อไฟล์หลักฐานผ่านสอบใบประกอบวิชาชีพครั้งแรก'",
-        'license_within_one_year_passed' => "ALTER TABLE student ADD COLUMN license_within_one_year_passed TINYINT(1) NOT NULL DEFAULT 0 COMMENT 'ผ่านสอบใบประกอบวิชาชีพภายใน 1 ปี'",
-        'license_within_one_year_passed_at' => "ALTER TABLE student ADD COLUMN license_within_one_year_passed_at DATETIME DEFAULT NULL COMMENT 'วันที่บันทึกว่าผ่านสอบใบประกอบวิชาชีพภายใน 1 ปี'",
-        'license_within_one_year_evidence_path' => "ALTER TABLE student ADD COLUMN license_within_one_year_evidence_path VARCHAR(255) DEFAULT NULL COMMENT 'ไฟล์หลักฐานผ่านสอบใบประกอบวิชาชีพภายใน 1 ปี'",
-        'license_within_one_year_evidence_name' => "ALTER TABLE student ADD COLUMN license_within_one_year_evidence_name VARCHAR(255) DEFAULT NULL COMMENT 'ชื่อไฟล์หลักฐานผ่านสอบใบประกอบวิชาชีพภายใน 1 ปี'",
-    ];
-
-    foreach ($columns as $column => $alterSql) {
-        $stmt = $db->prepare("
-            SELECT COUNT(*)
-            FROM INFORMATION_SCHEMA.COLUMNS
-            WHERE TABLE_SCHEMA = DATABASE()
-              AND TABLE_NAME = 'student'
-              AND COLUMN_NAME = :column
-        ");
-        $stmt->execute([':column' => $column]);
-        if ((int)$stmt->fetchColumn() === 0) {
-            $db->exec($alterSql);
-        }
-    }
-}
-
-function studentLicenseBool($value): bool
-{
-    if (is_bool($value)) {
-        return $value;
-    }
-    $normalized = strtolower(trim((string)$value));
-    return in_array($normalized, ['1', 'true', 'yes', 'on'], true);
-}
-
-function studentLicenseUploadedFile(string $fieldName): ?array
-{
-    if (!isset($_FILES[$fieldName]) || !is_array($_FILES[$fieldName])) {
-        return null;
-    }
-    $file = $_FILES[$fieldName];
-    if (($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
-        return null;
-    }
-    return $file;
-}
-
-function studentLicenseSaveEvidence(array $file, string $studentId, string $prefix): array
-{
-    $uploadErrors = [
-        UPLOAD_ERR_INI_SIZE => "ไฟล์หลักฐานใหญ่เกิน upload_max_filesize ของ PHP",
-        UPLOAD_ERR_FORM_SIZE => "ไฟล์หลักฐานใหญ่เกินขนาดที่ฟอร์มกำหนด",
-        UPLOAD_ERR_PARTIAL => "ไฟล์หลักฐานอัปโหลดมาไม่ครบ",
-        UPLOAD_ERR_NO_TMP_DIR => "ไม่พบ temporary upload directory",
-        UPLOAD_ERR_CANT_WRITE => "ไม่สามารถเขียนไฟล์หลักฐานลง disk ได้",
-        UPLOAD_ERR_EXTENSION => "PHP extension หยุดการอัปโหลดหลักฐาน",
-    ];
-
-    if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || !is_uploaded_file($file['tmp_name'] ?? '')) {
-        throw new Exception($uploadErrors[$file['error'] ?? UPLOAD_ERR_NO_FILE] ?? "อัปโหลดไฟล์หลักฐานไม่สำเร็จ");
-    }
-
-    if (($file['size'] ?? 0) > STUDENT_LICENSE_EVIDENCE_MAX_BYTES) {
-        throw new Exception("ไฟล์หลักฐานต้องมีขนาดไม่เกิน 5 MB");
-    }
-
-    $extension = strtolower(pathinfo((string)($file['name'] ?? ''), PATHINFO_EXTENSION));
-    $mime = mime_content_type($file['tmp_name']) ?: '';
-    $allowedExtension = STUDENT_LICENSE_EVIDENCE_MIME_EXTENSIONS[$mime] ?? null;
-    if ($allowedExtension === null || !in_array($extension, ['pdf', 'jpg', 'jpeg', 'png'], true)) {
-        throw new Exception("รองรับหลักฐานเฉพาะไฟล์ PDF, JPG หรือ PNG");
-    }
-    if ($extension === 'jpeg') {
-        $extension = 'jpg';
-    }
-    if ($allowedExtension !== $extension && !($allowedExtension === 'jpg' && $extension === 'jpeg')) {
-        throw new Exception("ชนิดไฟล์หลักฐานไม่ตรงกับนามสกุลไฟล์");
-    }
-
-    $safeOwner = preg_replace('/[^A-Za-z0-9_-]/', '_', $studentId);
-    $relativeDir = 'uploads/user-documents/' . $safeOwner;
-    $absoluteDir = __DIR__ . '/../../' . $relativeDir;
-    if (!is_dir($absoluteDir) && !mkdir($absoluteDir, 0775, true)) {
-        throw new Exception("ไม่สามารถสร้างโฟลเดอร์เก็บหลักฐานได้");
-    }
-
-    $fileName = $prefix . '_' . date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . '.' . $extension;
-    $targetPath = $absoluteDir . DIRECTORY_SEPARATOR . $fileName;
-    if (!move_uploaded_file($file['tmp_name'], $targetPath)) {
-        throw new Exception("ไม่สามารถบันทึกไฟล์หลักฐานได้");
-    }
-
-    $rawOriginalName = basename((string)$file['name']);
-    $originalName = function_exists('mb_substr') ? mb_substr($rawOriginalName, 0, 255) : substr($rawOriginalName, 0, 255);
-    return [
-        'path' => $relativeDir . '/' . $fileName,
-        'name' => $originalName !== '' ? $originalName : $fileName,
-    ];
-}
+// Note: studentLicenseEnsureSchema and helpers are loaded from student_license_helper.php
 
 function facultyProfilePictureCachePaths(string $facultyId, string $driveId): array
 {
@@ -918,8 +810,6 @@ try {
             $rawWeight = isset($input['weight']) ? trim((string)$input['weight']) : '';
             $weight    = ($rawWeight !== '' && is_numeric($rawWeight)) ? floatval($rawWeight) : null;
 
-            $rawGpa    = isset($input['gpa']) ? trim((string)$input['gpa']) : '';
-            $gpa       = ($rawGpa !== '' && is_numeric($rawGpa)) ? floatval($rawGpa) : null;
 
             $bmi = null;
             if ($height && $weight && $height > 0) {
@@ -941,68 +831,6 @@ try {
             $fatherPhone = !empty($input['father_phone']) ? substr(preg_replace('/\D/', '', (string)$input['father_phone']), 0, 15) : null;
             $motherPhone = !empty($input['mother_phone']) ? substr(preg_replace('/\D/', '', (string)$input['mother_phone']), 0, 15) : null;
 
-            $licenseFirstPassed = array_key_exists('license_first_attempt_passed', $input)
-                ? studentLicenseBool($input['license_first_attempt_passed'])
-                : (int)($currentStudent['license_first_attempt_passed'] ?? 0) === 1;
-            $licenseWithinYearPassed = array_key_exists('license_within_one_year_passed', $input)
-                ? studentLicenseBool($input['license_within_one_year_passed'])
-                : (int)($currentStudent['license_within_one_year_passed'] ?? 0) === 1;
-
-            $licenseFirstFile = studentLicenseUploadedFile('license_first_attempt_evidence');
-            $licenseWithinYearFile = studentLicenseUploadedFile('license_within_one_year_evidence');
-
-            $licenseFirstPath = $licenseFirstPassed ? ($currentStudent['license_first_attempt_evidence_path'] ?? null) : null;
-            $licenseFirstName = $licenseFirstPassed ? ($currentStudent['license_first_attempt_evidence_name'] ?? null) : null;
-            $licenseWithinYearPath = $licenseWithinYearPassed ? ($currentStudent['license_within_one_year_evidence_path'] ?? null) : null;
-            $licenseWithinYearName = $licenseWithinYearPassed ? ($currentStudent['license_within_one_year_evidence_name'] ?? null) : null;
-
-            if ($licenseFirstPassed && empty($licenseFirstPath) && $licenseFirstFile === null) {
-                http_response_code(400);
-                echo json_encode(["status" => "error", "message" => "กรุณาแนบหลักฐานการผ่านใบประกอบวิชาชีพครั้งแรก"], JSON_UNESCAPED_UNICODE);
-                exit;
-            }
-            if ($licenseWithinYearPassed && empty($licenseWithinYearPath) && $licenseWithinYearFile === null) {
-                http_response_code(400);
-                echo json_encode(["status" => "error", "message" => "กรุณาแนบหลักฐานการผ่านใบประกอบวิชาชีพภายใน 1 ปี"], JSON_UNESCAPED_UNICODE);
-                exit;
-            }
-
-            if ($licenseFirstPassed && $licenseFirstFile !== null) {
-                $saved = studentLicenseSaveEvidence($licenseFirstFile, (string)$u_info['username'], 'license_first_attempt');
-                $licenseFirstPath = $saved['path'];
-                $licenseFirstName = $saved['name'];
-            }
-            if ($licenseWithinYearPassed && $licenseWithinYearFile !== null) {
-                $saved = studentLicenseSaveEvidence($licenseWithinYearFile, (string)$u_info['username'], 'license_within_one_year');
-                $licenseWithinYearPath = $saved['path'];
-                $licenseWithinYearName = $saved['name'];
-            }
-
-            if ($licenseFirstPassed && empty($licenseFirstPath)) {
-                http_response_code(400);
-                echo json_encode(["status" => "error", "message" => "กรุณาแนบหลักฐานการผ่านใบประกอบวิชาชีพครั้งแรก"], JSON_UNESCAPED_UNICODE);
-                exit;
-            }
-            if ($licenseWithinYearPassed && empty($licenseWithinYearPath)) {
-                http_response_code(400);
-                echo json_encode(["status" => "error", "message" => "กรุณาแนบหลักฐานการผ่านใบประกอบวิชาชีพภายใน 1 ปี"], JSON_UNESCAPED_UNICODE);
-                exit;
-            }
-
-            $licenseFirstPassedAt = null;
-            if ($licenseFirstPassed) {
-                $licenseFirstPassedAt = (int)($currentStudent['license_first_attempt_passed'] ?? 0) === 1
-                    ? ($currentStudent['license_first_attempt_passed_at'] ?? null)
-                    : date('Y-m-d H:i:s');
-            }
-
-            $licenseWithinYearPassedAt = null;
-            if ($licenseWithinYearPassed) {
-                $licenseWithinYearPassedAt = (int)($currentStudent['license_within_one_year_passed'] ?? 0) === 1
-                    ? ($currentStudent['license_within_one_year_passed_at'] ?? null)
-                    : date('Y-m-d H:i:s');
-            }
-
             $sql = "UPDATE student SET 
                         first_name_en = :first_name_en, 
                         last_name_en = :last_name_en, 
@@ -1010,7 +838,6 @@ try {
                         birth_date = :birth_date, 
                         email = :email, 
                         phone = :phone, 
-                        gpa = :gpa,
                         height = :height,
                         weight = :weight,
                         bmi = :bmi,
@@ -1022,15 +849,7 @@ try {
                         mother_first_name = :mother_first_name,
                         mother_last_name = :mother_last_name,
                         mother_phone = :mother_phone,
-                        mother_address = :mother_address,
-                        license_first_attempt_passed = :license_first_attempt_passed,
-                        license_first_attempt_passed_at = :license_first_attempt_passed_at,
-                        license_first_attempt_evidence_path = :license_first_attempt_evidence_path,
-                        license_first_attempt_evidence_name = :license_first_attempt_evidence_name,
-                        license_within_one_year_passed = :license_within_one_year_passed,
-                        license_within_one_year_passed_at = :license_within_one_year_passed_at,
-                        license_within_one_year_evidence_path = :license_within_one_year_evidence_path,
-                        license_within_one_year_evidence_name = :license_within_one_year_evidence_name
+                        mother_address = :mother_address
                     WHERE student_id = :student_id";
             
             $stmtUpdate = $db->prepare($sql);
@@ -1041,7 +860,6 @@ try {
                 ':birth_date'       => !empty($input['birth_date']) ? trim((string)$input['birth_date']) : null,
                 ':email'            => !empty($input['email']) ? trim((string)$input['email']) : null,
                 ':phone'            => $phone,
-                ':gpa'              => $gpa,
                 ':height'           => $height,
                 ':weight'           => $weight,
                 ':bmi'              => $bmi,
@@ -1054,25 +872,8 @@ try {
                 ':mother_last_name' => !empty($input['mother_last_name']) ? trim((string)$input['mother_last_name']) : null,
                 ':mother_phone'     => $motherPhone,
                 ':mother_address'   => $parentAddress,
-                ':license_first_attempt_passed' => $licenseFirstPassed ? 1 : 0,
-                ':license_first_attempt_passed_at' => $licenseFirstPassedAt,
-                ':license_first_attempt_evidence_path' => $licenseFirstPath,
-                ':license_first_attempt_evidence_name' => $licenseFirstName,
-                ':license_within_one_year_passed' => $licenseWithinYearPassed ? 1 : 0,
-                ':license_within_one_year_passed_at' => $licenseWithinYearPassedAt,
-                ':license_within_one_year_evidence_path' => $licenseWithinYearPath,
-                ':license_within_one_year_evidence_name' => $licenseWithinYearName,
                 ':student_id'       => $u_info['username']
             ]);
-
-            $licenseChanged =
-                (int)($currentStudent['license_first_attempt_passed'] ?? 0) !== ($licenseFirstPassed ? 1 : 0)
-                || (string)($currentStudent['license_first_attempt_evidence_path'] ?? '') !== (string)($licenseFirstPath ?? '')
-                || (int)($currentStudent['license_within_one_year_passed'] ?? 0) !== ($licenseWithinYearPassed ? 1 : 0)
-                || (string)($currentStudent['license_within_one_year_evidence_path'] ?? '') !== (string)($licenseWithinYearPath ?? '');
-            if ($licenseChanged) {
-                logAudit($db, $id, 'update', 'student_license', 'นักศึกษาแก้ไขข้อมูลสอบใบประกอบวิชาชีพ (รหัส: ' . $u_info['username'] . ')');
-            }
         } else {
             // อีเมลใช้ส่งแจ้งเตือนใบประกอบวิชาชีพ จึงต้องเป็นรูปแบบที่ถูกต้อง (เว้นว่างได้)
             $email = trim((string)($input['email'] ?? ''));

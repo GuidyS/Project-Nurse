@@ -73,7 +73,6 @@ const Transcript = () => {
   // States สำหรับฟอร์มอัปโหลดใบเกรด
   const [gradeYear, setGradeYear] = useState<string>(new Date().getFullYear() + 543 + "");
   const [gradeSemester, setGradeSemester] = useState<string>("1");
-  const [gradeGpa, setGradeGpa] = useState<string>("");
   const [gradeFile, setGradeFile] = useState<File | null>(null);
   const [isUploadingGrade, setIsUploadingGrade] = useState(false);
 
@@ -172,7 +171,6 @@ const Transcript = () => {
       formData.append("action", "upload-term-grade");
       formData.append("academic_year", gradeYear);
       formData.append("semester", gradeSemester);
-      if (gradeGpa) formData.append("gpa", gradeGpa);
       formData.append("file", gradeFile);
 
       const res = await api.post("/index.php?page=transcript-api", formData, {
@@ -182,7 +180,6 @@ const Transcript = () => {
       if (res.data.status === "success") {
         toast({ title: "สำเร็จ", description: "อัปโหลดใบเกรดเรียบร้อยแล้ว" });
         setGradeFile(null);
-        setGradeGpa("");
         const fileInput = document.getElementById("grade-file-input") as HTMLInputElement;
         if (fileInput) fileInput.value = "";
         fetchData();
@@ -235,154 +232,164 @@ const Transcript = () => {
         </div>
       </div>
 
-      {/* ข้อมูลนักศึกษา และ สรุปสถิติ */}
-      <div className="grid gap-4 md:grid-cols-3">
-        {/* Card ข้อมูลนักศึกษา */}
-        <Card className="md:col-span-1 shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <GraduationCap className="h-4 w-4 text-primary" />
-              ข้อมูลนักศึกษา
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            <div className="flex justify-between border-b pb-1">
-              <span className="text-muted-foreground">รหัสนักศึกษา</span>
-              <span className="font-semibold">{studentInfo?.student_code || "N/A"}</span>
+      {/* ข้อมูลนักศึกษา และ อาจารย์ที่ปรึกษา */}
+      <div className="grid gap-4 md:grid-cols-2">
+        {/* Card 1: ข้อมูลนักศึกษา */}
+        <Card className="shadow-sm flex flex-col justify-between">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <GraduationCap className="h-5 w-5 text-primary" />
+                ข้อมูลนักศึกษา
+              </CardTitle>
+              <Badge variant="secondary" className="font-normal text-xs">
+                ชั้นปีที่ {studentInfo?.current_year || (studentInfo?.student_code ? calculateAcademicInfo(studentInfo.student_code).yearLevel : "N/A")}
+              </Badge>
             </div>
-            <div className="flex justify-between border-b pb-1">
+          </CardHeader>
+          <CardContent className="space-y-2.5 text-sm pt-0">
+            <div className="flex justify-between border-b pb-2">
+              <span className="text-muted-foreground">รหัสนักศึกษา</span>
+              <span className="font-semibold font-mono">{studentInfo?.student_code || "N/A"}</span>
+            </div>
+            <div className="flex justify-between border-b pb-2">
               <span className="text-muted-foreground">ชื่อ-นามสกุล</span>
               <span className="font-semibold">{studentInfo?.student_name || "N/A"}</span>
             </div>
-            <div className="flex justify-between border-b pb-1">
+            <div className="flex justify-between border-b pb-2">
               <span className="text-muted-foreground">คณะ</span>
               <span className="font-semibold">{studentInfo?.faculty || "N/A"}</span>
             </div>
-            <div className="flex justify-between border-b pb-1">
+            <div className="flex justify-between border-b pb-2">
               <span className="text-muted-foreground">หลักสูตร/สาขา</span>
-              <span className="font-semibold">{studentInfo?.major || "N/A"}</span>
+              <span className="font-semibold text-right">{studentInfo?.major || "N/A"}</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">ชั้นปีปัจจุบัน</span>
-              <span className="font-semibold">
-                ชั้นปีที่ {studentInfo?.current_year || (studentInfo?.student_code ? calculateAcademicInfo(studentInfo.student_code).yearLevel : "N/A")}
-              </span>
+            <div className="flex justify-between pt-0.5">
+              <span className="text-muted-foreground">สถานะ</span>
+              <Badge variant="outline" className="border-emerald-200 text-emerald-700 bg-emerald-50/60 font-medium text-xs">
+                กำลังศึกษา (ปกติ)
+              </Badge>
             </div>
           </CardContent>
         </Card>
 
-        {/* สรุปจำนวนเอกสารที่อัปโหลด */}
-        <div className="grid gap-4 grid-cols-2 md:col-span-2">
-          <Card className="shadow-sm">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600">
-                  <ClipboardList className="h-6 w-6" />
-                </div>
-                <div>
-                  <p className="text-3xl font-bold">{registrations.length}</p>
-                  <p className="text-xs text-muted-foreground">ใบลงทะเบียนเรียนที่อัปโหลด</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="shadow-sm">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600">
-                  <Award className="h-6 w-6" />
-                </div>
-                <div>
-                  <p className="text-3xl font-bold">{termGrades.length}</p>
-                  <p className="text-xs text-muted-foreground">ใบเกรดประจำเทอมที่อัปโหลด</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      {/* อาจารย์ผู้ดูแลคนปัจจุบัน */}
-      <Card className="shadow-sm">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Users className="h-4 w-4 text-primary" />
-            อาจารย์ผู้ดูแลคนปัจจุบัน
-          </CardTitle>
-          <CardDescription className="text-xs">
-            อาจารย์ที่ปรึกษาและอาจารย์ปฏิบัติที่ได้รับมอบหมาย
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 sm:grid-cols-2">
-            {/* อาจารย์ที่ปรึกษา */}
-            <div className="flex items-start gap-3.5 p-3.5 rounded-xl border bg-muted/20">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600">
+        {/* Card 2: อาจารย์ที่ปรึกษา */}
+        <Card className="shadow-sm flex flex-col justify-between">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <UserCheck className="h-5 w-5 text-primary" />
+                อาจารย์ที่ปรึกษา
+              </CardTitle>
+              <Badge variant="outline" className="text-xs px-2 py-0.5 border-blue-200 text-blue-700 bg-blue-50/50">
+                อาจารย์ที่ปรึกษาคนปัจจุบัน
+              </Badge>
+            </div>
+            <CardDescription className="text-xs">
+              อาจารย์ที่ปรึกษาประจำตัวที่ได้รับมอบหมาย
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3 pt-0">
+            {/* กล่องโปรไฟล์อาจารย์ที่ปรึกษา */}
+            <div className="flex items-start gap-3.5 p-3 rounded-xl border bg-muted/20">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 font-bold">
                 <UserCheck className="h-5 w-5" />
               </div>
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium text-muted-foreground">อาจารย์ที่ปรึกษา</span>
-                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-blue-200 text-blue-700 bg-blue-50/50">
-                    คนปัจจุบัน
-                  </Badge>
-                </div>
-                <p className="text-sm font-semibold text-foreground truncate mt-1">
+                <p className="text-sm font-semibold text-foreground truncate">
                   {studentInfo?.advisor_name || "ยังไม่มีข้อมูลอาจารย์ที่ปรึกษา"}
                 </p>
                 {studentInfo?.advisor_email ? (
                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1">
-                    <Mail className="h-3 w-3 shrink-0" />
+                    <Mail className="h-3.5 w-3.5 shrink-0" />
                     <span className="truncate">{studentInfo.advisor_email}</span>
                   </div>
                 ) : (
-                  <p className="text-xs text-muted-foreground mt-1">บทบาท: ดูแลให้คำปรึกษาแผนการเรียน</p>
+                  <p className="text-xs text-muted-foreground mt-1">บทบาท: ดูแลและให้คำปรึกษาแผนการเรียน</p>
                 )}
               </div>
             </div>
 
-            {/* อาจารย์ปฏิบัติ */}
-            <div className="flex items-start gap-3.5 p-3.5 rounded-xl border bg-muted/20">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600">
-                <Stethoscope className="h-5 w-5" />
+            {/* ข้อมูลบทบาทและคำแนะนำการติดต่อ */}
+            <div className="space-y-2 text-xs text-muted-foreground pt-1">
+              <div className="flex justify-between border-b pb-1.5">
+                <span>บทบาทหน้าที่</span>
+                <span className="text-foreground font-medium text-right">ดูแลและให้คำปรึกษาแผนการเรียน</span>
               </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium text-muted-foreground">อาจารย์ปฏิบัติ</span>
-                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-emerald-200 text-emerald-700 bg-emerald-50/50">
-                    คนปัจจุบัน
-                  </Badge>
-                </div>
-                <p className="text-sm font-semibold text-foreground truncate mt-1">
-                  {studentInfo?.practical_advisor_name || "ยังไม่มีข้อมูลอาจารย์ปฏิบัติ"}
-                </p>
-                {studentInfo?.practical_advisor_email ? (
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1">
-                    <Mail className="h-3 w-3 shrink-0" />
-                    <span className="truncate">{studentInfo.practical_advisor_email}</span>
-                  </div>
-                ) : (
-                  <p className="text-xs text-muted-foreground mt-1">บทบาท: ดูแลการฝึกปฏิบัติงานและการประเมินทักษะ</p>
-                )}
+              <div className="flex justify-between border-b pb-1.5">
+                <span>สังกัด</span>
+                <span className="text-foreground font-medium">{studentInfo?.faculty || "คณะพยาบาลศาสตร์"}</span>
+              </div>
+              <div className="flex justify-between pt-0.5">
+                <span>การติดต่อ</span>
+                <span className="text-foreground font-medium">ติดต่อทางอีเมลหรือเวลาให้คำปรึกษา</span>
               </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* การ์ดสรุปเอกสารการศึกษา 2 กล่องกะทัดรัด (แยกเป็นสัดส่วนชัดเจน) */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Card className="shadow-sm border-l-4 border-l-blue-500 hover:shadow transition-shadow">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3.5">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600">
+                <ClipboardList className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground font-medium">ใบลงทะเบียนเรียน</p>
+                <div className="flex items-baseline gap-1.5 mt-0.5">
+                  <span className="text-2xl font-bold tracking-tight">{registrations.length}</span>
+                  <span className="text-xs text-muted-foreground">ฉบับในระบบ</span>
+                </div>
+              </div>
+            </div>
+            <Badge variant="outline" className="text-xs border-blue-200 text-blue-700 bg-blue-50/50 font-normal">
+              หมวดที่ 1
+            </Badge>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm border-l-4 border-l-emerald-500 hover:shadow transition-shadow">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3.5">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600">
+                <Award className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground font-medium">ใบเกรดประจำเทอม</p>
+                <div className="flex items-baseline gap-1.5 mt-0.5">
+                  <span className="text-2xl font-bold tracking-tight">{termGrades.length}</span>
+                  <span className="text-xs text-muted-foreground">ฉบับในระบบ</span>
+                </div>
+              </div>
+            </div>
+            <Badge variant="outline" className="text-xs border-emerald-200 text-emerald-700 bg-emerald-50/50 font-normal">
+              หมวดที่ 2
+            </Badge>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* ---------------------------------------------------- */}
       {/* หมวดที่ 1: อัปโหลดใบการลงทะเบียนเรียน */}
       {/* ---------------------------------------------------- */}
       <Card className="shadow-sm">
         <CardHeader>
-          <div className="flex flex-col gap-1">
-            <CardTitle className="text-base flex items-center gap-2">
-              <ClipboardList className="h-5 w-5 text-blue-600" />
-              ใบการลงทะเบียนเรียน
-            </CardTitle>
-            <CardDescription className="text-xs">
-              อัปโหลดเอกสารใบลงทะเบียนเรียนของแต่ละภาคเรียน พร้อมระบุจำนวนวิชาที่ลงทะเบียน
-            </CardDescription>
+          <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-1">
+              <CardTitle className="text-base flex items-center gap-2">
+                <ClipboardList className="h-5 w-5 text-blue-600" />
+                ใบการลงทะเบียนเรียน
+              </CardTitle>
+              <CardDescription className="text-xs">
+                อัปโหลดเอกสารใบลงทะเบียนเรียนของแต่ละภาคเรียน พร้อมระบุจำนวนวิชาที่ลงทะเบียน
+              </CardDescription>
+            </div>
+            <Badge variant="outline" className="text-xs px-2.5 py-1 border-blue-200 text-blue-700 bg-blue-50/60 font-medium">
+              อัปโหลดแล้ว {registrations.length} ฉบับ
+            </Badge>
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -520,14 +527,19 @@ const Transcript = () => {
       {/* ---------------------------------------------------- */}
       <Card className="shadow-sm">
         <CardHeader>
-          <div className="flex flex-col gap-1">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Award className="h-5 w-5 text-emerald-600" />
-              รายงานผลการเรียน (เกรดแต่ละเทอม)
-            </CardTitle>
-            <CardDescription className="text-xs">
-              อัปโหลดเอกสารใบรายงานผลการเรียน หรือเกรดของแต่ละภาคเรียน
-            </CardDescription>
+          <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-1">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Award className="h-5 w-5 text-emerald-600" />
+                รายงานผลการเรียน (เกรดแต่ละเทอม)
+              </CardTitle>
+              <CardDescription className="text-xs">
+                อัปโหลดเอกสารใบรายงานผลการเรียน หรือเกรดของแต่ละภาคเรียน
+              </CardDescription>
+            </div>
+            <Badge variant="outline" className="text-xs px-2.5 py-1 border-emerald-200 text-emerald-700 bg-emerald-50/60 font-medium">
+              อัปโหลดแล้ว {termGrades.length} ฉบับ
+            </Badge>
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -537,7 +549,7 @@ const Transcript = () => {
               <Upload className="h-4 w-4 text-primary" />
               เพิ่มผลการเรียนประจำเทอม
             </h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
               <div className="space-y-1.5">
                 <Label htmlFor="grade-year">ปีการศึกษา (พ.ศ.)</Label>
                 <Input
@@ -560,19 +572,6 @@ const Transcript = () => {
                     <SelectItem value="3">ภาคฤดูร้อน</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="grade-gpa">เกรดเฉลี่ย (GPA เทอมนี้ - ถ้ามี)</Label>
-                <Input
-                  id="grade-gpa"
-                  type="number"
-                  step="0.01"
-                  min="0.00"
-                  max="4.00"
-                  placeholder="เช่น 3.50"
-                  value={gradeGpa}
-                  onChange={(e) => setGradeGpa(e.target.value)}
-                />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="grade-file-input">ไฟล์ใบเกรด (PDF/รูป)</Label>
@@ -602,9 +601,8 @@ const Transcript = () => {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/40">
-                  <TableHead className="w-[120px]">ปีการศึกษา</TableHead>
-                  <TableHead className="w-[140px]">ภาคเรียน</TableHead>
-                  <TableHead className="text-center w-[160px]">เกรดเฉลี่ย (GPA)</TableHead>
+                  <TableHead className="w-[140px]">ปีการศึกษา</TableHead>
+                  <TableHead className="w-[160px]">ภาคเรียน</TableHead>
                   <TableHead>วันที่อัปโหลด</TableHead>
                   <TableHead className="text-center w-[140px]">เอกสาร</TableHead>
                   <TableHead className="text-right w-[100px]">จัดการ</TableHead>
@@ -617,15 +615,6 @@ const Transcript = () => {
                       <TableCell className="font-semibold">{item.academic_year}</TableCell>
                       <TableCell>
                         {item.semester === "3" ? "ภาคฤดูร้อน" : `ภาคเรียนที่ ${item.semester}`}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {item.gpa !== null && item.gpa !== undefined && item.gpa !== "" ? (
-                          <Badge className="bg-emerald-500 text-white font-mono">
-                            {Number(item.gpa).toFixed(2)}
-                          </Badge>
-                        ) : (
-                          <span className="text-muted-foreground text-xs">-</span>
-                        )}
                       </TableCell>
                       <TableCell className="text-muted-foreground text-xs">
                         {new Date(item.uploaded_at).toLocaleDateString("th-TH")}
@@ -653,7 +642,7 @@ const Transcript = () => {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                       ยังไม่มีรายการใบรายงานผลการเรียน/เกรด
                     </TableCell>
                   </TableRow>

@@ -5,6 +5,7 @@ require_once __DIR__ . '/../../../config/audit_helper.php';
 require_once __DIR__ . '/user_status_helpers.php';
 require_once __DIR__ . '/../../../config/academic_helper.php';
 require_once __DIR__ . '/../../../config/name_validation.php';
+require_once __DIR__ . '/../../../config/student_license_helper.php';
 header('Access-Control-Allow-Origin: ' . (in_array($_SERVER['HTTP_ORIGIN'] ?? '', ['http://localhost:5173', 'http://127.0.0.1:5173'], true) ? ($_SERVER['HTTP_ORIGIN'] ?? '') : 'http://localhost:5173'));
 header('Vary: Origin');
 header("Access-Control-Allow-Credentials: true");
@@ -462,11 +463,13 @@ try {
             $input = [
                 'user_id' => $_POST['user_id'] ?? null,
                 'action' => $_POST['action'] ?? null,
-                'details' => parseRequestDetails($_POST['details'] ?? [])
+                'details' => parseRequestDetails($_POST['details'] ?? []),
+                'pdfLinks' => parseRequestDetails($_POST['pdfLinks'] ?? [])
             ];
         } else {
             $input = json_decode(file_get_contents("php://input"), true) ?: [];
             $input['details'] = parseRequestDetails($input['details'] ?? []);
+            $input['pdfLinks'] = parseRequestDetails($input['pdfLinks'] ?? []);
         }
         $id = $input['user_id'] ?? $input['id'] ?? null;
         if (!$id) throw new Exception("ข้อมูลไม่ครบถ้วน");
@@ -659,8 +662,102 @@ try {
                 }
             }
 
-            // ผู้ดูแลระบบแก้ข้อมูลนักศึกษาได้เฉพาะ "สถานะ" (และเหตุผลของสถานะ) เท่านั้น
-            // ข้อมูลอื่นทั้งหมดนักศึกษากรอกเอง หรือระบบคำนวณให้
+            // ผู้ดูแลระบบจัดการข้อมูลการสอบใบประกอบวิชาชีพ
+            studentLicenseEnsureSchema($db);
+
+            $rawDetails = $input['details'] ?? [];
+
+            $licenseFirstPassed = array_key_exists('license_first_attempt_passed', $rawDetails)
+                ? studentLicenseBool($rawDetails['license_first_attempt_passed'])
+                : (int)($currentDetails['license_first_attempt_passed'] ?? 0) === 1;
+
+            $licenseWithinYearPassed = array_key_exists('license_within_one_year_passed', $rawDetails)
+                ? studentLicenseBool($rawDetails['license_within_one_year_passed'])
+                : (int)($currentDetails['license_within_one_year_passed'] ?? 0) === 1;
+
+            $licenseFirstPassedAt = null;
+            if ($licenseFirstPassed) {
+                $rawFirstDate = !empty($rawDetails['license_first_attempt_passed_at']) ? trim((string)$rawDetails['license_first_attempt_passed_at']) : null;
+                if ($rawFirstDate) {
+                    $licenseFirstPassedAt = strlen($rawFirstDate) === 10 ? $rawFirstDate . ' 00:00:00' : $rawFirstDate;
+                } else {
+                    $licenseFirstPassedAt = !empty($currentDetails['license_first_attempt_passed_at'])
+                        ? $currentDetails['license_first_attempt_passed_at']
+                        : date('Y-m-d H:i:s');
+                }
+            }
+
+            $licenseWithinYearPassedAt = null;
+            if ($licenseWithinYearPassed) {
+                $rawWithinDate = !empty($rawDetails['license_within_one_year_passed_at']) ? trim((string)$rawDetails['license_within_one_year_passed_at']) : null;
+                if ($rawWithinDate) {
+                    $licenseWithinYearPassedAt = strlen($rawWithinDate) === 10 ? $rawWithinDate . ' 00:00:00' : $rawWithinDate;
+                } else {
+                    $licenseWithinYearPassedAt = !empty($currentDetails['license_within_one_year_passed_at'])
+                        ? $currentDetails['license_within_one_year_passed_at']
+                        : date('Y-m-d H:i:s');
+                }
+            }
+
+            $licenseFirstFile = studentLicenseUploadedFile('license_first_attempt_evidence');
+            $licenseWithinYearFile = studentLicenseUploadedFile('license_within_one_year_evidence');
+
+            $licenseFirstPath = $licenseFirstPassed ? ($currentDetails['license_first_attempt_evidence_path'] ?? null) : null;
+            $licenseFirstName = $licenseFirstPassed ? ($currentDetails['license_first_attempt_evidence_name'] ?? null) : null;
+
+            if (isset($rawDetails['delete_license_first_attempt_evidence']) && studentLicenseBool($rawDetails['delete_license_first_attempt_evidence'])) {
+                if ($licenseFirstPath) {
+                    studentLicenseDeleteEvidence($licenseFirstPath);
+                }
+                $licenseFirstPath = null;
+                $licenseFirstName = null;
+            } elseif (array_key_exists('license_first_attempt_evidence_path', $rawDetails) && empty($rawDetails['license_first_attempt_evidence_path'])) {
+                if ($licenseFirstPath) {
+                    studentLicenseDeleteEvidence($licenseFirstPath);
+                }
+                $licenseFirstPath = null;
+                $licenseFirstName = null;
+            }
+
+            $licenseWithinYearPath = $licenseWithinYearPassed ? ($currentDetails['license_within_one_year_evidence_path'] ?? null) : null;
+            $licenseWithinYearName = $licenseWithinYearPassed ? ($currentDetails['license_within_one_year_evidence_name'] ?? null) : null;
+
+            if (isset($rawDetails['delete_license_within_one_year_evidence']) && studentLicenseBool($rawDetails['delete_license_within_one_year_evidence'])) {
+                if ($licenseWithinYearPath) {
+                    studentLicenseDeleteEvidence($licenseWithinYearPath);
+                }
+                $licenseWithinYearPath = null;
+                $licenseWithinYearName = null;
+            } elseif (array_key_exists('license_within_one_year_evidence_path', $rawDetails) && empty($rawDetails['license_within_one_year_evidence_path'])) {
+                if ($licenseWithinYearPath) {
+                    studentLicenseDeleteEvidence($licenseWithinYearPath);
+                }
+                $licenseWithinYearPath = null;
+                $licenseWithinYearName = null;
+            }
+
+            $licenseEvidenceUploaded = false;
+            if ($licenseFirstPassed && $licenseFirstFile !== null) {
+                if ($licenseFirstPath) {
+                    studentLicenseDeleteEvidence($licenseFirstPath);
+                }
+                $saved = studentLicenseSaveEvidence($licenseFirstFile, (string)$u_info['username'], 'license_first_attempt');
+                $licenseFirstPath = $saved['path'];
+                $licenseFirstName = $saved['name'];
+                $licenseEvidenceUploaded = true;
+            }
+
+            if ($licenseWithinYearPassed && $licenseWithinYearFile !== null) {
+                if ($licenseWithinYearPath) {
+                    studentLicenseDeleteEvidence($licenseWithinYearPath);
+                }
+                $saved = studentLicenseSaveEvidence($licenseWithinYearFile, (string)$u_info['username'], 'license_within_one_year');
+                $licenseWithinYearPath = $saved['path'];
+                $licenseWithinYearName = $saved['name'];
+                $licenseEvidenceUploaded = true;
+            }
+
+            // ผู้ดูแลระบบแก้ข้อมูลนักศึกษาได้เฉพาะ "สถานะ" (และเหตุผลของสถานะ) และ "ข้อมูลการสอบใบประกอบวิชาชีพ"
             userStatusEnsureSchema($db);
             $statusInput = normalizeUserStatusInput(
                 'student',
@@ -679,13 +776,31 @@ try {
             }
 
             $sql = "UPDATE student SET
-                        status = :status, dropout_date = :dropout_date, dropout_reason = :dropout_reason
+                        status = :status,
+                        dropout_date = :dropout_date,
+                        dropout_reason = :dropout_reason,
+                        license_first_attempt_passed = :license_first_attempt_passed,
+                        license_first_attempt_passed_at = :license_first_attempt_passed_at,
+                        license_first_attempt_evidence_path = :license_first_attempt_evidence_path,
+                        license_first_attempt_evidence_name = :license_first_attempt_evidence_name,
+                        license_within_one_year_passed = :license_within_one_year_passed,
+                        license_within_one_year_passed_at = :license_within_one_year_passed_at,
+                        license_within_one_year_evidence_path = :license_within_one_year_evidence_path,
+                        license_within_one_year_evidence_name = :license_within_one_year_evidence_name
                     WHERE student_id = :sid";
             $stmt = $db->prepare($sql);
             $stmt->execute([
                 ':status' => $statusInput['status'],
                 ':dropout_date' => $dropoutDate,
                 ':dropout_reason' => $statusInput['reason'],
+                ':license_first_attempt_passed' => $licenseFirstPassed ? 1 : 0,
+                ':license_first_attempt_passed_at' => $licenseFirstPassedAt,
+                ':license_first_attempt_evidence_path' => $licenseFirstPath,
+                ':license_first_attempt_evidence_name' => $licenseFirstName,
+                ':license_within_one_year_passed' => $licenseWithinYearPassed ? 1 : 0,
+                ':license_within_one_year_passed_at' => $licenseWithinYearPassedAt,
+                ':license_within_one_year_evidence_path' => $licenseWithinYearPath,
+                ':license_within_one_year_evidence_name' => $licenseWithinYearName,
                 ':sid' => $u_info['username']
             ]);
         } else {
@@ -762,9 +877,9 @@ try {
             ]);
         }
 
-        if ($isMultipart && empty($uploadedDocuments)) {
+        if ($isMultipart && empty($uploadedDocuments) && empty($licenseEvidenceUploaded)) {
             $receivedFields = implode(', ', array_keys($_FILES));
-            throw new Exception("ไม่พบไฟล์ PDF ในคำขออัปโหลด" . ($receivedFields ? " (received: {$receivedFields})" : ""));
+            throw new Exception("ไม่พบไฟล์ในคำขออัปโหลด" . ($receivedFields ? " (received: {$receivedFields})" : ""));
         }
         
         $db->prepare("INSERT INTO audit_log (user_id, action_type, resource, details, ip_address) VALUES (?, 'update', 'ผู้ใช้', ?, ?)")

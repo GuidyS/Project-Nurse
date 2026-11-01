@@ -2,22 +2,31 @@ import React from 'react';
 import { Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-// ปรับ Interface ให้ตรงกับที่ AuditLog.tsx เรียกใช้
 interface ExportButtonProps {
   data?: any[];
-  reportName?: string; // เปลี่ยนจาก filename เป็น reportName
+  reportName?: string;
   className?: string;
+  onExport?: () => void;
+  onClick?: () => void;
 }
 
 const ExportButton: React.FC<ExportButtonProps> = ({ 
   data = [], 
   reportName = "export-data", 
-  className 
+  className,
+  onExport,
+  onClick,
 }) => {
-  
   const handleExport = () => {
+    if (onExport) {
+      onExport();
+      return;
+    }
+    if (onClick) {
+      onClick();
+      return;
+    }
     if (data.length === 0 && reportName === "Audit-Log") {
-       // ถ้าเป็นหน้า Audit Log เราอาจจะอยากแจ้งเตือนผู้ใช้
        console.log("Preparing export for:", reportName);
     }
     alert(`ระบบกำลังเตรียมส่งออกรายงาน: ${reportName}`);
@@ -28,7 +37,7 @@ const ExportButton: React.FC<ExportButtonProps> = ({
       variant="outline" 
       size="sm" 
       onClick={handleExport}
-      className={`flex items-center gap-2 ${className}`}
+      className={`flex items-center gap-2 ${className || ""}`}
     >
       <Download size={16} />
       <span>ส่งออกข้อมูล</span>

@@ -34,6 +34,7 @@ try {
             PDO::ATTR_EMULATE_PREPARES   => false,
         ]
     );
+    $pdo->exec("SET NAMES utf8mb4");
 } catch (PDOException $e) {
     error_log("[Retention] DB Connection Error: " . $e->getMessage());
     http_response_code(500);
@@ -44,38 +45,65 @@ try {
     exit();
 }
 
+require_once __DIR__ . '/../../../config/academic_calendar.php';
+
 /**
- * จัดกลุ่มสถานะนักศึกษาให้สอดคล้องกับ DeanDashboard
- * NULL / Active / Studying → กำลังศึกษา
- * Graduated (+ typo Graduted) → สำเร็จการศึกษา
- * อื่นๆ → พ้นสภาพ/ลาออก
+ * แก้ไขปัญหาฟอนต์อ่านไม่ออก (Mojibake / Double UTF-8 encoding)
+ */
+function fixMojibake(?string $str): string
+{
+    if ($str === null || $str === '') {
+        return '';
+    }
+    // หากพบตัวอักขระ Latin-1 ที่เกิดจาก UTF-8 ถูก double encode (เช่น à¸ หรือ à¹)
+    if (strpos($str, 'à¸') !== false || strpos($str, 'à¹') !== false) {
+        $decoded = @mb_convert_encoding($str, 'ISO-8859-1', 'UTF-8');
+        if ($decoded !== false && mb_check_encoding($decoded, 'UTF-8')) {
+            return $decoded;
+        }
+    }
+    return $str;
+}
+
+/**
+ * แปลงสถานะเป็นภาษาไทยให้ตรงกับ Role Admin (UsersManagement.tsx)
+ * และรองรับทั้งค่าภาษาอังกฤษและภาษาไทยที่อาจมีอยู่ในฐานข้อมูล
+ */
+function getStudentStatusLabel(?string $status): string
+{
+    $normalized = fixMojibake(trim((string)$status));
+    return match ($normalized) {
+        'Active', 'Studying', 'คงอยู่', 'กำลังศึกษา', 'ปกติ', '' => 'คงอยู่',
+        'Graduated', 'Graduted', 'สำเร็จการศึกษา', 'จบการศึกษา' => 'สำเร็จการศึกษา',
+        'OnLeave', 'พักการเรียน' => 'พักการเรียน',
+        'Resigned', 'ลาออก' => 'ลาออก',
+        'Retired', 'Dropout', 'พ้นสภาพ' => 'พ้นสภาพ',
+        default => $normalized
+    };
+}
+
+/**
+ * จัดกลุ่มสถานะนักศึกษาสำหรับสถิติคงอยู่
+ * 'Active' / 'Studying' / 'คงอยู่' / 'กำลังศึกษา' / 'ปกติ' / NULL / '' → studying (คงอยู่)
+ * 'Graduated' / 'Graduted' / 'สำเร็จการศึกษา' / 'จบการศึกษา' → graduated (สำเร็จการศึกษา)
+ * อื่นๆ (OnLeave, Resigned, Retired, Dropout, พ้นสภาพ, ลาออก, พักการเรียน) → dropped (ออกกลางคัน)
  */
 function classifyStudentStatus(?string $status): string
 {
-    $normalized = trim((string)$status);
-    if ($normalized === '' || $normalized === 'Active' || $normalized === 'Studying') {
+    $normalized = fixMojibake(trim((string)$status));
+    if (in_array($normalized, ['', 'Active', 'Studying', 'คงอยู่', 'กำลังศึกษา', 'ปกติ'], true)) {
         return 'studying';
     }
-    if ($normalized === 'Graduated' || $normalized === 'Graduted') {
+    if (in_array($normalized, ['Graduated', 'Graduted', 'สำเร็จการศึกษา', 'จบการศึกษา'], true)) {
         return 'graduated';
     }
     return 'dropped';
 }
 
-function statusLabelTh(string $bucket, ?string $rawStatus = null): string
-{
-    if ($bucket === 'studying') {
-        return 'กำลังศึกษา';
-    }
-    if ($bucket === 'graduated') {
-        return 'สำเร็จการศึกษา';
-    }
-    $raw = trim((string)$rawStatus);
-    return $raw !== '' ? $raw : 'พ้นสภาพ/ลาออก';
-}
-
 try {
-    // 1) สัดส่วนสถานะ (pie chart)
+    $academicYear = currentAcademicYear(null, $pdo);
+
+    // 1) สัดส่วนสถานะ (pie chart) - ใช้ชื่อภาษาไทยตรงกับ Role Admin
     $stmtStatus = $pdo->query("
         SELECT IFNULL(NULLIF(TRIM(status), ''), 'Active') AS status, COUNT(*) AS count
         FROM student
@@ -86,18 +114,16 @@ try {
     $studying = 0;
     $graduated = 0;
     $dropped = 0;
-    $retentionPie = [];
-    $pieBuckets = [
-        'studying' => 0,
-        'graduated' => 0,
-        'dropped' => 0,
-    ];
+    $statusCounts = [];
 
     foreach ($statusRows as $row) {
-        $bucket = classifyStudentStatus($row['status'] ?? null);
+        $raw = $row['status'] ?? '';
+        $label = getStudentStatusLabel($raw);
         $count = (int)$row['count'];
-        $pieBuckets[$bucket] += $count;
+        
+        $statusCounts[$label] = ($statusCounts[$label] ?? 0) + $count;
 
+        $bucket = classifyStudentStatus($raw);
         if ($bucket === 'studying') {
             $studying += $count;
         } elseif ($bucket === 'graduated') {
@@ -107,11 +133,22 @@ try {
         }
     }
 
-    foreach (['studying' => 'กำลังศึกษา', 'graduated' => 'สำเร็จการศึกษา', 'dropped' => 'พ้นสภาพ/ลาออก'] as $key => $label) {
-        if ($pieBuckets[$key] > 0) {
+    $retentionPie = [];
+    $desiredOrder = ['คงอยู่', 'สำเร็จการศึกษา', 'พ้นสภาพ', 'ลาออก', 'พักการเรียน'];
+    foreach ($desiredOrder as $lbl) {
+        if (!empty($statusCounts[$lbl])) {
             $retentionPie[] = [
-                "name"  => $label,
-                "value" => $pieBuckets[$key],
+                "name"  => $lbl,
+                "value" => $statusCounts[$lbl],
+            ];
+            unset($statusCounts[$lbl]);
+        }
+    }
+    foreach ($statusCounts as $lbl => $val) {
+        if ($val > 0) {
+            $retentionPie[] = [
+                "name"  => $lbl,
+                "value" => $val,
             ];
         }
     }
@@ -124,15 +161,16 @@ try {
         ? round($graduated / $totalEnrolled * 100, 1)
         : 0.0;
 
-    // 2) อัตราคงอยู่ตามชั้นปี
+    // 2) อัตราคงอยู่ตามชั้นปี (เฉพาะปี 1 - 4 ตามคำสั่ง: เกิน ปี4 ไม่ต้องดึงมา)
     $stmtByYear = $pdo->query("
         SELECT
-            IFNULL(year_level, 1) AS year_level,
+            year_level,
             IFNULL(NULLIF(TRIM(status), ''), 'Active') AS status,
             COUNT(*) AS count
         FROM student
-        GROUP BY IFNULL(year_level, 1), IFNULL(NULLIF(TRIM(status), ''), 'Active')
-        ORDER BY year_level
+        WHERE year_level BETWEEN 1 AND 4
+        GROUP BY year_level, IFNULL(NULLIF(TRIM(status), ''), 'Active')
+        ORDER BY year_level ASC
     ");
 
     $byYear = [];
@@ -149,49 +187,76 @@ try {
         }
     }
 
+    // สร้างข้อมูลชั้นปี 1 ถึง 4 ให้ครบตามลำดับเสมอ
     $retentionByYearLevel = [];
-    ksort($byYear);
-    foreach ($byYear as $level => $agg) {
-        $total = $agg['total'];
-        $retained = $agg['retained'];
+    for ($level = 1; $level <= 4; $level++) {
+        $agg = $byYear[$level] ?? ['total' => 0, 'retained' => 0];
+        $total = (int)$agg['total'];
+        $retained = (int)$agg['retained'];
+        $cohortYearBE = $academicYear - $level + 1;
+        $cohortCode = substr((string)$cohortYearBE, -2);
         $retentionByYearLevel[] = [
-            "level"    => "ปี " . $level,
-            "total"    => $total,
-            "retained" => $retained,
-            "rate"     => $total > 0 ? round($retained / $total * 100, 1) : 0.0,
+            "level"       => "ปี " . $level,
+            "year"        => $level,
+            "cohortYear"  => $cohortYearBE,
+            "cohortCode"  => $cohortCode,
+            "cohortLabel" => "รหัส " . $cohortCode,
+            "total"       => $total,
+            "retained"    => $retained,
+            "rate"        => $total > 0 ? round($retained / $total * 100, 1) : 0.0,
         ];
     }
 
-    // 3) รายชื่อออกกลางคันล่าสุด (สถานะที่ไม่ใช่กำลังศึกษา/สำเร็จการศึกษา)
+    // 3) รายชื่อออกกลางคันล่าสุด (เฉพาะสถานะที่ไม่ใช่ คงอยู่ หรือ สำเร็จการศึกษา)
     $stmtDropouts = $pdo->query("
         SELECT
             student_id,
             CONCAT(IFNULL(title, ''), IFNULL(first_name_th, ''), ' ', IFNULL(last_name_th, '')) AS name,
             IFNULL(year_level, '-') AS year,
-            status
+            status,
+            dropout_reason,
+            dropout_date
         FROM student
         WHERE status IS NOT NULL
           AND TRIM(status) <> ''
-          AND status NOT IN ('Active', 'Studying', 'Graduated', 'Graduted')
+          AND status NOT IN (
+              'Active', 'Studying', 'Graduated', 'Graduted',
+              'คงอยู่', 'กำลังศึกษา', 'ปกติ',
+              'สำเร็จการศึกษา', 'จบการศึกษา'
+          )
         ORDER BY student_id DESC
-        LIMIT 50
+        LIMIT 100
     ");
 
     $recentDropouts = [];
     foreach ($stmtDropouts->fetchAll() as $row) {
+        $rawStatus = (string)($row['status'] ?? '');
+        $thStatus = getStudentStatusLabel($rawStatus);
+        $reason = fixMojibake(trim((string)($row['dropout_reason'] ?? '')));
+        if ($reason === '') {
+            $reason = '-';
+        }
+        $yearVal = $row['year'];
+        if ($yearVal !== '-' && is_numeric($yearVal)) {
+            $yNum = (int)$yearVal;
+            $yearVal = ($yNum >= 1 && $yNum <= 4) ? $yNum : $yearVal;
+        }
         $recentDropouts[] = [
-            "studentId" => (string)$row['student_id'],
-            "name"      => trim((string)$row['name']),
-            "year"      => $row['year'],
-            "reason"    => statusLabelTh('dropped', $row['status'] ?? null),
+            "studentId"     => (string)$row['student_id'],
+            "name"          => trim((string)$row['name']),
+            "year"          => $yearVal,
+            "status"        => $thStatus,
+            "rawStatus"     => $rawStatus,
+            "reason"        => $reason,
+            "dropout_date"  => $row['dropout_date'] ?? null,
         ];
     }
 
     echo json_encode([
         "status" => "success",
         "data"   => [
+            "academic_year"        => $academicYear,
             "stats" => [
-                // total_students = กำลังศึกษา (หน้า Retention คำนวณคงอยู่ = studying + graduated)
                 "total_students"   => $studying,
                 "total_enrolled"   => $totalEnrolled,
                 "retention_rate"   => $retentionRate,
@@ -199,9 +264,9 @@ try {
                 "dropped"          => $dropped,
                 "graduated"        => $graduated,
             ],
-            "retention"             => $retentionPie,
-            "retentionByYearLevel"  => $retentionByYearLevel,
-            "recentDropouts"        => $recentDropouts,
+            "retention"            => $retentionPie,
+            "retentionByYearLevel" => $retentionByYearLevel,
+            "recentDropouts"       => $recentDropouts,
         ],
     ], JSON_UNESCAPED_UNICODE);
 } catch (PDOException $e) {

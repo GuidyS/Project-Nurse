@@ -1,15 +1,16 @@
-import { useState, useEffect} from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Edit, Trash2, MoreHorizontal, Upload, Users as UsersIcon, CalendarClock, Info, Eye, EyeOff } from "lucide-react";
+import { Loader2, Edit, Trash2, MoreHorizontal, Upload, Users as UsersIcon, CalendarClock, Info, Eye, EyeOff, ShieldCheck, FileText } from "lucide-react";
 import { onlyEnglish, onlyThai } from "@/lib/nameInput";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import api from "@/lib/axios";
@@ -36,16 +37,30 @@ type RoleTab = "teacher" | "student" | "admin" | "unassigned";
 // สถานะที่แอดมินเลือกได้ (ต้องตรงกับ backend/src/components/Admin/ManageUsers/user_status_helpers.php)
 const STUDENT_STATUS_OPTIONS = [
   { value: "Active", label: "คงอยู่" },
+  { value: "Graduated", label: "สำเร็จการศึกษา" },
   { value: "OnLeave", label: "พักการเรียน" },
   { value: "Resigned", label: "ลาออก" },
+  { value: "Retired", label: "พ้นสภาพ" },
 ];
-const STUDENT_STATUS_NEEDS_REASON = ["OnLeave", "Resigned"];
+const STUDENT_STATUS_NEEDS_REASON = ["OnLeave", "Resigned", "Retired"];
 const STUDENT_STATUS_REASONS = ["ปัญหาการเงิน", "ย้ายที่เรียน", "ปัญหาสุขภาพ", "โดนรีไทร์"];
 const FACULTY_STATUS_OPTIONS = [
   { value: "Active", label: "คงอยู่" },
   { value: "Resigned", label: "ลาออก" },
   { value: "Retired", label: "เกษียณ" },
 ];
+
+const normalizeStudentStatusValue = (val?: string) => {
+  if (!val) return "Active";
+  if (STUDENT_STATUS_OPTIONS.some(o => o.value === val)) return val;
+  const match = STUDENT_STATUS_OPTIONS.find(o => o.label === val);
+  return match ? match.value : "Active";
+};
+
+const isStudentStatusReasonNeeded = (val?: string) => {
+  const norm = normalizeStudentStatusValue(val);
+  return STUDENT_STATUS_NEEDS_REASON.includes(norm);
+};
 
 // ช่องที่แอดมินดูได้อย่างเดียว (นักศึกษากรอกเอง หรือระบบคำนวณให้)
 const ReadOnlyField = ({ label, value, note }: { label: string; value?: string | number | null; note?: string }) => (
@@ -55,6 +70,15 @@ const ReadOnlyField = ({ label, value, note }: { label: string; value?: string |
     {note && <p className="text-xs text-muted-foreground">{note}</p>}
   </div>
 );
+
+const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8080").replace(/\/$/, "");
+
+const resolveUploadUrl = (path: unknown, baseUrl: string) => {
+  const raw = String(path ?? "").trim();
+  if (!raw) return "";
+  if (/^https?:\/\//i.test(raw)) return raw;
+  return `${baseUrl}/${raw.replace(/^\//, "")}`;
+};
 
 const calculateBmi = (height?: string | number, weight?: string | number) => {
   const h = parseFloat(String(height ?? ""));
@@ -143,6 +167,10 @@ export default function UsersManagement() {
   const [isDeleteDocOpen, setIsDeleteDocOpen] = useState(false);
   const [isAcademicSettingsOpen, setIsAcademicSettingsOpen] = useState(false);
   const [academicSettings, setAcademicSettings] = useState<AcademicSettings | null>(null);
+  const [licenseFirstEvidenceFile, setLicenseFirstEvidenceFile] = useState<File | null>(null);
+  const [licenseWithinYearEvidenceFile, setLicenseWithinYearEvidenceFile] = useState<File | null>(null);
+  const licenseFirstInputRef = useRef<HTMLInputElement>(null);
+  const licenseWithinYearInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   // ใช้บอกในฟอร์มว่าระบบเลื่อนชั้นปีให้วันไหน
@@ -175,6 +203,8 @@ export default function UsersManagement() {
       setDetailForm({});
       setPdfLinks({});
       setSavedDocuments([]);
+      setLicenseFirstEvidenceFile(null);
+      setLicenseWithinYearEvidenceFile(null);
       const res = await api.get(`/index.php?page=manage-user&id=${userId}`);
       if (res.data.status === "success") {
         setEditingUserRole(res.data.data.role_id);
@@ -193,18 +223,36 @@ export default function UsersManagement() {
     try {
       setIsSaving(true);
 
-      const payload = {
-        user_id: editingUserId,
-        details: detailForm,
-        pdfLinks: pdfLinks
-      };
-
-      await api.post("/index.php?page=manage-user", payload);
+      const hasLicenseFiles = Boolean(licenseFirstEvidenceFile || licenseWithinYearEvidenceFile);
+      if (hasLicenseFiles) {
+        const formData = new FormData();
+        formData.append("user_id", editingUserId || "");
+        formData.append("details", JSON.stringify(detailForm));
+        formData.append("pdfLinks", JSON.stringify(pdfLinks));
+        if (licenseFirstEvidenceFile) {
+          formData.append("license_first_attempt_evidence", licenseFirstEvidenceFile);
+        }
+        if (licenseWithinYearEvidenceFile) {
+          formData.append("license_within_one_year_evidence", licenseWithinYearEvidenceFile);
+        }
+        await api.post("/index.php?page=manage-user", formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+      } else {
+        const payload = {
+          user_id: editingUserId,
+          details: detailForm,
+          pdfLinks: pdfLinks,
+        };
+        await api.post("/index.php?page=manage-user", payload);
+      }
 
       toast({ title: "อัปเดตข้อมูลสำเร็จ" });
       setIsEditDialogOpen(false);
       setPdfLinks({});
       setSavedDocuments([]);
+      setLicenseFirstEvidenceFile(null);
+      setLicenseWithinYearEvidenceFile(null);
       fetchUsers();
     } catch (error: any) {
       toast({
@@ -596,7 +644,7 @@ export default function UsersManagement() {
               <>
                 <div className="col-span-2 flex items-start gap-2 rounded-md border border-primary/30 bg-primary/5 p-3 text-sm">
                   <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                  <span>ข้อมูลของนักศึกษาแก้ไขได้เฉพาะเจ้าของบัญชีในหน้า "ข้อมูลส่วนตัว" ผู้ดูแลระบบเปลี่ยนได้เฉพาะสถานะเท่านั้น</span>
+                  <span>ข้อมูลทั่วไปของนักศึกษาแก้ไขโดยนักศึกษาในหน้าข้อมูลส่วนตัว ผู้ดูแลระบบเป็นผู้จัดการสถานะและข้อมูลการสอบใบประกอบวิชาชีพ</span>
                 </div>
 
                 <ReadOnlyField label="คำนำหน้า" value={detailForm.title} />
@@ -633,12 +681,12 @@ export default function UsersManagement() {
                 <div className="space-y-2">
                   <Label>สถานะ</Label>
                   <Select
-                    value={STUDENT_STATUS_OPTIONS.some(o => o.value === detailForm.status) ? detailForm.status : "Active"}
+                    value={normalizeStudentStatusValue(detailForm.status)}
                     onValueChange={(value) =>
                       setDetailForm({
                         ...detailForm,
                         status: value,
-                        dropout_reason: value === "Active" ? "" : detailForm.dropout_reason,
+                        dropout_reason: (value === "Active" || value === "Graduated") ? "" : detailForm.dropout_reason,
                       })
                     }
                   >
@@ -651,7 +699,7 @@ export default function UsersManagement() {
                   </Select>
                 </div>
 
-                {STUDENT_STATUS_NEEDS_REASON.includes(detailForm.status) && (
+                {isStudentStatusReasonNeeded(detailForm.status) && (
                   <div className="space-y-2">
                     <Label>เหตุผล</Label>
                     <Select
@@ -668,9 +716,272 @@ export default function UsersManagement() {
                   </div>
                 )}
 
-                {STUDENT_STATUS_NEEDS_REASON.includes(detailForm.status) && detailForm.dropout_date && (
+                {isStudentStatusReasonNeeded(detailForm.status) && detailForm.dropout_date && (
                   <ReadOnlyField label="วันที่เปลี่ยนสถานะ" value={detailForm.dropout_date} note="ระบบบันทึกให้อัตโนมัติ" />
                 )}
+
+                {/* 🎯 หมวดข้อมูลการสอบใบประกอบวิชาชีพ (Admin เป็นผู้กรอก) */}
+                <div className="col-span-2 rounded-lg border border-border p-4 space-y-4 bg-muted/10">
+                  <div className="flex items-center gap-2 border-b border-border pb-2">
+                    <ShieldCheck className="h-5 w-5 text-primary" />
+                    <div>
+                      <h4 className="font-semibold text-foreground">ข้อมูลการสอบใบประกอบวิชาชีพ</h4>
+                      <p className="text-xs text-muted-foreground">บันทึกผลการสอบและแนบหลักฐานการสอบใบประกอบวิชาชีพของนักศึกษา</p>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {/* 1. ผ่านใบประกอบวิชาชีพครั้งแรก */}
+                    <div className="rounded-md border border-border bg-card p-4 space-y-3">
+                      <div className="flex items-start gap-3">
+                        <Checkbox
+                          id="admin_license_first_attempt"
+                          checked={detailForm.license_first_attempt_passed === 1 || detailForm.license_first_attempt_passed === true || detailForm.license_first_attempt_passed === "1"}
+                          onCheckedChange={(checked) => {
+                            const isChecked = checked === true;
+                            setDetailForm((prev: any) => ({
+                              ...prev,
+                              license_first_attempt_passed: isChecked ? 1 : 0,
+                              license_first_attempt_passed_at: isChecked
+                                ? (prev.license_first_attempt_passed_at || new Date().toISOString().slice(0, 10))
+                                : "",
+                            }));
+                            if (!isChecked) {
+                              setLicenseFirstEvidenceFile(null);
+                            }
+                          }}
+                        />
+                        <div className="space-y-1">
+                          <Label htmlFor="admin_license_first_attempt" className="font-medium cursor-pointer">
+                            ผ่านใบประกอบวิชาชีพครั้งแรก
+                          </Label>
+                          <p className="text-xs text-muted-foreground">ทำเครื่องหมายเมื่อนักศึกษาสอบผ่านครั้งแรก</p>
+                        </div>
+                      </div>
+
+                      {(detailForm.license_first_attempt_passed === 1 || detailForm.license_first_attempt_passed === true || detailForm.license_first_attempt_passed === "1") && (
+                        <div className="space-y-3 pt-2 border-t border-border/60">
+                          <div className="space-y-1">
+                            <Label className="text-xs">วันที่สอบผ่าน</Label>
+                            <Input
+                              type="date"
+                              value={(detailForm.license_first_attempt_passed_at || "").slice(0, 10)}
+                              onChange={(e) =>
+                                setDetailForm((prev: any) => ({
+                                  ...prev,
+                                  license_first_attempt_passed_at: e.target.value,
+                                }))
+                              }
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label className="text-xs">หลักฐานการสอบผ่าน</Label>
+                            {licenseFirstEvidenceFile ? (
+                              <div className="flex items-center justify-between rounded border bg-muted/40 px-3 py-2 text-xs">
+                                <span className="truncate">ไฟล์ใหม่: {licenseFirstEvidenceFile.name}</span>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 px-2 text-destructive"
+                                  onClick={() => setLicenseFirstEvidenceFile(null)}
+                                >
+                                  ยกเลิก
+                                </Button>
+                              </div>
+                            ) : detailForm.license_first_attempt_evidence_path ? (
+                              <div className="flex items-center justify-between rounded border bg-muted/40 px-3 py-2 text-xs">
+                                <a
+                                  href={resolveUploadUrl(detailForm.license_first_attempt_evidence_path, apiBaseUrl)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1.5 text-primary hover:underline truncate max-w-[180px]"
+                                >
+                                  <FileText className="h-3.5 w-3.5 shrink-0" />
+                                  <span className="truncate">{detailForm.license_first_attempt_evidence_name || "ดูหลักฐานเดิม"}</span>
+                                </a>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 px-2 text-destructive hover:bg-destructive/10"
+                                  onClick={() =>
+                                    setDetailForm((prev: any) => ({
+                                      ...prev,
+                                      license_first_attempt_evidence_path: "",
+                                      license_first_attempt_evidence_name: "",
+                                      delete_license_first_attempt_evidence: true,
+                                    }))
+                                  }
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            ) : null}
+
+                            <div className="flex items-center gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="text-xs h-8 gap-1.5"
+                                onClick={() => licenseFirstInputRef.current?.click()}
+                              >
+                                <Upload className="h-3.5 w-3.5" />
+                                {licenseFirstEvidenceFile || detailForm.license_first_attempt_evidence_path
+                                  ? "เปลี่ยนหลักฐาน"
+                                  : "แนบหลักฐาน (PDF/รูปภาพ)"}
+                              </Button>
+                              <input
+                                ref={licenseFirstInputRef}
+                                type="file"
+                                accept="application/pdf,image/jpeg,image/png"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    if (file.size > 5 * 1024 * 1024) {
+                                      toast({ title: "ไฟล์ต้องมีขนาดไม่เกิน 5 MB", variant: "destructive" });
+                                      return;
+                                    }
+                                    setLicenseFirstEvidenceFile(file);
+                                  }
+                                  e.target.value = "";
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 2. ผ่านใบประกอบวิชาชีพภายใน 1 ปี */}
+                    <div className="rounded-md border border-border bg-card p-4 space-y-3">
+                      <div className="flex items-start gap-3">
+                        <Checkbox
+                          id="admin_license_within_one_year"
+                          checked={detailForm.license_within_one_year_passed === 1 || detailForm.license_within_one_year_passed === true || detailForm.license_within_one_year_passed === "1"}
+                          onCheckedChange={(checked) => {
+                            const isChecked = checked === true;
+                            setDetailForm((prev: any) => ({
+                              ...prev,
+                              license_within_one_year_passed: isChecked ? 1 : 0,
+                              license_within_one_year_passed_at: isChecked
+                                ? (prev.license_within_one_year_passed_at || new Date().toISOString().slice(0, 10))
+                                : "",
+                            }));
+                            if (!isChecked) {
+                              setLicenseWithinYearEvidenceFile(null);
+                            }
+                          }}
+                        />
+                        <div className="space-y-1">
+                          <Label htmlFor="admin_license_within_one_year" className="font-medium cursor-pointer">
+                            ผ่านใบประกอบวิชาชีพภายใน 1 ปี
+                          </Label>
+                          <p className="text-xs text-muted-foreground">ทำเครื่องหมายเมื่อนักศึกษาสอบผ่านภายใน 1 ปี</p>
+                        </div>
+                      </div>
+
+                      {(detailForm.license_within_one_year_passed === 1 || detailForm.license_within_one_year_passed === true || detailForm.license_within_one_year_passed === "1") && (
+                        <div className="space-y-3 pt-2 border-t border-border/60">
+                          <div className="space-y-1">
+                            <Label className="text-xs">วันที่สอบผ่าน</Label>
+                            <Input
+                              type="date"
+                              value={(detailForm.license_within_one_year_passed_at || "").slice(0, 10)}
+                              onChange={(e) =>
+                                setDetailForm((prev: any) => ({
+                                  ...prev,
+                                  license_within_one_year_passed_at: e.target.value,
+                                }))
+                              }
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label className="text-xs">หลักฐานการสอบผ่าน</Label>
+                            {licenseWithinYearEvidenceFile ? (
+                              <div className="flex items-center justify-between rounded border bg-muted/40 px-3 py-2 text-xs">
+                                <span className="truncate">ไฟล์ใหม่: {licenseWithinYearEvidenceFile.name}</span>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 px-2 text-destructive"
+                                  onClick={() => setLicenseWithinYearEvidenceFile(null)}
+                                >
+                                  ยกเลิก
+                                </Button>
+                              </div>
+                            ) : detailForm.license_within_one_year_evidence_path ? (
+                              <div className="flex items-center justify-between rounded border bg-muted/40 px-3 py-2 text-xs">
+                                <a
+                                  href={resolveUploadUrl(detailForm.license_within_one_year_evidence_path, apiBaseUrl)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1.5 text-primary hover:underline truncate max-w-[180px]"
+                                >
+                                  <FileText className="h-3.5 w-3.5 shrink-0" />
+                                  <span className="truncate">{detailForm.license_within_one_year_evidence_name || "ดูหลักฐานเดิม"}</span>
+                                </a>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 px-2 text-destructive hover:bg-destructive/10"
+                                  onClick={() =>
+                                    setDetailForm((prev: any) => ({
+                                      ...prev,
+                                      license_within_one_year_evidence_path: "",
+                                      license_within_one_year_evidence_name: "",
+                                      delete_license_within_one_year_evidence: true,
+                                    }))
+                                  }
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            ) : null}
+
+                            <div className="flex items-center gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="text-xs h-8 gap-1.5"
+                                onClick={() => licenseWithinYearInputRef.current?.click()}
+                              >
+                                <Upload className="h-3.5 w-3.5" />
+                                {licenseWithinYearEvidenceFile || detailForm.license_within_one_year_evidence_path
+                                  ? "เปลี่ยนหลักฐาน"
+                                  : "แนบหลักฐาน (PDF/รูปภาพ)"}
+                              </Button>
+                              <input
+                                ref={licenseWithinYearInputRef}
+                                type="file"
+                                accept="application/pdf,image/jpeg,image/png"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    if (file.size > 5 * 1024 * 1024) {
+                                      toast({ title: "ไฟล์ต้องมีขนาดไม่เกิน 5 MB", variant: "destructive" });
+                                      return;
+                                    }
+                                    setLicenseWithinYearEvidenceFile(file);
+                                  }
+                                  e.target.value = "";
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
                 <PdfUploadSection description="ไฟล์จะถูกบันทึกเป็นรายการ Portfolio ของนักศึกษา และแสดงในหน้าโปรไฟล์" />
               </>
             )}
