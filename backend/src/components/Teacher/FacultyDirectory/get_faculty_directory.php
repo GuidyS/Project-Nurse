@@ -12,6 +12,9 @@ if (session_status() === PHP_SESSION_NONE) {
 
 require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/faculty_directory_helpers.php';
+// ใช้ตัวสร้างรายการเอกสาร/รูปโปรไฟล์ชุดเดียวกับหน้า "ข้อมูลส่วนตัว"
+// ข้อมูลที่คณบดีเห็นจะได้ตรงกับที่เจ้าตัวเห็นเป๊ะ ๆ
+require_once __DIR__ . '/../../ProfilePage/faculty_profile_helpers.php';
 
 header("Content-Type: application/json; charset=UTF-8");
 
@@ -52,43 +55,43 @@ try {
     $requestedId = trim((string)($_GET['faculty_id'] ?? ''));
 
     // ---------- รายละเอียดรายบุคคล ----------
+    // ส่งข้อมูลรูปแบบเดียวกับ endpoint "profile" ทุกประการ หน้าเว็บจะได้ใช้
+    // component เดียวกับหน้า "ข้อมูลส่วนตัว" ซ้ำได้เลย แค่สลับเป็นโหมดดูอย่างเดียว
     if ($requestedId !== '') {
         $stmt = $db->prepare("SELECT * FROM faculty WHERE faculty_id = :fid LIMIT 1");
         $stmt->execute([':fid' => $requestedId]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        $profile = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        if (!$row) {
+        if (!$profile) {
             http_response_code(404);
             echo json_encode(["status" => "error", "message" => "ไม่พบข้อมูลบุคลากรที่ระบุ"], JSON_UNESCAPED_UNICODE);
             exit;
         }
 
-        $facultyId = (string)$row['faculty_id'];
-        $picture = facultyDirectoryResolveFile($row['profile_picture'] ?? null);
+        $facultyId = (string)$profile['faculty_id'];
+
+        $profile['pdf_documents'] = buildFacultyDocuments($db, $profile);
+
+        $stmtWL = $db->prepare("SELECT * FROM faculty_teaching_workloads WHERE faculty_id = :id ORDER BY uploaded_at DESC");
+        $stmtWL->execute([':id' => $facultyId]);
+        $profile['teaching_workloads'] = $stmtWL->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        $stmtPD = $db->prepare("SELECT * FROM faculty_personnel_development WHERE faculty_id = :id ORDER BY training_date DESC");
+        $stmtPD->execute([':id' => $facultyId]);
+        $profile['personnel_developments'] = $stmtPD->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        $profile['profile_picture_url'] = !empty($profile['profile_picture'])
+            ? resolveFacultyProfilePictureUrl((string)$profile['profile_picture'], $facultyId)
+            : null;
+
+        // ข้อมูลเสริมที่หน้าทำเนียบใช้ แต่ของ endpoint profile ไม่มี
+        $profile['username']  = $facultyId;
+        $profile['positions'] = $positionsByFaculty[$facultyId] ?? [];
 
         echo json_encode([
             "status" => "success",
-            "data"   => [
-                "faculty_id"         => $facultyId,
-                "name"               => facultyDirectoryFullName($row),
-                "title"              => $row['title'] ?? null,
-                "first_name_th"      => $row['first_name_th'] ?? null,
-                "last_name_th"       => $row['last_name_th'] ?? null,
-                "name_en"            => trim(($row['first_name_en'] ?? '') . ' ' . ($row['last_name_en'] ?? '')) ?: null,
-                "gender"             => $row['gender'] ?? null,
-                "birth_date"         => $row['birth_date'] ?? null,
-                "email"              => $row['email'] ?? null,
-                "phone"              => $row['phone'] ?? null,
-                "current_address"    => $row['current_address'] ?? null,
-                "positions"          => $positionsByFaculty[$facultyId] ?? [],
-                "status"             => $row['status'] ?? null,
-                "start_work_date"    => $row['start_work_date'] ?? null,
-                "academic_position_date" => $row['academic_position_date'] ?? null,
-                "nursing_council_no" => $row['nursing_council_no'] ?? null,
-                "license_expiry"     => $row['license_expiry'] ?? null,
-                "profile_picture"    => $picture['url'] ?? null,
-                "documents"          => facultyDirectoryDocuments($db, $row),
-            ],
+            "role"   => "teacher",
+            "data"   => $profile,
         ], JSON_UNESCAPED_UNICODE);
         exit;
     }

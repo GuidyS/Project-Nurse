@@ -83,7 +83,18 @@ export const calculateAcademicInfo = (studentIdOrEntryYear: string | number) => 
   };
 };
 
-export default function ProfilePage() {
+/**
+ * หน้าข้อมูลส่วนตัว
+ *
+ * ใช้ได้ 2 แบบ
+ *   - ไม่ส่ง props : โปรไฟล์ของผู้ใช้ที่ล็อกอินอยู่ แก้ไขได้ตามปกติ
+ *   - ส่ง facultyId + readOnly : เปิดดูโปรไฟล์ของบุคลากรคนอื่น (หน้า "บุคลากรภายในคณะ")
+ *     ซ่อนปุ่มแก้ไข ฟอร์มอัปโหลด และปุ่มลบทั้งหมด
+ */
+export default function ProfilePage({
+  facultyId,
+  readOnly = false,
+}: { facultyId?: string; readOnly?: boolean } = {}) {
   const [userRole, setUserRole] = useState<"student" | "teacher" | null>(null);
   const [profileData, setProfileData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -104,7 +115,10 @@ export default function ProfilePage() {
   const fetchProfile = async () => {
     try {
       setLoading(true);
-      const res = await api.get("/index.php?page=profile");
+      const endpoint = facultyId
+        ? `/index.php?page=faculty-directory&faculty_id=${encodeURIComponent(facultyId)}`
+        : "/index.php?page=profile";
+      const res = await api.get(endpoint);
       if (res.data.status === "success") {
         setUserRole(res.data.role);
         setProfileData(res.data.data);
@@ -118,7 +132,8 @@ export default function ProfilePage() {
 
   useEffect(() => {
     fetchProfile();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [facultyId]);
 
   // สร้าง/คืนหน่วยความจำรูปตัวอย่างเมื่อเปลี่ยนรูป
   useEffect(() => {
@@ -347,14 +362,17 @@ export default function ProfilePage() {
       <div className="app-page-header">
         <div>
           <h1 className="app-page-title">ข้อมูลส่วนตัว</h1>
-          <p className="app-page-description">ตรวจสอบและจัดการข้อมูลส่วนตัวของคุณ</p>
+          <p className="app-page-description">
+            {readOnly ? "ดูข้อมูลส่วนตัวของบุคลากร (ดูได้อย่างเดียว แก้ไขไม่ได้)" : "ตรวจสอบและจัดการข้อมูลส่วนตัวของคุณ"}
+          </p>
         </div>
       </div>
       
       {/* 🎯 ส่วนหัว Card ข้อมูลส่วนตัว */}
       <div className="bg-card rounded-2xl shadow-lg p-8 relative">
+        {/* โหมดดูอย่างเดียวไม่สร้างปุ่มแก้ไขเลย ไม่ใช่แค่ซ่อนด้วย CSS */}
         <div className="absolute top-6 right-6">
-          <Button 
+          {!readOnly && <Button 
             size="sm" 
             className="gap-2" 
             onClick={() => { 
@@ -372,7 +390,7 @@ export default function ProfilePage() {
           >
             <Edit className="h-4 w-4" />
             แก้ไขข้อมูล
-          </Button>
+          </Button>}
         </div>
 
         <div className="flex flex-col md:flex-row items-center gap-8">
@@ -442,11 +460,11 @@ export default function ProfilePage() {
                 <PdfDocumentsSection documents={pdfDocuments} />
 
                 <div className="md:col-span-2 border-t border-border pt-6 mt-2">
-                  <WorkloadsSection workloads={profileData.teaching_workloads || []} onUpdate={fetchProfile} />
+                  <WorkloadsSection workloads={profileData.teaching_workloads || []} onUpdate={fetchProfile} readOnly={readOnly} />
                 </div>
                 
                 <div className="md:col-span-2 border-t border-border pt-6 mt-2">
-                  <PersonnelDevelopmentsSection developments={profileData.personnel_developments || []} onUpdate={fetchProfile} />
+                  <PersonnelDevelopmentsSection developments={profileData.personnel_developments || []} onUpdate={fetchProfile} readOnly={readOnly} />
                 </div>
               </>
             ) : (
@@ -1351,7 +1369,7 @@ const PdfDocumentsSection = ({ documents }: { documents: any[] }) => {
   );
 };
 
-const WorkloadsSection = ({ workloads, onUpdate }: { workloads: any[], onUpdate: () => void }) => {
+const WorkloadsSection = ({ workloads, onUpdate, readOnly = false }: { workloads: any[], onUpdate: () => void, readOnly?: boolean }) => {
   const [academicYear, setAcademicYear] = useState("");
   const [term, setTerm] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -1412,17 +1430,19 @@ const WorkloadsSection = ({ workloads, onUpdate }: { workloads: any[], onUpdate:
       <div className="flex items-center gap-2 mb-4">
         <h3 className="font-semibold text-foreground text-base">ภาระงานสอน</h3>
       </div>
-      <div className="bg-muted/20 p-4 rounded-xl border border-border space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Input placeholder="ปีการศึกษา เช่น 2566" value={academicYear} onChange={(e) => setAcademicYear(e.target.value)} />
-          <Input placeholder="เทอม เช่น 1" value={term} onChange={(e) => setTerm(e.target.value)} />
-          <Input type="file" accept=".xls,.xlsx,.csv,.pdf,.doc,.docx" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+      {!readOnly && (
+        <div className="bg-muted/20 p-4 rounded-xl border border-border space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Input placeholder="ปีการศึกษา เช่น 2566" value={academicYear} onChange={(e) => setAcademicYear(e.target.value)} />
+            <Input placeholder="เทอม เช่น 1" value={term} onChange={(e) => setTerm(e.target.value)} />
+            <Input type="file" accept=".xls,.xlsx,.csv,.pdf,.doc,.docx" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+          </div>
+          <Button onClick={handleUpload} disabled={uploading}>
+            {uploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+            อัปโหลดภาระงานสอน
+          </Button>
         </div>
-        <Button onClick={handleUpload} disabled={uploading}>
-          {uploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
-          อัปโหลดภาระงานสอน
-        </Button>
-      </div>
+      )}
       {workloads && workloads.length > 0 && (
         <Table>
           <TableHeader>
@@ -1443,18 +1463,23 @@ const WorkloadsSection = ({ workloads, onUpdate }: { workloads: any[], onUpdate:
                   <Button variant="outline" size="sm" asChild>
                     <a href={`${apiBaseUrl}/${w.file_path}`} target="_blank" rel="noopener noreferrer"><Download className="h-4 w-4" /></a>
                   </Button>
-                  <Button variant="destructive" size="sm" onClick={() => handleDelete(w.id)}><Trash2 className="h-4 w-4" /></Button>
+                  {!readOnly && (
+                    <Button variant="destructive" size="sm" onClick={() => handleDelete(w.id)}><Trash2 className="h-4 w-4" /></Button>
+                  )}
                 </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       )}
+      {readOnly && (!workloads || workloads.length === 0) && (
+        <p className="text-sm text-muted-foreground">ยังไม่มีข้อมูลภาระงานสอนในระบบ</p>
+      )}
     </div>
   );
 };
 
-const PersonnelDevelopmentsSection = ({ developments, onUpdate }: { developments: any[], onUpdate: () => void }) => {
+const PersonnelDevelopmentsSection = ({ developments, onUpdate, readOnly = false }: { developments: any[], onUpdate: () => void, readOnly?: boolean }) => {
   const [trainingDate, setTrainingDate] = useState("");
   const [trainingTopic, setTrainingTopic] = useState("");
   const [learnings, setLearnings] = useState("");
@@ -1518,30 +1543,32 @@ const PersonnelDevelopmentsSection = ({ developments, onUpdate }: { developments
       <div className="flex items-center gap-2 mb-4">
         <h3 className="font-semibold text-foreground text-base">การพัฒนาบุคลากร</h3>
       </div>
-      <div className="bg-muted/20 p-4 rounded-xl border border-border space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>วันที่อบรม</Label>
-            <Input type="date" value={trainingDate} onChange={(e) => setTrainingDate(e.target.value)} />
+      {!readOnly && (
+        <div className="bg-muted/20 p-4 rounded-xl border border-border space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>วันที่อบรม</Label>
+              <Input type="date" value={trainingDate} onChange={(e) => setTrainingDate(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>หัวข้ออบรม/พัฒนาบุคลากร</Label>
+              <Input placeholder="กรอกหัวข้อ" value={trainingTopic} onChange={(e) => setTrainingTopic(e.target.value)} />
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <Label>สิ่งที่ได้จากการอบรม</Label>
+              <Textarea placeholder="กรอกรายละเอียด..." value={learnings} onChange={(e) => setLearnings(e.target.value)} rows={2} />
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <Label>อัปโหลดรูปเกียรติบัตร (ถ้ามี)</Label>
+              <Input type="file" accept=".jpg,.jpeg,.png,.webp,.pdf" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+            </div>
           </div>
-          <div className="space-y-2">
-            <Label>หัวข้ออบรม/พัฒนาบุคลากร</Label>
-            <Input placeholder="กรอกหัวข้อ" value={trainingTopic} onChange={(e) => setTrainingTopic(e.target.value)} />
-          </div>
-          <div className="space-y-2 md:col-span-2">
-            <Label>สิ่งที่ได้จากการอบรม</Label>
-            <Textarea placeholder="กรอกรายละเอียด..." value={learnings} onChange={(e) => setLearnings(e.target.value)} rows={2} />
-          </div>
-          <div className="space-y-2 md:col-span-2">
-            <Label>อัปโหลดรูปเกียรติบัตร (ถ้ามี)</Label>
-            <Input type="file" accept=".jpg,.jpeg,.png,.webp,.pdf" onChange={(e) => setFile(e.target.files?.[0] || null)} />
-          </div>
+          <Button onClick={handleUpload} disabled={uploading}>
+            {uploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+            บันทึกการพัฒนาบุคลากร
+          </Button>
         </div>
-        <Button onClick={handleUpload} disabled={uploading}>
-          {uploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
-          บันทึกการพัฒนาบุคลากร
-        </Button>
-      </div>
+      )}
       {developments && developments.length > 0 && (
         <Table>
           <TableHeader>
@@ -1567,12 +1594,17 @@ const PersonnelDevelopmentsSection = ({ developments, onUpdate }: { developments
                   ) : "-"}
                 </TableCell>
                 <TableCell className="text-right">
-                  <Button variant="destructive" size="sm" onClick={() => handleDelete(d.id)}><Trash2 className="h-4 w-4" /></Button>
+                  {!readOnly && (
+                    <Button variant="destructive" size="sm" onClick={() => handleDelete(d.id)}><Trash2 className="h-4 w-4" /></Button>
+                  )}
                 </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
+      )}
+      {readOnly && (!developments || developments.length === 0) && (
+        <p className="text-sm text-muted-foreground">ยังไม่มีข้อมูลการพัฒนาบุคลากรในระบบ</p>
       )}
     </div>
   );
