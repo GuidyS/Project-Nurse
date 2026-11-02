@@ -5,11 +5,9 @@ import {
   BookOpenCheck,
   ChevronRight,
   FlaskConical,
-  Landmark,
   Loader2,
   RefreshCw,
   Search,
-  Sparkles,
   UserRoundCheck,
   Users,
 } from "lucide-react";
@@ -93,6 +91,7 @@ interface FacultyWorkload {
   };
   academic_service: ProjectWorkload;
   culture: ProjectWorkload;
+  projects: { total: number; categories: Record<string, number>; records: ProjectRecord[] };
 }
 
 interface WorkloadData {
@@ -111,6 +110,7 @@ interface WorkloadData {
     };
     academic_service: { projects: number; items: number; faculty: number };
     culture: { projects: number; items: number; faculty: number };
+    projects: { total: number; faculty: number; categories: Record<string, number> };
   };
   faculty: FacultyWorkload[];
 }
@@ -349,7 +349,7 @@ export default function FacultyWorkloadDashboard() {
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <SummaryMetric
           icon={BookOpenCheck}
           title="การเรียนการสอน"
@@ -381,31 +381,16 @@ export default function FacultyWorkloadDashboard() {
         />
         <SummaryMetric
           icon={Users}
-          title="บริการวิชาการ"
-          value={`${formatNumber(data.summary.academic_service.projects)} โครงการ`}
-          detail={`${formatNumber(data.summary.academic_service.items)} โครงการ/กิจกรรม · ผู้รับผิดชอบ ${data.summary.academic_service.faculty} คน`}
+          title="ภาระงานโครงการ"
+          value={`${formatNumber(data.summary.projects.total)} โครงการ`}
+          detail={`ครบ 6 ประเภท · ผู้รับผิดชอบ ${data.summary.projects.faculty} คน`}
           tone="bg-amber-500/10 text-amber-600 dark:text-amber-400"
           barTone="bg-amber-500/80 group-hover:bg-amber-500"
           bars={[
-            { label: "โครงการ", value: data.summary.academic_service.projects },
-            { label: "ทุกรายการ", value: data.summary.academic_service.items },
-            { label: "ผู้รับผิดชอบ", value: data.summary.academic_service.faculty },
+            { label: "โครงการ", value: data.summary.projects.total },
+            { label: "ผู้รับผิดชอบ", value: data.summary.projects.faculty },
           ]}
-          page="dean-academic-service-workload"
-        />
-        <SummaryMetric
-          icon={Landmark}
-          title="ทำนุบำรุงศิลปวัฒนธรรม"
-          value={`${formatNumber(data.summary.culture.projects)} โครงการ`}
-          detail={`${formatNumber(data.summary.culture.items)} โครงการ/กิจกรรม · ผู้รับผิดชอบ ${data.summary.culture.faculty} คน`}
-          tone="bg-rose-500/10 text-rose-600 dark:text-rose-400"
-          barTone="bg-rose-500/80 group-hover:bg-rose-500"
-          bars={[
-            { label: "โครงการ", value: data.summary.culture.projects },
-            { label: "ทุกรายการ", value: data.summary.culture.items },
-            { label: "ผู้รับผิดชอบ", value: data.summary.culture.faculty },
-          ]}
-          page="dean-culture-workload"
+          page="dean-project-workload"
         />
       </div>
 
@@ -461,8 +446,7 @@ export default function FacultyWorkloadDashboard() {
                   <TableHead className="w-[260px]">อาจารย์</TableHead>
                   <TableHead>การสอน</TableHead>
                   <TableHead>วิจัย</TableHead>
-                  <TableHead>บริการวิชาการ</TableHead>
-                  <TableHead>ศิลปวัฒนธรรม</TableHead>
+                  <TableHead>โครงการ</TableHead>
                   <TableHead>เกณฑ์วิจัย</TableHead>
                   <TableHead className="w-12" />
                 </TableRow>
@@ -470,7 +454,7 @@ export default function FacultyWorkloadDashboard() {
               <TableBody>
                 {filteredFaculty.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="h-28 text-center text-muted-foreground">
+                    <TableCell colSpan={6} className="h-28 text-center text-muted-foreground">
                       ไม่พบอาจารย์ตามเงื่อนไขที่เลือก
                     </TableCell>
                   </TableRow>
@@ -493,7 +477,7 @@ export default function FacultyWorkloadDashboard() {
                           </Avatar>
                           <div className="min-w-0">
                             <p className="truncate text-sm font-medium text-foreground">{faculty.name}</p>
-                            <p className="text-xs text-muted-foreground">{faculty.faculty_id} · {faculty.active_dimensions}/4 ด้าน</p>
+                            <p className="text-xs text-muted-foreground">{faculty.faculty_id} · {faculty.active_dimensions}/3 ด้าน</p>
                           </div>
                         </div>
                       </TableCell>
@@ -506,12 +490,7 @@ export default function FacultyWorkloadDashboard() {
                         <p className="text-xs text-muted-foreground">เจ้าของผลงานหลัก</p>
                       </TableCell>
                       <TableCell>
-                        <p className="font-semibold text-foreground">{faculty.academic_service.projects} โครงการ</p>
-                        <p className="text-xs text-muted-foreground">{faculty.academic_service.activities} กิจกรรม</p>
-                      </TableCell>
-                      <TableCell>
-                        <p className="font-semibold text-foreground">{faculty.culture.projects} โครงการ</p>
-                        <p className="text-xs text-muted-foreground">{faculty.culture.activities} กิจกรรม</p>
+                        <p className="font-semibold text-foreground">{faculty.projects.total} โครงการ</p>
                       </TableCell>
                       <TableCell>
                         <Badge
@@ -571,12 +550,11 @@ export default function FacultyWorkloadDashboard() {
                 </div>
               </SheetHeader>
 
-              <div className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <div className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {[
                   ["การสอน", `${selectedFaculty.teaching.courses} วิชา`],
                   ["วิจัย", `${selectedFaculty.research.count} ผลงาน`],
-                  ["บริการวิชาการ", `${selectedFaculty.academic_service.projects} โครงการ`],
-                  ["ศิลปวัฒนธรรม", `${selectedFaculty.culture.projects} โครงการ`],
+                  ["โครงการ", `${selectedFaculty.projects.total} โครงการ`],
                 ].map(([label, value]) => (
                   <div key={label} className="rounded-lg border bg-muted/20 p-3">
                     <p className="text-xs text-muted-foreground">{label}</p>
@@ -648,25 +626,12 @@ export default function FacultyWorkloadDashboard() {
                 <section>
                   <div className="mb-3 flex items-center gap-2">
                     <Users className="h-4 w-4 text-amber-500" />
-                    <h3 className="text-sm font-semibold">บริการวิชาการ</h3>
+                    <h3 className="text-sm font-semibold">ภาระงานโครงการ</h3>
                   </div>
                   <div className="rounded-lg border p-3">
                     <ProjectRecordList
-                      records={selectedFaculty.academic_service.records}
-                      emptyLabel="ยังไม่มีโครงการบริการวิชาการในปีที่เลือก"
-                    />
-                  </div>
-                </section>
-
-                <section>
-                  <div className="mb-3 flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-rose-500" />
-                    <h3 className="text-sm font-semibold">ทำนุบำรุงศิลปวัฒนธรรม</h3>
-                  </div>
-                  <div className="rounded-lg border p-3">
-                    <ProjectRecordList
-                      records={selectedFaculty.culture.records}
-                      emptyLabel="ยังไม่มีโครงการทำนุบำรุงศิลปวัฒนธรรมในปีที่เลือก"
+                      records={selectedFaculty.projects.records}
+                      emptyLabel="ยังไม่มีโครงการในปีที่เลือก"
                     />
                   </div>
                 </section>

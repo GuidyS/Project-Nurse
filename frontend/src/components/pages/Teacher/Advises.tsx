@@ -432,6 +432,7 @@ export default function Advises() {
                                   }))
                                 }
                               />
+                              <span className="text-xs text-foreground font-medium">มีงานทำ</span>
                             </label>
                           </div>
                         ) : (

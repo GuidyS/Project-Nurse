@@ -42,6 +42,7 @@ import StudentHealthRecordsPage from "@/components/pages/Student/StudentHealthRe
 import AdvisorHealthRecordsView from "@/components/pages/Teacher/AdvisorHealthRecordsView";
 import CompetencyItemsManagement from "@/components/pages/Admin/CompetencyItemsManagement";
 import StudentCompetencyView from "@/components/pages/Student/StudentCompetencyView";
+import CourseRegistration from "@/components/pages/Student/CourseRegistration";
 import CurriculumCycles from "@/components/pages/Admin/CurriculumCycles";
 import PracticeLocationsManage from "@/components/pages/Admin/PracticeLocationsManage";
 import PracticeLocationsView from "@/components/pages/Teacher/PracticeLocationsView";
@@ -229,7 +230,7 @@ const Index = () => {
     // 4. 🔒 หมวดสิทธิ์คณบดี (Role 2 + Position 1) หรือ Admin
     const deanPages = [
       "dean-dashboard", "retention", "dean-teaching-workload", "dean-research-workload",
-      "dean-academic-service-workload", "dean-culture-workload"
+      "dean-project-workload", "dean-academic-service-workload", "dean-culture-workload"
     ];
     if (deanPages.includes(activeItem)) {
       if (roleId !== 1 && !(roleId === 2 && positionId === 1)) return <UnauthorizedView />;
@@ -238,8 +239,9 @@ const Index = () => {
         case "retention": return <Retention />;
         case "dean-teaching-workload": return <FacultyDimensionPage dimension="teaching" />;
         case "dean-research-workload": return <FacultyDimensionPage dimension="research" />;
-        case "dean-academic-service-workload": return <FacultyDimensionPage dimension="academic-service" />;
-        case "dean-culture-workload": return <FacultyDimensionPage dimension="culture" />;
+        case "dean-project-workload":
+        case "dean-academic-service-workload":
+        case "dean-culture-workload": return <FacultyDimensionPage dimension="projects" />;
       }
     }
 
@@ -279,7 +281,7 @@ const Index = () => {
     }
 
     // 6. 🔒 หมวดสิทธิ์นักศึกษา (Student - Role 3) หรือ Admin
-    const studentPages = ["transcript", "portfolio", "student-vaccinations", "student-health-records", "student-competency-view"];
+    const studentPages = ["transcript", "portfolio", "student-vaccinations", "student-health-records", "student-competency-view", "student-registration"];
     if (studentPages.includes(activeItem)) {
       if (roleId !== 1 && roleId !== 3) return <UnauthorizedView />;
       switch (activeItem) {
@@ -288,6 +290,7 @@ const Index = () => {
         case "student-vaccinations": return <StudentVaccinationPage />;
         case "student-health-records": return <StudentHealthRecordsPage />;
         case "student-competency-view": return <StudentCompetencyView />;
+        case "student-registration": return <CourseRegistration />;
       }
     }
 

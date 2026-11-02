@@ -319,13 +319,13 @@ export default function ProfilePage() {
   if (loading) return <div className="p-12 text-center text-muted-foreground animate-pulse">กำลังโหลดข้อมูลโปรไฟล์...</div>;
   if (!profileData) return <div className="p-12 text-center text-destructive">ไม่พบข้อมูลผู้ใช้งาน</div>;
 
-  const studentId = profileData.student_id || profileData.username || "6603400001";
+  const studentId = profileData.student_id || profileData.username;
   const academicCalculated = calculateAcademicInfo(studentId);
 
   const displayFullNameTH = `${profileData.first_name_th || ""} ${profileData.last_name_th || ""}`.trim();
   const displayFullNameEN = `${profileData.first_name_en || ""} ${profileData.last_name_en || ""}`.trim();
   const displayEmail = profileData.email || `${studentId}@siam.edu`;
-  const userInitial = profileData.first_name_th?.charAt(0) || "ญ";
+  const userInitial = profileData.first_name_th?.charAt(0);
   const pdfDocuments = Array.isArray(profileData.pdf_documents) ? profileData.pdf_documents : [];
   const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8080").replace(/\/$/, "");
   const profilePictureRaw =
@@ -385,10 +385,10 @@ export default function ProfilePage() {
 
           <div className="flex-1 text-center md:text-left">
             <h2 className="text-2xl font-bold leading-snug text-foreground">
-              {displayFullNameTH || "ญาณัณธร โอนอิง"}
+              {displayFullNameTH}
             </h2>
             <p className="text-sm font-medium text-muted-foreground mt-2">
-              {displayFullNameEN || "Yananthon Oning"}
+              {displayFullNameEN}
             </p>
             <p className="text-sm text-muted-foreground mt-1">
               รหัสประจำตัว: {userRole === "student" ? studentId : profileData.faculty_id}

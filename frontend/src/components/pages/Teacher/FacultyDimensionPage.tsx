@@ -5,7 +5,6 @@ import {
   BookOpenCheck,
   ChevronRight,
   FlaskConical,
-  Landmark,
   Loader2,
   RefreshCw,
   Search,
@@ -42,7 +41,18 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-export type FacultyDimension = "teaching" | "research" | "academic-service" | "culture";
+export type FacultyDimension = "teaching" | "research" | "projects";
+
+const PROJECT_CATEGORIES = [
+  { key: "academic_service", label: "บริการวิชาการ" },
+  { key: "culture", label: "ทำนุบำรุงศิลปวัฒนธรรม" },
+  { key: "teaching", label: "การเรียนการสอน" },
+  { key: "research", label: "วิจัย" },
+  { key: "quality_assurance", label: "การประกันคุณภาพ" },
+  { key: "other", label: "อื่น ๆ / ยังไม่จำแนก" },
+] as const;
+
+type ProjectCategory = typeof PROJECT_CATEGORIES[number]["key"];
 
 interface SubjectWorkload {
   code: string;
@@ -65,6 +75,13 @@ interface ProjectRecord {
   activity_name: string | null;
   row_type: "project" | "activity";
   strategy: string;
+  category: ProjectCategory;
+}
+
+interface ProjectsWorkload {
+  total: number;
+  categories: Record<ProjectCategory, number>;
+  records: ProjectRecord[];
 }
 
 interface ProjectWorkload {
@@ -92,6 +109,7 @@ interface FacultyWorkload {
   };
   academic_service: ProjectWorkload;
   culture: ProjectWorkload;
+  projects: ProjectsWorkload;
 }
 
 interface WorkloadData {
@@ -110,6 +128,7 @@ interface WorkloadData {
     };
     academic_service: { projects: number; items: number; faculty: number };
     culture: { projects: number; items: number; faculty: number };
+    projects: { total: number; faculty: number; categories: Record<ProjectCategory, number> };
   };
   faculty: FacultyWorkload[];
 }
@@ -127,17 +146,11 @@ const dimensionConfig = {
     icon: FlaskConical,
     iconTone: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
   },
-  "academic-service": {
-    title: "ภาระงานด้านบริการวิชาการ",
-    description: "โครงการและกิจกรรมบริการวิชาการ แยกตามอาจารย์ผู้รับผิดชอบ",
+  projects: {
+    title: "ภาระงานโครงการ",
+    description: "โครงการทุกประเภท แยกตามอาจารย์ผู้รับผิดชอบ",
     icon: Users,
     iconTone: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-  },
-  culture: {
-    title: "ภาระงานด้านทำนุบำรุงศิลปวัฒนธรรม",
-    description: "โครงการและกิจกรรมทำนุบำรุงศิลปวัฒนธรรม แยกตามอาจารย์ผู้รับผิดชอบ",
-    icon: Landmark,
-    iconTone: "bg-rose-500/10 text-rose-600 dark:text-rose-400",
   },
 } satisfies Record<FacultyDimension, {
   title: string;
@@ -186,7 +199,7 @@ function WorkloadStatus({ hasWorkload, dimension }: { hasWorkload: boolean; dime
   return (
     <Badge
       variant="outline"
-      className={`rounded-md ${
+      className={`whitespace-nowrap rounded-md px-2.5 py-1 ${
         hasWorkload
           ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
           : "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-400"
@@ -200,8 +213,7 @@ function WorkloadStatus({ hasWorkload, dimension }: { hasWorkload: boolean; dime
 function facultyHasWorkload(faculty: FacultyWorkload, dimension: FacultyDimension) {
   if (dimension === "teaching") return faculty.teaching.courses > 0;
   if (dimension === "research") return faculty.research.meets_criterion;
-  if (dimension === "academic-service") return faculty.academic_service.items > 0;
-  return faculty.culture.items > 0;
+  return faculty.projects.total > 0;
 }
 
 export default function FacultyDimensionPage({ dimension }: { dimension: FacultyDimension }) {
@@ -292,8 +304,7 @@ function FacultyDimensionContent({ dimension }: { dimension: FacultyDimension })
     );
   }
 
-  const projectSummary = dimension === "academic-service" ? data.summary.academic_service : data.summary.culture;
-  const projectKey = dimension === "academic-service" ? "academic_service" : "culture";
+  const projectSummary = data.summary.projects;
   const researchProgress = data.summary.total_faculty
     ? (data.summary.research.meeting_target / data.summary.total_faculty) * 100
     : 0;
@@ -361,10 +372,9 @@ function FacultyDimensionContent({ dimension }: { dimension: FacultyDimension })
         </>
       )}
 
-      {(dimension === "academic-service" || dimension === "culture") && (
-        <div className="grid gap-3 sm:grid-cols-3">
-          <Metric label="โครงการทั้งหมด" value={`${formatNumber(projectSummary.projects)} โครงการ`} detail={`ปีการศึกษา ${data.academic_year}`} />
-          <Metric label="โครงการ/กิจกรรม" value={`${formatNumber(projectSummary.items)} รายการ`} detail="รวมรายการที่ระบุผู้รับผิดชอบ" />
+      {dimension === "projects" && (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Metric label="โครงการทั้งหมด" value={`${formatNumber(projectSummary.total)} โครงการ`} detail={`ปีการศึกษา ${data.academic_year}`} />
           <Metric label="อาจารย์ผู้รับผิดชอบ" value={`${formatNumber(projectSummary.faculty)} คน`} detail={`จากอาจารย์ทั้งหมด ${data.summary.total_faculty} คน`} />
         </div>
       )}
@@ -394,34 +404,39 @@ function FacultyDimensionContent({ dimension }: { dimension: FacultyDimension })
 
         <div className="overflow-hidden rounded-lg border bg-card">
           <div className="overflow-x-auto">
-            <Table className="min-w-[820px]">
+            <Table className={dimension === "projects" ? "w-full min-w-[1240px] table-fixed" : "min-w-[820px]"}>
+              {dimension === "projects" && <colgroup>
+                <col className="w-[300px]" />
+                {PROJECT_CATEGORIES.map((category) => <col key={category.key} className="w-[128px]" />)}
+                <col className="w-[124px]" />
+                <col className="w-[48px]" />
+              </colgroup>}
               <TableHeader>
                 <TableRow className="bg-muted/40 hover:bg-muted/40">
-                  <TableHead className="w-[300px]">อาจารย์</TableHead>
+                  <TableHead className={dimension === "projects" ? "px-4 text-left" : "w-[300px]"}>อาจารย์</TableHead>
                   {dimension === "teaching" && <>
                     <TableHead>รายวิชา</TableHead><TableHead>YLO</TableHead><TableHead>PLO</TableHead><TableHead>CLO</TableHead>
                   </>}
                   {dimension === "research" && <>
                     <TableHead>ผลงานวิจัย</TableHead><TableHead>เกณฑ์ต่อปี</TableHead><TableHead>สถานะ</TableHead>
                   </>}
-                  {(dimension === "academic-service" || dimension === "culture") && <>
-                    <TableHead>โครงการ</TableHead><TableHead>กิจกรรม</TableHead><TableHead>รวมรายการ</TableHead>
-                  </>}
-                  {dimension !== "research" && <TableHead>สถานะ</TableHead>}
-                  <TableHead className="w-12" />
+                  {dimension === "projects" && PROJECT_CATEGORIES.map((category) => (
+                    <TableHead key={category.key} className="px-2 text-center text-xs leading-5 align-middle">{category.label}</TableHead>
+                  ))}
+                  {dimension !== "research" && <TableHead className={dimension === "projects" ? "px-2 text-center" : undefined}>สถานะ</TableHead>}
+                  <TableHead className={dimension === "projects" ? "px-1" : "w-12"} />
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredFaculty.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="h-28 text-center text-muted-foreground">ไม่พบอาจารย์ตามเงื่อนไขที่เลือก</TableCell>
+                    <TableCell colSpan={dimension === "projects" ? 9 : 7} className="h-28 text-center text-muted-foreground">ไม่พบอาจารย์ตามเงื่อนไขที่เลือก</TableCell>
                   </TableRow>
                 ) : filteredFaculty.map((faculty) => {
-                  const projectWorkload = faculty[projectKey] as ProjectWorkload;
                   const active = facultyHasWorkload(faculty, dimension);
                   return (
                     <TableRow key={faculty.faculty_id} className="cursor-pointer" onClick={() => setSelectedFaculty(faculty)}>
-                      <TableCell><FacultyIdentity faculty={faculty} /></TableCell>
+                      <TableCell className={dimension === "projects" ? "px-4 py-3" : undefined}><FacultyIdentity faculty={faculty} /></TableCell>
                       {dimension === "teaching" && <>
                         <TableCell className="font-semibold">{faculty.teaching.courses} วิชา</TableCell>
                         <TableCell>{faculty.teaching.ylo}</TableCell>
@@ -433,13 +448,11 @@ function FacultyDimensionContent({ dimension }: { dimension: FacultyDimension })
                         <TableCell>{faculty.research.count}/{data.research_target_per_faculty}</TableCell>
                         <TableCell><WorkloadStatus hasWorkload={active} dimension={dimension} /></TableCell>
                       </>}
-                      {(dimension === "academic-service" || dimension === "culture") && <>
-                        <TableCell className="font-semibold">{projectWorkload.projects} โครงการ</TableCell>
-                        <TableCell>{projectWorkload.activities} กิจกรรม</TableCell>
-                        <TableCell>{projectWorkload.items} รายการ</TableCell>
-                      </>}
-                      {dimension !== "research" && <TableCell><WorkloadStatus hasWorkload={active} dimension={dimension} /></TableCell>}
-                      <TableCell>
+                      {dimension === "projects" && PROJECT_CATEGORIES.map((category) => (
+                        <TableCell key={category.key} className="px-2 py-3 text-center font-semibold tabular-nums">{faculty.projects.categories[category.key] ?? 0}</TableCell>
+                      ))}
+                      {dimension !== "research" && <TableCell className={dimension === "projects" ? "px-2 py-3 text-center" : undefined}><WorkloadStatus hasWorkload={active} dimension={dimension} /></TableCell>}
+                      <TableCell className={dimension === "projects" ? "px-1 py-3 text-center" : undefined}>
                         <Button
                           variant="ghost"
                           size="icon"
@@ -514,13 +527,13 @@ function FacultyDimensionContent({ dimension }: { dimension: FacultyDimension })
                   </div>
                 )}
 
-                {(dimension === "academic-service" || dimension === "culture") && (() => {
-                  const records = selectedFaculty[projectKey].records;
+                {dimension === "projects" && (() => {
+                  const records = selectedFaculty.projects.records;
                   return (
                     <div className="space-y-3">
                       <h3 className="flex items-center gap-2 text-sm font-semibold">
-                        <Sparkles className={`h-4 w-4 ${dimension === "culture" ? "text-rose-500" : "text-amber-500"}`} />
-                        รายการโครงการและกิจกรรม
+                        <Sparkles className="h-4 w-4 text-amber-500" />
+                        รายการโครงการ
                       </h3>
                       {records.length === 0 ? (
                         <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">ยังไม่มีโครงการในปีที่เลือก</p>
@@ -530,7 +543,7 @@ function FacultyDimensionContent({ dimension }: { dimension: FacultyDimension })
                             <div key={record.id} className="p-3">
                               <div className="flex items-start justify-between gap-3">
                                 <p className="text-sm font-medium">{record.activity_name || record.project_name}</p>
-                                <Badge variant="outline" className="shrink-0 rounded-md text-[10px]">{record.row_type === "activity" ? "กิจกรรม" : "โครงการ"}</Badge>
+                                <Badge variant="outline" className="shrink-0 rounded-md text-[10px]">{PROJECT_CATEGORIES.find((category) => category.key === record.category)?.label ?? "อื่น ๆ / ยังไม่จำแนก"}</Badge>
                               </div>
                               {record.activity_name && <p className="mt-1 text-xs text-muted-foreground">{record.project_name}</p>}
                             </div>

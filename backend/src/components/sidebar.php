@@ -76,7 +76,17 @@ $stmt->execute([
 $menu_items = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 $sections = [];
+$projectWorkloadMenuAdded = false;
 foreach ($menu_items as $item) {
+    if (in_array($item['url'], ['dean-project-workload', 'dean-academic-service-workload', 'dean-culture-workload'], true)) {
+        if ($projectWorkloadMenuAdded) {
+            continue;
+        }
+        $projectWorkloadMenuAdded = true;
+        $item['url'] = 'dean-project-workload';
+        $item['title'] = 'ภาระงานโครงการ';
+        $item['icon'] = 'FolderKanban';
+    }
     $sectionName = $item['section_title'] ?? 'เมนูหลัก';
     if ($sectionName === '' || $sectionName === null) {
         $sectionName = 'เมนูหลัก';
