@@ -367,6 +367,10 @@
             case 'get-faculty-workload':
                 require_once 'components/Teacher/DeanDashboard/get_faculty_workload.php';
                 break;
+            // ทำเนียบบุคลากรภายในคณะ (ดูอย่างเดียว — ไม่มี endpoint สำหรับแก้ไข)
+            case 'faculty-directory':
+                require_once 'components/Teacher/FacultyDirectory/get_faculty_directory.php';
+                break;
             case 'get-student-learning-outcomes':
                 require_once 'components/Teacher/DeanDashboard/get_student_learning_outcomes.php';
                 break;

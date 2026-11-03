@@ -13,12 +13,11 @@ import {
   Users,
 } from "lucide-react";
 import api from "@/lib/axios";
-import StudentLearningOutcomesPage from "@/components/pages/Teacher/StudentLearningOutcomesPage";
+import FacultyDirectoryPage from "@/components/pages/Teacher/FacultyDirectoryPage";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Progress } from "@/components/ui/progress";
 import {
   Select,
   SelectContent,
@@ -86,7 +85,9 @@ interface FacultyWorkload {
     subjects: SubjectWorkload[];
   };
   research: {
-    count: number;
+    count: number;      // งานวิจัยที่นับ KPI (สีแดง)
+    co_author: number;  // ชื่อร่วม (สีดำ)
+    academic: number;   // วิชาการ/ตำรา (สีฟ้า)
     meets_criterion: boolean;
     records: ResearchRecord[];
   };
@@ -205,8 +206,9 @@ function facultyHasWorkload(faculty: FacultyWorkload, dimension: FacultyDimensio
 }
 
 export default function FacultyDimensionPage({ dimension }: { dimension: FacultyDimension }) {
+  // เมนู "บุคลากรภายในคณะ" ใช้ช่องเดียวกับมิติการเรียนการสอนเดิม
   if (dimension === "teaching") {
-    return <StudentLearningOutcomesPage />;
+    return <FacultyDirectoryPage />;
   }
 
   return <FacultyDimensionContent dimension={dimension} />;
@@ -294,19 +296,23 @@ function FacultyDimensionContent({ dimension }: { dimension: FacultyDimension })
 
   const projectSummary = dimension === "academic-service" ? data.summary.academic_service : data.summary.culture;
   const projectKey = dimension === "academic-service" ? "academic_service" : "culture";
-  const researchProgress = data.summary.total_faculty
-    ? (data.summary.research.meeting_target / data.summary.total_faculty) * 100
+  // สัดส่วนผลงานต่ออาจารย์ คิดเทียบกับเกณฑ์ต่อคนต่อปี แล้วแสดงเป็นเปอร์เซ็นต์
+  const researchRatioPercent = data.research_target_per_faculty > 0
+    ? (data.summary.research.ratio / data.research_target_per_faculty) * 100
     : 0;
 
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="app-page-header">
         <div className="flex items-start gap-3">
-          <div className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-md ${config.iconTone}`}>
-            <Icon className="h-5 w-5" />
-          </div>
+          {/* หน้าภาระงานวิจัยไม่ใช้ไอคอน และใช้ชื่อให้ตรงกับเมนูในแถบด้านข้าง */}
+          {dimension !== "research" && (
+            <div className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-md ${config.iconTone}`}>
+              <Icon className="h-5 w-5" />
+            </div>
+          )}
           <div>
-            <h1 className="app-page-title">{config.title}</h1>
+            <h1 className="app-page-title">{dimension === "research" ? "ภาระงานวิจัย" : config.title}</h1>
             <p className="app-page-description">{config.description}</p>
           </div>
         </div>
@@ -346,17 +352,10 @@ function FacultyDimensionContent({ dimension }: { dimension: FacultyDimension })
       {dimension === "research" && (
         <>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <Metric label="ผลงานวิจัย" value={`${formatNumber(data.summary.research.outputs)} ผลงาน`} detail="นับเจ้าของผลงานหลักคนเดียว" />
-            <Metric label="สัดส่วนผลงานต่ออาจารย์" value={data.summary.research.ratio.toFixed(2)} detail={`เกณฑ์ ${data.research_target_per_faculty} ผลงาน/คน/ปี`} />
-            <Metric label="ผ่านเกณฑ์" value={`${formatNumber(data.summary.research.meeting_target)} คน`} detail={`จากอาจารย์ ${data.summary.total_faculty} คน`} />
+            <Metric label="จำนวนงานวิจัย" value={`${formatNumber(data.summary.research.outputs)} ผลงาน`} detail="นับเฉพาะงานวิจัย (KPI) และวิชาการ/ตำรา ไม่นับชื่อร่วม" />
+            <Metric label="อาจารย์ที่มีงานวิจัย" value={`${formatNumber(data.summary.research.faculty)} คน`} detail={`จากอาจารย์ ${data.summary.total_faculty} คน`} />
+            <Metric label="สัดส่วนผลงานต่ออาจารย์" value={`${researchRatioPercent.toFixed(1)}%`} detail={`เกณฑ์ ${data.research_target_per_faculty} ผลงาน/คน/ปี`} />
             <Metric label="ต่ำกว่าเกณฑ์" value={`${formatNumber(data.summary.research.below_target)} คน`} detail="ใช้สำหรับติดตามแผนพัฒนาผลงาน" />
-          </div>
-          <div className="rounded-lg border bg-card p-4">
-            <div className="flex items-center justify-between gap-3 text-sm">
-              <span className="font-medium">อาจารย์ที่ผ่านเกณฑ์งานวิจัย</span>
-              <span className="font-semibold">{researchProgress.toFixed(1)}%</span>
-            </div>
-            <Progress value={researchProgress} className="mt-3 h-2" />
           </div>
         </>
       )}
@@ -402,7 +401,7 @@ function FacultyDimensionContent({ dimension }: { dimension: FacultyDimension })
                     <TableHead>รายวิชา</TableHead><TableHead>YLO</TableHead><TableHead>PLO</TableHead><TableHead>CLO</TableHead>
                   </>}
                   {dimension === "research" && <>
-                    <TableHead>ผลงานวิจัย</TableHead><TableHead>เกณฑ์ต่อปี</TableHead><TableHead>สถานะ</TableHead>
+                    <TableHead>งานวิจัย</TableHead><TableHead>ชื่อร่วม</TableHead><TableHead>วิชาการ/ตำรา</TableHead><TableHead>สถานะ</TableHead>
                   </>}
                   {(dimension === "academic-service" || dimension === "culture") && <>
                     <TableHead>โครงการ</TableHead><TableHead>กิจกรรม</TableHead><TableHead>รวมรายการ</TableHead>
@@ -414,7 +413,7 @@ function FacultyDimensionContent({ dimension }: { dimension: FacultyDimension })
               <TableBody>
                 {filteredFaculty.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="h-28 text-center text-muted-foreground">ไม่พบอาจารย์ตามเงื่อนไขที่เลือก</TableCell>
+                    <TableCell colSpan={dimension === "teaching" ? 7 : 6} className="h-28 text-center text-muted-foreground">ไม่พบอาจารย์ตามเงื่อนไขที่เลือก</TableCell>
                   </TableRow>
                 ) : filteredFaculty.map((faculty) => {
                   const projectWorkload = faculty[projectKey] as ProjectWorkload;
@@ -429,8 +428,9 @@ function FacultyDimensionContent({ dimension }: { dimension: FacultyDimension })
                         <TableCell>{faculty.teaching.clo}</TableCell>
                       </>}
                       {dimension === "research" && <>
-                        <TableCell className="font-semibold">{faculty.research.count} ผลงาน</TableCell>
-                        <TableCell>{faculty.research.count}/{data.research_target_per_faculty}</TableCell>
+                        <TableCell className="font-semibold text-red-600">{faculty.research.count}</TableCell>
+                        <TableCell className="text-foreground">{faculty.research.co_author}</TableCell>
+                        <TableCell className="text-sky-600">{faculty.research.academic}</TableCell>
                         <TableCell><WorkloadStatus hasWorkload={active} dimension={dimension} /></TableCell>
                       </>}
                       {(dimension === "academic-service" || dimension === "culture") && <>
