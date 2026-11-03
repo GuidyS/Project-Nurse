@@ -15,7 +15,7 @@ import {
   Cell,
   Legend,
 } from "recharts";
-import { TrendingUp, Users, UserMinus, GraduationCap, Loader2 } from "lucide-react";
+import { TrendingUp, Users, UserMinus, GraduationCap, Calendar, Loader2 } from "lucide-react";
 import { StatCard } from "@/components/dashboard/StatCard";
 import api from "@/lib/axios";
 
@@ -28,40 +28,12 @@ type RetentionData = {
     dropped: number;
     graduated: number;
   };
-  academicYear: number;
-  retention: { name: string; statusKey: string; value: number }[];
-  retentionByYearLevel: {
-    level: string;
-    label: string;
-    admissionYear: number;
-    total: number;
-    retained: number;
-    rate: number;
-  }[];
-  recentDropouts: {
-    studentId: string;
-    name: string;
-    year: string | number;
-    statusKey: string;
-    statusLabel: string;
-    reason: string | null;
-  }[];
+  retention: { name: string; value: number }[];
+  retentionByYearLevel: { level: string; total: number; retained: number; rate: number }[];
+  recentDropouts: { studentId: string; name: string; year: string | number; reason: string }[];
 };
 
-/**
- * ล็อกสีตามสถานะ ไม่ใช่ตามลำดับในกราฟ
- * ถ้าใช้ลำดับ พอสถานะไหนหายไปสีจะร่นมาแทนที่กัน เช่น "พ้นสภาพ" กลายเป็นสีเขียว
- */
-const STATUS_COLORS: Record<string, string> = {
-  active: "#3b82f6",    // คงอยู่ — น้ำเงิน
-  graduated: "#22c55e", // จบการศึกษา — เขียว
-  onleave: "#f59e0b",   // พักการเรียน — เหลือง
-  resigned: "#ef4444",  // ลาออก — แดง
-  dropped: "#b91c1c",   // พ้นสภาพ — แดงเข้ม
-  other: "#94a3b8",     // ค่าที่ไม่รู้จัก — เทา
-};
-
-const statusColor = (statusKey: string) => STATUS_COLORS[statusKey] ?? STATUS_COLORS.other;
+const PIE_COLORS = ["#3b82f6", "#22c55e", "#ef4444", "#f59e0b", "#8b5cf6"];
 
 export default function Retention() {
   const [data, setData] = useState<RetentionData | null>(null);
@@ -107,7 +79,13 @@ export default function Retention() {
           <h1 className="app-page-title">อัตราการคงอยู่ของนักศึกษา</h1>
           <p className="app-page-description">วิเคราะห์สัดส่วนนักศึกษาคงอยู่และสาเหตุการออกกลางคัน</p>
         </div>
-        <ExportButton reportName="Retention-Report" />
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Calendar className="h-4 w-4" />
+            <span>ข้อมูลนักศึกษาทุกปีที่เข้าศึกษา</span>
+          </div>
+          <ExportButton reportName="Retention-Report" />
+        </div>
       </div>
 
       {error && (
@@ -165,8 +143,8 @@ export default function Retention() {
                       nameKey="name"
                       label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                     >
-                      {data.retention.map((entry) => (
-                        <Cell key={entry.statusKey} fill={statusColor(entry.statusKey)} />
+                      {data.retention.map((_, index) => (
+                        <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                       ))}
                     </Pie>
                     <Tooltip />
@@ -182,19 +160,15 @@ export default function Retention() {
 
         <Card>
           <CardHeader>
-            <CardTitle>
-              อัตราการคงอยู่ของปีการศึกษา {data?.academicYear ?? "—"}
-            </CardTitle>
-            <CardDescription>
-              เปรียบเทียบชั้นปีที่ 1-4 พร้อมรหัสรุ่น (ชั้นปีที่เกิน 4 ไม่นำมาแสดง)
-            </CardDescription>
+            <CardTitle>อัตราคงอยู่ตามชั้นปี</CardTitle>
+            <CardDescription>เปรียบเทียบระหว่างชั้นปี</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
               {data?.retentionByYearLevel && data.retentionByYearLevel.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={data.retentionByYearLevel}>
-                    <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                    <XAxis dataKey="level" tick={{ fontSize: 11 }} />
                     <YAxis domain={[0, 100]} />
                     <Tooltip formatter={(v: number) => [`${v}%`, "อัตราคงอยู่"]} />
                     <Bar dataKey="rate" name="อัตราคงอยู่ (%)" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
@@ -211,7 +185,7 @@ export default function Retention() {
       <Card>
         <CardHeader>
           <CardTitle>นักศึกษาออกกลางคันล่าสุด</CardTitle>
-          <CardDescription>สถานะที่ไม่ใช่ "คงอยู่" หรือ "จบการศึกษา"</CardDescription>
+          <CardDescription>สถานะที่ไม่ใช่กำลังศึกษาหรือสำเร็จการศึกษา</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
@@ -220,8 +194,7 @@ export default function Retention() {
                 <TableHead>รหัสนักศึกษา</TableHead>
                 <TableHead>ชื่อ-นามสกุล</TableHead>
                 <TableHead>ชั้นปี</TableHead>
-                <TableHead>สถานะ</TableHead>
-                <TableHead>สาเหตุ</TableHead>
+                <TableHead>สถานะ/สาเหตุ</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -232,25 +205,13 @@ export default function Retention() {
                     <TableCell>{student.name}</TableCell>
                     <TableCell>{student.year}</TableCell>
                     <TableCell>
-                      {/* ใช้สีเดียวกับกราฟโดนัท จะได้อ่านคู่กันได้ */}
-                      <Badge
-                        variant="outline"
-                        style={{
-                          borderColor: statusColor(student.statusKey),
-                          color: statusColor(student.statusKey),
-                        }}
-                      >
-                        {student.statusLabel}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {student.reason ?? "-"}
+                      <Badge variant="secondary">{student.reason}</Badge>
                     </TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground">
+                  <TableCell colSpan={4} className="text-center text-muted-foreground">
                     ไม่มีข้อมูลนักศึกษาที่ออกกลางคัน
                   </TableCell>
                 </TableRow>
