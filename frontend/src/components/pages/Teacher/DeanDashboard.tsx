@@ -474,13 +474,6 @@ export default function DeanDashboard() {
           </div>
         </SectionCard>
 
-<<<<<<< HEAD
-        <SectionCard id="projects" icon={BriefcaseBusiness} title="8. โครงการและงบประมาณ" description="ยอดโครงการรวมกิจกรรมแล้ว ใช้ข้อมูลร่วมกับหน้ารายงานโครงการ">
-          <div className="grid gap-3 sm:grid-cols-3">
-            <MiniMetric label="งบเสนอ" value={formatCurrency(data.projects.budget)} />
-            <MiniMetric label="งบใช้จริง" value={formatCurrency(data.projects.spent)} />
-            <MiniMetric label="ส่วนต่างงบเสนอ − ใช้จริง" value={formatCurrency(data.projects.difference)} detail={`เกินงบ ${data.projects.over_budget} โครงการ`} />
-=======
         <SectionCard
           id="projects"
           title="โครงการและงบประมาณ"
@@ -502,7 +495,6 @@ export default function DeanDashboard() {
             <MiniMetric label="งบประมาณโครงการ" value={formatCurrency(data.projects.budget)} />
             <MiniMetric label="เบิกจ่าย" value={formatCurrency(data.projects.spent)} detail={`Burn rate ${data.projects.burn_rate}%`} />
             <MiniMetric label="จำนวนโครงการ" value={`${formatNumber(data.projects.total)} โครงการ`} detail={`ดำเนินการ ${data.projects.active} · เสร็จ ${data.projects.completed}`} />
->>>>>>> d716198a0cd9e109235177d936f1b153ead18b39
           </div>
           <div className="mt-4 h-[280px]">
             {data.projects.top_projects.length === 0 ? <EmptyState label={`ยังไม่มีโครงการในปีการศึกษา ${data.academic_year}`} /> : (
