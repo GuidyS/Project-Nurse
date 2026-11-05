@@ -9,8 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Edit, Trash2, MoreHorizontal, Upload, Users as UsersIcon, CalendarClock, Info, Eye, EyeOff, UserCog } from "lucide-react";
-import { onlyEnglish, onlyThai } from "@/lib/nameInput";
+import { Loader2, Edit, Trash2, MoreHorizontal, Upload, Download, Users as UsersIcon, CalendarClock, Info, Eye, EyeOff, UserCog } from "lucide-react";
+import { onlyThai } from "@/lib/nameInput";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import api from "@/lib/axios";
 import { ConfirmActionDialog } from "@/components/shared/ConfirmActionDialog";
@@ -21,6 +21,7 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { SearchInput } from "@/components/shared/SearchInput";
 import { TableStateRow } from "@/components/shared/TableStateRow";
 import { AssignRoleDialog } from "@/components/pages/Admin/AssignRoleDialog";
+import { downloadUserImportTemplate } from "@/lib/userImportTemplate";
 
 interface User {
   id: string;
@@ -474,6 +475,22 @@ export default function UsersManagement() {
               <CalendarClock className="h-4 w-4" />
               ตั้งค่าปีการศึกษา
             </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="gap-2">
+                  <Download className="h-4 w-4" />
+                  ดาวน์โหลดแพทเทิร์น
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => downloadUserImportTemplate("teachers")}>
+                  แพทเทิร์นข้อมูลอาจารย์
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => downloadUserImportTemplate("students")}>
+                  แพทเทิร์นข้อมูลนักศึกษา
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button variant="outline" className="gap-2" onClick={() => setIsImportOpen(true)}>
               <Upload className="h-4 w-4" />
               Import ข้อมูล
@@ -631,8 +648,6 @@ export default function UsersManagement() {
                 <div className="col-span-2 space-y-2 sm:max-w-[50%] sm:pr-2"><Label>คำนำหน้า</Label><Input value={detailForm.title || ""} onChange={e => setDetailForm({...detailForm, title: onlyThai(e.target.value)})} /></div>
                 <div className="space-y-2"><Label>ชื่อภาษาไทย</Label><Input value={detailForm.first_name_th || ""} onChange={e => setDetailForm({...detailForm, first_name_th: onlyThai(e.target.value)})} placeholder="ภาษาไทยเท่านั้น" /></div>
                 <div className="space-y-2"><Label>นามสกุลภาษาไทย</Label><Input value={detailForm.last_name_th || ""} onChange={e => setDetailForm({...detailForm, last_name_th: onlyThai(e.target.value)})} placeholder="ภาษาไทยเท่านั้น" /></div>
-                <div className="space-y-2"><Label>ชื่อภาษาอังกฤษ</Label><Input value={detailForm.first_name_en || ""} onChange={e => setDetailForm({...detailForm, first_name_en: onlyEnglish(e.target.value)})} placeholder="English only" /></div>
-                <div className="space-y-2"><Label>นามสกุลภาษาอังกฤษ</Label><Input value={detailForm.last_name_en || ""} onChange={e => setDetailForm({...detailForm, last_name_en: onlyEnglish(e.target.value)})} placeholder="English only" /></div>
                 <div className="space-y-2"><Label>เพศ</Label><Input value={detailForm.gender || ""} onChange={e => setDetailForm({...detailForm, gender: e.target.value})} /></div>
                 <div className="space-y-2"><Label>ว/ด/ป เกิด</Label><Input type="date" value={detailForm.birth_date || ""} onChange={e => setDetailForm({...detailForm, birth_date: e.target.value})} /></div>
                 <div className="space-y-2"><Label>อีเมล</Label><Input type="email" value={detailForm.email || ""} onChange={e => setDetailForm({...detailForm, email: e.target.value})} /></div>
@@ -673,8 +688,6 @@ export default function UsersManagement() {
                 <div className="hidden sm:block" />
                 <ReadOnlyField label="ชื่อภาษาไทย" value={detailForm.first_name_th} />
                 <ReadOnlyField label="นามสกุลภาษาไทย" value={detailForm.last_name_th} />
-                <ReadOnlyField label="ชื่อภาษาอังกฤษ" value={detailForm.first_name_en} />
-                <ReadOnlyField label="นามสกุลภาษาอังกฤษ" value={detailForm.last_name_en} />
                 <ReadOnlyField label="เพศ" value={detailForm.gender} />
                 <ReadOnlyField label="ว/ด/ป เกิด" value={detailForm.birth_date} />
                 <ReadOnlyField label="อีเมล" value={detailForm.email} />
@@ -770,7 +783,7 @@ export default function UsersManagement() {
         onOpenChange={setIsImportOpen}
         importTypes={userImportTypes}
         title="Import ข้อมูลผู้ใช้"
-        description="นำเข้าข้อมูลนักศึกษาและอาจารย์จากไฟล์ Excel หรือ CSV"
+        description="นำเข้าข้อมูลนักศึกษาและอาจารย์จากไฟล์ Excel"
         onImported={fetchUsers}
       />
 

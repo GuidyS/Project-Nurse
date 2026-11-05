@@ -42,7 +42,7 @@ interface ImportDataDialogProps {
   onImported?: (importType: string) => void | Promise<void>;
 }
 
-const allowedExtensions = [".xlsx", ".xls", ".csv"];
+const allowedExtensions = [".xlsx", ".xls"];
 
 const apiErrorMessage = (error: unknown, fallback: string) => {
   const maybeError = error as { response?: { data?: { message?: string } } };
@@ -54,7 +54,7 @@ export function ImportDataDialog({
   onOpenChange,
   importTypes,
   title = "Import ข้อมูล",
-  description = "อัปโหลดไฟล์ Excel หรือ CSV เพื่อนำเข้าข้อมูลเข้าสู่ระบบ",
+  description = "อัปโหลดไฟล์ Excel เพื่อนำเข้าข้อมูลเข้าสู่ระบบ",
   onImported,
 }: ImportDataDialogProps) {
   const { toast } = useToast();
@@ -109,7 +109,7 @@ export function ImportDataDialog({
     if (!isAllowed) {
       toast({
         title: "ไฟล์ไม่ถูกต้อง",
-        description: "กรุณาเลือกไฟล์ .xlsx, .xls หรือ .csv เท่านั้น",
+        description: "กรุณาเลือกไฟล์ .xlsx หรือ .xls เท่านั้น",
         variant: "destructive",
       });
       return;
@@ -235,12 +235,12 @@ export function ImportDataDialog({
             >
               <Upload className="mb-3 h-9 w-9 text-primary" />
               <p className="font-medium text-foreground">เลือกไฟล์หรือลากไฟล์มาวางที่นี่</p>
-              <p className="mt-1 text-xs text-muted-foreground">รองรับ .xlsx, .xls, .csv</p>
+              <p className="mt-1 text-xs text-muted-foreground">รองรับ .xlsx และ .xls</p>
               <Input
                 ref={fileInputRef}
                 id={uploadInputId}
                 type="file"
-                accept=".xlsx,.xls,.csv"
+                accept=".xlsx,.xls"
                 className="hidden"
                 onChange={handleFileChange}
               />

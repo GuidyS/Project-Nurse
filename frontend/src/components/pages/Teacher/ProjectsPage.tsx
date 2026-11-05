@@ -63,6 +63,12 @@ interface ProjectDocument {
   mime_type?: string | null;
   file_size?: number | null;
 }
+interface ProjectActivity {
+  id?: number;
+  activity_name: string;
+  google_drive_url: string;
+  sort_order?: number;
+}
 
 interface Project {
   merge_pending?: boolean;
@@ -93,6 +99,8 @@ interface Project {
   member_names?: string[];
   member_faculty_ids?: number[];
   documents?: ProjectDocument[];
+  has_sub_activities?: boolean;
+  activities?: ProjectActivity[];
   plos?: string[];
 }
 
@@ -121,6 +129,8 @@ interface ProjectFormData {
   budget_spent: string;
   budget_source: string;
   budget_note: string;
+  has_sub_activities: boolean;
+  activities: ProjectActivity[];
 }
 
 interface ProjectDocumentUploadForm {
@@ -192,7 +202,7 @@ const projectImportTypes: ImportDataTypeOption[] = [
     value: "projects",
     label: "ข้อมูลโครงการ",
     icon: Upload,
-    description: "Excel รองรับโครงการ กิจกรรมย่อย และงบประมาณ; CSV แบบเดิมรองรับข้อมูลโครงการหลัก โดยใช้ project_id จับคู่ข้อมูลเดิม",
+    description: "Excel ชีตเดียว: แถวแรกเป็นโครงการหลัก แถวถัดไปใช้ project_id เดิมพร้อมชื่อกิจกรรมและลิงก์ Google Drive",
   },
 ];
 
@@ -225,6 +235,8 @@ const createInitialFormData = (): ProjectFormData => ({
   budget_spent: "",
   budget_source: "",
   budget_note: "",
+  has_sub_activities: false,
+  activities: [],
 });
 
 const getCurrentUser = (): CurrentUser | null => {
@@ -426,6 +438,7 @@ const ProjectsPage = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const [isDownloadingTemplate, setIsDownloadingTemplate] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [viewProject, setViewProject] = useState<Project | null>(null);
   const [isViewOpen, setIsViewOpen] = useState(false);
@@ -449,6 +462,7 @@ const ProjectsPage = () => {
   const [pendingDeleteDocument, setPendingDeleteDocument] = useState<ProjectDocument | null>(null);
   const [isDocumentDeleteOpen, setIsDocumentDeleteOpen] = useState(false);
   const [isDeletingDocument, setIsDeletingDocument] = useState(false);
+  const [isActivityClearConfirmOpen, setIsActivityClearConfirmOpen] = useState(false);
   const [formData, setFormData] = useState<ProjectFormData>(() => createInitialFormData());
   const [facultyOptions, setFacultyOptions] = useState<FacultyOption[]>([]);
   const [detailsCode, setDetailsCode] = useState<string | null>(null);
@@ -935,6 +949,13 @@ const ProjectsPage = () => {
       budget_spent: projectBudgetSpent(project)?.toString() || "",
       budget_source: project.budget_source || "",
       budget_note: budget.note,
+      has_sub_activities: Boolean(project.has_sub_activities || project.activities?.length),
+      activities: (project.activities || []).map((activity, index) => ({
+        id: activity.id,
+        activity_name: activity.activity_name || "",
+        google_drive_url: activity.google_drive_url || "",
+        sort_order: index,
+      })),
     });
     resetCreateDocumentFields();
     setMemberSearch("");
@@ -957,6 +978,18 @@ const ProjectsPage = () => {
       member_faculty_ids: prev.member_faculty_ids.includes(facultyId)
         ? prev.member_faculty_ids.filter((id) => id !== facultyId)
         : [...prev.member_faculty_ids, facultyId],
+    }));
+  };
+
+  const setHasSubActivities = (checked: boolean) => {
+    if (!checked && formData.activities.length > 0) {
+      setIsActivityClearConfirmOpen(true);
+      return;
+    }
+    setFormData((prev) => ({
+      ...prev,
+      has_sub_activities: checked,
+      activities: checked && prev.activities.length === 0 ? [{ activity_name: "", google_drive_url: "", sort_order: 0 }] : prev.activities,
     }));
   };
 
@@ -986,6 +1019,22 @@ const ProjectsPage = () => {
 
     if (formData.start_date && formData.end_date && formData.end_date < formData.start_date) {
       return "วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่มต้น";
+    }
+
+    if (formData.has_sub_activities) {
+      if (formData.activities.length === 0) return "กรุณาเพิ่มกิจกรรมย่อยอย่างน้อย 1 รายการ";
+      const names = new Set<string>();
+      for (const activity of formData.activities) {
+        const name = activity.activity_name.trim();
+        if (!name) return "กรุณากรอกชื่อกิจกรรมย่อยให้ครบ";
+        const nameKey = name.toLocaleLowerCase("th");
+        if (names.has(nameKey)) return "ชื่อกิจกรรมย่อยห้ามซ้ำภายในโครงการ";
+        names.add(nameKey);
+        const linkError = getGoogleDriveLinkError(activity.google_drive_url);
+        if (linkError) return linkError;
+      }
+    } else if (formData.activities.length > 0) {
+      return "กรุณายืนยันการลบกิจกรรมย่อยก่อนบันทึก";
     }
 
     if (!editMode) {
@@ -1060,6 +1109,13 @@ const ProjectsPage = () => {
         start_date: formData.start_date || null,
         end_date: formData.end_date || null,
         status: formData.status,
+        has_sub_activities: formData.has_sub_activities,
+        activities: formData.has_sub_activities ? formData.activities.map((activity, index) => ({
+          ...(activity.id ? { id: activity.id } : {}),
+          activity_name: activity.activity_name.trim(),
+          google_drive_url: activity.google_drive_url.trim(),
+          sort_order: index,
+        })) : [],
         ...(!budgetsRequireDetails ? { budget_proposed: formData.budget_proposed === "" ? null : Number(formData.budget_proposed),
         budget_spent: formData.budget_spent === "" ? null : Number(formData.budget_spent),
         budget_source: formData.budget_source.trim(),
@@ -1192,6 +1248,26 @@ const ProjectsPage = () => {
     }
   };
 
+  const handleDownloadProjectImportTemplate = async () => {
+    if (isDownloadingTemplate) return;
+    setIsDownloadingTemplate(true);
+    try {
+      await downloadProjectImportTemplate();
+      toast({
+        title: "ดาวน์โหลดสำเร็จ",
+        description: "ดาวน์โหลดแพทเทิร์นนำเข้าข้อมูลโครงการแล้ว",
+      });
+    } catch (error: unknown) {
+      toast({
+        title: "ดาวน์โหลดไม่สำเร็จ",
+        description: getApiErrorMessage(error, "ไม่สามารถดาวน์โหลดแพทเทิร์นข้อมูลโครงการได้"),
+        variant: "destructive",
+      });
+    } finally {
+      setIsDownloadingTemplate(false);
+    }
+  };
+
   const normalizedResponsibleSearch = responsibleSearch.trim().toLowerCase();
   const filteredResponsibleOptions = facultyOptions.filter((faculty) =>
     `${faculty.name} ${faculty.faculty_id} ${faculty.email || ""}`.toLowerCase().includes(normalizedResponsibleSearch)
@@ -1236,9 +1312,14 @@ const ProjectsPage = () => {
         title="จัดการโครงการ"
         description="สร้าง แก้ไข และติดตามสถานะโครงการภาควิชา"
         actions={canManageProjects ? <>
-            <Button variant="outline" className="gap-2" onClick={downloadProjectImportTemplate}>
-              <Download className="h-4 w-4" />
-              ดาวน์โหลดแพทเทิร์น
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={handleDownloadProjectImportTemplate}
+              disabled={isDownloadingTemplate}
+            >
+              {isDownloadingTemplate ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+              {isDownloadingTemplate ? "กำลังสร้างแพทเทิร์น..." : "ดาวน์โหลดแพทเทิร์น"}
             </Button>
             <Button variant="outline" className="gap-2" onClick={() => setIsImportOpen(true)}>
               <Upload className="h-4 w-4" />
@@ -1257,7 +1338,7 @@ const ProjectsPage = () => {
           onOpenChange={setIsImportOpen}
           importTypes={projectImportTypes}
           title="Import ข้อมูลโครงการ"
-          description="นำเข้าข้อมูลโครงการจากไฟล์ Excel หรือ CSV"
+          description="นำเข้าข้อมูลโครงการจากไฟล์ Excel"
           onImported={fetchProjects}
         />
       )}
@@ -1402,7 +1483,7 @@ const ProjectsPage = () => {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-48">
                       {!project.merge_pending && <DropdownMenuItem onClick={() => navigateToProject("project-reports", project.project_id, "reports")}>ดูรายงานโครงการ</DropdownMenuItem>}
-                      {!project.merge_pending && <DropdownMenuItem onClick={() => setDetailsCode(project.project_id)}>กิจกรรมและงบแยกแหล่ง</DropdownMenuItem>}
+                      {!project.merge_pending && <DropdownMenuItem onClick={() => setDetailsCode(project.project_id)}>กิจกรรมย่อยและงบโครงการ</DropdownMenuItem>}
                       <DropdownMenuItem className="gap-2" onClick={() => handleOpenViewModal(project)}>
                         <Eye className="h-4 w-4 text-blue-500" /> ดูรายละเอียด
                       </DropdownMenuItem>
@@ -1667,6 +1748,48 @@ const ProjectsPage = () => {
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-3 rounded-lg border p-4">
+              <label className="flex cursor-pointer items-center gap-3">
+                <Checkbox
+                  checked={formData.has_sub_activities}
+                  onCheckedChange={(value) => setHasSubActivities(value === true)}
+                  disabled={isSubmitting}
+                />
+                <span>
+                  <span className="block font-medium">โครงการนี้มีกิจกรรมย่อย</span>
+                  <span className="block text-xs text-muted-foreground">แต่ละกิจกรรมระบุเฉพาะชื่อและลิงก์ Google Drive</span>
+                </span>
+              </label>
+              {formData.has_sub_activities && (
+                <div className="space-y-3 border-t pt-3">
+                  {formData.activities.map((activity, index) => (
+                    <div key={activity.id ?? `activity-${index}`} className="space-y-3 rounded-md border bg-muted/20 p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-medium">กิจกรรมย่อย {index + 1}</p>
+                        <div className="flex flex-wrap gap-1">
+                          <Button type="button" size="sm" variant="ghost" disabled={index === 0 || isSubmitting} onClick={() => setFormData((prev) => { const activities = [...prev.activities]; [activities[index - 1], activities[index]] = [activities[index], activities[index - 1]]; return { ...prev, activities }; })}>ขึ้น</Button>
+                          <Button type="button" size="sm" variant="ghost" disabled={index === formData.activities.length - 1 || isSubmitting} onClick={() => setFormData((prev) => { const activities = [...prev.activities]; [activities[index], activities[index + 1]] = [activities[index + 1], activities[index]]; return { ...prev, activities }; })}>ลง</Button>
+                          <Button type="button" size="sm" variant="ghost" className="text-destructive" disabled={isSubmitting} onClick={() => setFormData((prev) => ({ ...prev, activities: prev.activities.filter((_, activityIndex) => activityIndex !== index) }))}>ลบ</Button>
+                        </div>
+                      </div>
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div className="grid gap-2">
+                          <Label htmlFor={`project-activity-name-${index}`}>ชื่อกิจกรรม <span className="text-red-500">*</span></Label>
+                          <Input id={`project-activity-name-${index}`} maxLength={255} value={activity.activity_name} onChange={(event) => setFormData((prev) => ({ ...prev, activities: prev.activities.map((item, activityIndex) => activityIndex === index ? { ...item, activity_name: event.target.value } : item) }))} disabled={isSubmitting} />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor={`project-activity-drive-${index}`}>ลิงก์ Google Drive <span className="text-red-500">*</span></Label>
+                          <Input id={`project-activity-drive-${index}`} type="url" placeholder="https://drive.google.com/..." value={activity.google_drive_url} onChange={(event) => setFormData((prev) => ({ ...prev, activities: prev.activities.map((item, activityIndex) => activityIndex === index ? { ...item, google_drive_url: event.target.value } : item) }))} disabled={isSubmitting} />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  <Button type="button" variant="outline" onClick={() => setFormData((prev) => ({ ...prev, activities: [...prev.activities, { activity_name: "", google_drive_url: "", sort_order: prev.activities.length }] }))} disabled={isSubmitting}>
+                    <Plus className="mr-2 h-4 w-4" /> เพิ่มกิจกรรมย่อย
+                  </Button>
+                </div>
+              )}
+            </div>
             <div className="grid gap-4 md:grid-cols-3">
               <div className="grid gap-2">
                 <Label>งบเสนอ (บาท)</Label>
@@ -1693,7 +1816,7 @@ const ProjectsPage = () => {
               <div className="grid gap-2">
                 <Label>แหล่งงบประมาณ</Label>
                 <Select disabled={budgetsRequireDetails} value={formData.budget_source || "unspecified"} onValueChange={value => setFormData({ ...formData, budget_source: value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Object.entries({ university: 'มหาวิทยาลัยสยาม', thonburiHospital: 'โรงพยาบาลธนบุรี', nursingFaculty: 'คณะพยาบาลศาสตร์', external: 'หน่วยงานภายนอก', unspecified: 'ยังไม่ระบุแหล่งเงิน' }).map(([key, label]) => <SelectItem key={key} value={key}>{label}</SelectItem>)}</SelectContent></Select>
-                <p className="text-xs text-muted-foreground">หากมีหลายแหล่งเงิน ให้แก้ที่เมนูกิจกรรมและงบแยกแหล่ง</p>
+                <p className="text-xs text-muted-foreground">หากมีหลายแหล่งเงิน ให้แก้ที่เมนูกิจกรรมย่อยและงบโครงการ</p>
               </div>
             </div>
             <div className="grid gap-2">
@@ -1928,6 +2051,18 @@ const ProjectsPage = () => {
               </div>
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-2">
+                  <p className="text-foreground text-base font-bold">กิจกรรมย่อย</p>
+                  <Badge variant="outline">{viewProject.activities?.length || 0} รายการ</Badge>
+                </div>
+                {!viewProject.activities?.length ? <p className="text-sm text-muted-foreground">ไม่มีกิจกรรมย่อย</p> : viewProject.activities.map((activity) => (
+                  <div key={activity.id ?? activity.activity_name} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3">
+                    <span className="font-medium">{activity.activity_name}</span>
+                    <a href={activity.google_drive_url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary underline">เปิด Google Drive</a>
+                  </div>
+                ))}
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
                   <p className="text-foreground text-base font-bold">เอกสารที่อัปโหลด</p>
                   <Badge variant="outline">{projectDocuments(viewProject).length} รายการ</Badge>
                 </div>
@@ -2108,6 +2243,17 @@ const ProjectsPage = () => {
         description={`คุณแน่ใจหรือไม่ว่าต้องการลบเอกสาร "${pendingDeleteDocument?.name || ""}"? ระบบจะลบข้อมูลเอกสารออกจากระบบ และลบไฟล์จริงถ้ามี`}
         onConfirm={handleDeleteDocument}
         isLoading={isDeletingDocument}
+      />
+      <ConfirmActionDialog
+        open={isActivityClearConfirmOpen}
+        onOpenChange={setIsActivityClearConfirmOpen}
+        title="ยืนยันการลบกิจกรรมย่อย"
+        description="กิจกรรมย่อยและลิงก์ Google Drive ทั้งหมดในฟอร์มจะถูกลบเมื่อบันทึกโครงการ"
+        confirmLabel="ลบกิจกรรมย่อย"
+        onConfirm={() => {
+          setFormData((prev) => ({ ...prev, has_sub_activities: false, activities: [] }));
+          setIsActivityClearConfirmOpen(false);
+        }}
       />
       <ProjectReportDetailsDialog projectId={detailsCode} open={detailsCode !== null} onOpenChange={open => { if (!open) setDetailsCode(null); }} onSaved={fetchProjects} />
     </div>

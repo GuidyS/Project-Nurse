@@ -198,7 +198,7 @@ function project_error_status(Throwable $e): int {
 function project_require_existing_project(PDO $db, string $projectId): array
 {
     $stmt = $db->prepare("
-        SELECT id, project_id, project_name_th, responsible_faculty_id, mapping_json
+        SELECT id, project_id, project_name_th, responsible_faculty_id
         FROM project
         WHERE project_id = :project_id
         LIMIT 1

@@ -19,7 +19,7 @@ type MergeReport = {
 export type ProjectMergeQueue = {
   projects: { project_id: string; project_name_th?: string; responsible_faculty_id?: number; project_type: string; report_item_id?: number }[];
   reports: MergeReport[];
-  orphan_activities: (ReportActivity & { id: number; project_name?: string; documents: MergeDocument[] })[];
+  orphan_activities: (ReportActivity & { id: number; project_name?: string; responsible_person?: string; documents: MergeDocument[] })[];
   legacy_budgets: { source_id: string; project_id: string; original: { fiscal_year?: number; legacy_amount?: number | string; spent?: number | string; result?: string } }[];
   pending: { projects: number; report_items: number; legacy_budgets: number };
   periodStatus: 'open' | 'review' | 'closed';
@@ -37,8 +37,8 @@ const budgets = z.union([budgetCells, z.array(z.never())]).transform(value => Ar
 const document = z.object({ id, url: text, created_at: text });
 const metadata = { plan_name: text, objective: text, kpi: text };
 const activity = z.object({
-  id, activity_code: text, activity_name: text, responsible_person: text, project_name: text,
-  ...metadata, budgets, documents: z.array(document).optional(),
+  id, activity_name: text, google_drive_url: text,
+  responsible_person: text.optional(), project_name: text.optional(), documents: z.array(document).optional(),
 });
 const queueSchema = z.object({
   projects: z.array(z.object({ project_id: z.string().min(1), project_name_th: text, responsible_faculty_id: optionalId, project_type: z.string(), report_item_id: optionalId })),

@@ -764,6 +764,7 @@ try {
             $stmt = $db->prepare("SELECT * FROM student WHERE student_id = :id LIMIT 1");
             $stmt->execute(['id' => $u_info['username']]);
             $profile = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+            unset($profile['first_name_en'], $profile['last_name_en']);
 
             // คำนวณปีการศึกษาและชั้นปี Real-time ตามวันตัดรอบที่แอดมินตั้งไว้
             $academicInfo = calculateRealtimeAcademicInfo(
@@ -826,6 +827,7 @@ try {
             $stmt = $db->prepare("SELECT * FROM faculty WHERE faculty_id = :id LIMIT 1");
             $stmt->execute(['id' => $u_info['username']]);
             $profile = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+            unset($profile['first_name_en'], $profile['last_name_en']);
             $profile['pdf_documents'] = buildFacultyDocuments($db, $profile);
 
             // Fetch Workloads
@@ -878,7 +880,7 @@ try {
         if ((int)$u_info['role_id'] === 3) {
             studentLicenseEnsureSchema($db);
 
-            // ชื่อภาษาไทย/อังกฤษต้องตรงกับภาษาของช่อง
+            // ชื่อภาษาไทยต้องตรงกับภาษาของช่อง
             try {
                 nameAssertLanguages(is_array($input) ? $input : []);
             } catch (InvalidArgumentException $e) {
@@ -917,9 +919,6 @@ try {
 
             $rawWeight = isset($input['weight']) ? trim((string)$input['weight']) : '';
             $weight    = ($rawWeight !== '' && is_numeric($rawWeight)) ? floatval($rawWeight) : null;
-
-            $rawGpa    = isset($input['gpa']) ? trim((string)$input['gpa']) : '';
-            $gpa       = ($rawGpa !== '' && is_numeric($rawGpa)) ? floatval($rawGpa) : null;
 
             $bmi = null;
             if ($height && $weight && $height > 0) {
@@ -1004,13 +1003,10 @@ try {
             }
 
             $sql = "UPDATE student SET 
-                        first_name_en = :first_name_en, 
-                        last_name_en = :last_name_en, 
                         gender = :gender, 
                         birth_date = :birth_date, 
                         email = :email, 
                         phone = :phone, 
-                        gpa = :gpa,
                         height = :height,
                         weight = :weight,
                         bmi = :bmi,
@@ -1035,13 +1031,10 @@ try {
             
             $stmtUpdate = $db->prepare($sql);
             $stmtUpdate->execute([
-                ':first_name_en'    => !empty($input['first_name_en']) ? trim((string)$input['first_name_en']) : null,
-                ':last_name_en'     => !empty($input['last_name_en']) ? trim((string)$input['last_name_en']) : null,
                 ':gender'           => !empty($input['gender']) ? trim((string)$input['gender']) : null,
                 ':birth_date'       => !empty($input['birth_date']) ? trim((string)$input['birth_date']) : null,
                 ':email'            => !empty($input['email']) ? trim((string)$input['email']) : null,
                 ':phone'            => $phone,
-                ':gpa'              => $gpa,
                 ':height'           => $height,
                 ':weight'           => $weight,
                 ':bmi'              => $bmi,
@@ -1106,10 +1099,8 @@ try {
                 exit();
             }
 
-            $sql = "UPDATE faculty SET first_name_en = ?, last_name_en = ?, gender = ?, birth_date = ?, email = ?, phone = ?, current_address = ?, nursing_council_no = ?, license_expiry = ?, start_work_date = ?, contract_date = ?, pts_date = ? WHERE faculty_id = ?";
+            $sql = "UPDATE faculty SET gender = ?, birth_date = ?, email = ?, phone = ?, current_address = ?, nursing_council_no = ?, license_expiry = ?, start_work_date = ?, contract_date = ?, pts_date = ? WHERE faculty_id = ?";
             $db->prepare($sql)->execute([
-                $input['first_name_en'] ?? null,
-                $input['last_name_en'] ?? null,
                 $input['gender'] ?? null,
                 $input['birth_date'] ?? null,
                 $email !== '' ? $email : null,

@@ -6,6 +6,7 @@ if (session_status() === PHP_SESSION_NONE) {
 require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../Teacher/ProjectShared/project_helpers.php';
 require_once __DIR__ . '/../../Teacher/MyProjects/my_project_member_helpers.php';
+require_once __DIR__ . '/../../Teacher/ProjectLinks/project_outcome_link_helpers.php';
 require_once __DIR__ . '/../../../config/audit_helper.php';
 require_once __DIR__ . '/../../../config/admin_access.php';
 require_once __DIR__ . '/../ManageUsers/user-account-import-helper.php';
@@ -24,17 +25,60 @@ function getImportSchema($importType) {
             'table' => 'student',
             'key' => 'student_id',
             'row_key' => 'student_id',
+            'required_columns' => ['student_id', 'title', 'first_name_th', 'last_name_th', 'gender', 'birth_date'],
             'optional_columns' => [],
+            'ignore_blank_optional_columns' => true,
             'date_columns' => ['birth_date', 'graduation_date', 'dropout_date'],
-            'columns' => ['student_id', 'title', 'first_name_th', 'last_name_th', 'first_name_en', 'last_name_en', 'gender', 'birth_date', 'email', 'phone', 'year_level', 'gpa', 'hometown_province', 'height', 'weight', 'bmi', 'home_phone', 'home_address', 'status', 'graduation_date', 'dropout_date', 'dropout_reason', 'admission_year']
+            'header_aliases' => [
+                'student_id' => ['รหัสนักศึกษา'],
+                'title' => ['คำนำหน้า'],
+                'first_name_th' => ['ชื่อภาษาไทย'],
+                'last_name_th' => ['นามสกุลภาษาไทย'],
+                'gender' => ['เพศ'],
+                'birth_date' => ['วันเดือนปีเกิด'],
+                'email' => ['อีเมล'],
+                'phone' => ['เบอร์โทรศัพท์'],
+                'year_level' => ['ชั้นปี'],
+                'gpa' => ['เกรดเฉลี่ย (GPA)'],
+                'hometown_province' => ['จังหวัดภูมิลำเนา'],
+                'height' => ['ส่วนสูง'],
+                'weight' => ['น้ำหนัก'],
+                'bmi' => ['ดัชนีมวลกาย (BMI)'],
+                'home_phone' => ['เบอร์โทรศัพท์บ้าน'],
+                'home_address' => ['ที่อยู่ตามภูมิลำเนา'],
+                'status' => ['สถานะ'],
+                'graduation_date' => ['วันที่สำเร็จการศึกษา'],
+                'dropout_date' => ['วันที่เปลี่ยนสถานะการศึกษา'],
+                'dropout_reason' => ['เหตุผลการเปลี่ยนสถานะ'],
+                'admission_year' => ['ปีที่เข้าศึกษา'],
+            ],
+            'columns' => ['student_id', 'title', 'first_name_th', 'last_name_th', 'gender', 'birth_date', 'email', 'phone', 'year_level', 'gpa', 'hometown_province', 'height', 'weight', 'bmi', 'home_phone', 'home_address', 'status', 'graduation_date', 'dropout_date', 'dropout_reason', 'admission_year']
         ],
         'teachers' => [
             'table' => 'faculty',
             'key' => 'faculty_id',
             'row_key' => 'faculty_id',
+            'required_columns' => ['faculty_id', 'title', 'first_name_th', 'last_name_th', 'gender', 'birth_date'],
             'optional_columns' => [],
+            'ignore_blank_optional_columns' => true,
             'date_columns' => ['birth_date', 'license_expiry', 'start_work_date', 'academic_position_date'],
-            'columns' => ['faculty_id', 'title', 'first_name_th', 'last_name_th', 'first_name_en', 'last_name_en', 'gender', 'birth_date', 'email', 'phone', 'current_address', 'nursing_council_no', 'license_expiry', 'start_work_date', 'academic_position_date', 'status']
+            'header_aliases' => [
+                'faculty_id' => ['รหัสประจำตัวอาจารย์'],
+                'title' => ['คำนำหน้า'],
+                'first_name_th' => ['ชื่อภาษาไทย'],
+                'last_name_th' => ['นามสกุลภาษาไทย'],
+                'gender' => ['เพศ'],
+                'birth_date' => ['วันเดือนปีเกิด'],
+                'email' => ['อีเมล'],
+                'phone' => ['เบอร์โทรศัพท์'],
+                'current_address' => ['ที่อยู่ปัจจุบัน'],
+                'nursing_council_no' => ['เลขใบประกอบวิชาชีพ'],
+                'license_expiry' => ['วันหมดอายุใบอนุญาต'],
+                'start_work_date' => ['วันที่เริ่มทำงาน'],
+                'academic_position_date' => ['วันที่ได้รับตำแหน่งทางวิชาการ'],
+                'status' => ['สถานะ'],
+            ],
+            'columns' => ['faculty_id', 'title', 'first_name_th', 'last_name_th', 'gender', 'birth_date', 'email', 'phone', 'current_address', 'nursing_council_no', 'license_expiry', 'start_work_date', 'academic_position_date', 'status']
         ],
         'courses' => [
             'table' => 'subject',
@@ -69,22 +113,79 @@ function buildHeaderMap(array $headers) {
     return $headerMap;
 }
 
-function validateHeaders(array $headerMap, array $schema, string $importType) {
-    $missingColumns = [];
-    $optionalColumns = $schema['optional_columns'] ?? [];
+function buildSchemaHeaderMap(array $headers, array $schema) {
+    $rawHeaderMap = buildHeaderMap($headers);
+    $headerAliases = $schema['header_aliases'] ?? [];
+    $schemaHeaderMap = [];
 
     foreach ($schema['columns'] as $column) {
-        if (in_array($column, $optionalColumns, true)) {
-            continue;
+        $aliases = array_merge([$column], $headerAliases[$column] ?? []);
+        foreach ($aliases as $alias) {
+            $normalizedAlias = normalizeHeader($alias);
+            if (array_key_exists($normalizedAlias, $rawHeaderMap)) {
+                $schemaHeaderMap[$column] = $rawHeaderMap[$normalizedAlias];
+                break;
+            }
         }
+    }
 
-        if (!array_key_exists($column, $headerMap)) {
-            $missingColumns[] = $column;
+    return $schemaHeaderMap;
+}
+
+function getImportColumnLabel(string $column, array $schema): string {
+    $aliases = $schema['header_aliases'][$column] ?? [];
+    return $aliases[0] ?? $column;
+}
+
+function validateHeaders(array $headerMap, array $schema, string $importType) {
+    $missingColumns = [];
+    $requiredColumns = $schema['required_columns'] ?? null;
+
+    if ($requiredColumns !== null) {
+        foreach ($requiredColumns as $column) {
+            if (!array_key_exists($column, $headerMap)) {
+                $missingColumns[] = getImportColumnLabel($column, $schema);
+            }
+        }
+    } else {
+        $optionalColumns = $schema['optional_columns'] ?? [];
+
+        foreach ($schema['columns'] as $column) {
+            if (in_array($column, $optionalColumns, true)) {
+                continue;
+            }
+
+            if (!array_key_exists($column, $headerMap)) {
+                $missingColumns[] = getImportColumnLabel($column, $schema);
+            }
         }
     }
 
     if (!empty($missingColumns)) {
-        throw new Exception("โครงสร้างไฟล์ไม่ตรงกับประเภท {$importType}: ขาดคอลัมน์ " . implode(', ', $missingColumns));
+        throw new InvalidArgumentException("โครงสร้างไฟล์ไม่ตรงกับประเภท {$importType}: ขาดคอลัมน์ " . implode(', ', $missingColumns));
+    }
+}
+
+function rowHasImportValues(array $values): bool {
+    return count(array_filter($values, static fn($value) => $value !== null && $value !== '')) > 0;
+}
+
+function validateRequiredRowValues(array $values, array $schema, int $rowNumber): void {
+    $requiredColumns = $schema['required_columns'] ?? [];
+    if (empty($requiredColumns)) {
+        return;
+    }
+
+    $missing = [];
+    foreach ($requiredColumns as $column) {
+        $index = array_search($column, $schema['columns'], true);
+        if ($index === false || $values[$index] === null || $values[$index] === '') {
+            $missing[] = getImportColumnLabel($column, $schema);
+        }
+    }
+
+    if (!empty($missing)) {
+        throw new InvalidArgumentException("แถว {$rowNumber}: กรุณาระบุ " . implode(', ', $missing));
     }
 }
 
@@ -94,7 +195,7 @@ function normalizeImportedDateParts(int $day, int $month, int $year, string $col
     }
 
     if (!checkdate($month, $day, $year)) {
-        throw new Exception("{$column} แถว {$rowNumber} ต้องเป็นวันที่รูปแบบ dd/mm/yyyy");
+        throw new InvalidArgumentException("{$column} แถว {$rowNumber} ต้องเป็นวันที่รูปแบบ dd/mm/yyyy");
     }
 
     return sprintf('%04d-%02d-%02d', $year, $month, $day);
@@ -129,7 +230,7 @@ function normalizeImportedDateValue($value, string $column, int $rowNumber, ?Cel
         $month = (int)$matches[2];
         $day = (int)$matches[3];
         if (!checkdate($month, $day, $year)) {
-            throw new Exception("{$column} แถว {$rowNumber} ต้องเป็นวันที่รูปแบบ dd/mm/yyyy");
+            throw new InvalidArgumentException("{$column} แถว {$rowNumber} ต้องเป็นวันที่รูปแบบ dd/mm/yyyy");
         }
         return sprintf('%04d-%02d-%02d', $year, $month, $day);
     }
@@ -138,7 +239,7 @@ function normalizeImportedDateValue($value, string $column, int $rowNumber, ?Cel
         return normalizeImportedDateParts((int)$matches[1], (int)$matches[2], (int)$matches[3], $column, $rowNumber);
     }
 
-    throw new Exception("{$column} แถว {$rowNumber} ต้องเป็นวันที่รูปแบบ dd/mm/yyyy");
+    throw new InvalidArgumentException("{$column} แถว {$rowNumber} ต้องเป็นวันที่รูปแบบ dd/mm/yyyy");
 }
 
 function getRowValuesBySchema(array $row, array $headerMap, array $schema, int $rowNumber, array $cells = []) {
@@ -193,6 +294,42 @@ function buildUpsertSql(array $schema) {
     }
 
     return "INSERT INTO {$schema['table']} (" . implode(', ', $columns) . ") VALUES ({$placeholders}) ON DUPLICATE KEY UPDATE " . implode(', ', $updates);
+}
+
+/**
+ * ไฟล์ผู้ใช้อาจไม่มีคอลัมน์ optional หรือเว้นช่องว่างไว้ได้ โดยค่าที่ว่างต้องไม่ล้างข้อมูลเดิม
+ * คืน SQL และค่าที่มีจริงในแถวนั้นเพื่อให้ INSERT ใช้ default ของฐานข้อมูล และ UPDATE แตะเฉพาะค่าที่กรอก
+ */
+function buildRowUpsert(array $schema, array $values): array {
+    if (empty($schema['ignore_blank_optional_columns'])) {
+        return [buildUpsertSql($schema), $values];
+    }
+
+    $requiredColumns = $schema['required_columns'] ?? [];
+    $includedColumns = [];
+    $includedValues = [];
+    foreach ($schema['columns'] as $index => $column) {
+        $value = $values[$index] ?? null;
+        if (in_array($column, $requiredColumns, true) || ($value !== null && $value !== '')) {
+            $includedColumns[] = $column;
+            $includedValues[] = $value;
+        }
+    }
+
+    $quotedColumns = array_map(static fn(string $column): string => "`{$column}`", $includedColumns);
+    $placeholders = implode(', ', array_fill(0, count($includedColumns), '?'));
+    $updates = [];
+    foreach ($includedColumns as $column) {
+        if ($column !== $schema['key']) {
+            $updates[] = "`{$column}`=VALUES(`{$column}`)";
+        }
+    }
+
+    $sql = "INSERT INTO `{$schema['table']}` (" . implode(', ', $quotedColumns) . ") VALUES ({$placeholders})";
+    if (!empty($updates)) {
+        $sql .= " ON DUPLICATE KEY UPDATE " . implode(', ', $updates);
+    }
+    return [$sql, $includedValues];
 }
 
 function prepareGeneratedIdValues(PDO $db, array $values, array $schema) {
@@ -257,53 +394,12 @@ function prepareExistingLookupValues(PDO $db, array $values, array $schema) {
     return $values;
 }
 
-function processExcelToDatabase($filePath, $importType, $db, $fileExt) {
-    if ($importType === 'projects') return processProjectWorkbook($filePath, $db, $fileExt);
+function processExcelToDatabase($filePath, $importType, $db) {
+    if ($importType === 'projects') return processProjectWorkbook($filePath, $db);
     $rowCount = 0;
     $rowKeys = [];
     $schema = getImportSchema($importType);
-    $sql = buildUpsertSql($schema);
     $rowKeyIndex = array_search($schema['row_key'], $schema['columns'], true);
-
-    if ($fileExt === 'csv') {
-        if (($handle = fopen($filePath, "r")) === false) {
-            throw new Exception("ไม่สามารถอ่านไฟล์ CSV ได้");
-        }
-
-        $headers = fgetcsv($handle, 1000, ",");
-        if ($headers === false) {
-            fclose($handle);
-            throw new Exception("ไม่พบหัวตารางในไฟล์นำเข้า");
-        }
-
-        $headerMap = buildHeaderMap($headers);
-        validateHeaders($headerMap, $schema, $importType);
-
-        $db->beginTransaction();
-        try {
-            $stmt = $db->prepare($sql);
-            $rowNumber = 1;
-            while (($data = fgetcsv($handle, 1000, ",")) !== false) {
-                $rowNumber++;
-                $values = getRowValuesBySchema($data, $headerMap, $schema, $rowNumber);
-                if ($values[$rowKeyIndex] === null || $values[$rowKeyIndex] === '') continue;
-
-                $rowKeys[] = (string)$values[$rowKeyIndex];
-                $values = prepareExistingLookupValues($db, $values, $schema);
-                $values = prepareGeneratedIdValues($db, $values, $schema);
-                $stmt->execute($values);
-                $rowCount++;
-            }
-
-            $db->commit();
-            fclose($handle);
-            return ['recordCount' => $rowCount, 'rowKeys' => $rowKeys];
-        } catch (Exception $e) {
-            $db->rollBack();
-            fclose($handle);
-            throw $e;
-        }
-    }
 
     $spreadsheet = IOFactory::load($filePath);
     $worksheet = $spreadsheet->getActiveSheet();
@@ -316,12 +412,12 @@ function processExcelToDatabase($filePath, $importType, $db, $fileExt) {
         $headers[] = $worksheet->getCell($columnLetter . '1')->getValue();
     }
 
-    $headerMap = buildHeaderMap($headers);
+    $headerMap = buildSchemaHeaderMap($headers, $schema);
     validateHeaders($headerMap, $schema, $importType);
 
     $db->beginTransaction();
     try {
-        $stmt = $db->prepare($sql);
+        $statementCache = [];
         for ($row = 2; $row <= $highestRow; $row++) {
             $rowData = [];
             $rowCells = [];
@@ -333,12 +429,18 @@ function processExcelToDatabase($filePath, $importType, $db, $fileExt) {
             }
 
             $values = getRowValuesBySchema($rowData, $headerMap, $schema, $row, $rowCells);
+            if (!rowHasImportValues($values)) continue;
+            validateRequiredRowValues($values, $schema, $row);
             if ($values[$rowKeyIndex] === null || $values[$rowKeyIndex] === '') continue;
 
             $rowKeys[] = (string)$values[$rowKeyIndex];
             $values = prepareExistingLookupValues($db, $values, $schema);
             $values = prepareGeneratedIdValues($db, $values, $schema);
-            $stmt->execute($values);
+            [$sql, $rowValues] = buildRowUpsert($schema, $values);
+            if (!isset($statementCache[$sql])) {
+                $statementCache[$sql] = $db->prepare($sql);
+            }
+            $statementCache[$sql]->execute($rowValues);
             $rowCount++;
         }
 
@@ -362,11 +464,16 @@ try {
     $importType = $_POST['importType'];
     $userId = $adminUserId;
 
-    $allowed = ["xlsx", "xls", "csv"];
+    $allowedImportTypes = ['students', 'teachers', 'courses', 'projects'];
+    if (!in_array($importType, $allowedImportTypes, true)) {
+        throw new InvalidArgumentException("ประเภทการนำเข้าไม่ถูกต้อง");
+    }
+
+    $allowed = ["xlsx", "xls"];
     $fileExt = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
 
     if (!in_array($fileExt, $allowed)) {
-        throw new Exception("รองรับเฉพาะไฟล์ .xlsx, .xls และ .csv เท่านั้น");
+        throw new InvalidArgumentException("รองรับเฉพาะไฟล์ .xlsx และ .xls เท่านั้น");
     }
 
     $uploadDir = __DIR__ . "/../../../uploads/imports/$importType/";
@@ -389,7 +496,7 @@ try {
         $importId = $db->lastInsertId();
 
         try {
-            $importResult = processExcelToDatabase($uploadPath, $importType, $db, $fileExt);
+            $importResult = processExcelToDatabase($uploadPath, $importType, $db);
             $finalCount = (int)($importResult['recordCount'] ?? 0);
             $accountSummary = null;
 

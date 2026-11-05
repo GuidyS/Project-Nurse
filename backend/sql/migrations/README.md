@@ -33,6 +33,28 @@ Run frontend lint/build and PHP syntax checks, and verify create/update, import,
 export, project documents, PLO/CLO, reminders, and dean dashboards. Do not use
 real dump rows or send reminder email during tests.
 
+## Retire `project.mapping_json` (2026-10-29)
+
+This change is deployed in two phases. Back up the database and pause project
+writes before either database operation.
+
+1. Run `2026-10-29-backfill-project-mapping-json.sql`. It copies PLO/CLO links,
+   preserves legacy YLO rows, validates the legacy member count, and prints only
+   project codes and issue types. Do not deploy phase 1 until its final status is
+   `ready_for_phase_1_deploy`.
+2. Deploy application code that reads members from `project_faculty_members` and
+   links from `project_outcome_links`. Project export/import uses the separate
+   `member_faculty_ids`, `plo_codes`, and `clo_codes` fields.
+3. Verify create/update, project links, import, export, permissions, and the
+   migration audit in the target environment.
+4. In a later maintenance window, run
+   `2026-10-29-drop-project-mapping-json.sql`. It refuses to drop the column if
+   the phase-1 marker/hash is missing or PLO/CLO remains on a non-academic project.
+
+After phase 2, do not roll back to an application version that references
+`project.mapping_json`. Fresh installations use `MYSQL_DATABASE.sql`, where the
+column is already absent.
+
 ## รวมโครงการและรายงาน (2026-10-26)
 
 ฐานใหม่ใช้ DDL ใน `MYSQL_DATABASE.sql` ซึ่งมีเฉพาะงบเสนอ/งบใช้จริงในโมเดลใช้งาน
@@ -114,6 +136,19 @@ backfills existing activity rows with `LEGACY-<id>`, and adds a unique key scope
 links, snapshots, or project codes. Do not apply it to the application database
 automatically; first verify it on a DDL-only disposable database.
 
-New project Excel templates use `project_id + activity_code` as the stable activity
-identity. Missing rows never delete projects, activities, budget sources, or members.
-Closed report years remain read-only and old one-sheet project imports remain accepted.
+This section documents the retired activity-code format that was used before the
+2026-11-02 reset below. Do not use `activity_code` in newly generated import files.
+
+## Reset project activities to name + Google Drive (2026-11-02)
+
+Deploy the application code first, back up the database, and pause project writes.
+Then run `2026-11-02-reset-project-activities.php --confirm` manually inside an
+environment that can load the backend database configuration. The script deletes
+legacy activity rows, activity budgets and activity-linked documents, removes safe
+local upload files after commit, and redacts activity arrays from closed snapshots
+and merge payloads while preserving audit/import rows. It does not run automatically.
+
+After the reset, activities contain only a name, display order and one Google Drive
+link. Project imports use the single `โครงการ` sheet: the first row for each
+`project_id` is the project master and following rows repeat only that code with an
+activity name and Google Drive link. Budgets exist only on the master row.

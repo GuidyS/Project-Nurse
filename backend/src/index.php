@@ -156,6 +156,9 @@
             case 'import-data':
                 require_once 'components/Admin/ImportData/import-data.php'; 
                 break;
+            case 'project-import-template':
+                require_once 'components/Admin/ImportData/project-import-template.php';
+                break;
             case 'get-import-history':
                 require_once 'components/Admin/ImportData/get-import-history.php';
                 break;

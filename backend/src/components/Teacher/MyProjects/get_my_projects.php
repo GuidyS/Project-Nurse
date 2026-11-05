@@ -123,6 +123,7 @@ try {
         WHERE project_id IN ({$projectIdSql})
           AND file_path IS NOT NULL
           AND TRIM(file_path) <> ''
+          AND report_document_type <> 'activity_attachment'
         ORDER BY date DESC, id DESC
     ");
     $docsStmt->execute($params);

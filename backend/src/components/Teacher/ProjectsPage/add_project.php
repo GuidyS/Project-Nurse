@@ -99,7 +99,6 @@ try {
     $responsibleFacultyId = project_page_responsible_faculty_id($db, $input);
     my_project_ensure_member_table($db);
     $memberFacultyIds = my_project_normalize_member_faculty_ids($db, $input, $responsibleFacultyId);
-    $memberCount = count($memberFacultyIds) + 1;
 
     $db->beginTransaction();
     project_u_lock_year($db, project_u_year($academicYear));
@@ -109,7 +108,6 @@ try {
             project_id,
             project_name_th,
             project_type,
-            mapping_json,
             responsible_faculty_id,
             academic_year,
             status,
@@ -119,7 +117,6 @@ try {
             :project_id,
             :name_th,
             :project_type,
-            :mapping_json,
             :responsible_faculty_id,
             :academic_year,
             :status,
@@ -131,7 +128,6 @@ try {
         ':project_id' => $projectId,
         ':name_th' => $nameTh,
         ':project_type' => $projectType,
-        ':mapping_json' => json_encode(['member_count' => $memberCount], JSON_UNESCAPED_UNICODE),
         ':responsible_faculty_id' => $responsibleFacultyId,
         ':academic_year' => $academicYear,
         ':status' => $status,
@@ -146,6 +142,7 @@ try {
     project_u_link_new($db, $projectId);
     project_u_metadata($db, $projectId, $input);
     project_u_save_flat_budget($db, $projectId, $input);
+    project_u_save_activities($db, $projectId, $input);
 
     $db->commit();
 

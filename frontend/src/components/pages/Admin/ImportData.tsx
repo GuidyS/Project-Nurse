@@ -92,10 +92,10 @@ export default function ImportData() {
   const handleFileSelect = (file?: File | null) => {
     if (!file) return;
 
-    const allowedExtensions = [".xlsx", ".xls", ".csv"];
+    const allowedExtensions = [".xlsx", ".xls"];
     const isAllowed = allowedExtensions.some((extension) => file.name.toLowerCase().endsWith(extension));
     if (!isAllowed) {
-      toast({ title: "ไฟล์ไม่ถูกต้อง", description: "กรุณาเลือกไฟล์ .xlsx, .xls หรือ .csv เท่านั้น", variant: "destructive" });
+      toast({ title: "ไฟล์ไม่ถูกต้อง", description: "กรุณาเลือกไฟล์ .xlsx หรือ .xls เท่านั้น", variant: "destructive" });
       return;
     }
 
@@ -123,7 +123,7 @@ export default function ImportData() {
         <div className="app-page-header">
           <div>
             <h1 className="app-page-title">นำเข้าข้อมูล</h1>
-            <p className="app-page-description">อัปโหลดไฟล์ Excel หรือ CSV เพื่อนำเข้าข้อมูลเข้าสู่ระบบ</p>
+            <p className="app-page-description">อัปโหลดไฟล์ Excel เพื่อนำเข้าข้อมูลเข้าสู่ระบบ</p>
           </div>
         </div>
 
@@ -154,7 +154,7 @@ export default function ImportData() {
         <Card className="app-section-card">
           <CardHeader>
             <CardTitle>อัปโหลดไฟล์</CardTitle>
-            <CardDescription>รองรับไฟล์ .xlsx, .xls, .csv (ขนาดไม่เกิน 10MB)</CardDescription>
+            <CardDescription>รองรับไฟล์ .xlsx และ .xls (ขนาดไม่เกิน 10MB)</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <Label
@@ -172,7 +172,7 @@ export default function ImportData() {
               <Input
                 id="file-upload"
                 type="file"
-                accept=".xlsx,.xls,.csv"
+                accept=".xlsx,.xls"
                 className="hidden"
                 onChange={handleFileChange}
               />

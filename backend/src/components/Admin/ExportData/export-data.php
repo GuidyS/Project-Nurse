@@ -23,77 +23,233 @@ if (!$data || !isset($data['category'])) {
 }
 
 $category = $data['category'];
-$format = $data['format'] ?? 'csv';
+$format = $data['format'] ?? 'xlsx';
 $requestedFields = $data['fields'] ?? [];
-$academicYear = $data['academicYear'] ?? '';
 
 function getExportSchema(): array
 {
-    $fullNameTh = function ($row) {
-        $parts = array_filter([
-            $row['title'] ?? '',
-            $row['first_name_th'] ?? '',
-            $row['last_name_th'] ?? ''
-        ], fn($v) => $v !== null && trim((string)$v) !== '');
-        return trim(implode(' ', $parts));
+    $makeFields = static function (array $labels): array {
+        $fields = [];
+        foreach ($labels as $key => $label) {
+            $fields[$key] = [
+                'label' => $label,
+                'resolve' => static fn(array $row) => $row[$key] ?? null,
+            ];
+        }
+        return $fields;
     };
+
+    $studentLabels = [
+        'student_id' => 'รหัสนักศึกษา',
+        'year_level' => 'ชั้นปี',
+        'status' => 'สถานะการศึกษา',
+        'admission_year' => 'ปีที่เข้าศึกษา',
+        'graduation_date' => 'วันที่สำเร็จการศึกษา',
+        'dropout_date' => 'วันที่ออกจากการศึกษา',
+        'dropout_reason' => 'เหตุผลที่ออกจากการศึกษา',
+        'created_at' => 'วันที่สร้างข้อมูล',
+        'updated_at' => 'วันที่แก้ไขข้อมูลล่าสุด',
+        'last_eval_date' => 'วันที่ประเมินล่าสุด',
+        'title' => 'คำนำหน้า',
+        'first_name_th' => 'ชื่อภาษาไทย',
+        'last_name_th' => 'นามสกุลภาษาไทย',
+        'gender' => 'เพศ',
+        'birth_date' => 'วันเดือนปีเกิด',
+        'height' => 'ส่วนสูง',
+        'weight' => 'น้ำหนัก',
+        'bmi' => 'ดัชนีมวลกาย (BMI)',
+        'email' => 'อีเมล',
+        'phone' => 'เบอร์โทรศัพท์มือถือ',
+        'home_phone' => 'เบอร์โทรศัพท์บ้าน',
+        'home_address' => 'ที่อยู่ตามทะเบียนบ้าน',
+        'father_first_name' => 'ชื่อบิดา',
+        'father_last_name' => 'นามสกุลบิดา',
+        'father_age' => 'อายุบิดา',
+        'father_phone' => 'เบอร์โทรศัพท์บิดา',
+        'father_address' => 'ที่อยู่ปัจจุบันของบิดา',
+        'mother_first_name' => 'ชื่อมารดา',
+        'mother_last_name' => 'นามสกุลมารดา',
+        'mother_age' => 'อายุมารดา',
+        'mother_phone' => 'เบอร์โทรศัพท์มารดา',
+        'mother_address' => 'ที่อยู่ปัจจุบันของมารดา',
+        'advisor_status' => 'สถานะการให้คำปรึกษา',
+        'advisor_status_details' => 'รายละเอียดสถานะการให้คำปรึกษา',
+        'advisor_is_employed' => 'สถานะการมีงานทำ',
+        'license_first_attempt_passed' => 'ผ่านใบประกอบวิชาชีพครั้งแรก',
+        'license_first_attempt_passed_at' => 'วันที่บันทึกการผ่านครั้งแรก',
+        'license_first_attempt_evidence_path' => 'ที่อยู่ไฟล์หลักฐานการผ่านครั้งแรก',
+        'license_first_attempt_evidence_name' => 'ชื่อไฟล์หลักฐานการผ่านครั้งแรก',
+        'license_within_one_year_passed' => 'ผ่านใบประกอบวิชาชีพภายในหนึ่งปี',
+        'license_within_one_year_passed_at' => 'วันที่บันทึกการผ่านภายในหนึ่งปี',
+        'license_within_one_year_evidence_path' => 'ที่อยู่ไฟล์หลักฐานการผ่านภายในหนึ่งปี',
+        'license_within_one_year_evidence_name' => 'ชื่อไฟล์หลักฐานการผ่านภายในหนึ่งปี',
+    ];
+
+    $facultyLabels = [
+        'faculty_id' => 'รหัสอาจารย์',
+        'status' => 'สถานะการทำงาน',
+        'start_work_date' => 'วันที่เริ่มปฏิบัติงาน',
+        'contract_date' => 'วันที่สัญญาจ้าง',
+        'academic_position_date' => 'วันที่รับตำแหน่งทางวิชาการ',
+        'pts_date' => 'วันที่รับตำแหน่ง พตส',
+        'created_at' => 'วันที่สร้างข้อมูล',
+        'title' => 'คำนำหน้า',
+        'first_name_th' => 'ชื่อภาษาไทย',
+        'last_name_th' => 'นามสกุลภาษาไทย',
+        'gender' => 'เพศ',
+        'birth_date' => 'วันเดือนปีเกิด',
+        'email' => 'อีเมล',
+        'phone' => 'เบอร์โทรศัพท์',
+        'current_address' => 'ที่อยู่ปัจจุบัน',
+        'nursing_council_no' => 'เลขใบประกอบวิชาชีพ',
+        'license_expiry' => 'วันหมดอายุใบอนุญาต',
+        'nursing_council_file' => 'ไฟล์บัตรสภาการพยาบาล',
+        'license_file' => 'ไฟล์ใบอนุญาตประกอบวิชาชีพ',
+        'teaching_cert_file' => 'ไฟล์ใบประกอบวิชาชีพครู',
+        'license_image' => 'รูปใบประกอบวิชาชีพ',
+    ];
+
+    $courseLabels = [
+        'subject_code' => 'รหัสวิชา',
+        'subject_name_th' => 'ชื่อวิชา (ไทย)',
+        'subject_name_en' => 'ชื่อวิชา (อังกฤษ)',
+        'credit' => 'จำนวนหน่วยกิต',
+        'credit_desc' => 'รายละเอียดหน่วยกิต',
+        'subject_type' => 'ประเภทวิชา',
+        'semester' => 'ภาคเรียน',
+        'academic_year' => 'ปีการศึกษา',
+    ];
+
+    $projectLabels = [
+        'project_id' => 'รหัสโครงการ',
+        'project_name_th' => 'ชื่อโครงการ',
+        'project_type' => 'ประเภทโครงการ',
+        'responsible_faculty_id' => 'ผู้ดำเนินโครงการ',
+        'academic_year' => 'ปีการศึกษา',
+        'status' => 'สถานะโครงการ',
+        'start_date' => 'วันที่เริ่มต้น',
+        'end_date' => 'วันที่สิ้นสุด',
+        'strategy' => 'ยุทธศาสตร์',
+        'member_faculty_ids' => 'ผู้เข้าร่วมโครงการ',
+        'plo_codes' => 'รหัส PLO',
+        'clo_codes' => 'รหัส CLO',
+        'created_at' => 'วันที่สร้างข้อมูล',
+        'updated_at' => 'วันที่แก้ไขข้อมูลล่าสุด',
+    ];
+
+    $projectFields = $makeFields($projectLabels);
+    $projectTypeLabels = [
+        'academic_service' => 'บริการวิชาการ',
+        'culture' => 'ทำนุบำรุงศิลปวัฒนธรรม',
+        'teaching' => 'การเรียนการสอน',
+        'research' => 'วิจัย',
+        'quality_assurance' => 'การประกันคุณภาพ',
+        'other' => 'อื่นๆ/ยังไม่จำแนก',
+    ];
+    $projectStatusLabels = [
+        'pending' => 'รอดำเนินการ',
+        'active' => 'กำลังดำเนินการ',
+        'completed' => 'เสร็จสิ้น',
+        'cancelled' => 'ยกเลิก',
+    ];
+    $projectFields['project_type']['resolve'] = static function (array $row) use ($projectTypeLabels) {
+        $value = (string)($row['project_type'] ?? '');
+        return $projectTypeLabels[$value] ?? $value;
+    };
+    $projectFields['status']['resolve'] = static function (array $row) use ($projectStatusLabels) {
+        $value = (string)($row['status'] ?? '');
+        return $projectStatusLabels[$value] ?? $value;
+    };
+    $projectFields['responsible_faculty_id']['resolve'] = static fn(array $row) => $row['responsible_faculty_display'] ?? $row['responsible_faculty_id'] ?? null;
 
     return [
         'students' => [
             'table' => 'student',
             'order_by' => 'student_id ASC',
-            'select' => ['student_id', 'title', 'first_name_th', 'last_name_th', 'gender', 'year_level', 'gpa', 'status', 'email', 'phone', 'admission_year'],
-            'fields' => [
-                'student_id'        => ['label' => 'รหัสนักศึกษา',  'resolve' => fn($r) => $r['student_id']],
-                'full_name_th'      => ['label' => 'ชื่อ-นามสกุล',  'resolve' => $fullNameTh],
-                'gender'            => ['label' => 'เพศ',           'resolve' => fn($r) => $r['gender']],
-                'year_level'        => ['label' => 'ชั้นปี',         'resolve' => fn($r) => $r['year_level']],
-                'gpa'               => ['label' => 'GPA',           'resolve' => fn($r) => $r['gpa']],
-                'status'            => ['label' => 'สถานะ',         'resolve' => fn($r) => $r['status']],
-                'email'             => ['label' => 'อีเมล',         'resolve' => fn($r) => $r['email']],
-                'phone'             => ['label' => 'เบอร์โทร',      'resolve' => fn($r) => $r['phone']],
-                'admission_year'    => ['label' => 'ปีที่เข้าศึกษา', 'resolve' => fn($r) => $r['admission_year']],
-            ],
+            'select' => array_keys($studentLabels),
+            'fields' => $makeFields($studentLabels),
         ],
         'teachers' => [
             'table' => 'faculty',
             'order_by' => 'faculty_id ASC',
-            'select' => ['faculty_id', 'title', 'first_name_th', 'last_name_th', 'gender', 'email', 'phone', 'current_address', 'nursing_council_no', 'license_expiry', 'status'],
-            'fields' => [
-                'faculty_id'         => ['label' => 'รหัสอาจารย์',          'resolve' => fn($r) => $r['faculty_id']],
-                'full_name_th'       => ['label' => 'ชื่อ-นามสกุล',         'resolve' => $fullNameTh],
-                'gender'             => ['label' => 'เพศ',                  'resolve' => fn($r) => $r['gender']],
-                'email'              => ['label' => 'อีเมล',                'resolve' => fn($r) => $r['email']],
-                'phone'              => ['label' => 'เบอร์โทร',             'resolve' => fn($r) => $r['phone']],
-                'current_address'    => ['label' => 'ที่อยู่ปัจจุบัน',       'resolve' => fn($r) => $r['current_address']],
-                'nursing_council_no' => ['label' => 'เลขใบประกอบวิชาชีพ',  'resolve' => fn($r) => $r['nursing_council_no']],
-                'license_expiry'     => ['label' => 'วันหมดอายุใบอนุญาต',   'resolve' => fn($r) => $r['license_expiry']],
-                'status'             => ['label' => 'สถานะ',               'resolve' => fn($r) => $r['status']],
-            ],
+            'select' => array_keys($facultyLabels),
+            'fields' => $makeFields($facultyLabels),
         ],
-        // รายวิชาของหลักสูตรที่ใช้งานในระบบ (หน้า "จัดการหลักสูตรรอบ 5 ปี") — ใช้ SQL เฉพาะ ดู exportCoursesQuery()
         'courses' => [
-            'fields' => [
-                'subject_code'    => ['label' => 'รหัสวิชา',           'resolve' => fn($r) => $r['subject_code']],
-                'subject_name_th' => ['label' => 'ชื่อวิชา (ไทย)',     'resolve' => fn($r) => $r['subject_name_th']],
-                'subject_name_en' => ['label' => 'ชื่อวิชา (อังกฤษ)',  'resolve' => fn($r) => $r['subject_name_en']],
-                // แสดงแบบเดียวกับหน้าจัดการหลักสูตร เช่น 3(2-2-5) ถ้าไม่มีรายละเอียดใช้ตัวเลข
-                'credit'          => ['label' => 'หน่วยกิต',          'resolve' => fn($r) => ($r['credit_desc'] ?? '') !== '' ? $r['credit_desc'] : $r['credit']],
-                'subject_type'    => ['label' => 'ประเภทวิชา',        'resolve' => fn($r) => $r['subject_type']],
-            ],
+            'fields' => $makeFields($courseLabels),
         ],
         'projects' => [
             'table' => 'project',
             'order_by' => 'project_id ASC',
-            'select' => ['project_id', 'project_name_th', 'responsible_faculty_id', 'academic_year'],
-            'fields' => [
-                'project_id'             => ['label' => 'รหัสโครงการ',         'resolve' => fn($r) => $r['project_id']],
-                'project_name_th'        => ['label' => 'ชื่อโครงการ',    'resolve' => fn($r) => $r['project_name_th']],
-
-                'responsible_faculty_id' => ['label' => 'อาจารย์ผู้รับผิดชอบ',  'resolve' => fn($r) => $r['responsible_faculty_id']],
-                'academic_year'          => ['label' => 'ปีการศึกษา',          'resolve' => fn($r) => $r['academic_year']],
-            ],
+            'select' => array_keys($projectLabels),
+            'fields' => $projectFields,
         ],
+    ];
+}
+
+/**
+ * Export project relations as stable, comma-separated codes instead of the
+ * retired project-level JSON compatibility field.
+ * @return array{0:string,1:array}
+ */
+function exportProjectsQuery(): array
+{
+    return [
+        "SELECT p.project_id,
+                p.project_name_th,
+                p.project_type,
+                p.responsible_faculty_id,
+                CASE
+                    WHEN p.responsible_faculty_id IS NULL THEN ''
+                    WHEN NULLIF(TRIM(CONCAT_WS(' ', NULLIF(rf.title, ''), NULLIF(rf.first_name_th, ''), NULLIF(rf.last_name_th, ''))), '') IS NULL
+                        THEN CAST(p.responsible_faculty_id AS CHAR)
+                    ELSE CONCAT(
+                        CAST(p.responsible_faculty_id AS CHAR),
+                        ' - ',
+                        TRIM(CONCAT_WS(' ', NULLIF(rf.title, ''), NULLIF(rf.first_name_th, ''), NULLIF(rf.last_name_th, '')))
+                    )
+                END AS responsible_faculty_display,
+                p.academic_year,
+                p.status,
+                p.start_date,
+                p.end_date,
+                p.strategy,
+                COALESCE((
+                    SELECT GROUP_CONCAT(
+                        DISTINCT CASE
+                            WHEN NULLIF(TRIM(CONCAT_WS(' ', NULLIF(mf.title, ''), NULLIF(mf.first_name_th, ''), NULLIF(mf.last_name_th, ''))), '') IS NULL
+                                THEN CAST(pfm.faculty_id AS CHAR)
+                            ELSE CONCAT(
+                                CAST(pfm.faculty_id AS CHAR),
+                                ' - ',
+                                TRIM(CONCAT_WS(' ', NULLIF(mf.title, ''), NULLIF(mf.first_name_th, ''), NULLIF(mf.last_name_th, '')))
+                            )
+                        END
+                        ORDER BY pfm.faculty_id SEPARATOR ', '
+                    )
+                    FROM project_faculty_members pfm
+                    LEFT JOIN faculty mf ON mf.faculty_id = pfm.faculty_id
+                    WHERE pfm.project_id = p.project_id
+                      AND (p.responsible_faculty_id IS NULL OR pfm.faculty_id <> p.responsible_faculty_id)
+                ), '') AS member_faculty_ids,
+                COALESCE((
+                    SELECT GROUP_CONCAT(DISTINCT pol.outcome_code
+                                        ORDER BY pol.outcome_code SEPARATOR ',')
+                    FROM project_outcome_links pol
+                    WHERE pol.project_id = p.project_id AND pol.outcome_type = 'plo'
+                ), '') AS plo_codes,
+                COALESCE((
+                    SELECT GROUP_CONCAT(DISTINCT pol.outcome_code
+                                        ORDER BY pol.outcome_code SEPARATOR ',')
+                    FROM project_outcome_links pol
+                    WHERE pol.project_id = p.project_id AND pol.outcome_type = 'clo'
+                ), '') AS clo_codes,
+                p.created_at,
+                p.updated_at
+         FROM project p
+         LEFT JOIN faculty rf ON rf.faculty_id = p.responsible_faculty_id
+         ORDER BY p.project_id ASC",
+        [],
     ];
 }
 
@@ -107,7 +263,8 @@ function exportCoursesQuery(PDO $db): array
     $cycle = activeCurriculumCycle($db);
     if ($cycle === null) {
         return [
-            "SELECT subject_code, subject_name_th, subject_name_en, credit, credit_desc, subject_type
+            "SELECT subject_code, subject_name_th, subject_name_en, credit, credit_desc,
+                    subject_type, semester, academic_year
              FROM subject ORDER BY subject_code ASC",
             [],
             null,
@@ -115,9 +272,24 @@ function exportCoursesQuery(PDO $db): array
     }
 
     curriculumCyclesEnsureSchema($db); // มีคอลัมน์ subject_name_en / subject_type แน่นอน
+    $cycleHasTerm = activeCurriculumColumnExists($db, 'curriculum_cycle_subject', 'semester');
+    $subjectHasYear = activeCurriculumColumnExists($db, 'subject', 'academic_year');
+    $semesterSelect = $cycleHasTerm ? 'COALESCE(cs.semester, s.semester)' : 's.semester';
+    $subjectYear = $subjectHasYear ? 's.academic_year' : 'NULL';
+    $yearSelect = $cycleHasTerm ? "COALESCE(cs.academic_year, {$subjectYear})" : $subjectYear;
     return [
-        "SELECT subject_code, subject_name AS subject_name_th, subject_name_en, credit, credit_desc, subject_type
-         FROM curriculum_cycle_subject WHERE cycle_id = :cycle_id ORDER BY subject_code ASC, id ASC",
+        "SELECT cs.subject_code,
+                cs.subject_name AS subject_name_th,
+                COALESCE(cs.subject_name_en, s.subject_name_en) AS subject_name_en,
+                cs.credit,
+                cs.credit_desc,
+                COALESCE(cs.subject_type, s.subject_type) AS subject_type,
+                {$semesterSelect} AS semester,
+                {$yearSelect} AS academic_year
+         FROM curriculum_cycle_subject cs
+         LEFT JOIN subject s ON s.subject_code = cs.subject_code
+         WHERE cs.cycle_id = :cycle_id
+         ORDER BY cs.subject_code ASC, cs.id ASC",
         [':cycle_id' => $cycle['id']],
         $cycle,
     ];
@@ -127,6 +299,12 @@ try {
     $schemas = getExportSchema();
     $db = new Connect();
     $adminUserId = adminRequireAccess($db);
+
+    if ($format !== 'xlsx') {
+        http_response_code(400);
+        echo json_encode(["status" => "error", "message" => "รองรับเฉพาะไฟล์ Excel (.xlsx) เท่านั้น"], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
 
     if (!isset($schemas[$category])) {
         http_response_code(400);
@@ -144,32 +322,17 @@ try {
 
     $headers = array_map(fn($k) => $schema['fields'][$k]['label'], $selectedKeys);
 
-    // ข้อมูลอาจารย์ / รายวิชา ส่งออกทั้งหมด ไม่มีตัวกรองปีการศึกษา/ภาคเรียน
-    if ($category === 'teachers' || $category === 'courses') {
-        $academicYear = '';
-        $data['semester'] = '';
-    }
-    $semester = $data['semester'] ?? 'ทั้งหมด';
     $curriculum = null;
 
     if ($category === 'courses') {
         [$sql, $params, $curriculum] = exportCoursesQuery($db);
+    } elseif ($category === 'projects') {
+        $db->exec('SET SESSION group_concat_max_len = 1048576');
+        [$sql, $params] = exportProjectsQuery();
     } else {
         $columns = implode(', ', array_map(fn($c) => "`$c`", $schema['select']));
-        $whereClause = "";
         $params = [];
-
-        if ($academicYear !== '' && $academicYear !== 'ทั้งหมด') {
-            if ($category === 'students') {
-                $whereClause .= ($whereClause ? " AND " : " WHERE ") . "admission_year = :year";
-                $params[':year'] = $academicYear;
-            } elseif ($category === 'projects') {
-                $whereClause .= ($whereClause ? " AND " : " WHERE ") . "academic_year = :year";
-                $params[':year'] = $academicYear;
-            }
-        }
-
-        $sql = "SELECT $columns FROM `{$schema['table']}`{$whereClause} ORDER BY {$schema['order_by']}";
+        $sql = "SELECT $columns FROM `{$schema['table']}` ORDER BY {$schema['order_by']}";
     }
     $stmt = $db->prepare($sql);
     $stmt->execute($params);
@@ -186,63 +349,43 @@ try {
 
     $recordCount = count($exportData);
     $fieldCount = count($selectedKeys);
-    $yearFilter = $academicYear !== '' ? $academicYear : 'all';
-    $semesterFilter = $semester !== '' ? $semester : 'all';
     $curriculumNote = $curriculum ? ", curriculum={$curriculum['start_year']}-{$curriculum['end_year']}" : '';
-    logAudit($db, $adminUserId, 'export', 'export', "ส่งออกข้อมูล {$category} รูปแบบ {$format} จำนวน {$recordCount} รายการ ({$fieldCount} fields, year={$yearFilter}, semester={$semesterFilter}{$curriculumNote})");
+    logAudit($db, $adminUserId, 'export', 'export', "ส่งออกข้อมูล {$category} รูปแบบ {$format} จำนวน {$recordCount} รายการ ({$fieldCount} fields, all records{$curriculumNote})");
 
     $fileSuffix = $curriculum
         ? "_{$curriculum['start_year']}-{$curriculum['end_year']}"
-        : ($academicYear !== '' ? '_' . $academicYear : '');
+        : '';
 
-    // ส่งออก Excel (.xlsx)
-    if ($format === 'xlsx') {
-        $spreadsheet = new Spreadsheet();
-        $sheet = $spreadsheet->getActiveSheet();
+    $spreadsheet = new Spreadsheet();
+    $sheet = $spreadsheet->getActiveSheet();
 
+    $colIndex = 1;
+    foreach ($headers as $header) {
+        $sheet->setCellValue([$colIndex, 1], $header);
+        $colIndex++;
+    }
+
+    $rowIndex = 2;
+    foreach ($exportData as $rowData) {
         $colIndex = 1;
-        foreach ($headers as $header) {
-            $sheet->setCellValue([$colIndex, 1], $header);
+        foreach ($rowData as $value) {
+            $sheet->setCellValueExplicit(
+                [$colIndex, $rowIndex],
+                (string)$value,
+                \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING
+            );
             $colIndex++;
         }
-
-        $rowIndex = 2;
-        foreach ($exportData as $rowData) {
-            $colIndex = 1;
-            foreach ($rowData as $value) {
-                $sheet->setCellValueExplicit(
-                    [$colIndex, $rowIndex],
-                    (string)$value,
-                    \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING
-                );
-                $colIndex++;
-            }
-            $rowIndex++;
-        }
-
-        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        header('Content-Disposition: attachment; filename="export_' . $category . $fileSuffix . '.xlsx"');
-        header('Cache-Control: max-age=0');
-
-        $writer = new Xlsx($spreadsheet);
-        $writer->save('php://output');
-        exit;
+        $rowIndex++;
     }
-    // ส่งออก CSV
-    else {
-        header('Content-Type: text/csv; charset=UTF-8');
-        header('Content-Disposition: attachment; filename="export_' . $category . $fileSuffix . '.csv"');
 
-        $output = fopen('php://output', 'w');
-        fputs($output, "\xEF\xBB\xBF");
-        fputcsv($output, $headers);
+    header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    header('Content-Disposition: attachment; filename="export_' . $category . $fileSuffix . '.xlsx"');
+    header('Cache-Control: max-age=0');
 
-        foreach ($exportData as $rowData) {
-            fputcsv($output, $rowData);
-        }
-        fclose($output);
-        exit;
-    }
+    $writer = new Xlsx($spreadsheet);
+    $writer->save('php://output');
+    exit;
 
 } catch (Exception $e) {
     http_response_code(500);

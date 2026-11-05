@@ -12,6 +12,16 @@ function project_u_sources(): array {
     return ['university'=>'มหาวิทยาลัยสยาม','thonburiHospital'=>'โรงพยาบาลธนบุรี',
         'nursingFaculty'=>'คณะพยาบาลศาสตร์','external'=>'หน่วยงานภายนอก','unspecified'=>'ยังไม่ระบุแหล่งเงิน'];
 }
+function project_u_google_drive_url(mixed $value): string {
+    if (!is_string($value)) throw new InvalidArgumentException('กรุณาระบุลิงก์ Google Drive');
+    $url=trim($value);
+    if ($url==='' || mb_strlen($url,'UTF-8')>2048 || !filter_var($url,FILTER_VALIDATE_URL)) throw new InvalidArgumentException('ลิงก์ Google Drive ไม่ถูกต้อง');
+    $parts=parse_url($url); $scheme=strtolower((string)($parts['scheme']??'')); $host=strtolower((string)($parts['host']??''));
+    if ($scheme!=='https' || !in_array($host,['drive.google.com','docs.google.com'],true)) {
+        throw new InvalidArgumentException('กรุณาแนบลิงก์ Google Drive ที่ขึ้นต้นด้วย https://drive.google.com หรือ https://docs.google.com');
+    }
+    return $url;
+}
 function project_u_activity_code(mixed $value): string {
     if (!is_string($value) && !is_int($value)) throw new InvalidArgumentException('กรุณาระบุรหัสกิจกรรมเป็นข้อความ');
     $code=trim((string)$value);
@@ -140,8 +150,10 @@ function project_u_sync_cache(PDO $db, string $code): void {
         [$p['project_id'],$p['academic_year'],project_u_decimal(project_u_total($budget,'proposed')),project_u_decimal(project_u_total($budget,'actual'))]);
 }
 function project_u_activities(PDO $db, int $root): array {
-    $items = project_u_rows($db, "SELECT id,activity_code,activity_name,responsible_person,plan_name,objective,kpi,sort_order FROM annual_project_report_items WHERE parent_item_id=? AND row_type='activity' ORDER BY sort_order,id",[$root]);
-    foreach ($items as &$item) { $item['id']=(int)$item['id']; $item['budgets']=project_u_budget($db,$item['id']); }
+    $items = project_u_rows($db, "SELECT i.id,i.activity_name,i.sort_order,
+        (SELECT d.file_path FROM project_documents d WHERE d.report_item_id=i.id AND d.report_document_type='activity_attachment' ORDER BY d.id DESC LIMIT 1) AS google_drive_url
+        FROM annual_project_report_items i WHERE i.parent_item_id=? AND i.row_type='activity' ORDER BY i.sort_order,i.id",[$root]);
+    foreach ($items as &$item) { $item['id']=(int)$item['id']; $item['sort_order']=(int)$item['sort_order']; }
     return $items;
 }
 function project_u_save_flat_budget(PDO $db, string $code, array $input): void {
@@ -164,7 +176,6 @@ function project_u_save_flat_budget(PDO $db, string $code, array $input): void {
     }
     if ($sameTotals && $source===(array_key_first($old)??'unspecified') && $note===($old[$source]['note']??'')) return;
     $budget = project_u_normalize_budget([$source=>['proposed'=>project_u_number($proposed),'actual'=>project_u_number($actual),'note'=>$note]]);
-    project_u_validate_activity_budgets($budget,project_u_activities($db,$root));
     project_u_write_budget($db,$root,$budget); project_u_sync_cache($db,$code);
 }
 function project_u_metadata(PDO $db, string $code, array $input): void {
@@ -217,53 +228,64 @@ function project_u_document_link(PDO $db, string $code, int $document, array $in
     if (!in_array($purpose,['general','budget_document','summary_report'],true)) throw new InvalidArgumentException('ประเภทเอกสารรายงานไม่ถูกต้อง');
     project_u_query($db,'UPDATE project_documents SET project_id=?,report_item_id=?,report_document_type=? WHERE id=? AND project_id=?',[$canonical,$item,$purpose,$document,$canonical]);
 }
-function project_u_save_details(PDO $db, string $code, array $input): void {
-    project_u_guard($db,$code); $root=project_u_require_root($db,$code);
-    $budget=project_u_normalize_budget($input['budgets'] ?? []);
-    $existing=project_u_activities($db,$root); $byId=[]; $existingCodes=[];
-    foreach ($existing as $a) { $byId[$a['id']]=$a; if (trim((string)($a['activity_code'] ?? ''))!=='') $existingCodes[mb_strtolower((string)$a['activity_code'],'UTF-8')]=$a['id']; }
-    $activities=[]; $activityCodes=[];
-    foreach (($input['activities'] ?? []) as $index=>$a) {
-        $id=(int)($a['id'] ?? 0);
-        if ($id && !isset($byId[$id])) throw new ProjectConflict('กิจกรรมไม่ใช่ของโครงการนี้');
-        $name=trim((string)($a['activity_name'] ?? ''));
-        if ($name==='') throw new InvalidArgumentException('กรุณาระบุชื่อกิจกรรม');
-        if ($id) {
-            $activityCode=(string)($byId[$id]['activity_code'] ?? '');
-            if ($activityCode==='') $activityCode='LEGACY-'.$id;
-            if (isset($a['activity_code']) && trim((string)$a['activity_code'])!=='' && strcasecmp(project_u_activity_code($a['activity_code']),$activityCode)!==0) {
-                throw new ProjectConflict('รหัสกิจกรรมแก้ไขไม่ได้หลังสร้าง');
-            }
-        } else $activityCode=project_u_activity_code($a['activity_code'] ?? null);
-        $activityKey=mb_strtolower($activityCode,'UTF-8');
-        if (isset($activityCodes[$activityKey]) || (!$id && isset($existingCodes[$activityKey]))) throw new ProjectConflict('รหัสกิจกรรมซ้ำภายในโครงการ');
-        $activityCodes[$activityKey]=$id ?: true;
-        $a=['id'=>$id,'activity_code'=>$activityCode,'activity_name'=>$name,'responsible_person'=>trim((string)($a['responsible_person'] ?? '')),'sort_order'=>$index,'budgets'=>project_u_normalize_budget($a['budgets'] ?? [])];
-        foreach (['plan_name','objective','kpi'] as $field) $a[$field]=trim((string)(($input['activities'][$index][$field] ?? null) ?? ($byId[$id][$field] ?? '')));
-        $activities[]=$a; unset($byId[$id]);
-    }
-    $deleted=array_map('intval',$input['deleted_activity_ids'] ?? []);
-    foreach ($byId as $id=>$a) if (!in_array($id,$deleted,true)) $activities[]=$a;
-    foreach ($deleted as $id) {
-        if (!isset($byId[$id])) throw new ProjectConflict('กิจกรรมที่ลบไม่ถูกต้อง');
-        $used=(int)project_u_query($db,'SELECT COUNT(*) FROM project_documents WHERE report_item_id=?',[$id])->fetchColumn();
-        if ($used) throw new ProjectConflict('กิจกรรมมีเอกสาร จึงลบไม่ได้');
-    }
-    project_u_validate_activity_budgets($budget,$activities);
-    project_u_metadata($db,$code,$input);
-    project_u_write_budget($db,$root,$budget);
-    foreach ($activities as $a) {
-        $id=$a['id'];
-        if (!$id) {
-            $p=project_u_project($db,$code);
-            project_u_query($db,"INSERT INTO annual_project_report_items(academic_year,project_name,activity_name,activity_code,responsible_person,row_type,parent_item_id,sort_order) VALUES (?,?,?,?,?,'activity',?,?)",[$p['academic_year'],$a['activity_name'],$a['activity_name'],$a['activity_code'],$a['responsible_person'],$root,$a['sort_order']]);
+function project_u_save_activities(PDO $db,string $code,array $input): void {
+    if (!array_key_exists('has_sub_activities',$input) && !array_key_exists('activities',$input)) return;
+    $root=project_u_require_root($db,$code); $project=project_u_project($db,$code);
+    $has=filter_var($input['has_sub_activities'] ?? false,FILTER_VALIDATE_BOOL,FILTER_NULL_ON_FAILURE);
+    if ($has===null) throw new InvalidArgumentException('สถานะกิจกรรมย่อยไม่ถูกต้อง');
+    $rows=$input['activities']??[];
+    if (!is_array($rows)) throw new InvalidArgumentException('รายการกิจกรรมย่อยไม่ถูกต้อง');
+    if (!$has && $rows) throw new InvalidArgumentException('โครงการที่ไม่มีกิจกรรมย่อยต้องไม่มีรายการกิจกรรม');
+    if ($has && !$rows) throw new InvalidArgumentException('กรุณาเพิ่มกิจกรรมย่อยอย่างน้อย 1 รายการ');
+    $existing=project_u_rows($db,"SELECT id FROM annual_project_report_items WHERE parent_item_id=? AND row_type='activity' FOR UPDATE",[$root]);
+    $existingIds=array_fill_keys(array_map('intval',array_column($existing,'id')),true); $kept=[]; $names=[];
+    foreach ($rows as $index=>$row) {
+        if (!is_array($row)) throw new InvalidArgumentException('รายการกิจกรรมย่อยไม่ถูกต้อง');
+        $name=trim((string)($row['activity_name']??''));
+        if ($name==='' || mb_strlen($name,'UTF-8')>255) throw new InvalidArgumentException('ชื่อกิจกรรมต้องมีความยาวไม่เกิน 255 ตัวอักษร');
+        $key=mb_strtolower($name,'UTF-8'); if (isset($names[$key])) throw new InvalidArgumentException('ชื่อกิจกรรมย่อยห้ามซ้ำภายในโครงการ'); $names[$key]=true;
+        $url=project_u_google_drive_url($row['google_drive_url']??null); $id=(int)($row['id']??0);
+        if ($id>0 && !isset($existingIds[$id])) throw new ProjectConflict('กิจกรรมไม่ใช่ของโครงการนี้');
+        if ($id===0) {
+            project_u_query($db,"INSERT INTO annual_project_report_items(academic_year,project_name,activity_name,row_type,parent_item_id,sort_order) VALUES (?,?,?,'activity',?,?)",[(int)$project['academic_year'],$name,$name,$root,$index]);
             $id=(int)$db->lastInsertId();
-        } else project_u_query($db,'UPDATE annual_project_report_items SET activity_code=COALESCE(activity_code,?),activity_name=?,project_name=?,responsible_person=?,sort_order=? WHERE id=?',[$a['activity_code'],$a['activity_name'],$a['activity_name'],$a['responsible_person'],$a['sort_order'],$id]);
-        project_u_query($db,'UPDATE annual_project_report_items SET plan_name=?,objective=?,kpi=? WHERE id=?',[$a['plan_name']??'',$a['objective']??'',$a['kpi']??'',$id]);
-        project_u_write_budget($db,$id,$a['budgets']);
+        } else project_u_query($db,'UPDATE annual_project_report_items SET project_name=?,activity_name=?,activity_code=NULL,responsible_person=NULL,plan_name=NULL,objective=NULL,kpi=NULL,sort_order=? WHERE id=? AND parent_item_id=?',[$name,$name,$index,$id,$root]);
+        $kept[$id]=true;
+        $docs=project_u_rows($db,"SELECT id FROM project_documents WHERE project_id=? AND report_item_id=? AND report_document_type='activity_attachment' ORDER BY id DESC FOR UPDATE",[$code,$id]);
+        if ($docs) {
+            $docId=(int)$docs[0]['id'];
+            project_u_query($db,"UPDATE project_documents SET name=?,project=?,type='summary',date=CURDATE(),status='available',file_path=?,file_name='Google Drive',mime_type=NULL,file_size=NULL,report_document_type='activity_attachment' WHERE id=?",[$name,$project['project_name_th']??$code,$url,$docId]);
+            foreach (array_slice($docs,1) as $duplicate) project_u_query($db,'DELETE FROM project_documents WHERE id=?',[(int)$duplicate['id']]);
+        } else project_u_query($db,"INSERT INTO project_documents(project_id,name,project,type,date,status,file_path,file_name,report_item_id,report_document_type) VALUES (?,?,?,'summary',CURDATE(),'available',?,'Google Drive',?,'activity_attachment')",[$code,$name,$project['project_name_th']??$code,$url,$id]);
+        project_u_query($db,'DELETE FROM annual_project_report_budgets WHERE report_item_id=?',[$id]);
     }
-    foreach ($deleted as $id) project_u_query($db,'DELETE FROM annual_project_report_items WHERE id=? AND parent_item_id=?',[$id,$root]);
-    project_u_sync_cache($db,$code);
+    foreach (array_keys($existingIds) as $id) if (!isset($kept[$id])) {
+        project_u_query($db,'DELETE FROM project_documents WHERE report_item_id=?',[$id]);
+        project_u_query($db,"DELETE FROM annual_project_report_items WHERE id=? AND parent_item_id=? AND row_type='activity'",[$id,$root]);
+    }
+}
+function project_u_merge_activity(PDO $db,string $code,string $name,string $url,int $sortOrder): int {
+    $root=project_u_require_root($db,$code); $name=trim($name); $url=project_u_google_drive_url($url);
+    if ($name==='' || mb_strlen($name,'UTF-8')>255) throw new InvalidArgumentException('ชื่อกิจกรรมต้องมีความยาวไม่เกิน 255 ตัวอักษร');
+    $row=project_u_query($db,"SELECT id FROM annual_project_report_items WHERE parent_item_id=? AND row_type='activity' AND LOWER(TRIM(activity_name))=LOWER(?) ORDER BY id LIMIT 1 FOR UPDATE",[$root,$name])->fetch(PDO::FETCH_ASSOC);
+    $project=project_u_project($db,$code);
+    if ($row) $id=(int)$row['id']; else {
+        project_u_query($db,"INSERT INTO annual_project_report_items(academic_year,project_name,activity_name,row_type,parent_item_id,sort_order) VALUES (?,?,?,'activity',?,?)",[(int)$project['academic_year'],$name,$name,$root,$sortOrder]);
+        $id=(int)$db->lastInsertId();
+    }
+    project_u_query($db,'UPDATE annual_project_report_items SET project_name=?,activity_name=?,activity_code=NULL,responsible_person=NULL,plan_name=NULL,objective=NULL,kpi=NULL WHERE id=?',[$name,$name,$id]);
+    $docs=project_u_rows($db,"SELECT id FROM project_documents WHERE project_id=? AND report_item_id=? AND report_document_type='activity_attachment' ORDER BY id DESC FOR UPDATE",[$code,$id]);
+    if ($docs) {
+        $doc=(int)$docs[0]['id'];
+        project_u_query($db,"UPDATE project_documents SET name=?,project=?,type='summary',date=CURDATE(),status='available',file_path=?,file_name='Google Drive',mime_type=NULL,file_size=NULL WHERE id=?",[$name,$project['project_name_th']??$code,$url,$doc]);
+        foreach (array_slice($docs,1) as $duplicate) project_u_query($db,'DELETE FROM project_documents WHERE id=?',[(int)$duplicate['id']]);
+    }
+    else project_u_query($db,"INSERT INTO project_documents(project_id,name,project,type,date,status,file_path,file_name,report_item_id,report_document_type) VALUES (?,?,?,'summary',CURDATE(),'available',?,'Google Drive',?,'activity_attachment')",[$code,$name,$project['project_name_th']??$code,$url,$id]);
+    project_u_query($db,'DELETE FROM annual_project_report_budgets WHERE report_item_id=?',[$id]); return $id;
+}
+function project_u_save_details(PDO $db, string $code, array $input): void {
+    project_u_guard($db,$code); $root=project_u_require_root($db,$code); $budget=project_u_normalize_budget($input['budgets'] ?? []);
+    project_u_metadata($db,$code,$input); project_u_write_budget($db,$root,$budget); project_u_save_activities($db,$code,$input); project_u_sync_cache($db,$code);
 }
 function project_u_snapshot(PDO $db, int $year): ?array {
     $json=project_u_query($db,'SELECT snapshot_json FROM project_report_snapshots WHERE academic_year=?',[$year])->fetchColumn();
@@ -277,6 +299,7 @@ function project_u_catalogue(PDO $db, array $projects, bool $live=false): array 
         if (!array_key_exists($year,$snapshots)) $snapshots[$year]=project_u_snapshot($db,$year);
         if ($snapshots[$year]!==null && isset($snapshots[$year]['catalogue'][$code])) { $p=array_merge($p,$snapshots[$year]['catalogue'][$code]); unset($p['description']); $p['documents']=project_u_documents($p['documents'] ?? []); $p['read_only']=true; continue; }
         $root=project_u_root($db,$code); $p['report_item_id']=$root; $p['merge_pending']=$root===null || project_u_code_pending($db,$code) || (!$live && project_u_period($db,$year)==='review'); $p['read_only']=false;
+        $p['activities']=$root===null ? [] : project_u_activities($db,$root); $p['has_sub_activities']=count($p['activities'])>0;
         $b=$p['merge_pending'] ? [] : project_u_budget($db,$root);
         $p['budget_proposed']=$p['budget']=project_u_number(project_u_total($b,'proposed'));
         $p['budget_spent']=$p['spent']=project_u_number(project_u_total($b,'actual'));
@@ -336,8 +359,9 @@ function project_u_details(PDO $db,string $code): array {
     if ($snapshot!==null && isset($snapshot['details'][$p['project_id']])) return array_replace($snapshot['details'][$p['project_id']],['read_only'=>true,'documents'=>project_u_documents($snapshot['details'][$p['project_id']]['documents'] ?? [])]);
     $root=project_u_require_root($db,$p['project_id']);
     $meta=project_u_query($db,'SELECT plan_name,objective,kpi,sort_order FROM annual_project_report_items WHERE id=?',[$root])->fetch(PDO::FETCH_ASSOC);
-    return ['project_id'=>$p['project_id'],'report_item_id'=>$root,'academic_year'=>(int)$p['academic_year'],'strategy'=>$p['strategy']??'','project_name_th'=>$p['project_name_th'],'read_only'=>false,
-        'budgets'=>(object)project_u_budget($db,$root),'activities'=>project_u_activities($db,$root),'sources'=>project_u_sources(),'documents'=>project_u_documents(project_u_rows($db,'SELECT id,name,date,file_path,report_item_id,report_document_type FROM project_documents WHERE project_id=? ORDER BY report_item_id,id',[$p['project_id']]))]+($meta?:[]);
+    $activities=project_u_activities($db,$root);
+    return ['project_id'=>$p['project_id'],'report_item_id'=>$root,'academic_year'=>(int)$p['academic_year'],'strategy'=>$p['strategy']??'','project_name_th'=>$p['project_name_th'],'read_only'=>false,'has_sub_activities'=>count($activities)>0,
+        'budgets'=>(object)project_u_budget($db,$root),'activities'=>$activities,'sources'=>project_u_sources(),'documents'=>project_u_documents(project_u_rows($db,"SELECT id,name,date,file_path,report_item_id,report_document_type FROM project_documents WHERE project_id=? AND report_document_type<>'activity_attachment' ORDER BY report_item_id,id",[$p['project_id']]))]+($meta?:[]);
 }
 function project_u_pending(PDO $db,int $year): array {
     $projects=(int)project_u_query($db,'SELECT COUNT(*) FROM project p LEFT JOIN project_report_links l ON l.project_id=p.project_id WHERE p.academic_year=? AND l.project_id IS NULL',[$year])->fetchColumn();

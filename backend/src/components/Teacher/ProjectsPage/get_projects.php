@@ -42,11 +42,8 @@ try {
             p.status,
             p.start_date,
             p.end_date,
-            CASE
-                WHEN p.responsible_faculty_id IS NOT NULL THEN COALESCE(pfm.members, 0) + 1
-                WHEN COALESCE(pfm.members, 0) > 0 THEN COALESCE(pfm.members, 0)
-                ELSE COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(p.mapping_json, '$.member_count')) AS UNSIGNED), 0)
-            END AS members,
+            COALESCE(pfm.members, 0)
+                + CASE WHEN p.responsible_faculty_id IS NULL THEN 0 ELSE 1 END AS members,
             COALESCE(pb.budget, 0) AS budget,
             COALESCE(pb.spent, 0) AS spent,
             COALESCE(pb.budget, 0) AS budget_proposed,
@@ -114,6 +111,7 @@ try {
             WHERE project_id IN (" . implode(',', $placeholders) . ")
               AND file_path IS NOT NULL
               AND TRIM(file_path) <> ''
+              AND report_document_type <> 'activity_attachment'
             ORDER BY date DESC, id DESC
         ");
         $docsStmt->execute($docParams);

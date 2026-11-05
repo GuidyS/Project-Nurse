@@ -428,6 +428,7 @@ try {
             $s_stmt = $db->prepare("SELECT * FROM student WHERE student_id = :sid");
             $s_stmt->execute([':sid' => $u_info['username']]);
             $data['details'] = $s_stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+            unset($data['details']['first_name_en'], $data['details']['last_name_en']);
 
             // ปีที่รับเข้าศึกษา/ชั้นปี ใช้ค่าที่ระบบคำนวณให้ (แอดมินแก้ไม่ได้)
             $academicInfo = calculateRealtimeAcademicInfo(
@@ -444,6 +445,7 @@ try {
             $f_stmt = $db->prepare("SELECT * FROM faculty WHERE faculty_id = :fid");
             $f_stmt->execute([':fid' => $u_info['username']]);
             $data['details'] = $f_stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+            unset($data['details']['first_name_en'], $data['details']['last_name_en']);
             $data['uploaded_documents'] = listFacultyUploadedDocuments($db, $data['details'], (string)$u_info['username']);
         }
 
@@ -721,7 +723,7 @@ try {
                 );
             }
 
-            // ชื่อภาษาไทย/อังกฤษต้องตรงกับภาษาของช่อง
+            // ชื่อภาษาไทยต้องตรงกับภาษาของช่อง
             nameAssertLanguages($input['details'] ?? []);
 
             // สถานะการทำงาน: คงอยู่ / ลาออก / เกษียณ
@@ -735,8 +737,7 @@ try {
 
             $sql = "UPDATE faculty SET
                         title = :title, first_name_th = :first_name_th, last_name_th = :last_name_th,
-                        first_name_en = :first_name_en, last_name_en = :last_name_en, gender = :gender, 
-                        birth_date = :birth_date, email = :email, phone = :phone, current_address = :current_address,
+                        gender = :gender, birth_date = :birth_date, email = :email, phone = :phone, current_address = :current_address,
                         nursing_council_no = :nursing_council_no, license_expiry = :license_expiry,
                         start_work_date = :start_work_date, academic_position_date = :academic_position_date,
                         profile_picture = :profile_picture, nursing_council_file = :nursing_council_file,
@@ -746,8 +747,7 @@ try {
             $stmt = $db->prepare($sql);
             $stmt->execute([
                 ':title' => $details['title'] ?? null, ':first_name_th' => $details['first_name_th'] ?? null, 
-                ':last_name_th' => $details['last_name_th'] ?? null, ':first_name_en' => $details['first_name_en'] ?? null, 
-                ':last_name_en' => $details['last_name_en'] ?? null, ':gender' => $details['gender'] ?? null, 
+                ':last_name_th' => $details['last_name_th'] ?? null, ':gender' => $details['gender'] ?? null,
                 ':birth_date' => !empty($details['birth_date']) ? $details['birth_date'] : null, 
                 ':email' => $details['email'] ?? null, ':phone' => $details['phone'] ?? null, 
                 ':current_address' => $details['current_address'] ?? null, ':nursing_council_no' => $details['nursing_council_no'] ?? null, 

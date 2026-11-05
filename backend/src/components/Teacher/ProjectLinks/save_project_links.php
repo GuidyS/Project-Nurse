@@ -14,6 +14,7 @@ foreach ($possible_paths as $path) {
     }
 }
 require_once __DIR__ . '/../ProjectShared/project_helpers.php';
+require_once __DIR__ . '/project_outcome_link_helpers.php';
 require_once __DIR__ . '/../../../config/audit_helper.php'; // นำเข้า Audit Helper
 
 $origin = $_SERVER['HTTP_ORIGIN'] ?? 'http://localhost:5173';
@@ -47,6 +48,9 @@ try {
 
     $projectId = project_validate_code($input['project_id']);
     $links = $input['links'];
+    if (!is_array($links)) {
+        throw new InvalidArgumentException('ข้อมูลการเชื่อมโยงไม่ถูกต้อง');
+    }
 
     $projectStmt = $db->prepare("SELECT project_type FROM project WHERE project_id = :project_id LIMIT 1");
     $projectStmt->execute([':project_id' => $projectId]);
@@ -60,67 +64,23 @@ try {
         throw new Exception("เชื่อม PLO/CLO ได้เฉพาะโครงการบริการวิชาการ");
     }
 
-    // ระบบไม่เชื่อมโครงการกับ YLO แล้ว เหลือเฉพาะ PLO และ CLO
-    // แถว outcome_type = 'ylo' ที่เคยบันทึกไว้จะถูกล้างออกตอนบันทึกครั้งถัดไป
     $normalizedLinks = [
-        'plos' => array_values(array_unique(array_filter($links['plos'] ?? [], 'is_string'))),
-        'clos' => array_values(array_unique(array_filter($links['clos'] ?? [], 'is_string'))),
+        'plos' => project_outcome_normalize_codes($links['plos'] ?? [], 'PLO '),
+        'clos' => project_outcome_normalize_codes($links['clos'] ?? [], 'CLO '),
     ];
-
-    $desiredLinks = [];
-    foreach (['plos' => 'plo', 'clos' => 'clo'] as $payloadKey => $outcomeType) {
-        foreach ($normalizedLinks[$payloadKey] as $code) {
-            $desiredLinks[$outcomeType . "\0" . $code] = true;
-        }
-    }
 
     $db->beginTransaction();
     $projectId = project_u_guard($db, $projectId)['project_id'];
     project_u_require_root($db, $projectId);
 
-    $existingStmt = $db->prepare("
-        SELECT id, outcome_type, outcome_code
-        FROM project_outcome_links
-        WHERE project_id = :project_id
-    ");
-    $existingStmt->execute([':project_id' => $projectId]);
-    $existingLinks = $existingStmt->fetchAll(PDO::FETCH_ASSOC);
-
-    $deleteLinkStmt = $db->prepare("DELETE FROM project_outcome_links WHERE id = :link_id");
-    foreach ($existingLinks as $existingLink) {
-        $key = $existingLink['outcome_type'] . "\0" . $existingLink['outcome_code'];
-        if (isset($desiredLinks[$key])) {
-            unset($desiredLinks[$key]);
-            continue;
-        }
-
-        $deleteLinkStmt->execute([':link_id' => $existingLink['id']]);
-    }
-
-    $insertStmt = $db->prepare("
-        INSERT INTO project_outcome_links (project_id, outcome_type, outcome_code)
-        VALUES (:project_id, :outcome_type, :outcome_code)
-    ");
-
-    foreach ($desiredLinks as $key => $_unused) {
-        [$outcomeType, $code] = explode("\0", $key, 2);
-        $insertStmt->execute([
-            ':project_id' => $projectId,
-            ':outcome_type' => $outcomeType,
-            ':outcome_code' => $code
-        ]);
-    }
-
-    $mappingJsonString = json_encode($normalizedLinks, JSON_UNESCAPED_UNICODE);
-    $updateStmt = $db->prepare("UPDATE project SET mapping_json = :mapping_json WHERE project_id = :project_id");
-    $updateStmt->execute([
-        ':mapping_json' => $mappingJsonString,
-        ':project_id' => $projectId
+    project_outcome_replace_links($db, $projectId, [
+        'plo' => $normalizedLinks['plos'],
+        'clo' => $normalizedLinks['clos'],
     ]);
 
     $db->commit();
 
-    logAudit($db, $_SESSION['user_id'], 'update', 'project_links', "บันทึกการเชื่อมโยง CLO/PLO/YLO ของโครงการ ID: {$projectId}");
+    logAudit($db, $_SESSION['user_id'], 'update', 'project_links', "บันทึกการเชื่อมโยง CLO/PLO ของโครงการ ID: {$projectId}");
 
     echo json_encode([
         "status" => "success",

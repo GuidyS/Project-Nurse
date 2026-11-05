@@ -319,7 +319,7 @@ try {
                 ? "แทนที่รายวิชาทั้งหมดด้วย " . count($clean) . " วิชาจากไฟล์แล้ว"
                 : "นำเข้าสำเร็จ: เพิ่มใหม่ {$inserted} วิชา, อัปเดต {$updated} วิชา" . ($unchanged > 0 ? ", ไม่เปลี่ยนแปลง {$unchanged} วิชา" : "");
 
-            logAudit($db, $_SESSION['user_id'] ?? null, 'update', 'curriculum_subjects', "นำเข้ารายวิชาหลักสูตร พ.ศ. {$cycle['start_year']} - {$cycle['end_year']} โหมด {$mode}: เพิ่ม {$inserted}, แก้ไข {$updated}, ไม่เปลี่ยนแปลง {$unchanged}");
+            logAudit($db, $_SESSION['user_id'] ?? null, 'create', 'import_data', "นำเข้ารายวิชาหลักสูตร พ.ศ. {$cycle['start_year']} - {$cycle['end_year']} โหมด {$mode}: เพิ่ม {$inserted}, แก้ไข {$updated}, ไม่เปลี่ยนแปลง {$unchanged}");
             curriculumCyclesRespond(200, [
                 "status" => "success",
                 "message" => $message,

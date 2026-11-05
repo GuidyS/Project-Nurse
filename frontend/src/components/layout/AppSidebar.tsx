@@ -39,7 +39,6 @@ const getDisplayName = (user: any) => {
   const candidates = [
     user.full_name_th,
     [user.first_name_th, user.last_name_th].filter(Boolean).join(' '),
-    [user.first_name_en, user.last_name_en].filter(Boolean).join(' '),
     user.name,
   ]
     .map((value) => (typeof value === 'string' ? value.trim() : ''))

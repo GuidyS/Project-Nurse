@@ -99,7 +99,6 @@ try {
     $responsibleFacultyId = update_project_page_responsible_faculty_id($db, $input);
     my_project_ensure_member_table($db);
     $memberFacultyIds = my_project_normalize_member_faculty_ids($db, $input, $responsibleFacultyId);
-    $memberCount = count($memberFacultyIds) + 1;
 
     $currentStmt = $db->prepare("SELECT project_type FROM project WHERE project_id = :project_id LIMIT 1");
     $currentStmt->execute([':project_id' => $projectId]);
@@ -110,12 +109,12 @@ try {
     }
 
     if ($projectType !== 'academic_service') {
-        $linkStmt = $db->prepare("SELECT COUNT(*) FROM project_outcome_links WHERE project_id = :project_id");
+        $linkStmt = $db->prepare("SELECT COUNT(*) FROM project_outcome_links WHERE project_id = :project_id AND outcome_type IN ('plo', 'clo')");
         $linkStmt->execute([':project_id' => $projectId]);
         if ((int)$linkStmt->fetchColumn() > 0) {
             project_json([
                 "status" => "error",
-                "message" => "โครงการนี้มีการเชื่อม CLO/PLO/YLO อยู่ กรุณานำการเชื่อมโยงออกก่อนเปลี่ยนประเภท",
+                "message" => "โครงการนี้มีการเชื่อม CLO/PLO อยู่ กรุณานำการเชื่อมโยงออกก่อนเปลี่ยนประเภท",
             ], 409);
             exit;
         }
@@ -137,8 +136,7 @@ try {
             academic_year = :academic_year,
             status = :status,
             start_date = :start_date,
-            end_date = :end_date,
-            mapping_json = JSON_SET(COALESCE(mapping_json, JSON_OBJECT()), '$.member_count', :member_count)
+            end_date = :end_date
         WHERE project_id = :project_id
     ");
     $stmt->execute([
@@ -149,7 +147,6 @@ try {
         ':status' => $status,
         ':start_date' => $startDate,
         ':end_date' => $endDate,
-        ':member_count' => $memberCount,
         ':project_id' => $projectId,
     ]);
 
@@ -157,6 +154,7 @@ try {
 
     project_u_metadata($db, $projectId, $input);
     project_u_save_flat_budget($db, $projectId, $input);
+    project_u_save_activities($db, $projectId, $input);
 
     $db->commit();
 

@@ -40,7 +40,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useState, useEffect, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
-import { onlyEnglish, onlyThai } from "@/lib/nameInput";
+import { onlyThai } from "@/lib/nameInput";
 
 // Helper สำหรับคำนวณปีการศึกษาและชั้นปี Real-time (ตัดรอบ 10 สิงหาคม)
 export const calculateAcademicInfo = (studentIdOrEntryYear: string | number) => {
@@ -173,12 +173,10 @@ export default function ProfilePage() {
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
-    // ช่องชื่อ-นามสกุล บังคับภาษาให้ตรงกับช่อง (ไทย/อังกฤษ)
+    // ช่องชื่อ-นามสกุลภาษาไทยบังคับอักษรไทย
     let nextValue = value;
     if (["title", "first_name_th", "last_name_th"].includes(name)) {
       nextValue = onlyThai(value);
-    } else if (["first_name_en", "last_name_en"].includes(name)) {
-      nextValue = onlyEnglish(value);
     }
     setFormData((prev: any) => ({ ...prev, [name]: nextValue }));
   };
@@ -258,11 +256,15 @@ export default function ProfilePage() {
       const hasStudentLicenseEvidenceFiles =
         userRole === "student" &&
         STUDENT_LICENSE_ITEMS.some((item) => Boolean(studentLicenseEvidenceFiles[item.fileField]));
+      const profilePayload = { ...formData };
+      if (userRole === "student") {
+        delete profilePayload.gpa;
+      }
 
       let res;
       if (hasStudentLicenseEvidenceFiles) {
         const payload = new FormData();
-        payload.append("profile", JSON.stringify(formData));
+        payload.append("profile", JSON.stringify(profilePayload));
         for (const item of STUDENT_LICENSE_ITEMS) {
           const file = studentLicenseEvidenceFiles[item.fileField];
           if (file) {
@@ -273,7 +275,7 @@ export default function ProfilePage() {
           headers: { "Content-Type": "multipart/form-data" },
         });
       } else {
-        res = await api.post("/index.php?page=profile", formData);
+        res = await api.post("/index.php?page=profile", profilePayload);
       }
       if (res.data.status === "success") {
         // บันทึกข้อมูลแล้วค่อยอัปโหลดรูปใบประกอบวิชาชีพ (ถ้าเลือกรูปใหม่)
@@ -323,7 +325,6 @@ export default function ProfilePage() {
   const academicCalculated = calculateAcademicInfo(studentId);
 
   const displayFullNameTH = `${profileData.first_name_th || ""} ${profileData.last_name_th || ""}`.trim();
-  const displayFullNameEN = `${profileData.first_name_en || ""} ${profileData.last_name_en || ""}`.trim();
   const displayEmail = profileData.email || `${studentId}@siam.edu`;
   const userInitial = profileData.first_name_th?.charAt(0);
   const pdfDocuments = Array.isArray(profileData.pdf_documents) ? profileData.pdf_documents : [];
@@ -387,9 +388,6 @@ export default function ProfilePage() {
             <h2 className="text-2xl font-bold leading-snug text-foreground">
               {displayFullNameTH}
             </h2>
-            <p className="text-sm font-medium text-muted-foreground mt-2">
-              {displayFullNameEN}
-            </p>
             <p className="text-sm text-muted-foreground mt-1">
               รหัสประจำตัว: {userRole === "student" ? studentId : profileData.faculty_id}
             </p>
@@ -457,7 +455,6 @@ export default function ProfilePage() {
                 <InfoRow icon={<Mail className="h-4 w-4 text-primary" />} label="อีเมล" value={displayEmail} />
                 <InfoRow icon={<Phone className="h-4 w-4 text-primary" />} label="เบอร์โทรศัพท์มือถือ" value={profileData.phone} />
                 <InfoRow icon={<GraduationCap className="h-4 w-4 text-primary" />} label="ชั้นปีปัจจุบัน" value={academicCalculated.yearLevelText} />
-                <InfoRow icon={<GraduationCap className="h-4 w-4 text-primary" />} label="เกรดเฉลี่ย (GPA)" value={profileData.gpa} />
                 <InfoRow icon={<Activity className="h-4 w-4 text-primary" />} label="ส่วนสูง / น้ำหนัก" value={profileData.height && profileData.weight ? `${profileData.height} ซม. / ${profileData.weight} กก.` : null} />
                 <InfoRow icon={<Activity className="h-4 w-4 text-primary" />} label="ดัชนีมวลกาย (BMI)" value={profileData.bmi || calculateBMI(profileData.height, profileData.weight)} />
                 <InfoRow icon={<Calendar className="h-4 w-4 text-primary" />} label="ปีการศึกษาที่เข้าศึกษา" value={academicCalculated.entryYear} />
@@ -590,26 +587,6 @@ export default function ProfilePage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="first_name_en">ชื่อภาษาอังกฤษ</Label>
-                  <Input
-                    id="first_name_en"
-                    name="first_name_en"
-                    value={formData.first_name_en || ""}
-                    onChange={handleInputChange}
-                    placeholder="First Name"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="last_name_en">นามสกุลภาษาอังกฤษ</Label>
-                  <Input
-                    id="last_name_en"
-                    name="last_name_en"
-                    value={formData.last_name_en || ""}
-                    onChange={handleInputChange}
-                    placeholder="Last Name"
-                  />
-                </div>
-                <div className="space-y-2">
                   <Label htmlFor="gender">เพศ</Label>
                   <Select
                     value={formData.gender || "หญิง"}
@@ -679,20 +656,6 @@ export default function ProfilePage() {
                         onChange={(e) => handleNumericInputChange(e, 10)}
                         placeholder="08XXXXXXXX"
                         maxLength={10}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="gpa">เกรดเฉลี่ย (GPA)</Label>
-                      <Input
-                        id="gpa"
-                        name="gpa"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        max="4"
-                        value={formData.gpa ?? ""}
-                        onChange={handleInputChange}
-                        placeholder="เช่น 3.50"
                       />
                     </div>
                     <div className="space-y-2 col-span-2">

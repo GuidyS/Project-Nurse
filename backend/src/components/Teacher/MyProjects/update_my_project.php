@@ -44,7 +44,6 @@ try {
 
     my_project_ensure_member_table($db);
     $memberFacultyIds = my_project_normalize_member_faculty_ids($db, $input, $facultyId);
-    $memberCount = count($memberFacultyIds) + 1;
 
     if (!empty($input['start_date']) && !empty($input['end_date']) && $input['end_date'] < $input['start_date']) {
         project_json(["status" => "error", "message" => "วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่มต้น"], 400);
@@ -101,9 +100,6 @@ try {
         $params[':end_date'] = !empty($input['end_date']) ? $input['end_date'] : null;
     }
 
-    $fields[] = "mapping_json = JSON_SET(COALESCE(mapping_json, JSON_OBJECT()), '$.member_count', :member_count)";
-    $params[':member_count'] = $memberCount;
-
     $db->beginTransaction();
     $currentProject = project_u_guard($db, $projectId);
     $projectId = (string)$currentProject['project_id'];
@@ -119,6 +115,7 @@ try {
 
     project_u_metadata($db, $projectId, $input);
     project_u_save_flat_budget($db, $projectId, $input);
+    project_u_save_activities($db, $projectId, $input);
 
     $db->commit();
 

@@ -37,7 +37,6 @@ try {
 
     my_project_ensure_member_table($db);
     $memberFacultyIds = my_project_normalize_member_faculty_ids($db, $input, $facultyId);
-    $memberCount = count($memberFacultyIds) + 1;
 
     $academicYear = isset($input['academic_year']) && $input['academic_year'] !== ''
         ? (int) $input['academic_year']
@@ -72,7 +71,6 @@ try {
         INSERT INTO project (
             project_id,
             project_name_th,
-            mapping_json,
             responsible_faculty_id,
             academic_year,
             status,
@@ -81,7 +79,6 @@ try {
         ) VALUES (
             :project_id,
             :project_name_th,
-            :mapping_json,
             :responsible_faculty_id,
             :academic_year,
             :status,
@@ -92,7 +89,6 @@ try {
     $stmt->execute([
         ':project_id' => $projectId,
         ':project_name_th' => $nameTh,
-        ':mapping_json' => json_encode(['member_count' => $memberCount], JSON_UNESCAPED_UNICODE),
         ':responsible_faculty_id' => $facultyId,
         ':academic_year' => $academicYear,
         ':status' => project_normalize_status($input['status'] ?? 'active'),
@@ -108,6 +104,7 @@ try {
     project_u_link_new($db, $projectId);
     project_u_metadata($db, $projectId, $input);
     project_u_save_flat_budget($db, $projectId, $input);
+    project_u_save_activities($db, $projectId, $input);
 
     $db->commit();
 
