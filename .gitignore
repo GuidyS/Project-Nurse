@@ -31,7 +31,6 @@ dist-ssr
 # backend
 
 config.php
-/sql
 /mysql-data
 /mysql-data-backup
 .agents
