@@ -8,24 +8,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { FileText, Download, DollarSign, Filter } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import * as XLSX from 'xlsx';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 
 // เรียกใช้โมดูลอินสแตนซ์ Axios ที่กำหนดค่าพอร์ตกลางไว้แล้ว
 import api from '@/lib/axios';
+import { type ReportDetails } from '@/components/ui/ProjectReportDetailsDialog';
 import { consumePendingProjectNavigation } from '@/lib/projectNavigation';
 
 interface ProjectOption {
   id: number;
+  project_id: string;
   name: string;
   project_type?: ProjectType;
-  description?: string;
-  responsible_faculty_id?: string;
-  academic_year?: string | number;
-  start_date?: string;
-  end_date?: string;
-  status?: string;
 }
 
 type ProjectType = 'academic_service' | 'culture' | 'other' | 'teaching' | 'research' | 'quality_assurance';;
@@ -53,9 +46,9 @@ const projectTypeFilterOptions: { value: ProjectTypeFilter; label: string }[] = 
 const normalizeProjectType = (value?: ProjectType | null): ProjectType => value || 'other';
 
 interface ProjectStats {
-  totalBudget: number;
-  totalSpent: number;
-  remaining: number;
+  totalBudget: number | null;
+  totalSpent: number | null;
+  remaining: number | null;
 }
 
 interface BudgetRow {
@@ -71,29 +64,37 @@ export default function ProjectReports() {
   const [isProjectSearchOpen, setIsProjectSearchOpen] = useState(false);
   const [projectTypeFilter, setProjectTypeFilter] = useState<ProjectTypeFilter>('all');
   
-  const [stats, setStats] = useState<ProjectStats>({ totalBudget: 0, totalSpent: 0, remaining: 0 });
+  const [stats, setStats] = useState<ProjectStats>({ totalBudget: null, totalSpent: null, remaining: null });
+  const [details, setDetails] = useState<ReportDetails | null>(null);
   const [budgetData, setBudgetData] = useState<BudgetRow[]>([]);
   
+  const [errorMessage, setErrorMessage] = useState('');
+  const [periodStatus, setPeriodStatus] = useState('open');
   const [loading, setLoading] = useState(true);
   const activeFilterCount = Number(projectTypeFilter !== 'all');
 
   // ฟังก์ชันดึงข้อมูลรายงานจาก API (แก้ไขให้ใช้ Axios Instance)
   const fetchReportData = async (projectId = '') => {
     setLoading(true);
+    setErrorMessage('');
     try {
       // เรียกข้อมูลผ่านหน้า index.php ของ Backend ตามรูปแบบ API ที่ใช้อยู่ทั่วไป
-      const response = await api.get(`/index.php?page=get-project-reports${projectId ? `&project_id=${projectId}` : ''}`);
+      const response = await api.get('/index.php', { params: { page: 'get-project-reports', ...(projectId ? { project_id: projectId } : {}) } });
       const res = response.data;
       
       if (res.status === 'success') {
         setProjects(res.data.projects);
         setSelectedProject(res.data.selectedProjectId ? res.data.selectedProjectId.toString() : '');
         setStats(res.data.stats);
+        setDetails(res.data.details);
+        setPeriodStatus(res.data.periodStatus);
         setBudgetData(res.data.budgetData);
       } else {
         console.error(res.message);
       }
-    } catch (err) {
+    } catch (err: any) {
+      setDetails(null); setStats({ totalBudget: null, totalSpent: null, remaining: null }); setBudgetData([]);
+      setErrorMessage(err.response?.data?.message || "โหลดรายงานไม่สำเร็จ");
       console.error("เกิดข้อผิดพลาดในการโหลดรายงาน:", err);
     } finally {
       setLoading(false);
@@ -113,7 +114,7 @@ export default function ProjectReports() {
   const handleProjectSearchSelect = (project: ProjectOption) => {
     setProjectSearch(project.name);
     setIsProjectSearchOpen(false);
-    handleProjectChange(project.id.toString());
+    handleProjectChange(project.project_id.toString());
   };
 
   const getProjectsByType = (filter: ProjectTypeFilter) => projects.filter((project) => {
@@ -126,14 +127,14 @@ export default function ProjectReports() {
   const handleProjectTypeFilterChange = (value: string) => {
     const nextFilter = value as ProjectTypeFilter;
     const nextProjects = getProjectsByType(nextFilter);
-    const currentProject = projects.find((project) => project.id.toString() === selectedProject);
+    const currentProject = projects.find((project) => project.project_id.toString() === selectedProject);
     const currentMatchesFilter =
       !currentProject || nextFilter === 'all' || normalizeProjectType(currentProject.project_type) === nextFilter;
 
     setProjectTypeFilter(nextFilter);
 
     if (!currentMatchesFilter && nextProjects.length > 0) {
-      handleProjectChange(nextProjects[0].id.toString());
+      handleProjectChange(nextProjects[0].project_id.toString());
     }
   };
 
@@ -141,71 +142,14 @@ export default function ProjectReports() {
   const hasProjectSearchText = projectSearchText.length > 0;
   const searchedProjects = hasProjectSearchText
     ? typeFilteredProjects.filter((project) =>
-        `${project.id} ${project.name}`.toLowerCase().includes(projectSearchText.toLowerCase())
+        `${project.project_id} ${project.name}`.toLowerCase().includes(projectSearchText.toLowerCase())
       )
     : [];
 
-  const selectedProjectName = projects.find(p => p.id.toString() === selectedProject)?.name || 'project-report';
-  const selectedProjectDetails = projects.find(p => p.id.toString() === selectedProject);
-  const safeProjectName = selectedProjectName.replace(/[\\/:*?"<>|]/g, '_');
+  const selectedProjectName = projects.find(p => p.project_id.toString() === selectedProject)?.name || 'project-report';
 
-  const handleExport = (format: 'excel' | 'pdf') => {
-    if (!selectedProject) return;
-
-    if (format === 'excel') {
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet([
-        { รายการ: 'ชื่อโครงการ', ข้อมูล: selectedProjectName },
-        { รายการ: 'รหัสโครงการ', ข้อมูล: selectedProject },
-        { รายการ: 'ประเภทโครงการ', ข้อมูล: projectTypeLabels[normalizeProjectType(selectedProjectDetails?.project_type)] },
-        { รายการ: 'รายละเอียด', ข้อมูล: selectedProjectDetails?.description || '' },
-        { รายการ: 'อาจารย์ผู้รับผิดชอบ', ข้อมูล: selectedProjectDetails?.responsible_faculty_id || '' },
-        { รายการ: 'ปีการศึกษา', ข้อมูล: selectedProjectDetails?.academic_year || '' },
-        { รายการ: 'วันที่เริ่ม', ข้อมูล: selectedProjectDetails?.start_date || '' },
-        { รายการ: 'วันที่สิ้นสุด', ข้อมูล: selectedProjectDetails?.end_date || '' },
-        { รายการ: 'สถานะ', ข้อมูล: selectedProjectDetails?.status || '' },
-        { รายการ: 'งบประมาณทั้งหมด', ข้อมูล: stats.totalBudget },
-        { รายการ: 'ใช้จ่ายจริง', ข้อมูล: stats.totalSpent },
-        { รายการ: 'งบประมาณคงเหลือ', ข้อมูล: stats.remaining },
-      ]), 'Summary');
-      XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(budgetData.map((row) => ({ ปีงบประมาณ: row.month, งบประมาณ: row.budget, ใช้จริง: row.spent }))), 'Budget');
-      XLSX.writeFile(workbook, `${safeProjectName}.xlsx`);
-      return;
-    }
-
-    const doc = new jsPDF();
-    const titleCanvas = document.createElement('canvas');
-    const context = titleCanvas.getContext('2d');
-    if (context) {
-      const title = `รายงานโครงการ: ${selectedProjectName}`;
-      context.font = 'bold 24px Tahoma, sans-serif';
-      titleCanvas.width = Math.max(900, Math.ceil(context.measureText(title).width) + 24);
-      titleCanvas.height = 48;
-      context.font = 'bold 24px Tahoma, sans-serif';
-      context.fillStyle = '#111827';
-      context.fillText(title, 8, 32);
-      const titleWidth = Math.min(180, titleCanvas.width / 5);
-      doc.addImage(titleCanvas.toDataURL('image/png'), 'PNG', 14, 9, titleWidth, titleWidth * titleCanvas.height / titleCanvas.width);
-    } else {
-      doc.text(`Project Report: ${selectedProject}`, 14, 16);
-    }
-    autoTable(doc, {
-      startY: 24,
-      head: [['Metric', 'Value']],
-      body: [
-        ['Budget', formatCurrency(stats.totalBudget)],
-        ['Spent', formatCurrency(stats.totalSpent)],
-        ['Remaining', formatCurrency(stats.remaining)],
-      ],
-    });
-    autoTable(doc, {
-      head: [['Period', 'Budget', 'Spent']],
-      body: budgetData.map(row => [row.month, formatCurrency(row.budget), formatCurrency(row.spent)]),
-    });
-    doc.save(`${safeProjectName}.pdf`);
-  };
-
-  const formatCurrency = (num: number) => {
+  const formatCurrency = (num: number | null) => {
+    if (num === null || num === undefined) return "ยังไม่ระบุ";
     return new Intl.NumberFormat('th-TH').format(num);
   };
 
@@ -219,20 +163,12 @@ export default function ProjectReports() {
         <div className="app-page-header">
           <div>
             <h1 className="app-page-title">รายงานสรุปโครงการ</h1>
-            <p className="app-page-description">รายงานความคืบหน้าและงบประมาณสะสม</p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => handleExport('excel')} disabled={!selectedProject}>
-              <Download className="mr-2 h-4 w-4" />
-              Excel
-            </Button>
-            <Button variant="outline" onClick={() => handleExport('pdf')} disabled={!selectedProject}>
-              <FileText className="mr-2 h-4 w-4" />
-              PDF
-            </Button>
+            <p className="app-page-description">รายงานงบเสนอและงบใช้จริงของโครงการที่ตรวจย้ายแล้ว</p>
           </div>
         </div>
 
+        {errorMessage && <p role="alert" className="text-destructive">{errorMessage}</p>}
+        <p className="text-sm text-muted-foreground">{periodStatus === "closed" ? "ปิดรอบแล้ว · อ่านจากภาพรายงานที่บันทึกไว้" : "ยอดงบประมาณมาจากโครงการหลักเท่านั้น · รายการที่รอตรวจย้ายยังไม่รวมในรายงาน"}</p>
         {/* ส่วนเลือกโครงการ */}
         <Card>
           <CardContent className="pt-6">
@@ -246,7 +182,7 @@ export default function ProjectReports() {
                   </SelectTrigger>
                   <SelectContent>
                     {typeFilteredProjects.map((project) => (
-                      <SelectItem key={project.id} value={project.id.toString()}>
+                      <SelectItem key={project.project_id} value={project.project_id.toString()}>
                         <span className="font-bold text-slate-900">{project.name}</span>
                         <span className="mx-1 text-muted-foreground">•</span>
                         <span className="text-muted-foreground">
@@ -279,7 +215,7 @@ export default function ProjectReports() {
                       ) : (
                         searchedProjects.map((project) => (
                           <button
-                            key={project.id}
+                            key={project.project_id}
                             type="button"
                             className="flex w-full flex-col rounded-sm px-3 py-2 text-left text-sm outline-none hover:bg-accent hover:text-accent-foreground"
                             onMouseDown={(event) => event.preventDefault()}
@@ -346,7 +282,7 @@ export default function ProjectReports() {
         <div className="grid gap-4 md:grid-cols-3">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">งบประมาณโครงการ</CardTitle>
+              <CardTitle className="text-sm font-medium">งบเสนอโครงการ</CardTitle>
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -364,7 +300,7 @@ export default function ProjectReports() {
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">งบประมาณคงเหลือ</CardTitle>
+              <CardTitle className="text-sm font-medium">ส่วนต่างงบเสนอ − ใช้จริง</CardTitle>
               <DollarSign className="h-4 w-4 text-green-500" />
             </CardHeader>
             <CardContent>
@@ -373,12 +309,15 @@ export default function ProjectReports() {
           </Card>
         </div>
 
+        {details && <Card><CardHeader><CardTitle>รายละเอียดโครงการและกิจกรรม</CardTitle></CardHeader><CardContent className="space-y-4"><p className="text-sm">รหัส {selectedProject} · ปี {details.academic_year} · {details.plan_name || 'ยังไม่ระบุแผนงาน'}</p><p className="text-sm">วัตถุประสงค์: {details.objective || 'ยังไม่ระบุ'} · KPI: {details.kpi || 'ยังไม่ระบุ'}</p><div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b"><th className="p-2 text-left">แหล่งเงินของโครงการหลัก</th><th className="p-2 text-right">งบเสนอ</th><th className="p-2 text-right">งบใช้จริง</th></tr></thead><tbody><tr className="border-b align-top"><td className="p-2">ยอดโครงการ{Object.entries(details.budgets).map(([source]) => <div key={source} className="text-xs text-muted-foreground">{details.sources?.[source] || source}</div>)}</td>{(['proposed', 'actual'] as const).map(type => <td key={type} className="p-2 text-right">{Object.keys(details.budgets).length ? Object.entries(details.budgets).map(([source, budget]) => <div key={source}>{formatCurrency(budget[type] == null ? null : Number(budget[type]))}</div>) : 'ยังไม่ระบุ'}</td>)}</tr></tbody></table></div><div className="space-y-2"><h3 className="font-semibold">กิจกรรมย่อย</h3>{details.activities.length === 0 ? <p className="text-sm text-muted-foreground">ไม่มีกิจกรรมย่อย</p> : details.activities.map(activity => <div key={activity.id ?? activity.activity_name} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3"><span>{activity.activity_name}</span><a href={activity.google_drive_url} target="_blank" rel="noopener noreferrer" className="text-primary underline">เปิด Google Drive</a></div>)}</div><p className="text-xs text-muted-foreground">งบประมาณบันทึกเฉพาะระดับโครงการหลัก</p></CardContent></Card>}
+
+        {/* กราฟงบประมาณ */}
         <div className="grid gap-4">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <DollarSign className="h-5 w-5" />
-                งบประมาณรายเดือน
+                งบเสนอและงบใช้จริง (ปีงบประมาณตรงกับปีการศึกษา)
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -390,7 +329,7 @@ export default function ProjectReports() {
                     <YAxis />
                     <Tooltip formatter={(value) => `฿${formatCurrency(Number(value))}`} />
                     <Legend />
-                    <Bar dataKey="budget" name="งบประมาณ" fill="hsl(var(--primary))" />
+                    <Bar dataKey="budget" name="งบเสนอ" fill="hsl(var(--primary))" />
                     <Bar dataKey="spent" name="ใช้จริง" fill="#22c55e" />
                   </BarChart>
                 </ResponsiveContainer>

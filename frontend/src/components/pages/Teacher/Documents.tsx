@@ -21,7 +21,6 @@ type DocumentItem = {
   uploadedAt: string;
   fileUrl?: string;
   downloadUrl?: string;
-  canDelete?: boolean;
 };
 
 export default function Documents() {
@@ -94,7 +93,7 @@ export default function Documents() {
       toast({ title: "กรุณาระบุปีการศึกษา พ.ศ. 2500–2700", variant: "destructive" });
       return;
     }
-    if (!newDocument.type || !newDocument.course || !newDocument.google_drive_link.trim()) {
+    if (!newDocument.name || !newDocument.type || !newDocument.course || !newDocument.google_drive_link) {
       toast({ title: "แจ้งเตือน", description: "กรุณากรอกข้อมูลและแนบลิงก์ให้ครบถ้วน", variant: "destructive" });
       return;
     }
@@ -102,7 +101,7 @@ export default function Documents() {
     try {
       // Send as JSON since we don't have files anymore
       const payload = {
-        name: newDocument.name.trim() || `${newDocument.type} - ${newDocument.course}`,
+        name: newDocument.name,
         type: newDocument.type,
         course: newDocument.course,
         academic_year: newDocument.academic_year,
@@ -296,7 +295,6 @@ export default function Documents() {
                             variant="outline" 
                             size="icon" 
                             className="h-8 w-8" 
-                            aria-label="เปิดเอกสาร"
                             disabled={!doc.fileUrl}
                             onClick={() => doc.fileUrl && window.open(doc.fileUrl, '_blank')}
                           >
@@ -306,7 +304,6 @@ export default function Documents() {
                             variant="outline" 
                             size="icon" 
                             className="h-8 w-8" 
-                            aria-label="ดาวน์โหลดเอกสาร"
                             disabled={!doc.downloadUrl && !doc.fileUrl}
                             onClick={() => {
                               const url = doc.downloadUrl || doc.fileUrl;
@@ -318,7 +315,7 @@ export default function Documents() {
                           >
                             <Download className="h-4 w-4" />
                           </Button>
-                          <Button variant="outline" size="icon" className="h-8 w-8 hover:bg-red-100 hover:text-red-600" aria-label="ลบเอกสาร" disabled={!doc.canDelete} title={doc.canDelete ? 'ลบเอกสาร' : 'ลบได้เฉพาะเอกสารที่คุณบันทึก'} onClick={() => { setDeleteId(doc.id); setIsDeleteOpen(true); }}>
+                          <Button variant="outline" size="icon" className="h-8 w-8 hover:bg-red-100 hover:text-red-600" onClick={() => { setDeleteId(doc.id); setIsDeleteOpen(true); }}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>

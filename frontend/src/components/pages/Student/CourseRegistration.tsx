@@ -15,15 +15,10 @@ interface RegistrationSubject {
   subject_name: string;
   credit: number;
   credit_desc: string | null;
-  semester: number | null;
-  academic_year: number | null;
-  term_label: string;
   ylo: number | null;
   instructor_id: string | null;
   instructor_name: string | null;
   is_enrolled: boolean;
-  enrolled_semester: number | null;
-  enrolled_year: number | null;
   enrollment_status: string | null;
   /** มีคะแนนที่อาจารย์บันทึกไว้แล้ว — ถอนเองไม่ได้ */
   has_scores: boolean;
@@ -172,7 +167,6 @@ export default function CourseRegistration() {
                     <TableHead className="min-w-[220px]">ชื่อวิชา</TableHead>
                     <TableHead className="w-24 text-center whitespace-nowrap">หน่วยกิต</TableHead>
                     <TableHead className="w-24 text-center whitespace-nowrap">YLO</TableHead>
-                    <TableHead className="w-28 text-center whitespace-nowrap">ภาคเรียน</TableHead>
                     <TableHead className="min-w-[180px]">อาจารย์ผู้รับผิดชอบ</TableHead>
                     <TableHead className="w-28 text-right whitespace-nowrap">จัดการ</TableHead>
                   </TableRow>
@@ -191,9 +185,6 @@ export default function CourseRegistration() {
                         ) : (
                           <span className="text-muted-foreground text-xs">-</span>
                         )}
-                      </TableCell>
-                      <TableCell className="text-center whitespace-nowrap text-muted-foreground">
-                        {subject.term_label || "-"}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {subject.instructor_name || (
@@ -259,7 +250,7 @@ export default function CourseRegistration() {
             {subjects.length === 0 ? (
               <div className="py-10 text-center text-muted-foreground space-y-2">
                 <AlertCircle className="h-8 w-8 mx-auto text-amber-500" />
-                <p>ยังไม่มีรายวิชาในหลักสูตรที่ใช้งานในระบบ</p>
+                <p>ยังไม่มีรายวิชาที่เปิดให้ลงทะเบียน (ต้องมีอาจารย์ผู้รับผิดชอบก่อน)</p>
               </div>
             ) : (
               <Table>
@@ -269,7 +260,7 @@ export default function CourseRegistration() {
                     <TableHead className="min-w-[200px]">ชื่อวิชา</TableHead>
                     <TableHead className="w-20 text-center whitespace-nowrap">หน่วยกิต</TableHead>
                     <TableHead className="w-20 text-center whitespace-nowrap">YLO</TableHead>
-                    <TableHead className="w-24 text-center whitespace-nowrap">ภาคเรียน</TableHead>
+                    <TableHead className="min-w-[160px]">อาจารย์ผู้รับผิดชอบ</TableHead>
                     <TableHead className="w-36 text-right whitespace-nowrap">ลงทะเบียน</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -295,8 +286,8 @@ export default function CourseRegistration() {
                             <span className="text-muted-foreground text-xs">-</span>
                           )}
                         </TableCell>
-                        <TableCell className="text-center whitespace-nowrap text-muted-foreground">
-                          {subject.term_label || "-"}
+                        <TableCell className="text-muted-foreground">
+                          {subject.instructor_name || "-"}
                         </TableCell>
                         <TableCell className="text-right">
                           {subject.is_enrolled ? (

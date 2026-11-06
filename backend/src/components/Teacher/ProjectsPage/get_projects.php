@@ -10,7 +10,11 @@ try {
     my_project_ensure_member_table($db);
 
     $search = trim((string) ($_GET['search'] ?? ''));
-    $projectId = project_request_int('project_id');
+    $projectId = project_request_code();
+    if (isset($_GET['project_id']) && $_GET['project_id'] !== '' && $projectId === null) {
+        project_json(["status" => "error", "message" => "รหัสโครงการไม่ถูกต้อง"], 400);
+        exit;
+    }
 
     $where = [];
     $params = [];
@@ -21,19 +25,15 @@ try {
     }
 
     if ($search !== '') {
-        $where[] = '(p.project_name_th LIKE :search_th OR p.project_name_en LIKE :search_en
-            OR CONCAT_WS(\' \', f.first_name_th, f.last_name_th) LIKE :search_faculty)';
-        $params[':search_th'] = "%{$search}%";
-        $params[':search_en'] = "%{$search}%";
-        $params[':search_faculty'] = "%{$search}%";
+        $where[] = 'p.project_name_th LIKE :search';
+        $params[':search'] = "%{$search}%";
     }
 
     $sql = "
         SELECT
+            p.id,
             p.project_id,
             p.project_name_th,
-            p.project_name_en,
-            p.description,
             p.project_type,
             p.strategy,
             p.responsible_faculty_id,
@@ -42,14 +42,11 @@ try {
             p.status,
             p.start_date,
             p.end_date,
-            CASE
-                WHEN p.responsible_faculty_id IS NOT NULL THEN COALESCE(pfm.members, 0) + 1
-                WHEN COALESCE(pfm.members, 0) > 0 THEN COALESCE(pfm.members, 0)
-                ELSE COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(p.mapping_json, '$.member_count')) AS UNSIGNED), 0)
-            END AS members,
+            COALESCE(pfm.members, 0)
+                + CASE WHEN p.responsible_faculty_id IS NULL THEN 0 ELSE 1 END AS members,
             COALESCE(pb.budget, 0) AS budget,
             COALESCE(pb.spent, 0) AS spent,
-            COALESCE(pb.budget, 0) AS budget_allocated,
+            COALESCE(pb.budget, 0) AS budget_proposed,
             COALESCE(pb.spent, 0) AS budget_spent,
             pb.project_budget_years_id,
             pb.fiscal_year,
@@ -65,7 +62,7 @@ try {
             SELECT project_id,
                    MAX(project_budget_years_id) AS project_budget_years_id,
                    MAX(fiscal_year) AS fiscal_year,
-                   SUM(COALESCE(budget_allocated, 0)) AS budget,
+                   SUM(COALESCE(budget_proposed, 0)) AS budget,
                    SUM(COALESCE(budget_spent, 0)) AS spent,
                    MAX(result) AS budget_note
             FROM project_budget_years
@@ -86,7 +83,7 @@ try {
     $plosByProject = [];
     $membersByProject = [];
     $projectIds = array_values(array_filter(array_map(
-        static fn(array $project): int => (int) $project['project_id'],
+        static fn(array $project): string => (string) $project['project_id'],
         $projects
     )));
 
@@ -114,6 +111,7 @@ try {
             WHERE project_id IN (" . implode(',', $placeholders) . ")
               AND file_path IS NOT NULL
               AND TRIM(file_path) <> ''
+              AND report_document_type <> 'activity_attachment'
             ORDER BY date DESC, id DESC
         ");
         $docsStmt->execute($docParams);
@@ -227,10 +225,12 @@ try {
     }
     unset($project);
 
+    $projects = project_u_catalogue($db, $projects);
+
     // PROJECT_VIEW already authorizes this catalogue; search must not hide historical filter options.
     $availableYears = $db->query('SELECT DISTINCT academic_year FROM project WHERE academic_year IS NOT NULL')->fetchAll(PDO::FETCH_COLUMN);
     project_json(["status" => "success", "data" => $projects, "academicYears" => academicYearOptions($availableYears, currentAcademicYear(null, $db))]);
 } catch (Exception $e) {
-    project_json(["status" => "error", "message" => $e->getMessage()], 500);
+    project_json(["status" => "error", "message" => $e->getMessage()], project_error_status($e));
 }
 ?>

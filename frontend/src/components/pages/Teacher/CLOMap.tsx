@@ -1,14 +1,14 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { AlertCircle, FileText, Loader2, Search } from 'lucide-react';
+import { AlertCircle, FileText, Save, Edit, Loader2, Search } from 'lucide-react';
 import { useState, useEffect, useMemo } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface CLOMapData {
@@ -32,6 +32,7 @@ export default function CLOMap() {
   const [plos, setPlos] = useState<string[]>([]);
   const [cloMap, setCloMap] = useState<CLOMapData>({});
   
+  const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [courseSearch, setCourseSearch] = useState('');
@@ -76,6 +77,38 @@ export default function CLOMap() {
     });
   }, [courses, courseSearch, yloFilter]);
 
+  const toggleMapping = (courseCode: string, plo: string) => {
+    if (!isEditing) return;
+    setCloMap(prev => {
+      const current = prev[courseCode] || [];
+      const updated = current.includes(plo)
+        ? current.filter(p => p !== plo)
+        : [...current, plo];
+      return { ...prev, [courseCode]: updated };
+    });
+  };
+
+  // 🌟 ส่งข้อมูลที่แก้ไขไปบันทึก
+  const handleSave = async () => {
+    try {
+      const response = await api.post('/index.php?page=save-clo-map', cloMap);
+      if (response.data.status === 'success') {
+        toast({ title: "สำเร็จ", description: "บันทึกข้อมูล CLO Map เรียบร้อยแล้ว" });
+        setIsEditing(false);
+        await fetchMapData();
+      } else {
+        toast({
+          title: "ล้มเหลว",
+          description: response.data?.message || "ไม่สามารถบันทึกข้อมูลได้",
+          variant: "destructive",
+        });
+      }
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "ไม่สามารถบันทึกข้อมูลได้";
+      toast({ title: "ล้มเหลว", description: message, variant: "destructive" });
+    }
+  };
+
   if (isLoading) {
     return <div className="flex h-96 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
@@ -95,6 +128,22 @@ return (
           <div>
             <h1 className="app-page-title">CLO Map</h1>
             <p className="app-page-description">แผนที่การเชื่อมโยงรายวิชากับผลลัพธ์การเรียนรู้ระดับหลักสูตร (PLO)</p>
+          </div>
+          <div className="flex gap-2">
+            {isEditing ? (
+              <>
+                <Button variant="outline" onClick={() => { setIsEditing(false); fetchMapData(); }}>
+                  ยกเลิก
+                </Button>
+                <Button onClick={handleSave}>
+                  <Save className="mr-2 h-4 w-4" /> บันทึก
+                </Button>
+              </>
+            ) : (
+              <Button onClick={() => setIsEditing(true)}>
+                <Edit className="mr-2 h-4 w-4" /> แก้ไข
+              </Button>
+            )}
           </div>
         </div>
         
@@ -125,7 +174,7 @@ return (
                 ตาราง CLO Mapping
               </CardTitle>
               <CardDescription>
-                ดูความสอดคล้องระหว่างรายวิชา (แกน Y) และ PLO (แกน X)
+                ติ๊กเลือกความสอดคล้องระหว่างรายวิชา (แกน Y) และ PLO (แกน X)
               </CardDescription>
             </div>
             <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-end">
@@ -194,7 +243,8 @@ return (
                         <TableCell key={plo} className="text-center">
                           <Checkbox
                             checked={cloMap[course.code]?.includes(plo) || false}
-                            disabled
+                            onCheckedChange={() => toggleMapping(course.code, plo)}
+                            disabled={!isEditing}
                           />
                         </TableCell>
                       ))}

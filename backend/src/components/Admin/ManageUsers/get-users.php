@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/user_status_helpers.php';
 header("Content-Type: application/json");
 
 if (session_status() === PHP_SESSION_NONE) {
@@ -26,9 +27,10 @@ try {
     // ดึงข้อมูลผู้ใช้ พร้อมชื่อจากตาราง faculty หรือ student และตำแหน่งปัจจุบัน
     $sql = "SELECT u.user_id as id, u.username, u.role_id, u.created_at,
                    COALESCE(u.status, 'active') as status,
-                   s.status as student_status,
                    s.first_name_th as s_fname, s.last_name_th as s_lname,
+                   s.status as s_status,
                    f.first_name_th as f_fname, f.last_name_th as f_lname,
+                   f.status as f_status,
                    up.position_id
             FROM users u
             LEFT JOIN student s ON u.username = s.student_id
@@ -38,13 +40,6 @@ try {
             
     $stmt = $db->query($sql);
     $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-    $adminSecondaryPositions = [];
-    $extraPositionStmt = $db->query("SELECT up.user_id, up.position_id FROM user_position up JOIN users u ON u.user_id = up.user_id WHERE u.role_id = 1 AND up.position_id IN (1, 2, 3, 4, 5, 6, 9)");
-    $positionSlugs = [1 => 'dean', 2 => 'instructor', 3 => 'advisor', 4 => 'practical_instructor', 5 => 'program_manager', 6 => 'project_manager', 9 => 'research'];
-    foreach ($extraPositionStmt->fetchAll(PDO::FETCH_ASSOC) as $position) {
-        $adminSecondaryPositions[(int)$position['user_id']][] = $positionSlugs[(int)$position['position_id']];
-    }
 
     $result = [];
     foreach($users as $u) {
@@ -70,35 +65,22 @@ try {
         ];
         $teacherSubRole = isset($subRoleMap[$u['position_id']]) ? $subRoleMap[$u['position_id']] : null;
 
+        // สถานะการศึกษาของนักศึกษา (คงอยู่/พักการเรียน/ลาออก) แยกจากสถานะบัญชี (ใช้งาน/ระงับ)
+        // ถ้าพักการเรียนหรือลาออก หน้าเว็บจะแสดงสถานะนี้แทน และเจ้าตัวเข้าระบบไม่ได้
+        $personStatus = is_string($u['s_status'] ?? null) && $u['s_status'] !== '' ? $u['s_status'] : null;
+        $personLabels = studentStatusOptions();
+
         $result[] = [
             'id' => (string)$u['id'],
             'email' => $u['username'], // ใช้ username แทนอีเมลชั่วคราว
             'fullName' => $fullName !== '' ? $fullName : 'ไม่ระบุชื่อ',
             'role' => $roleStr,
             'teacherSubRole' => $teacherSubRole,
-            'secondaryPositions' => $roleStr === 'admin' ? ($adminSecondaryPositions[(int)$u['id']] ?? []) : [],
             'status' => ($u['status'] === 'inactive') ? 'inactive' : 'active',
-            'academicStatus' => $u['student_status'] ?? null,
+            'personStatus' => $personStatus,
+            'personStatusLabel' => $personStatus !== null ? ($personLabels[$personStatus] ?? $personStatus) : null,
+            'isBlocked' => $personStatus !== null && studentStatusBlocksLogin($personStatus),
             'createdAt' => date('Y-m-d', strtotime($u['created_at']))
-        ];
-    }
-
-    // Imported student records can exist before a login account is created.
-    // Include them in the admin list without inventing a password or user ID.
-    $missingStmt = $db->query("SELECT s.student_id, s.first_name_th, s.last_name_th, s.email, s.admission_year, s.status
-        FROM student s LEFT JOIN users u ON u.username = s.student_id OR u.user_id = s.user_id
-        WHERE u.user_id IS NULL ORDER BY s.student_id DESC");
-    foreach ($missingStmt->fetchAll(PDO::FETCH_ASSOC) as $student) {
-        $result[] = [
-            'id' => 'student:' . $student['student_id'],
-            'email' => $student['student_id'],
-            'fullName' => trim(($student['first_name_th'] ?? '') . ' ' . ($student['last_name_th'] ?? '')),
-            'role' => 'student',
-            'teacherSubRole' => null,
-            'status' => 'inactive',
-            'academicStatus' => $student['status'] ?? null,
-            'createdAt' => '-',
-            'accountMissing' => true,
         ];
     }
 

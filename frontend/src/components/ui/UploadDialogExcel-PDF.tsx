@@ -13,8 +13,8 @@ interface UploadDialogProps {
 const config = {
   excel: {
     title: "อัปโหลดไฟล์ Excel",
-    accept: ".xlsx,.csv,.xls",
-    formats: "XLSX, CSV, XLS (สูงสุด 20MB)",
+    accept: ".xlsx,.xls",
+    formats: "XLSX, XLS (สูงสุด 20MB)",
     icon: FileSpreadsheet,
     colorClass: "text-emerald-600",
     iconBgClass: "bg-emerald-50",

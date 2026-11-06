@@ -3,7 +3,6 @@ if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../config/audit_helper.php'; // นำเข้า Audit Helper
 require_once __DIR__ . '/../CLOPage/curriculum_repository.php';
-require_once __DIR__ . '/../../../config/active_curriculum.php';
 require_once __DIR__ . '/subject_term_helpers.php';
 
 header('Access-Control-Allow-Origin: ' . (in_array($_SERVER['HTTP_ORIGIN'] ?? '', ['http://localhost:5173', 'http://127.0.0.1:5173'], true) ? ($_SERVER['HTTP_ORIGIN'] ?? '') : 'http://localhost:5173'));
@@ -17,18 +16,6 @@ $input = json_decode(file_get_contents("php://input"), true);
 
 try {
     $db = new Connect();
-    if (!isset($_SESSION['user_id'])) {
-        http_response_code(401);
-        echo json_encode(['status' => 'error', 'message' => 'Unauthorized']);
-        exit();
-    }
-    $roleStmt = $db->prepare('SELECT role_id FROM users WHERE user_id = ? LIMIT 1');
-    $roleStmt->execute([$_SESSION['user_id']]);
-    if (!in_array((int)$roleStmt->fetchColumn(), [1, 2], true)) {
-        http_response_code(403);
-        echo json_encode(['status' => 'error', 'message' => 'ไม่มีสิทธิ์มอบหมายอาจารย์'], JSON_UNESCAPED_UNICODE);
-        exit();
-    }
 
     if (empty($input['subject_code']) || !isset($input['faculty_id'])) {
         echo json_encode(["status" => "error", "message" => "ข้อมูลไม่ครบถ้วน"], JSON_UNESCAPED_UNICODE);
@@ -37,23 +24,6 @@ try {
 
     $subject_code = $input['subject_code'];
     $faculty_id = $input['faculty_id'];
-
-    $activeSubjects = activeCurriculumSubjects($db);
-    if ($activeSubjects !== null && !in_array((string)$subject_code, array_column($activeSubjects, 'subject_code'), true)) {
-        http_response_code(422);
-        echo json_encode(['status' => 'error', 'message' => 'รายวิชาไม่อยู่ในหลักสูตรที่ใช้งาน'], JSON_UNESCAPED_UNICODE);
-        exit();
-    }
-    if (!empty($faculty_id)) {
-        $facultyStmt = $db->prepare('SELECT f.faculty_id, u.role_id FROM faculty f LEFT JOIN users u ON u.username = f.faculty_id WHERE f.faculty_id = ? LIMIT 1');
-        $facultyStmt->execute([$faculty_id]);
-        $facultyAccount = $facultyStmt->fetch(PDO::FETCH_ASSOC);
-        if (!$facultyAccount || (int)($facultyAccount['role_id'] ?? 0) !== 2) {
-            http_response_code(409);
-            echo json_encode(['status' => 'error', 'message' => 'อาจารย์ต้องมีบัญชีผู้ใช้และ Role อาจารย์ก่อนมอบหมายรายวิชา'], JSON_UNESCAPED_UNICODE);
-            exit();
-        }
-    }
 
     $frameworkId = getActiveFrameworkId($db);
     if (!$frameworkId) {
@@ -70,28 +40,13 @@ try {
         exit();
     }
 
-    // ตรวจค่าภาคเรียน/ปีการศึกษาให้ผ่านก่อน แล้วค่อยเขียนอะไรลงฐานข้อมูล
-    // (ไม่งั้นกรอกปีผิดแล้วอาจารย์จะถูกมอบหมายไปแล้วทั้งที่ขึ้น error)
-    $semester = array_key_exists('semester', $input) ? subjectTermNormalizeSemester($input['semester']) : null;
-    $academicYear = array_key_exists('academic_year', $input) ? subjectTermNormalizeYear($input['academic_year']) : null;
-
+    // ระบบไม่ผูกรายวิชากับภาคเรียน/ปีการศึกษาแล้ว หน้านี้จึงบันทึกเฉพาะอาจารย์ผู้รับผิดชอบ
     $msg = empty($faculty_id) ? "ยกเลิกการมอบหมายอาจารย์สำเร็จ" : "มอบหมายอาจารย์สำเร็จ";
     setSubjectInstructor($db, $frameworkId, (string)$subject_code, empty($faculty_id) ? null : (string)$faculty_id);
 
-    if (array_key_exists('semester', $input) || array_key_exists('academic_year', $input)) {
-        // ส่งคีย์มาแล้วแต่ค่าว่าง = ตั้งใจล้างค่า จึงเขียนทับด้วย NULL
-        subjectTermSave($db, (string)$subject_code, $semester, $academicYear, true);
-        $msg .= ' (ภาคเรียน ' . subjectTermLabel($semester, $academicYear) . ')';
-    }
-
-    // บันทึก Audit Log เมื่อมอบหมายอาจารย์หรืออัปเดตภาคเรียนสำเร็จ
-    $actionDesc = empty($faculty_id) 
-        ? "ยกเลิกมอบหมายอาจารย์ผู้สอน รายวิชา: {$subject_code}" 
+    $actionDesc = empty($faculty_id)
+        ? "ยกเลิกมอบหมายอาจารย์ผู้สอน รายวิชา: {$subject_code}"
         : "มอบหมายอาจารย์ผู้สอน (ID: {$faculty_id}) รายวิชา: {$subject_code}";
-    
-    if (array_key_exists('semester', $input) || array_key_exists('academic_year', $input)) {
-        $actionDesc .= " (ภาคเรียน " . subjectTermLabel($semester, $academicYear) . ")";
-    }
 
     logAudit(
         $db,
@@ -104,11 +59,6 @@ try {
     echo json_encode([
         "status" => "success",
         "message" => $msg,
-        "data" => [
-            "semester" => $semester,
-            "academic_year" => $academicYear,
-            "term_label" => subjectTermLabel($semester, $academicYear),
-        ],
     ], JSON_UNESCAPED_UNICODE);
 } catch (InvalidArgumentException $e) {
     http_response_code(400);

@@ -1,5 +1,4 @@
 <?php
-require_once __DIR__ . '/../../config/config.php';
 session_start();
 
 header('Access-Control-Allow-Origin: ' . (in_array($_SERVER['HTTP_ORIGIN'] ?? '', ['http://localhost:5173', 'http://127.0.0.1:5173'], true) ? ($_SERVER['HTTP_ORIGIN'] ?? '') : 'http://localhost:5173'));
@@ -14,7 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit();
 }
 
-$pdo = new Connect();
+$pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
 
 // สร้างตารางเก็บ "ใบที่ผู้ใช้ลบออกจากรายการตัวเอง" ถ้ายังไม่มี (ครั้งแรกเท่านั้น)
 require_once __DIR__ . '/notification_hidden_helper.php';
@@ -88,22 +87,20 @@ try {
         $studentAdvisorInfo = $advStmt->fetch(PDO::FETCH_ASSOC) ?: null;
 
         // หากมีข้อมูลอาจารย์ แต่ยังไม่เคยมีแจ้งเตือนเรื่องอาจารย์เลย ให้สร้างแจ้งเตือนเริ่มต้น 1 รายการ
-        if ($studentAdvisorInfo && (!empty($studentAdvisorInfo['advisor_name']) || !empty($studentAdvisorInfo['practical_advisor_name']))) {
+        if ($studentAdvisorInfo && !empty($studentAdvisorInfo['advisor_name'])) {
             $checkNotif = $pdo->prepare("
                 SELECT COUNT(*) FROM notifications
-                WHERE user_id = :uid AND (title LIKE '%อาจารย์ที่ปรึกษา%' OR title LIKE '%อาจารย์ปฏิบัติ%' OR title LIKE '%อาจารย์ผู้ดูแล%')
+                WHERE user_id = :uid AND (title LIKE '%อาจารย์ที่ปรึกษา%' OR title LIKE '%อาจารย์ผู้ดูแล%')
             ");
             $checkNotif->execute([':uid' => $user_id]);
             if ((int)$checkNotif->fetchColumn() === 0) {
                 $advText = !empty($studentAdvisorInfo['advisor_name']) ? $studentAdvisorInfo['advisor_name'] : 'ยังไม่มีการมอบหมาย';
-                $pracText = !empty($studentAdvisorInfo['practical_advisor_name']) ? $studentAdvisorInfo['practical_advisor_name'] : 'ยังไม่มีการมอบหมาย';
-                $initTitle = "แจ้งข้อมูลอาจารย์ผู้ดูแลคนปัจจุบัน";
-                $initMsg = "อาจารย์ที่ปรึกษา: {$advText} | อาจารย์ปฏิบัติ: {$pracText} (คลิกเพื่อดูรายละเอียดในใบแสดงผลการเรียน)";
+                $initTitle = "แจ้งข้อมูลอาจารย์ที่ปรึกษาคนปัจจุบัน";
+                $initMsg = "อาจารย์ที่ปรึกษา: {$advText} (คลิกเพื่อดูรายละเอียดในใบแสดงผลการเรียน)";
                 $initPayload = json_encode([
                     'action' => 'view_transcript',
                     'target' => 'transcript',
-                    'advisor_name' => $advText,
-                    'practical_advisor_name' => $pracText
+                    'advisor_name' => $advText
                 ], JSON_UNESCAPED_UNICODE);
 
                 $initNotif = $pdo->prepare("
@@ -162,7 +159,7 @@ try {
             LEFT JOIN faculty f_sender ON CAST(sender_u.username AS CHAR) = f_sender.faculty_id
             LEFT JOIN student s_sender ON CAST(sender_u.username AS UNSIGNED) = s_sender.student_id
             
-            WHERE (n.user_id = :recipient_user_id OR n.sender_user_id = :sender_user_id)
+            WHERE (n.user_id = :filter_user_id OR n.sender_user_id = :filter_user_id)
               -- ไม่แสดงใบที่ผู้ใช้คนนี้ลบออกจากรายการของตัวเองแล้ว (อีกฝ่ายยังเห็นอยู่)
               AND NOT EXISTS (
                     SELECT 1 FROM notification_hidden nh
@@ -173,8 +170,7 @@ try {
     $stmt = $pdo->prepare($sql);
     $stmt->execute([
         ':current_user_id' => $user_id,
-        ':recipient_user_id' => $user_id,
-        ':sender_user_id' => $user_id,
+        ':filter_user_id' => $user_id,
         ':hidden_user_id' => $user_id,
     ]);
     $notifications = $stmt->fetchAll(PDO::FETCH_ASSOC);

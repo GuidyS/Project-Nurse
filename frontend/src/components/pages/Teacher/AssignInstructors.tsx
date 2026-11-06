@@ -14,7 +14,7 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command';
-import { Users, Search, UserPlus, BookOpen, Edit, Loader2, Check, ChevronsUpDown, CalendarRange } from 'lucide-react';
+import { Users, Search, UserPlus, BookOpen, Edit, Loader2, Check, ChevronsUpDown } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import api from '@/lib/axios';
 import { useToast } from '@/hooks/use-toast';
@@ -105,7 +105,7 @@ export default function AssignInstructors() {
       setIsSaving(true);
       const response = await api.post('/index.php?page=save-assign-instructor', {
         subject_code: selectedCourse,
-        faculty_id: selectedInstructor,
+        faculty_id: selectedInstructor
       });
 
       if (response.data.status === 'success') {
@@ -271,7 +271,6 @@ export default function AssignInstructors() {
                     <TableHead className="whitespace-nowrap">รหัสวิชา</TableHead>
                     <TableHead>ชื่อวิชา</TableHead>
                     <TableHead className="text-center">หน่วยกิต</TableHead>
-                    <TableHead className="text-center whitespace-nowrap">ภาคเรียน</TableHead>
                     <TableHead className="text-center">อาจารย์ประจำวิชา</TableHead>
                     <TableHead className="text-center">การดำเนินการ</TableHead>
                   </TableRow>
@@ -282,13 +281,6 @@ export default function AssignInstructors() {
                       <TableCell className="font-medium whitespace-nowrap">{course.code}</TableCell>
                       <TableCell>{course.name}</TableCell>
                       <TableCell className="text-center">{course.credits}</TableCell>
-                      <TableCell className="text-center whitespace-nowrap">
-                        {course.term_label && course.term_label !== '-' ? (
-                          <Badge variant="secondary">{course.term_label}</Badge>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
                       <TableCell className="text-center">
                         {course.instructor ? (
                           <Badge className="bg-green-500 px-2.5 py-0.5">{course.instructor}</Badge>

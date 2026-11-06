@@ -1,6 +1,7 @@
 <?php
 if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/../../../config/academic_helper.php';
 require_once __DIR__ . '/assign_students_helpers.php';
 
 header('Access-Control-Allow-Origin: ' . (in_array($_SERVER['HTTP_ORIGIN'] ?? '', ['http://localhost:5173', 'http://127.0.0.1:5173'], true) ? ($_SERVER['HTTP_ORIGIN'] ?? '') : 'http://localhost:5173'));
@@ -69,21 +70,38 @@ try {
     $stmt = $db->prepare($sqlStudents);
     $stmt->execute($typeParams);
     $students = [];
+    $allYears = [];
+    $updateStmt = null;
     foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $yl = $row['year_level'] === null ? null : (int)$row['year_level'];
+        if (function_exists('calculateRealtimeAcademicInfo')) {
+            $info = calculateRealtimeAcademicInfo($row['student_code'], null, $db);
+            $calculatedYl = (int)$info['year_level'];
+            if ($yl !== $calculatedYl) {
+                if ($updateStmt === null) {
+                    $updateStmt = $db->prepare("UPDATE student SET year_level = :yl WHERE student_id = :sid");
+                }
+                $updateStmt->execute([':yl' => $calculatedYl, ':sid' => $row['student_code']]);
+            }
+            $yl = $calculatedYl;
+        }
+        if ($yl !== null) {
+            $allYears[$yl] = true;
+        }
         $students[] = [
             'id' => (string)$row['id'],
             'student_code' => (string)$row['student_code'],
             'name' => trim((string)$row['name']),
             'gender' => $row['gender'],
-            'year_level' => $row['year_level'] === null ? null : (int)$row['year_level'],
+            'year_level' => $yl,
             'assigned_faculty_id' => $row['assigned_faculty_id'] === null ? null : (string)$row['assigned_faculty_id'],
             'assigned_faculty_name' => $row['assigned_faculty_name'] ? trim($row['assigned_faculty_name']) : null,
         ];
     }
 
     // 3) ชั้นปีที่มีอยู่จริง เอาไปทำ dropdown
-    $years = $db->query("SELECT DISTINCT year_level FROM student WHERE year_level IS NOT NULL ORDER BY year_level")
-                ->fetchAll(PDO::FETCH_COLUMN);
+    $years = array_keys($allYears);
+    sort($years);
 
     echo json_encode([
         "status" => "success",

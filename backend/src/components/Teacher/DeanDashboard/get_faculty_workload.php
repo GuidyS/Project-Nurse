@@ -5,6 +5,9 @@ if (session_status() === PHP_SESSION_NONE) {
 
 require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../config/academic_calendar.php';
+require_once __DIR__ . '/../ProjectShared/unified_projects.php';
+// ใช้ตัวแยกบทบาทผู้แต่งชุดเดียวกับหน้า "สรุปผลงานวิจัย 5 ปี"
+require_once __DIR__ . '/../ResearchSummary/research_summary_helpers.php';
 
 header('Content-Type: application/json; charset=UTF-8');
 
@@ -22,20 +25,20 @@ function uniqueCount(array $values): int
 function summarizeProjectRecords(array $records): array
 {
     return [
-        'projects' => uniqueCount(array_column($records, 'project_name')),
+        'projects' => uniqueCount(array_column($records, 'project_code')),
         'activities' => count(array_filter($records, fn($record) => ($record['row_type'] ?? '') === 'activity')),
         'items' => count($records),
         'records' => array_values($records),
     ];
 }
 
-function projectCategory(string $type): string
+function projectWorkloadCategory(string $type): string
 {
     return in_array($type, ['academic_service', 'culture', 'teaching', 'research', 'quality_assurance'], true)
         ? $type : 'other';
 }
 
-function emptyProjectCategories(): array
+function emptyProjectWorkloadCategories(): array
 {
     return array_fill_keys(['academic_service', 'culture', 'teaching', 'research', 'quality_assurance', 'other'], 0);
 }
@@ -112,13 +115,15 @@ try {
                 'subjects' => [],
             ],
             'research' => [
-                'count' => 0,
+                'count' => 0,            // งานวิจัยที่นับ KPI (เจ้าของผลงานหลัก)
+                'co_author' => 0,        // ผลงานที่เป็นชื่อร่วม
+                'academic' => 0,         // วิชาการ/ตำรา
                 'meets_criterion' => false,
                 'records' => [],
             ],
             'academic_service' => [],
             'culture' => [],
-            'projects' => ['categories' => emptyProjectCategories(), 'records' => []],
+            'projects' => ['total' => 0, 'categories' => emptyProjectWorkloadCategories(), 'records' => []],
         ];
     }
 
@@ -223,8 +228,13 @@ try {
         ];
     }
 
+    // แยกประเภทผลงานด้วยกติกาเดียวกับหน้า "สรุปผลงานวิจัย 5 ปี" ของอาจารย์วิจัย
+    //   วิชาการ/ตำรา            -> academic (สีฟ้า)
+    //   เป็นเจ้าของผลงานหลัก      -> count    (สีแดง นับ KPI)
+    //   นอกนั้น                  -> co_author (สีดำ ชื่อร่วม)
     $researchStmt = $db->prepare(
-        'SELECT research_id, faculty_id, title, publication_year, category
+        'SELECT research_id, faculty_id, title, publication_year, category, article_type,
+                first_author_id, corresponding_author_id, co_author_ids
          FROM faculty_research
          WHERE publication_year IN (:academic_year, :gregorian_year)
          ORDER BY publication_year DESC, research_id DESC'
@@ -234,60 +244,70 @@ try {
         ':gregorian_year' => $gregorianYear,
     ]);
     foreach ($researchStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-        $facultyId = (string)$row['faculty_id'];
-        if (!isset($faculty[$facultyId])) {
-            continue;
+        $isAcademic = in_array($row['article_type'] ?? '', ['academic', 'บทความวิชาการ', 'textbook', 'ตำรา'], true);
+
+        foreach (researchAuthorRoles($row) as $authorId => $role) {
+            $facultyId = (string)$authorId;
+            if (!isset($faculty[$facultyId])) {
+                continue;
+            }
+
+            if ($isAcademic) {
+                $kind = 'academic';
+            } elseif ($role === 'first_author' || $role === 'corresponding') {
+                $kind = 'count';
+            } else {
+                $kind = 'co_author';
+            }
+            $faculty[$facultyId]['research'][$kind]++;
+
+            $faculty[$facultyId]['research']['records'][] = [
+                'id' => (string)$row['research_id'],
+                'title' => (string)$row['title'],
+                'year' => (int)$row['publication_year'],
+                'category' => (string)($row['category'] ?? 'ไม่ระบุประเภท'),
+                'kind' => $kind,
+            ];
         }
-        $faculty[$facultyId]['research']['records'][] = [
-            'id' => (string)$row['research_id'],
-            'title' => (string)$row['title'],
-            'year' => (int)$row['publication_year'],
-            'category' => (string)($row['category'] ?? 'ไม่ระบุประเภท'),
-        ];
     }
 
-    $projectStmt = $db->prepare(
-        "SELECT
-            p.project_id,
-            p.project_name_th,
-            p.project_name_en,
-            p.project_type,
-            p.responsible_faculty_id,
-            TRIM(CONCAT(COALESCE(f.title, ''), COALESCE(f.first_name_th, ''), ' ', COALESCE(f.last_name_th, ''))) AS responsible_person
-         FROM project p
-         LEFT JOIN faculty f ON f.faculty_id = p.responsible_faculty_id
-         WHERE p.academic_year = :academic_year
-         ORDER BY p.project_id DESC"
-    );
-    $projectStmt->execute([':academic_year' => $academicYear]);
+    project_u_ready($db);
+    $projectRows=project_u_catalogue($db,project_u_rows($db,"SELECT p.*,CONCAT_WS(' ',f.title,f.first_name_th,f.last_name_th) AS responsible_name FROM project p LEFT JOIN faculty f ON f.faculty_id=p.responsible_faculty_id WHERE p.academic_year=?",[$academicYear]));
+    $byCode=[]; foreach ($projectRows as $p) if (!$p['merge_pending']) $byCode[$p['project_id']]=$p;
+    $allProjectIds = [];
+    $projectFaculty = 0;
+    $projectCategories = emptyProjectWorkloadCategories();
+    foreach ($projectRows as $project) {
+        $facultyId = (string)($project['responsible_faculty_id'] ?? '');
+        if (!isset($faculty[$facultyId])) continue;
 
-    foreach ($projectStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-        $facultyId = (string)($row['responsible_faculty_id'] ?? '');
-        if ($facultyId === '' || !isset($faculty[$facultyId])) {
-            continue;
-        }
-
-        $category = projectCategory((string)($row['project_type'] ?? 'other'));
-        $projectName = trim((string)($row['project_name_th'] ?? ''));
+        $category = projectWorkloadCategory((string)($project['project_type'] ?? ''));
+        $projectId = (string)$project['project_id'];
+        $projectName = trim((string)($project['project_name_th'] ?? ''));
         if ($projectName === '') {
-            $projectName = trim((string)($row['project_name_en'] ?? '')) ?: ('Project #' . $row['project_id']);
+            $projectName = trim((string)($project['project_name_en'] ?? '')) ?: ('โครงการ #' . $projectId);
         }
-
-        $record = [
-            'id' => (string)$row['project_id'],
-            'project_code' => '',
+        $faculty[$facultyId]['projects']['categories'][$category]++;
+        $faculty[$facultyId]['projects']['records'][] = [
+            'id' => $projectId,
             'project_name' => $projectName,
             'activity_name' => null,
             'row_type' => 'project',
-            'strategy' => '',
-            'responsible_person' => trim((string)$row['responsible_person']),
+            'strategy' => (string)($project['strategy'] ?? ''),
             'category' => $category,
         ];
-        $faculty[$facultyId]['projects']['categories'][$category]++;
-        $faculty[$facultyId]['projects']['records'][] = $record;
-        if ($category === 'academic_service' || $category === 'culture') {
-            $faculty[$facultyId][$category][] = $record;
-        }
+        $allProjectIds[$projectId] = true;
+        $projectCategories[$category]++;
+    }
+    foreach (project_u_bundle($db,$academicYear)['rows'] as $row) {
+        $master=$byCode[$row['project_id']] ?? null; if (!$master) continue;
+        $facultyId=(string)($master['responsible_faculty_id'] ?? ''); $category=$master['project_type'];
+        if (!isset($faculty[$facultyId]) || !in_array($category,['academic_service','culture'],true)) continue;
+        $faculty[$facultyId][$category][]=[
+            'id'=>$row['id'],'project_code'=>$row['project_id'],
+            'project_name'=>trim((string)$master['project_name_th']) ?: 'โครงการ #'.$row['project_id'],
+            'activity_name'=>$row['activityName'],'row_type'=>$row['rowType'],
+            'strategy'=>$row['strategy'],'responsible_person'=>$row['responsiblePerson']];
     }
 
     $totalCourses = 0;
@@ -304,23 +324,16 @@ try {
     $cultureRecordIds = [];
     $serviceProjectNames = [];
     $cultureProjectNames = [];
-    $allProjectIds = [];
-    $projectFaculty = 0;
-    $projectCategories = emptyProjectCategories();
 
     foreach ($faculty as &$person) {
-        $researchCount = count($person['research']['records']);
-        $person['research']['count'] = $researchCount;
-        $person['research']['meets_criterion'] = $researchCount >= $researchTarget;
+        // "ผ่านเกณฑ์" ดูจากคอลัมน์งานวิจัย (สีแดง นับ KPI) ว่ามีมากกว่า 0 ในปีนั้นหรือไม่
+        $researchCount = $person['research']['count'];
+        $person['research']['meets_criterion'] = $researchCount > 0;
 
         $person['academic_service'] = summarizeProjectRecords($person['academic_service']);
         $person['culture'] = summarizeProjectRecords($person['culture']);
         $person['projects']['total'] = count($person['projects']['records']);
         if ($person['projects']['total'] > 0) $projectFaculty++;
-        foreach ($person['projects']['records'] as $record) {
-            $allProjectIds[$record['id']] = true;
-            $projectCategories[$record['category']]++;
-        }
 
         $activeDimensions = 0;
         if ($person['teaching']['courses'] > 0) $activeDimensions++;
@@ -334,7 +347,9 @@ try {
         $totalYlo += $person['teaching']['ylo'];
         if ($person['teaching']['courses'] > 0) $teachingFaculty++;
 
-        $totalResearch += $researchCount;
+        $totalResearch += $researchCount + $person['research']['academic'];
+        // อาจารย์ที่มีงานวิจัย = มีผลงานสีแดง (นับ KPI) อย่างน้อย 1 ชิ้น
+        // ใช้เกณฑ์เดียวกับคอลัมน์สถานะในตาราง จะได้ไม่ขัดกันเอง
         if ($researchCount > 0) $researchFaculty++;
         if ($person['research']['meets_criterion']) $meetingTarget++;
         if ($person['academic_service']['items'] > 0) $serviceFaculty++;
@@ -342,11 +357,11 @@ try {
 
         foreach ($person['academic_service']['records'] as $record) {
             $serviceRecordIds[$record['id']] = true;
-            $serviceProjectNames[$record['project_name']] = true;
+            $serviceProjectNames[$record['project_code']] = true;
         }
         foreach ($person['culture']['records'] as $record) {
             $cultureRecordIds[$record['id']] = true;
-            $cultureProjectNames[$record['project_name']] = true;
+            $cultureProjectNames[$record['project_code']] = true;
         }
 
         unset($person['first_name']);

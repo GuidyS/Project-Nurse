@@ -21,7 +21,6 @@ try {
             p.title,
             p.type,
             p.file_path,
-            p.verified,
             DATE_FORMAT(p.created_at, '%Y-%m-%d') as created_date
         FROM portfolio p
         JOIN student s ON p.student_id = s.student_id
@@ -43,13 +42,11 @@ try {
         
         $type = $row['type'] ?: 'document';
         $title = $row['title'] ?: 'หลักฐานทั่วไป';
-        $verified = (bool)$row['verified'];
 
         // รองรับข้อมูลเก่าที่เคยเก็บ metadata เป็น JSON ใน file_path
         if (is_array($meta)) {
             $type = $row['type'] ?: ($meta['type'] ?? $type);
             $title = $row['title'] ?: ($meta['title'] ?? $title);
-            $verified = (bool)($row['verified'] ?: ($meta['verified'] ?? false));
         }
         $url = "index.php?page=download-file&id=" . $row['id'];
 
@@ -60,8 +57,7 @@ try {
             "type" => $type,
             "title" => $title,
             "url" => $url,
-            "date" => $row['created_date'] ?: date('Y-m-d'),
-            "verified" => $verified
+            "date" => $row['created_date'] ?: date('Y-m-d')
         ];
     }
 

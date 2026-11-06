@@ -6,7 +6,9 @@ if (session_status() === PHP_SESSION_NONE) {
 require_once __DIR__ . '/curriculum_repository.php';
 require_once __DIR__ . '/clo_access_helpers.php';
 require_once __DIR__ . '/../../../config/active_curriculum.php';
-require_once __DIR__ . '/../../../config/config.php';
+
+$pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
+$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
 try {
     if (!isset($_SESSION['user_id'])) {
@@ -14,8 +16,6 @@ try {
         echo json_encode(["status" => "error", "message" => "Unauthorized"]);
         exit();
     }
-
-    $pdo = new Connect();
 
     $userId = $_SESSION['user_id'];
     $isAdmin = cloAccessIsAdmin($pdo, $userId);
@@ -27,10 +27,10 @@ try {
     if ($curriculumSubjects !== null) {
         // รายวิชาตามหลักสูตรที่ใช้งานในระบบ (ตั้งค่าที่หน้า "จัดการหลักสูตร") — ชื่อวิชาตามหลักสูตร
         // subject_id เป็น null ได้ถ้าวิชามีเฉพาะในหลักสูตร (หน้า CLO ระบุวิชาด้วย subject_code)
-        $myCodeSet = array_fill_keys(array_map('strtolower', $myCodes), true);
+        $myCodeSet = array_fill_keys(array_map('mb_strtolower', $myCodes), true);
         $subjects = [];
         foreach ($curriculumSubjects as $subject) {
-            if (!isset($myCodeSet[strtolower($subject['subject_code'])])) {
+            if (!isset($myCodeSet[mb_strtolower($subject['subject_code'])])) {
                 continue;
             }
             $subjects[] = [
@@ -60,8 +60,7 @@ try {
         "curriculum" => activeCurriculumCycle($pdo),
     ], JSON_UNESCAPED_UNICODE);
 
-} catch (Throwable $e) {
-    error_log('get-subjects failed: ' . $e->getMessage());
+} catch (PDOException $e) {
     http_response_code(500);
-    echo json_encode(["status" => "error", "message" => "ดึงข้อมูลรายวิชาไม่สำเร็จ"], JSON_UNESCAPED_UNICODE);
+    echo json_encode(["status" => "error", "message" => $e->getMessage()]);
 }

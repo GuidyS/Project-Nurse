@@ -1,8 +1,11 @@
+import ProjectReportDetailsDialog from '@/components/ui/ProjectReportDetailsDialog';
+import { getProjectCodeError } from '@/lib/projectCode';
+import { downloadProjectImportTemplate } from '@/lib/projectImportTemplate';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useAcademicYear } from "@/hooks/use-academic-year";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { getCurrentAcademicYear } from "@/lib/academicYear";
-import { Plus, Filter, Eye, Edit, MoreVertical, Upload, Link2, Trash2, Loader2, UserCheck, Users, Globe2, Image } from "lucide-react";
+import { Plus, Filter, Eye, Edit, MoreVertical, Upload, Download, Link2, Trash2, Loader2, UserCheck, Users, Globe2, Image } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -38,7 +41,7 @@ import { SearchInput } from "@/components/shared/SearchInput";
 type ProjectType = "academic_service" | "culture" | "other" | "teaching" | "research" | "quality_assurance";
 type ProjectTypeFilter = "all" | ProjectType;
 type ProjectStatus = "pending" | "active" | "completed" | "cancelled";
-type ProjectStatusFilter = "all" | ProjectStatus;
+type ProjectStatusFilter = "all" | "active" | "completed";
 type ProjectDocumentType = "proposal" | "progress" | "financial" | "summary";
 type ProjectAttachmentType = "google_drive" | "website_url" | "file";
 
@@ -51,7 +54,7 @@ interface ProjectMember {
 
 interface ProjectDocument {
   id: number;
-  project_id?: number | null;
+  project_id?: string | null;
   name: string;
   type: ProjectDocumentType | string;
   date: string;
@@ -60,12 +63,20 @@ interface ProjectDocument {
   mime_type?: string | null;
   file_size?: number | null;
 }
+interface ProjectActivity {
+  id?: number;
+  activity_name: string;
+  google_drive_url: string;
+  sort_order?: number;
+}
 
 interface Project {
-  project_id: number;
+  merge_pending?: boolean;
+  read_only?: boolean;
+  id: number;
+  project_id: string;
   project_name_th: string;
-  project_name_en: string;
-  description: string;
+  strategy?: string | null;
   project_type?: ProjectType | null;
   responsible_faculty_id?: number | string | null;
   responsible_name?: string | null;
@@ -77,7 +88,9 @@ interface Project {
   fiscal_year?: number | null;
   budget?: string | number | null;
   spent?: string | number | null;
-  budget_allocated?: string | number | null;
+  budget_source?: string;
+  multiple_budget_sources?: boolean;
+  budget_proposed?: string | number | null;
   budget_spent?: string | number | null;
   budget_note?: string | null;
   result?: string | null;
@@ -86,6 +99,8 @@ interface Project {
   member_names?: string[];
   member_faculty_ids?: number[];
   documents?: ProjectDocument[];
+  has_sub_activities?: boolean;
+  activities?: ProjectActivity[];
   plos?: string[];
 }
 
@@ -102,8 +117,7 @@ interface FacultyOption {
 interface ProjectFormData {
   project_id: string;
   project_name_th: string;
-  project_name_en: string;
-  description: string;
+  strategy: string;
   project_type: ProjectType;
   responsible_faculty_id: string;
   member_faculty_ids: number[];
@@ -111,10 +125,12 @@ interface ProjectFormData {
   start_date: string;
   end_date: string;
   status: ProjectStatus;
-  budget_allocated: string;
+  budget_proposed: string;
   budget_spent: string;
   budget_source: string;
   budget_note: string;
+  has_sub_activities: boolean;
+  activities: ProjectActivity[];
 }
 
 interface ProjectDocumentUploadForm {
@@ -140,10 +156,10 @@ const projectTypeLabels: Record<ProjectType, string> = {
 };
 
 const statusLabels: Record<ProjectStatus, string> = {
-  pending: "รออนุมัติ",
+  pending: "รอดำเนินการ",
   active: "กำลังดำเนินการ",
   completed: "เสร็จสิ้น",
-  cancelled: "ไม่อนุมัติ/ยกเลิก",
+  cancelled: "ยกเลิก",
 };
 
 const projectTypeTabs: { value: ProjectTypeFilter; label: string }[] = [
@@ -169,15 +185,24 @@ const statusClassNames: Record<ProjectStatus, string> = {
   cancelled: "border-red-500/60 bg-red-500/10 text-red-700 dark:text-red-300",
 };
 
+const projectStrategies = [
+  "ยุทธศาสตร์ที่ 1: Future Research & Innovation",
+  "ยุทธศาสตร์ที่ 2: Future Education",
+  "ยุทธศาสตร์ที่ 3: Future Lecturer/Researcher",
+  "ยุทธศาสตร์ที่ 4: Future System for Management",
+  "ยุทธศาสตร์ที่ 5: Sustainable Future",
+  "ยุทธศาสตร์ที่ 6: ทำนุบำรุงศิลปวัฒนธรรม",
+];
+const UNSPECIFIED_STRATEGY = "__unspecified_strategy__";
 const BUDGET_SOURCE_PREFIX = "แหล่งงบ: ";
+const optionalText = (value?: string | null) => value?.trim() || "-";
 
 const projectImportTypes: ImportDataTypeOption[] = [
   {
     value: "projects",
     label: "ข้อมูลโครงการ",
     icon: Upload,
-    description: "นำเข้าข้อมูลโครงการจากไฟล์ Excel หรือ CSV",
-    templateColumns: ["project_name_th", "project_name_en", "description", "mapping_json", "responsible_faculty_id", "academic_year"],
+    description: "Excel ชีตเดียว: แถวแรกเป็นโครงการหลัก แถวถัดไปใช้ project_id เดิมพร้อมชื่อกิจกรรมและลิงก์ Google Drive",
   },
 ];
 
@@ -198,8 +223,7 @@ const createInitialCreateDocumentForm = (): ProjectDocumentUploadForm => ({
 const createInitialFormData = (): ProjectFormData => ({
   project_id: "",
   project_name_th: "",
-  project_name_en: "",
-  description: "",
+  strategy: "",
   project_type: "other",
   responsible_faculty_id: "",
   member_faculty_ids: [],
@@ -207,10 +231,12 @@ const createInitialFormData = (): ProjectFormData => ({
   start_date: "",
   end_date: "",
   status: "active",
-  budget_allocated: "",
+  budget_proposed: "",
   budget_spent: "",
   budget_source: "",
   budget_note: "",
+  has_sub_activities: false,
+  activities: [],
 });
 
 const getCurrentUser = (): CurrentUser | null => {
@@ -275,6 +301,7 @@ const getProjectDocumentFileError = (file: File) => {
 };
 
 const formatCurrency = (value?: string | number | null) => {
+  if (value === null || value === undefined || value === "") return "ยังไม่ระบุ";
   const amount = Number(value || 0);
   return amount.toLocaleString("th-TH", {
     minimumFractionDigits: 0,
@@ -334,9 +361,11 @@ const DocumentAttachmentIcon = ({ document, className = "h-4 w-4" }: { document:
 const normalizeProjectType = (value?: ProjectType | null): ProjectType => value || "other";
 const normalizeStatus = (value?: ProjectStatus | null): ProjectStatus => value || "active";
 const projectAcademicYear = (project: Project) => project.academic_year ?? project.fiscal_year ?? null;
+const projectDisplayName = (project: Project) => (project.project_name_th || "").trim() || `โครงการ #${project.project_id}`;
+const projectStrategyName = (project: Project) => project.strategy?.trim() || "ยังไม่ระบุ";
 
-const projectBudgetAllocated = (project: Project) => project.budget_allocated ?? project.budget ?? 0;
-const projectBudgetSpent = (project: Project) => project.budget_spent ?? project.spent ?? 0;
+const projectBudgetProposed = (project: Project) => project.budget_proposed ?? project.budget ?? null;
+const projectBudgetSpent = (project: Project) => project.budget_spent ?? project.spent ?? null;
 const projectBudgetNote = (project: Project) => project.budget_note ?? project.result ?? "";
 
 const projectResponsibleName = (project: Project) => {
@@ -373,16 +402,22 @@ const projectMemberFacultyIds = (project: Project) => {
 };
 
 const parseBudgetNote = (raw?: string | null) => {
-  const note = raw || "";
-  const [sourcePart, ...rest] = note.split(" | ");
+  const text = raw?.trim() || "";
+  try {
+    const parsed: unknown = JSON.parse(text);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && ("source" in parsed || "note" in parsed)) {
+      const budget = parsed as { source?: unknown; note?: unknown };
+      return {
+        source: typeof budget.source === "string" ? budget.source.trim() : "",
+        note: typeof budget.note === "string" ? budget.note.trim() : "",
+      };
+    }
+  } catch { /* Legacy notes can be plain text. */ }
+  const [sourcePart, ...rest] = text.split(" | ");
   if (sourcePart.startsWith(BUDGET_SOURCE_PREFIX)) {
-    return {
-      source: sourcePart.replace(BUDGET_SOURCE_PREFIX, ""),
-      note: rest.join(" | "),
-    };
+    return { source: sourcePart.slice(BUDGET_SOURCE_PREFIX.length).trim(), note: rest.join(" | ").trim() };
   }
-
-  return { source: "", note };
+  return { source: "", note: text };
 };
 
 const ProjectsPage = () => {
@@ -400,11 +435,12 @@ const ProjectsPage = () => {
   const [academicYearFilter, setAcademicYearFilter] = useState("all");
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const [isDownloadingTemplate, setIsDownloadingTemplate] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [viewProject, setViewProject] = useState<Project | null>(null);
   const [isViewOpen, setIsViewOpen] = useState(false);
@@ -428,14 +464,16 @@ const ProjectsPage = () => {
   const [pendingDeleteDocument, setPendingDeleteDocument] = useState<ProjectDocument | null>(null);
   const [isDocumentDeleteOpen, setIsDocumentDeleteOpen] = useState(false);
   const [isDeletingDocument, setIsDeletingDocument] = useState(false);
+  const [isActivityClearConfirmOpen, setIsActivityClearConfirmOpen] = useState(false);
   const [formData, setFormData] = useState<ProjectFormData>(() => createInitialFormData());
   const [facultyOptions, setFacultyOptions] = useState<FacultyOption[]>([]);
-  const [responsibleSearch, setResponsibleSearch] = useState("");
+  const [detailsCode, setDetailsCode] = useState<string | null>(null);
   const [memberSearch, setMemberSearch] = useState("");
+  const [responsibleSearch, setResponsibleSearch] = useState("");
   const currentUser = getCurrentUser();
   const canManageProjects = Number(currentUser?.role_id || 0) === 1;
 
-  const navigateToProjectLinks = (projectId: number) => {
+  const navigateToProjectLinks = (projectId: string) => {
     if (!canManageProjects) return;
     navigateToProject("project-links", projectId, "links");
   };
@@ -547,7 +585,7 @@ const ProjectsPage = () => {
   };
 
   const createProjectDocumentLink = async (
-    projectId: number,
+    projectId: string,
     name: string,
     date: string,
     attachmentType: Exclude<ProjectAttachmentType, "file">,
@@ -569,7 +607,7 @@ const ProjectsPage = () => {
     return documentResponse.data;
   };
 
-  const uploadProjectDocumentFile = async (projectId: number, name: string, date: string, file: File) => {
+  const uploadProjectDocumentFile = async (projectId: string, name: string, date: string, file: File) => {
     const uploadData = new FormData();
     uploadData.append("file", file);
     uploadData.append("project_id", String(projectId));
@@ -596,7 +634,7 @@ const ProjectsPage = () => {
     websiteLink,
     files,
   }: {
-    projectId: number;
+    projectId: string;
     name: string;
     date: string;
     googleDriveLink: string;
@@ -890,18 +928,18 @@ const ProjectsPage = () => {
     setFormData(createInitialFormData());
     resetCreateDocumentFields();
     setMemberSearch("");
+    setResponsibleSearch("");
     setIsModalOpen(true);
   };
 
   const handleOpenEditModal = (project: Project) => {
-    if (!canManageProjects) return;
+    if (!canManageProjects || project.read_only) return;
     const budget = parseBudgetNote(projectBudgetNote(project));
     setEditMode(true);
     setFormData({
       project_id: project.project_id.toString(),
       project_name_th: project.project_name_th,
-      project_name_en: project.project_name_en || "",
-      description: project.description || "",
+      strategy: project.strategy || "",
       project_type: normalizeProjectType(project.project_type),
       responsible_faculty_id: project.responsible_faculty_id ? String(project.responsible_faculty_id) : "",
       member_faculty_ids: projectMemberFacultyIds(project),
@@ -909,13 +947,21 @@ const ProjectsPage = () => {
       start_date: project.start_date || "",
       end_date: project.end_date || "",
       status: normalizeStatus(project.status),
-      budget_allocated: projectBudgetAllocated(project)?.toString() || "",
+      budget_proposed: projectBudgetProposed(project)?.toString() || "",
       budget_spent: projectBudgetSpent(project)?.toString() || "",
-      budget_source: budget.source,
+      budget_source: project.budget_source || "",
       budget_note: budget.note,
+      has_sub_activities: Boolean(project.has_sub_activities || project.activities?.length),
+      activities: (project.activities || []).map((activity, index) => ({
+        id: activity.id,
+        activity_name: activity.activity_name || "",
+        google_drive_url: activity.google_drive_url || "",
+        sort_order: index,
+      })),
     });
     resetCreateDocumentFields();
     setMemberSearch("");
+    setResponsibleSearch("");
     setIsModalOpen(true);
   };
 
@@ -937,8 +983,22 @@ const ProjectsPage = () => {
     }));
   };
 
+  const setHasSubActivities = (checked: boolean) => {
+    if (!checked && formData.activities.length > 0) {
+      setIsActivityClearConfirmOpen(true);
+      return;
+    }
+    setFormData((prev) => ({
+      ...prev,
+      has_sub_activities: checked,
+      activities: checked && prev.activities.length === 0 ? [{ activity_name: "", google_drive_url: "", sort_order: 0 }] : prev.activities,
+    }));
+  };
+
   const validateProjectForm = () => {
-    if (!formData.project_name_th.trim()) return "กรุณากรอกชื่อโครงการ (ภาษาไทย)";
+    const codeError = getProjectCodeError(formData.project_id);
+    if (codeError) return codeError;
+    if (!formData.project_name_th.trim()) return "กรุณากรอกชื่อโครงการ";
 
     const responsibleFacultyId = Number(formData.responsible_faculty_id);
     if (!Number.isInteger(responsibleFacultyId) || responsibleFacultyId <= 0) {
@@ -950,9 +1010,9 @@ const ProjectsPage = () => {
       return "กรุณาระบุปีการศึกษา พ.ศ. 2500-2700";
     }
 
-    const budgetAllocated = formData.budget_allocated === "" ? null : Number(formData.budget_allocated);
+    const budgetProposed = formData.budget_proposed === "" ? null : Number(formData.budget_proposed);
     const budgetSpent = formData.budget_spent === "" ? null : Number(formData.budget_spent);
-    if (budgetAllocated !== null && (!Number.isFinite(budgetAllocated) || budgetAllocated < 0)) {
+    if (budgetProposed !== null && (!Number.isFinite(budgetProposed) || budgetProposed < 0)) {
       return "งบเสนอต้องเป็นตัวเลขไม่ติดลบ";
     }
     if (budgetSpent !== null && (!Number.isFinite(budgetSpent) || budgetSpent < 0)) {
@@ -961,6 +1021,22 @@ const ProjectsPage = () => {
 
     if (formData.start_date && formData.end_date && formData.end_date < formData.start_date) {
       return "วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่มต้น";
+    }
+
+    if (formData.has_sub_activities) {
+      if (formData.activities.length === 0) return "กรุณาเพิ่มกิจกรรมย่อยอย่างน้อย 1 รายการ";
+      const names = new Set<string>();
+      for (const activity of formData.activities) {
+        const name = activity.activity_name.trim();
+        if (!name) return "กรุณากรอกชื่อกิจกรรมย่อยให้ครบ";
+        const nameKey = name.toLocaleLowerCase("th");
+        if (names.has(nameKey)) return "ชื่อกิจกรรมย่อยห้ามซ้ำภายในโครงการ";
+        names.add(nameKey);
+        const linkError = getGoogleDriveLinkError(activity.google_drive_url);
+        if (linkError) return linkError;
+      }
+    } else if (formData.activities.length > 0) {
+      return "กรุณายืนยันการลบกิจกรรมย่อยก่อนบันทึก";
     }
 
     if (!editMode) {
@@ -1010,6 +1086,7 @@ const ProjectsPage = () => {
     return null;
   };
 
+  const budgetsRequireDetails = editMode && Boolean(projects.find(p => p.project_id === formData.project_id)?.multiple_budget_sources);
   const handleSaveProject = async () => {
     if (!canManageProjects) return;
 
@@ -1024,10 +1101,9 @@ const ProjectsPage = () => {
       const academicYear = Number(formData.academic_year);
       const endpoint = editMode ? "/index.php?page=update-project" : "/index.php?page=add-project";
       const payload = {
-        ...(editMode ? { project_id: formData.project_id } : {}),
+        project_id: formData.project_id.trim(),
         project_name_th: formData.project_name_th.trim(),
-        project_name_en: formData.project_name_en.trim(),
-        description: formData.description.trim(),
+        strategy: formData.strategy.trim(),
         project_type: formData.project_type,
         responsible_faculty_id: Number(formData.responsible_faculty_id),
         member_faculty_ids: formData.member_faculty_ids,
@@ -1035,16 +1111,23 @@ const ProjectsPage = () => {
         start_date: formData.start_date || null,
         end_date: formData.end_date || null,
         status: formData.status,
-        budget_allocated: formData.budget_allocated === "" ? null : Number(formData.budget_allocated),
+        has_sub_activities: formData.has_sub_activities,
+        activities: formData.has_sub_activities ? formData.activities.map((activity, index) => ({
+          ...(activity.id ? { id: activity.id } : {}),
+          activity_name: activity.activity_name.trim(),
+          google_drive_url: activity.google_drive_url.trim(),
+          sort_order: index,
+        })) : [],
+        ...(!budgetsRequireDetails ? { budget_proposed: formData.budget_proposed === "" ? null : Number(formData.budget_proposed),
         budget_spent: formData.budget_spent === "" ? null : Number(formData.budget_spent),
         budget_source: formData.budget_source.trim(),
-        budget_note: formData.budget_note.trim(),
+        budget_note: formData.budget_note.trim() } : {}),
       };
 
       const res = await api.post(endpoint, payload);
       if (res.data.status === "success") {
         if (!editMode) {
-          const projectId = Number(res.data.project_id ?? res.data.data?.project_id ?? res.data.data?.id ?? 0);
+          const projectId = String(res.data.project_id ?? res.data.data?.project_id ?? "");
           const documentName = createDocumentForm.name.trim();
           const documentDriveLink = createDocumentDriveLink.trim();
           const documentWebsiteLink = createDocumentWebsiteLink.trim();
@@ -1052,7 +1135,7 @@ const ProjectsPage = () => {
 
           if (shouldCreateAttachments) {
             try {
-              if (!Number.isInteger(projectId) || projectId <= 0) {
+              if (!projectId) {
                 throw new Error("ไม่พบรหัสโครงการสำหรับบันทึกเอกสารแนบ");
               }
 
@@ -1089,9 +1172,9 @@ const ProjectsPage = () => {
         const shouldCreateDocument = !editMode && Boolean(documentName || createDocumentForm.date || documentDriveLink);
 
         if (shouldCreateDocument) {
-          const projectId = Number(res.data.project_id ?? res.data.data?.project_id ?? res.data.data?.id ?? 0);
+          const projectId = String(res.data.project_id ?? res.data.data?.project_id ?? "");
           try {
-            if (!Number.isInteger(projectId) || projectId <= 0) {
+            if (!projectId) {
               throw new Error("ไม่พบรหัสโครงการสำหรับบันทึกลิงก์เอกสาร");
             }
 
@@ -1137,7 +1220,7 @@ const ProjectsPage = () => {
     }
   };
 
-  const openDeleteConfirm = (id: number) => {
+  const openDeleteConfirm = (id: string) => {
     if (!canManageProjects) return;
     setPendingDeleteId(id);
     setIsConfirmOpen(true);
@@ -1156,10 +1239,10 @@ const ProjectsPage = () => {
         setPendingDeleteId(null);
         fetchProjects();
       }
-    } catch {
+    } catch (error: unknown) {
       toast({
         title: "ข้อผิดพลาด",
-        description: "ไม่สามารถลบโครงการได้ อาจมีการใช้งานอยู่",
+        description: getApiErrorMessage(error, "ไม่สามารถลบโครงการได้"),
         variant: "destructive",
       });
     } finally {
@@ -1167,11 +1250,32 @@ const ProjectsPage = () => {
     }
   };
 
+  const handleDownloadProjectImportTemplate = async () => {
+    if (isDownloadingTemplate) return;
+    setIsDownloadingTemplate(true);
+    try {
+      await downloadProjectImportTemplate();
+      toast({
+        title: "ดาวน์โหลดสำเร็จ",
+        description: "ดาวน์โหลดแพทเทิร์นนำเข้าข้อมูลโครงการแล้ว",
+      });
+    } catch (error: unknown) {
+      toast({
+        title: "ดาวน์โหลดไม่สำเร็จ",
+        description: getApiErrorMessage(error, "ไม่สามารถดาวน์โหลดแพทเทิร์นข้อมูลโครงการได้"),
+        variant: "destructive",
+      });
+    } finally {
+      setIsDownloadingTemplate(false);
+    }
+  };
+
+  const normalizedResponsibleSearch = responsibleSearch.trim().toLowerCase();
+  const filteredResponsibleOptions = facultyOptions.filter((faculty) =>
+    `${faculty.name} ${faculty.faculty_id} ${faculty.email || ""}`.toLowerCase().includes(normalizedResponsibleSearch)
+  );
+  const selectedResponsibleFaculty = facultyOptions.find(faculty => String(faculty.faculty_id) === formData.responsible_faculty_id);
   const normalizedMemberSearch = memberSearch.trim().toLowerCase();
-  const normalizedResponsibleSearch = responsibleSearch.trim().toLocaleLowerCase("th-TH");
-  const filteredResponsibleFacultyOptions = facultyOptions.filter((faculty) =>
-    `${faculty.name} ${faculty.faculty_id} ${faculty.email || ""}`
-      .toLocaleLowerCase("th-TH").includes(normalizedResponsibleSearch));
   const responsibleFacultyId = Number(formData.responsible_faculty_id || 0);
   const filteredFacultyOptions = facultyOptions.filter((faculty) => {
     const haystack = `${faculty.name} ${faculty.faculty_id} ${faculty.email || ""}`.toLowerCase();
@@ -1208,8 +1312,17 @@ const ProjectsPage = () => {
     <div className="app-page animate-fade-in">
       <PageHeader
         title="จัดการโครงการ"
-        description="สร้าง แก้ไข และติดตามความคืบหน้าโครงการภาควิชา"
+        description="สร้าง แก้ไข และติดตามสถานะโครงการภาควิชา"
         actions={canManageProjects ? <>
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={handleDownloadProjectImportTemplate}
+              disabled={isDownloadingTemplate}
+            >
+              {isDownloadingTemplate ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+              {isDownloadingTemplate ? "กำลังสร้างแพทเทิร์น..." : "ดาวน์โหลดแพทเทิร์น"}
+            </Button>
             <Button variant="outline" className="gap-2" onClick={() => setIsImportOpen(true)}>
               <Upload className="h-4 w-4" />
               Import ข้อมูล
@@ -1227,14 +1340,14 @@ const ProjectsPage = () => {
           onOpenChange={setIsImportOpen}
           importTypes={projectImportTypes}
           title="Import ข้อมูลโครงการ"
-          description="นำเข้าข้อมูลโครงการจากไฟล์ Excel หรือ CSV"
+          description="นำเข้าข้อมูลโครงการจากไฟล์ Excel"
           onImported={fetchProjects}
         />
       )}
 
       <div className="flex flex-col sm:flex-row gap-4">
         <SearchInput
-            placeholder="ค้นหาโครงการด้วยชื่อภาษาไทย หรือ ภาษาอังกฤษ..."
+            placeholder="ค้นหาโครงการด้วยชื่อโครงการ..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10"
@@ -1345,10 +1458,11 @@ const ProjectsPage = () => {
                         {statusLabels[status]}
                       </Badge>
                     </div>
-                    <h3 className="text-lg font-semibold text-foreground line-clamp-2">{project.project_name_th}</h3>
-                    {project.project_name_en && (
-                      <p className="text-xs text-muted-foreground mt-1 truncate">{project.project_name_en}</p>
-                    )}
+                    <h3 className="text-lg font-semibold text-foreground line-clamp-2">{projectDisplayName(project)}</h3>
+                    <p className="text-xs text-muted-foreground">รหัสโครงการ: {project.project_id}</p>
+                    <p className="mt-1 whitespace-pre-wrap break-words text-xs text-muted-foreground">ยุทธศาสตร์: {projectStrategyName(project)}</p>
+                    {project.merge_pending && <Badge variant="outline">รอตรวจจับคู่และกระทบยอดที่หน้ารายงานผู้ดูแล</Badge>}
+                    {project.read_only && <Badge variant="secondary">ปิดรอบแล้ว</Badge>}
                     {plos.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-1">
                         {visiblePlos.map((plo) => (
@@ -1370,10 +1484,12 @@ const ProjectsPage = () => {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-48">
+                      {!project.merge_pending && <DropdownMenuItem onClick={() => navigateToProject("project-reports", project.project_id, "reports")}>ดูรายงานโครงการ</DropdownMenuItem>}
+                      {!project.merge_pending && <DropdownMenuItem onClick={() => setDetailsCode(project.project_id)}>กิจกรรมย่อยและงบโครงการ</DropdownMenuItem>}
                       <DropdownMenuItem className="gap-2" onClick={() => handleOpenViewModal(project)}>
                         <Eye className="h-4 w-4 text-blue-500" /> ดูรายละเอียด
                       </DropdownMenuItem>
-                      {canManageProjects && (
+                      {canManageProjects && !project.read_only && (
                         <>
                           <DropdownMenuItem className="gap-2" onClick={() => handleOpenEditModal(project)}>
                             <Edit className="h-4 w-4 text-orange-500" /> แก้ไขโครงการ
@@ -1404,9 +1520,6 @@ const ProjectsPage = () => {
                 </div>
 
                 <div className="space-y-3 mt-4 pt-4 border-t border-slate-100">
-                  <p className="text-sm text-slate-600 line-clamp-2 min-h-[40px]">
-                    {project.description || "ไม่มีคำอธิบายโครงการ"}
-                  </p>
                   <div className="grid grid-cols-1 gap-3 text-xs text-muted-foreground sm:grid-cols-3">
                     <div>
                       <p>ปีการศึกษา</p>
@@ -1414,7 +1527,7 @@ const ProjectsPage = () => {
                     </div>
                     <div>
                       <p>งบเสนอ</p>
-                      <p className="mt-1 font-medium text-foreground">{formatCurrency(projectBudgetAllocated(project))} บาท</p>
+                      <p className="mt-1 font-medium text-foreground">{formatCurrency(projectBudgetProposed(project))} บาท</p>
                     </div>
                     <div>
                       <p>งบใช้จริง</p>
@@ -1493,7 +1606,19 @@ const ProjectsPage = () => {
               </Select>
             </div>
             <div className="grid gap-2">
-              <Label>ชื่อโครงการ (ภาษาไทย) <span className="text-red-500">*</span></Label>
+              <Label htmlFor="project-code">รหัสโครงการ <span className="text-red-500">*</span></Label>
+              <Input
+                id="project-code"
+                maxLength={100}
+                value={formData.project_id}
+                readOnly={editMode}
+                onChange={(event) => setFormData({ ...formData, project_id: event.target.value })}
+                placeholder="กรอกรหัสโครงการ"
+              />
+              {editMode && <p className="text-xs text-muted-foreground">รหัสโครงการไม่สามารถแก้ไขได้หลังสร้าง</p>}
+            </div>
+            <div className="grid gap-2">
+              <Label>ชื่อโครงการ <span className="text-red-500">*</span></Label>
               <Input
                 value={formData.project_name_th}
                 onChange={(e) => setFormData({ ...formData, project_name_th: e.target.value })}
@@ -1501,44 +1626,32 @@ const ProjectsPage = () => {
               />
             </div>
             <div className="grid gap-2">
-              <Label>ชื่อโครงการ (ภาษาอังกฤษ)</Label>
-              <Input
-                value={formData.project_name_en}
-                onChange={(e) => setFormData({ ...formData, project_name_en: e.target.value })}
-                placeholder="เช่น Student Development Project..."
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label>รายละเอียดโครงการ</Label>
-              <Textarea
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="อธิบายวัตถุประสงค์ หรือเป้าหมายของโครงการโดยสังเขป..."
-                rows={4}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label>ผู้ดำเนินโครงการ <span className="text-red-500">*</span></Label>
-              <Select value={formData.responsible_faculty_id} onValueChange={handleResponsibleFacultyChange}>
-                <SelectTrigger>
-                  <SelectValue placeholder="เลือกผู้ดำเนินโครงการ" />
-                </SelectTrigger>
-                <SelectContent className="overflow-y-auto [&_[data-radix-select-viewport]]:!h-auto [&_[data-radix-select-viewport]]:max-h-72 [&_[data-radix-select-viewport]]:overflow-y-auto">
-                  <Input
-                    value={responsibleSearch}
-                    onChange={(event) => setResponsibleSearch(event.target.value)}
-                    onKeyDown={(event) => event.stopPropagation()}
-                    placeholder="ค้นหาชื่อหรือรหัสอาจารย์"
-                    className="mb-2"
-                  />
-                  {filteredResponsibleFacultyOptions.length === 0 && <p className="px-2 py-2 text-sm text-muted-foreground">ไม่พบรายชื่ออาจารย์</p>}
-                  {filteredResponsibleFacultyOptions.map((faculty) => (
-                    <SelectItem key={faculty.faculty_id} value={String(faculty.faculty_id)}>
-                      {faculty.name}
-                    </SelectItem>
-                  ))}
+              <Label htmlFor="project-strategy">ยุทธศาสตร์</Label>
+              <Select value={formData.strategy || UNSPECIFIED_STRATEGY} onValueChange={value => setFormData(prev => ({ ...prev, strategy: value === UNSPECIFIED_STRATEGY ? "" : value }))}>
+                <SelectTrigger id="project-strategy"><SelectValue placeholder="ยังไม่ระบุ" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={UNSPECIFIED_STRATEGY}>ยังไม่ระบุ</SelectItem>
+                  {formData.strategy && !projectStrategies.includes(formData.strategy) && <SelectItem value={formData.strategy}>{formData.strategy} (ข้อมูลเดิม)</SelectItem>}
+                  {projectStrategies.map(strategy => <SelectItem key={strategy} value={strategy}>{strategy}</SelectItem>)}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="grid gap-2" role="group" aria-labelledby="project-responsible-label">
+              <div className="flex items-center justify-between gap-2">
+                <Label id="project-responsible-label">ผู้ดำเนินโครงการ <span className="text-red-500">*</span></Label>
+                <Badge variant="outline">เลือกได้ 1 คน</Badge>
+              </div>
+              <Input aria-label="ค้นหาผู้ดำเนินโครงการ" value={responsibleSearch} onChange={e => setResponsibleSearch(e.target.value)} placeholder="ค้นหาชื่อ รหัสอาจารย์ หรืออีเมล" />
+              {selectedResponsibleFaculty && <p className="text-sm text-muted-foreground">ผู้ที่เลือก: {selectedResponsibleFaculty.name}</p>}
+              <div className="max-h-52 overflow-y-auto rounded-md border">
+                {filteredResponsibleOptions.length === 0 ? <p className="px-3 py-4 text-sm text-muted-foreground">ไม่พบรายชื่ออาจารย์</p> : filteredResponsibleOptions.map(faculty => {
+                  const checked = formData.responsible_faculty_id === String(faculty.faculty_id);
+                  return <label key={faculty.faculty_id} className="flex cursor-pointer items-center gap-3 border-b px-3 py-2 text-sm last:border-b-0 hover:bg-muted/50">
+                    <Checkbox aria-label={`ผู้ดำเนินโครงการ ${faculty.name}`} checked={checked} onCheckedChange={value => handleResponsibleFacultyChange(value === true ? String(faculty.faculty_id) : "")} />
+                    <span className="min-w-0 flex-1"><span className="block truncate font-medium">{faculty.name}</span><span className="block truncate text-xs text-muted-foreground">รหัสอาจารย์ {faculty.faculty_id}{faculty.email ? ` - ${faculty.email}` : ""}</span></span>
+                  </label>;
+                })}
+              </div>
             </div>
             <div className="grid gap-2">
               <div className="flex items-center justify-between gap-2">
@@ -1546,6 +1659,7 @@ const ProjectsPage = () => {
                 <Badge variant="outline">{formData.member_faculty_ids.length} คน</Badge>
               </div>
               <Input
+                aria-label="ค้นหาผู้ร่วมโครงการ"
                 value={memberSearch}
                 onChange={(e) => setMemberSearch(e.target.value)}
                 placeholder="ค้นหาชื่อ รหัสอาจารย์ หรืออีเมล"
@@ -1602,6 +1716,7 @@ const ProjectsPage = () => {
                   type="number"
                   min="2500"
                   max="2700"
+                  readOnly={editMode}
                   value={formData.academic_year}
                   onChange={(e) => setFormData({ ...formData, academic_year: e.target.value })}
                   placeholder="เช่น 2569"
@@ -1626,15 +1741,56 @@ const ProjectsPage = () => {
             </div>
             <div className="grid gap-2">
               <Label>สถานะโครงการ</Label>
-              <Select value={formData.status} onValueChange={(value: ProjectStatus) => setFormData({ ...formData, status: value })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="เลือกสถานะ" />
-                </SelectTrigger>
+              {editMode && formData.status !== "active" && formData.status !== "completed" && <p className="text-sm text-muted-foreground">สถานะเดิม: {statusLabels[formData.status]} · คงเดิมหากไม่เลือกสถานะใหม่</p>}
+              <Select value={formData.status === "active" || formData.status === "completed" ? formData.status : ""} onValueChange={(value: "active" | "completed") => setFormData({ ...formData, status: value })}>
+                <SelectTrigger aria-label="สถานะโครงการ"><SelectValue placeholder="เลือกสถานะใหม่" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="active">กำลังดำเนินการ</SelectItem>
                   <SelectItem value="completed">เสร็จสิ้น</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-3 rounded-lg border p-4">
+              <label className="flex cursor-pointer items-center gap-3">
+                <Checkbox
+                  checked={formData.has_sub_activities}
+                  onCheckedChange={(value) => setHasSubActivities(value === true)}
+                  disabled={isSubmitting}
+                />
+                <span>
+                  <span className="block font-medium">โครงการนี้มีกิจกรรมย่อย</span>
+                  <span className="block text-xs text-muted-foreground">แต่ละกิจกรรมระบุเฉพาะชื่อและลิงก์ Google Drive</span>
+                </span>
+              </label>
+              {formData.has_sub_activities && (
+                <div className="space-y-3 border-t pt-3">
+                  {formData.activities.map((activity, index) => (
+                    <div key={activity.id ?? `activity-${index}`} className="space-y-3 rounded-md border bg-muted/20 p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-medium">กิจกรรมย่อย {index + 1}</p>
+                        <div className="flex flex-wrap gap-1">
+                          <Button type="button" size="sm" variant="ghost" disabled={index === 0 || isSubmitting} onClick={() => setFormData((prev) => { const activities = [...prev.activities]; [activities[index - 1], activities[index]] = [activities[index], activities[index - 1]]; return { ...prev, activities }; })}>ขึ้น</Button>
+                          <Button type="button" size="sm" variant="ghost" disabled={index === formData.activities.length - 1 || isSubmitting} onClick={() => setFormData((prev) => { const activities = [...prev.activities]; [activities[index], activities[index + 1]] = [activities[index + 1], activities[index]]; return { ...prev, activities }; })}>ลง</Button>
+                          <Button type="button" size="sm" variant="ghost" className="text-destructive" disabled={isSubmitting} onClick={() => setFormData((prev) => ({ ...prev, activities: prev.activities.filter((_, activityIndex) => activityIndex !== index) }))}>ลบ</Button>
+                        </div>
+                      </div>
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div className="grid gap-2">
+                          <Label htmlFor={`project-activity-name-${index}`}>ชื่อกิจกรรม <span className="text-red-500">*</span></Label>
+                          <Input id={`project-activity-name-${index}`} maxLength={255} value={activity.activity_name} onChange={(event) => setFormData((prev) => ({ ...prev, activities: prev.activities.map((item, activityIndex) => activityIndex === index ? { ...item, activity_name: event.target.value } : item) }))} disabled={isSubmitting} />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor={`project-activity-drive-${index}`}>ลิงก์ Google Drive <span className="text-red-500">*</span></Label>
+                          <Input id={`project-activity-drive-${index}`} type="url" placeholder="https://drive.google.com/..." value={activity.google_drive_url} onChange={(event) => setFormData((prev) => ({ ...prev, activities: prev.activities.map((item, activityIndex) => activityIndex === index ? { ...item, google_drive_url: event.target.value } : item) }))} disabled={isSubmitting} />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  <Button type="button" variant="outline" onClick={() => setFormData((prev) => ({ ...prev, activities: [...prev.activities, { activity_name: "", google_drive_url: "", sort_order: prev.activities.length }] }))} disabled={isSubmitting}>
+                    <Plus className="mr-2 h-4 w-4" /> เพิ่มกิจกรรมย่อย
+                  </Button>
+                </div>
+              )}
             </div>
             <div className="grid gap-4 md:grid-cols-3">
               <div className="grid gap-2">
@@ -1642,8 +1798,9 @@ const ProjectsPage = () => {
                 <Input
                   type="number"
                   min="0"
-                  value={formData.budget_allocated}
-                  onChange={(e) => setFormData({ ...formData, budget_allocated: e.target.value })}
+                  disabled={budgetsRequireDetails}
+                  value={formData.budget_proposed}
+                  onChange={(e) => setFormData({ ...formData, budget_proposed: e.target.value })}
                   placeholder="0"
                 />
               </div>
@@ -1652,6 +1809,7 @@ const ProjectsPage = () => {
                 <Input
                   type="number"
                   min="0"
+                  disabled={budgetsRequireDetails}
                   value={formData.budget_spent}
                   onChange={(e) => setFormData({ ...formData, budget_spent: e.target.value })}
                   placeholder="0"
@@ -1659,19 +1817,17 @@ const ProjectsPage = () => {
               </div>
               <div className="grid gap-2">
                 <Label>แหล่งงบประมาณ</Label>
-                <Input
-                  value={formData.budget_source}
-                  onChange={(e) => setFormData({ ...formData, budget_source: e.target.value })}
-                  placeholder="เช่น คณะ, มหาวิทยาลัย"
-                />
+                <Select disabled={budgetsRequireDetails} value={formData.budget_source || "unspecified"} onValueChange={value => setFormData({ ...formData, budget_source: value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Object.entries({ university: 'มหาวิทยาลัยสยาม', thonburiHospital: 'โรงพยาบาลธนบุรี', nursingFaculty: 'คณะพยาบาลศาสตร์', external: 'หน่วยงานภายนอก', unspecified: 'ยังไม่ระบุแหล่งเงิน' }).map(([key, label]) => <SelectItem key={key} value={key}>{label}</SelectItem>)}</SelectContent></Select>
+                <p className="text-xs text-muted-foreground">หากมีหลายแหล่งเงิน ให้แก้ที่เมนูกิจกรรมย่อยและงบโครงการ</p>
               </div>
             </div>
             <div className="grid gap-2">
               <Label>หมายเหตุงบประมาณ</Label>
               <Textarea
+                disabled={budgetsRequireDetails}
                 value={formData.budget_note}
                 onChange={(e) => setFormData({ ...formData, budget_note: e.target.value })}
-                placeholder="ระบุรายละเอียดเพิ่มเติม เช่น ไม่ใช้งบ, รออนุมัติ, งบจากภายนอก"
+                placeholder="ระบุรายละเอียดเพิ่มเติม เช่น ไม่ใช้งบ, รอดำเนินการ, งบจากภายนอก"
                 rows={2}
               />
             </div>
@@ -1860,20 +2016,12 @@ const ProjectsPage = () => {
                 )}
               </div>
               <div className="space-y-1">
-                <p className="text-muted-foreground">ชื่อโครงการ (ภาษาไทย)</p>
-                <p className="font-medium text-foreground whitespace-pre-wrap">{viewProject.project_name_th}</p>
+                <p className="text-muted-foreground">ยุทธศาสตร์</p>
+                <p className="whitespace-pre-wrap break-words font-medium text-foreground">{projectStrategyName(viewProject)}</p>
               </div>
               <div className="space-y-1">
-                <p className="text-muted-foreground">ชื่อโครงการ (ภาษาอังกฤษ)</p>
-                <p className="font-medium text-foreground whitespace-pre-wrap">
-                  {viewProject.project_name_en || "-"}
-                </p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-muted-foreground">คำอธิบาย</p>
-                <p className="font-medium text-foreground whitespace-pre-wrap rounded-lg border bg-muted/30 p-3">
-                  {viewProject.description || "ไม่มีคำอธิบายโครงการ"}
-                </p>
+                <p className="text-muted-foreground">ชื่อโครงการ</p>
+                <p className="font-medium text-foreground whitespace-pre-wrap">{projectDisplayName(viewProject)}</p>
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1 rounded-lg border bg-muted/30 p-3">
@@ -1894,7 +2042,7 @@ const ProjectsPage = () => {
                 </div>
                 <div className="space-y-1 rounded-lg border bg-muted/30 p-3">
                   <p className="text-muted-foreground">งบเสนอ</p>
-                  <p className="font-medium text-foreground">{formatCurrency(projectBudgetAllocated(viewProject))} บาท</p>
+                  <p className="font-medium text-foreground">{formatCurrency(projectBudgetProposed(viewProject))} บาท</p>
                 </div>
                 <div className="space-y-1 rounded-lg border bg-muted/30 p-3">
                   <p className="text-muted-foreground">งบใช้จริง</p>
@@ -1902,10 +2050,22 @@ const ProjectsPage = () => {
                 </div>
               </div>
               <div className="space-y-1">
-                <p className="text-muted-foreground">แหล่งงบ/หมายเหตุ</p>
+                <p className="text-muted-foreground">หมายเหตุงบประมาณ</p>
                 <p className="font-medium text-foreground whitespace-pre-wrap rounded-lg border bg-muted/30 p-3">
-                  {projectBudgetNote(viewProject) || "-"}
+                  {optionalText(parseBudgetNote(projectBudgetNote(viewProject)).note)}
                 </p>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-foreground text-base font-bold">กิจกรรมย่อย</p>
+                  <Badge variant="outline">{viewProject.activities?.length || 0} รายการ</Badge>
+                </div>
+                {!viewProject.activities?.length ? <p className="text-sm text-muted-foreground">ไม่มีกิจกรรมย่อย</p> : viewProject.activities.map((activity) => (
+                  <div key={activity.id ?? activity.activity_name} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3">
+                    <span className="font-medium">{activity.activity_name}</span>
+                    <a href={activity.google_drive_url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary underline">เปิด Google Drive</a>
+                  </div>
+                ))}
               </div>
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-2">
@@ -1982,10 +2142,7 @@ const ProjectsPage = () => {
             <div className="space-y-2">
               <Label>โครงการ</Label>
               <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm">
-                <p className="font-medium text-foreground">{uploadProject?.project_name_th || "-"}</p>
-                {uploadProject?.project_name_en && (
-                  <p className="mt-1 text-xs text-muted-foreground">{uploadProject.project_name_en}</p>
-                )}
+                <p className="font-medium text-foreground">{uploadProject ? projectDisplayName(uploadProject) : "-"}</p>
               </div>
             </div>
               <div className="space-y-2">
@@ -2097,6 +2254,18 @@ const ProjectsPage = () => {
         onConfirm={handleDeleteDocument}
         isLoading={isDeletingDocument}
       />
+      <ConfirmActionDialog
+        open={isActivityClearConfirmOpen}
+        onOpenChange={setIsActivityClearConfirmOpen}
+        title="ยืนยันการลบกิจกรรมย่อย"
+        description="กิจกรรมย่อยและลิงก์ Google Drive ทั้งหมดในฟอร์มจะถูกลบเมื่อบันทึกโครงการ"
+        confirmLabel="ลบกิจกรรมย่อย"
+        onConfirm={() => {
+          setFormData((prev) => ({ ...prev, has_sub_activities: false, activities: [] }));
+          setIsActivityClearConfirmOpen(false);
+        }}
+      />
+      <ProjectReportDetailsDialog projectId={detailsCode} open={detailsCode !== null} onOpenChange={open => { if (!open) setDetailsCode(null); }} onSaved={fetchProjects} />
     </div>
   );
 };

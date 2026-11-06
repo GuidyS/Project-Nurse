@@ -15,6 +15,7 @@ foreach ($possible_paths as $path) {
     }
 }
 require_once __DIR__ . '/../CLOPage/curriculum_repository.php';
+require_once __DIR__ . '/../ProjectShared/project_helpers.php';
 require_once __DIR__ . '/../../../config/active_curriculum.php';
 
 $origin = $_SERVER['HTTP_ORIGIN'] ?? 'http://localhost:5173';
@@ -36,12 +37,16 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 try {
-    $db = new Connect();
+    $db = project_db();
+    project_require_auth($db,['PROJECT_VIEW']);
 
     $stmt = $db->query("
         SELECT
-            project_id AS id,
-            COALESCE(NULLIF(project_name_th, ''), NULLIF(project_name_en, ''), CONCAT('Project #', project_id)) AS name,
+            id,
+            project_id,
+            academic_year,
+            project_name_th,
+            COALESCE(NULLIF(TRIM(project_name_th), ''), CONCAT('โครงการ #', project_id)) AS name,
             project_type
         FROM project
         WHERE project_type = 'academic_service'
@@ -52,24 +57,25 @@ try {
     $projects = [];
     $matrix = [];
 
-    foreach ($projects_raw as $row) {
-        $pid = $row['id'];
-        $projects[] = ['id' => $pid, 'name' => $row['name'], 'project_type' => $row['project_type']];
+    foreach (project_u_catalogue($db,$projects_raw) as $row) {
+        $pid = $row['project_id'];
+        $projects[] = ['id' => $row['id'], 'project_id' => $pid, 'name' => trim((string)$row['project_name_th']) ?: 'โครงการ #'.$pid, 'project_type' => $row['project_type'], 'read_only' => $row['read_only'] || $row['merge_pending']];
 
-        $matrix[$pid] = ['plos' => [], 'ylos' => [], 'clos' => []];
+        $matrix[$pid] = ['plos' => [], 'clos' => []];
     }
 
     $linkStmt = $db->query("
-        SELECT l.project_id, l.outcome_type, l.outcome_code
+        SELECT p.project_id, l.outcome_type, l.outcome_code
         FROM project_outcome_links l
         INNER JOIN project p ON p.project_id = l.project_id
         WHERE p.project_type = 'academic_service'
+          AND l.outcome_type <> 'ylo'
         ORDER BY l.project_id, l.outcome_type, l.outcome_code
     ");
     foreach ($linkStmt->fetchAll(PDO::FETCH_ASSOC) as $link) {
         $projectId = $link['project_id'];
         if (!isset($matrix[$projectId])) {
-            $matrix[$projectId] = ['plos' => [], 'ylos' => [], 'clos' => []];
+            $matrix[$projectId] = ['plos' => [], 'clos' => []];
         }
 
         $key = $link['outcome_type'] . 's';
@@ -79,7 +85,6 @@ try {
     }
 
     $plos = [];
-    $ylosByCode = [];
     $closByCode = [];
 
     $mappingData = loadActiveMappingData($db);
@@ -98,14 +103,6 @@ try {
             $plos[] = [
                 'code' => $code,
                 'description' => $plo['plo_name'] ?? $code
-            ];
-        }
-
-        foreach (($plo['ylo_descriptions'] ?? []) as $yearKey => $description) {
-            $code = strtoupper(str_replace('YEAR_', 'YLO', strtoupper($yearKey)));
-            $ylosByCode[$code] = [
-                'code' => $code,
-                'description' => $code . ': ' . $description
             ];
         }
     }
@@ -132,11 +129,9 @@ try {
         }
     }
 
-    $ylos = array_values($ylosByCode);
     $clos = array_values($closByCode);
 
     $ploCodes = array_column($plos, 'code');
-    $yloCodes = array_column($ylos, 'code');
     $cloCodes = array_column($clos, 'code');
 
     foreach ($matrix as $projectLinks) {
@@ -144,12 +139,6 @@ try {
             if (!in_array($code, $ploCodes, true)) {
                 $plos[] = ['code' => $code, 'description' => $code . ' (legacy mapping)'];
                 $ploCodes[] = $code;
-            }
-        }
-        foreach ($projectLinks['ylos'] as $code) {
-            if (!in_array($code, $yloCodes, true)) {
-                $ylos[] = ['code' => $code, 'description' => $code . ' (legacy mapping)'];
-                $yloCodes[] = $code;
             }
         }
         foreach ($projectLinks['clos'] as $code) {
@@ -167,9 +156,8 @@ try {
         "data" => [
             "projects" => $projects,
             "plos" => $plos,
-            "ylos" => $ylos,
             "clos" => $clos,
-            "links" => empty($matrix) ? new stdClass() : $matrix,
+            "links" => (object)$matrix,
             "curriculum" => activeCurriculumCycle($db),
         ]
     ], JSON_UNESCAPED_UNICODE);

@@ -77,8 +77,7 @@ try {
 
     [$typeSql, $typeParams] = assignStudentsTypeCondition($type, 'sam');
 
-    // The academic-year helper may create its settings table on first use.
-    // MySQL DDL implicitly commits, so resolve it before opening this transaction.
+    // The academic-year helper may create a settings table and implicitly commit a MySQL transaction.
     $academicYear = currentAcademicYear(null, $db);
     $db->beginTransaction();
 

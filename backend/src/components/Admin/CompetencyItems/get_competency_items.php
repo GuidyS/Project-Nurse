@@ -7,6 +7,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 if (session_status() == PHP_SESSION_NONE) { session_start(); }
 require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/competency_helpers.php';
 
 ob_end_clean();
 header("Content-Type: application/json; charset=UTF-8");
@@ -20,30 +21,34 @@ if (!$userId) {
 
 try {
     $db = new Connect;
+    competencyRequireAdmin($db, $userId);
 
-    // ตรวจสอบสิทธิ์ Admin
-    $stmt = $db->prepare("SELECT role_id FROM users WHERE user_id = :id");
-    $stmt->execute([':id' => $userId]);
-    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+    // ย้ายรายการประเมินชุดเดิมมาเป็น Sub PLO ครั้งแรกที่เปิดหน้านี้ (ทำครั้งเดียว)
+    outcomesMigrateCompetencyItems($db);
+    // นับรหัสใหม่แยกตามชั้นปี สำหรับข้อมูลที่ออกรหัสด้วยกติกาเดิม (ทำครั้งเดียว)
+    outcomesRenumberIfNeeded($db);
 
-    if (!$user || (int)($user['role_id'] ?? 0) !== 1) {
-        http_response_code(403);
-        echo json_encode(["status" => "error", "message" => "Forbidden"], JSON_UNESCAPED_UNICODE);
+    // หลักสูตรยึดตามหน้า "จัดการหลักสูตร" ที่เดียว ไม่ให้เลือกคนละชุดกับหน้าอื่น
+    $resolved = competencyResolveCurriculum($db);
+    $frameworkId = $resolved['framework_id'];
+
+    if ($frameworkId === null) {
+        echo json_encode([
+            "status" => "success",
+            "mode" => "items",
+            "curriculum" => $resolved['curriculum'],
+            "framework_id" => null,
+            "data" => [],
+        ], JSON_UNESCAPED_UNICODE);
         exit;
     }
 
-    if (empty($_GET['framework_id'])) {
-        $stmt2 = $db->prepare("SELECT id, curriculum_year, program_name, is_active FROM curriculum_framework ORDER BY is_active DESC, curriculum_year DESC");
-        $stmt2->execute();
-        $frameworks = $stmt2->fetchAll(PDO::FETCH_ASSOC) ?: [];
-        echo json_encode(["status" => "success", "mode" => "frameworks", "data" => $frameworks], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
-
-    $frameworkId = (int)$_GET['framework_id'];
     $yearLevel = isset($_GET['year_level']) ? (int)$_GET['year_level'] : 1;
+    if ($yearLevel < 1 || $yearLevel > OUTCOME_MAX_YLO) {
+        $yearLevel = 1;
+    }
 
-    // 1. ดึง PLO ทั้งหมดของหลักสูตร เรียงตามลำดับ PLO
+    // 1. PLO ทั้งหมดของหลักสูตร เรียงตามลำดับ
     $ploStmt = $db->prepare("
         SELECT id AS plo_id, plo_code, name AS plo_name
         FROM curriculum_plo
@@ -53,38 +58,52 @@ try {
     $ploStmt->execute([':fid' => $frameworkId]);
     $plos = $ploStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
-    // 2. ดึงข้อประเมินทั้งหมดในหลักสูตรและชั้นปีนั้น
-    $itemStmt = $db->prepare("
-        SELECT ci.id, ci.plo_id, ci.year_level, ci.sequence_no, ci.competency_name, ci.is_scorable
-        FROM competency_items ci
-        INNER JOIN curriculum_plo cp ON cp.id = ci.plo_id
-        WHERE cp.framework_id = :fid AND ci.year_level = :yl
-        ORDER BY COALESCE(cp.sort_order, cp.id) ASC, ci.sequence_no ASC, ci.id ASC
-    ");
-    $itemStmt->execute([':fid' => $frameworkId, ':yl' => $yearLevel]);
-    $allItems = $itemStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-
-    // Auto Fix: ซ่อมแซมลำดับข้อใน Database ให้เรียง 1..N ต่อเนื่องอัตโนมัติหากพบเลขกระโดด
-    $updateSeq = $db->prepare("UPDATE competency_items SET sequence_no = :seq WHERE id = :id");
-    $currentRunningSeq = 1;
+    // 2. Sub PLO ของชั้นปีที่เลือก + จำนวนรวมทุกชั้นปี (ใช้กับปุ่มลบทั้งหมด)
     $itemsByPlo = [];
-
-    foreach ($allItems as $item) {
-        if ((int)$item['sequence_no'] !== $currentRunningSeq) {
-            $updateSeq->execute([':seq' => $currentRunningSeq, ':id' => $item['id']]);
-            $item['sequence_no'] = $currentRunningSeq;
-        }
-        $itemsByPlo[(int)$item['plo_id']][] = $item;
-        $currentRunningSeq++;
+    foreach (outcomesSubPlos($db, $frameworkId, $yearLevel) as $sub) {
+        $itemsByPlo[$sub['plo_id']][] = $sub;
     }
 
-    // รวม items เข้ากลุ่ม PLO
-    $result = array_map(function ($plo) use ($itemsByPlo) {
-        $plo['items'] = $itemsByPlo[(int)$plo['plo_id']] ?? [];
-        return $plo;
-    }, $plos);
+    $countStmt = $db->prepare("
+        SELECT plo_id, COUNT(*) AS total
+        FROM curriculum_sub_plo WHERE framework_id = :fid GROUP BY plo_id
+    ");
+    $countStmt->execute([':fid' => $frameworkId]);
+    $totalByPlo = [];
+    foreach ($countStmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+        $totalByPlo[(int)$row['plo_id']] = (int)$row['total'];
+    }
 
-    echo json_encode(["status" => "success", "mode" => "items", "data" => $result], JSON_UNESCAPED_UNICODE);
+    $result = [];
+    $seq = 1;
+    foreach ($plos as $plo) {
+        $ploId = (int)$plo['plo_id'];
+        $items = [];
+        foreach ($itemsByPlo[$ploId] ?? [] as $sub) {
+            $items[] = [
+                'id' => $sub['id'],
+                'plo_id' => $ploId,
+                'year_level' => $sub['year_level'],
+                'sequence_no' => $seq++,
+                'sub_plo_code' => $sub['code'],
+                'competency_name' => $sub['description'],
+                'is_scorable' => $sub['is_scorable'],
+            ];
+        }
+        $plo['plo_id'] = $ploId;
+        $plo['items'] = $items;
+        $plo['total_all_years'] = $totalByPlo[$ploId] ?? 0;
+        $result[] = $plo;
+    }
+
+    echo json_encode([
+        "status" => "success",
+        "mode" => "items",
+        "year_level" => $yearLevel,
+        "curriculum" => $resolved['curriculum'],
+        "framework_id" => $frameworkId,
+        "data" => $result,
+    ], JSON_UNESCAPED_UNICODE);
 
 } catch (Exception $e) {
     http_response_code(500);

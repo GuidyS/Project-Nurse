@@ -20,9 +20,7 @@ import Advises from "@/components/pages/Teacher/Advises";
 import AssignInstructors from "@/components/pages/Teacher/AssignInstructors";
 import CLOMap from "@/components/pages/Teacher/CLOMap";
 import Evidence from "@/components/pages/Teacher/Evidence";
-import Grades from "@/components/pages/Teacher/Grades";
 import MyProjects from "@/components/pages/Teacher/MyProjects";
-import Performance from "@/components/pages/Teacher/Performance";
 import ScheduleTasks from "@/components/pages/Teacher/ScheduleTasks";
 import ProjectReports from "@/components/pages/Teacher/ProjectReports";
 import ProjectLinks from "@/components/pages/Teacher/ProjectLinks";
@@ -119,6 +117,9 @@ const Index = () => {
   );
 
   const renderPage = () => {
+    if (["approvals", "grades", "performance"].includes(activeItem)) {
+      return <p className="p-6 text-muted-foreground">ฟังก์ชันนี้ยุติการใช้งานแล้ว</p>;
+    }
     // 1. ดึงข้อมูลสิทธิ์ปัจจุบันเสมอ เมื่อมีการเรนเดอร์หน้าใหม่
     const savedUser = localStorage.getItem('user');
     const userObj = savedUser ? JSON.parse(savedUser) : null;
@@ -139,13 +140,13 @@ const Index = () => {
     // 2. หมวดทั่วไปที่ทุกคนเข้าถึงได้ (Public / All Roles)
     if (activeItem === "login") {
       return (
-        <LoginPage 
+        <LoginPage
           onLoginSuccess={(userData: unknown) => {
             if (!userData || typeof userData !== "object") return;
             const loginUser = userData as LoginUserPayload;
             const rId = Number(loginUser.role_id);
             const pId = Number(loginUser.position_id);
-            
+
             localStorage.setItem('user', JSON.stringify(loginUser));
 
             switch (rId) {
@@ -163,11 +164,11 @@ const Index = () => {
               default: setActiveItem("profile");
             }
           }}
-          onGoToRegister={() => setActiveItem("register")} 
+          onGoToRegister={() => setActiveItem("register")}
         />
       );
     }
-    
+
     if (activeItem === "register") return <RegisterPage onBackToLogin={() => setActiveItem("login")} />;
     if (activeItem === "profile") return <ProfilePage />;
     if (activeItem === "notifications") return <NotificationsPage />; //*
@@ -249,12 +250,12 @@ const Index = () => {
     const teacherPages = [
       "courses", "five-year-summary", "clos",
       "course-students", "documents", "assign-instructors", "clo-map",
-      "evidence", "grades", "performance", "practical-students",
+      "evidence", "practical-students",
       "schedule-tasks", "advise-notes", "advisor-notifications", "advises",
       "students", "students-info", "my-research", "research-summary",
       "advisor-health-records-view"
     ];
-    
+
     if (teacherPages.includes(activeItem)) {
       if (activeItem === "research-summary" && !isResearchPreviewRoute && !canViewResearchSummary) return <UnauthorizedView />;
       if (!isResearchPreviewRoute && roleId !== 1 && roleId !== 2) return <UnauthorizedView />;
@@ -267,9 +268,7 @@ const Index = () => {
         case "assign-instructors": return <AssignInstructors />;                    //*
         case "clo-map": return <CLOMap />;                                          //*
         case "evidence": return <Evidence />;                                       //*
-        case "grades": return <Grades />;                                           //*
-        case "performance": return <Performance />;
-        case "practical-students": return <PracticalPage />;                    //* /* ดูรายชื่อนศ.และประเมินผลการฝึกปฏิบัติของเด็กได้*/ /* อจ.ปฏิบัติ */
+        case "practical-students": return <PracticalPage />;
         case "schedule-tasks": return <ScheduleTasks />;                            //*
         case "advise-notes": return <AdviseNotes />;                                      //*
         case "advises": return <Advises />;
@@ -309,7 +308,7 @@ const Index = () => {
   }
 
   return (
-    <MainLayout 
+    <MainLayout
       onItemClick={handleItemClick}
       activeItem={activeItem}
     >

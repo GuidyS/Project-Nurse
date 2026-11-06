@@ -39,7 +39,6 @@ const getDisplayName = (user: any) => {
   const candidates = [
     user.full_name_th,
     [user.first_name_th, user.last_name_th].filter(Boolean).join(' '),
-    [user.first_name_en, user.last_name_en].filter(Boolean).join(' '),
     user.name,
   ]
     .map((value) => (typeof value === 'string' ? value.trim() : ''))
@@ -53,7 +52,7 @@ const previewMenuSectionsByRole: Record<string, any[]> = {
     {
       sectionTitle: "Admin",
       items: [
-        { title: "จัดการข้อมูลผู้ใช้", url: "users-management", icon: "Users" },
+        { title: "จัดการผู้ใช้", url: "users-management", icon: "Users" },
         { title: "Audit Log", url: "audit-log", icon: "ClipboardList" },
         { title: "นำเข้าข้อมูล", url: "import-data", icon: "Upload" },
         { title: "ส่งออกข้อมูล", url: "export-data", icon: "Download" },
@@ -113,7 +112,6 @@ const sidebarIconOverrides: Record<string, string> = {
   "project-reports": "ChartColumnBig",
   "practical-students": "ClipboardCheck",
   "evidence": "FileBadge2",
-  "performance": "Gauge",
   "advisor-notifications": "MessageSquareWarning",
   "student-vaccinations": "Syringe",
   "student-health-records": "HeartPulse",
@@ -315,8 +313,7 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
         {menuSections.map((section, idx) => {
           // 1. กรองรายการเมนูที่ต้องการซ่อนออกก่อนเก็บไว้ในตัวแปร
           const filteredItems = section.items.filter(
-            (item: any) => !['notifications', 'profile', 'settings', 'roles-management'].includes(item.url)
-              && item.title !== 'จัดการสิทธิ์/ตำแหน่ง'
+            (item: any) => !['notifications', 'profile', 'settings', 'roles-management', 'approvals', 'grades', 'performance'].includes(item.url)
           );
 
           // 2. ถ้ากลุ่มนี้ไม่มีเมนูเหลืออยู่เลย (ความยาวเป็น 0) ให้ส่งค่า null เพื่อไม่เรนเดอร์ทั้ง Section

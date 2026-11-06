@@ -40,7 +40,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useState, useEffect, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
-import { onlyEnglish, onlyThai } from "@/lib/nameInput";
+import { onlyThai } from "@/lib/nameInput";
 
 // Helper สำหรับคำนวณปีการศึกษาและชั้นปี Real-time (ตัดรอบ 10 สิงหาคม)
 export const calculateAcademicInfo = (studentIdOrEntryYear: string | number) => {
@@ -58,7 +58,7 @@ export const calculateAcademicInfo = (studentIdOrEntryYear: string | number) => 
   // 1. ดึงกรณีเป็น พ.ศ. 4 หลัก
   if (val.length === 4 && parseInt(val, 10) >= 2500 && parseInt(val, 10) <= 2600) {
     entryYear = parseInt(val, 10);
-  } 
+  }
   // 2. ดึงจาก 2 ตัวแรกของรหัสนักศึกษา (เช่น "6603400001" -> 66 -> 2566)
   else if (val.length >= 2) {
     const prefix = parseInt(val.substring(0, 2), 10);
@@ -83,7 +83,18 @@ export const calculateAcademicInfo = (studentIdOrEntryYear: string | number) => 
   };
 };
 
-export default function ProfilePage() {
+/**
+ * หน้าข้อมูลส่วนตัว
+ *
+ * ใช้ได้ 2 แบบ
+ *   - ไม่ส่ง props : โปรไฟล์ของผู้ใช้ที่ล็อกอินอยู่ แก้ไขได้ตามปกติ
+ *   - ส่ง facultyId + readOnly : เปิดดูโปรไฟล์ของบุคลากรคนอื่น (หน้า "บุคลากรภายในคณะ")
+ *     ซ่อนปุ่มแก้ไข ฟอร์มอัปโหลด และปุ่มลบทั้งหมด
+ */
+export default function ProfilePage({
+  facultyId,
+  readOnly = false,
+}: { facultyId?: string; readOnly?: boolean } = {}) {
   const [userRole, setUserRole] = useState<"student" | "teacher" | null>(null);
   const [profileData, setProfileData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -104,7 +115,10 @@ export default function ProfilePage() {
   const fetchProfile = async () => {
     try {
       setLoading(true);
-      const res = await api.get("/index.php?page=profile");
+      const endpoint = facultyId
+        ? `/index.php?page=faculty-directory&faculty_id=${encodeURIComponent(facultyId)}`
+        : "/index.php?page=profile";
+      const res = await api.get(endpoint);
       if (res.data.status === "success") {
         setUserRole(res.data.role);
         setProfileData(res.data.data);
@@ -118,7 +132,8 @@ export default function ProfilePage() {
 
   useEffect(() => {
     fetchProfile();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [facultyId]);
 
   // สร้าง/คืนหน่วยความจำรูปตัวอย่างเมื่อเปลี่ยนรูป
   useEffect(() => {
@@ -173,12 +188,10 @@ export default function ProfilePage() {
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
-    // ช่องชื่อ-นามสกุล บังคับภาษาให้ตรงกับช่อง (ไทย/อังกฤษ)
+    // ช่องชื่อ-นามสกุลภาษาไทยบังคับอักษรไทย
     let nextValue = value;
     if (["title", "first_name_th", "last_name_th"].includes(name)) {
       nextValue = onlyThai(value);
-    } else if (["first_name_en", "last_name_en"].includes(name)) {
-      nextValue = onlyEnglish(value);
     }
     setFormData((prev: any) => ({ ...prev, [name]: nextValue }));
   };
@@ -258,11 +271,15 @@ export default function ProfilePage() {
       const hasStudentLicenseEvidenceFiles =
         userRole === "student" &&
         STUDENT_LICENSE_ITEMS.some((item) => Boolean(studentLicenseEvidenceFiles[item.fileField]));
+      const profilePayload = { ...formData };
+      if (userRole === "student") {
+        delete profilePayload.gpa;
+      }
 
       let res;
       if (hasStudentLicenseEvidenceFiles) {
         const payload = new FormData();
-        payload.append("profile", JSON.stringify(formData));
+        payload.append("profile", JSON.stringify(profilePayload));
         for (const item of STUDENT_LICENSE_ITEMS) {
           const file = studentLicenseEvidenceFiles[item.fileField];
           if (file) {
@@ -273,7 +290,7 @@ export default function ProfilePage() {
           headers: { "Content-Type": "multipart/form-data" },
         });
       } else {
-        res = await api.post("/index.php?page=profile", formData);
+        res = await api.post("/index.php?page=profile", profilePayload);
       }
       if (res.data.status === "success") {
         // บันทึกข้อมูลแล้วค่อยอัปโหลดรูปใบประกอบวิชาชีพ (ถ้าเลือกรูปใหม่)
@@ -323,7 +340,6 @@ export default function ProfilePage() {
   const academicCalculated = calculateAcademicInfo(studentId);
 
   const displayFullNameTH = `${profileData.first_name_th || ""} ${profileData.last_name_th || ""}`.trim();
-  const displayFullNameEN = `${profileData.first_name_en || ""} ${profileData.last_name_en || ""}`.trim();
   const displayEmail = profileData.email || `${studentId}@siam.edu`;
   const userInitial = profileData.first_name_th?.charAt(0);
   const pdfDocuments = Array.isArray(profileData.pdf_documents) ? profileData.pdf_documents : [];
@@ -347,32 +363,35 @@ export default function ProfilePage() {
       <div className="app-page-header">
         <div>
           <h1 className="app-page-title">ข้อมูลส่วนตัว</h1>
-          <p className="app-page-description">ตรวจสอบและจัดการข้อมูลส่วนตัวของคุณ</p>
+          <p className="app-page-description">
+            {readOnly ? "ดูข้อมูลส่วนตัวของบุคลากร (ดูได้อย่างเดียว แก้ไขไม่ได้)" : "ตรวจสอบและจัดการข้อมูลส่วนตัวของคุณ"}
+          </p>
         </div>
       </div>
-      
+
       {/* 🎯 ส่วนหัว Card ข้อมูลส่วนตัว */}
       <div className="bg-card rounded-2xl shadow-lg p-8 relative">
+        {/* โหมดดูอย่างเดียวไม่สร้างปุ่มแก้ไขเลย ไม่ใช่แค่ซ่อนด้วย CSS */}
         <div className="absolute top-6 right-6">
-          <Button 
-            size="sm" 
-            className="gap-2" 
-            onClick={() => { 
+          {!readOnly && <Button
+            size="sm"
+            className="gap-2"
+            onClick={() => {
               setFormData({
                 ...profileData,
                 parent_address: parentAddress || "",
                 home_address: profileData.home_address || profileData.address || ""
               });
               setLicenseFile(null);
-              setLicenseFileError(""); 
+              setLicenseFileError("");
               setStudentLicenseEvidenceFiles({});
               setStudentLicenseEvidenceErrors({});
-              setEditing(true); 
+              setEditing(true);
             }}
           >
             <Edit className="h-4 w-4" />
             แก้ไขข้อมูล
-          </Button>
+          </Button>}
         </div>
 
         <div className="flex flex-col md:flex-row items-center gap-8">
@@ -387,9 +406,6 @@ export default function ProfilePage() {
             <h2 className="text-2xl font-bold leading-snug text-foreground">
               {displayFullNameTH}
             </h2>
-            <p className="text-sm font-medium text-muted-foreground mt-2">
-              {displayFullNameEN}
-            </p>
             <p className="text-sm text-muted-foreground mt-1">
               รหัสประจำตัว: {userRole === "student" ? studentId : profileData.faculty_id}
             </p>
@@ -442,11 +458,11 @@ export default function ProfilePage() {
                 <PdfDocumentsSection documents={pdfDocuments} />
 
                 <div className="md:col-span-2 border-t border-border pt-6 mt-2">
-                  <WorkloadsSection workloads={profileData.teaching_workloads || []} onUpdate={fetchProfile} />
+                  <WorkloadsSection workloads={profileData.teaching_workloads || []} onUpdate={fetchProfile} readOnly={readOnly} />
                 </div>
-                
+
                 <div className="md:col-span-2 border-t border-border pt-6 mt-2">
-                  <PersonnelDevelopmentsSection developments={profileData.personnel_developments || []} onUpdate={fetchProfile} />
+                  <PersonnelDevelopmentsSection developments={profileData.personnel_developments || []} onUpdate={fetchProfile} readOnly={readOnly} />
                 </div>
               </>
             ) : (
@@ -457,7 +473,6 @@ export default function ProfilePage() {
                 <InfoRow icon={<Mail className="h-4 w-4 text-primary" />} label="อีเมล" value={displayEmail} />
                 <InfoRow icon={<Phone className="h-4 w-4 text-primary" />} label="เบอร์โทรศัพท์มือถือ" value={profileData.phone} />
                 <InfoRow icon={<GraduationCap className="h-4 w-4 text-primary" />} label="ชั้นปีปัจจุบัน" value={academicCalculated.yearLevelText} />
-                <InfoRow icon={<GraduationCap className="h-4 w-4 text-primary" />} label="เกรดเฉลี่ย (GPA)" value={profileData.gpa} />
                 <InfoRow icon={<Activity className="h-4 w-4 text-primary" />} label="ส่วนสูง / น้ำหนัก" value={profileData.height && profileData.weight ? `${profileData.height} ซม. / ${profileData.weight} กก.` : null} />
                 <InfoRow icon={<Activity className="h-4 w-4 text-primary" />} label="ดัชนีมวลกาย (BMI)" value={profileData.bmi || calculateBMI(profileData.height, profileData.weight)} />
                 <InfoRow icon={<Calendar className="h-4 w-4 text-primary" />} label="ปีการศึกษาที่เข้าศึกษา" value={academicCalculated.entryYear} />
@@ -513,7 +528,7 @@ export default function ProfilePage() {
                   <div className="flex items-center gap-2 mb-4">
                     <h3 className="font-semibold text-foreground text-base">ข้อมูลครอบครัว (บิดา-มารดา)</h3>
                   </div>
-                  
+
                   <div className="bg-muted/20 p-4 rounded-xl border border-border space-y-4">
                     <div className="grid md:grid-cols-2 gap-6">
                       {/* ข้อมูลบิดา */}
@@ -590,26 +605,6 @@ export default function ProfilePage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="first_name_en">ชื่อภาษาอังกฤษ</Label>
-                  <Input
-                    id="first_name_en"
-                    name="first_name_en"
-                    value={formData.first_name_en || ""}
-                    onChange={handleInputChange}
-                    placeholder="First Name"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="last_name_en">นามสกุลภาษาอังกฤษ</Label>
-                  <Input
-                    id="last_name_en"
-                    name="last_name_en"
-                    value={formData.last_name_en || ""}
-                    onChange={handleInputChange}
-                    placeholder="Last Name"
-                  />
-                </div>
-                <div className="space-y-2">
                   <Label htmlFor="gender">เพศ</Label>
                   <Select
                     value={formData.gender || "หญิง"}
@@ -679,20 +674,6 @@ export default function ProfilePage() {
                         onChange={(e) => handleNumericInputChange(e, 10)}
                         placeholder="08XXXXXXXX"
                         maxLength={10}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="gpa">เกรดเฉลี่ย (GPA)</Label>
-                      <Input
-                        id="gpa"
-                        name="gpa"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        max="4"
-                        value={formData.gpa ?? ""}
-                        onChange={handleInputChange}
-                        placeholder="เช่น 3.50"
                       />
                     </div>
                     <div className="space-y-2 col-span-2">
@@ -1351,7 +1332,7 @@ const PdfDocumentsSection = ({ documents }: { documents: any[] }) => {
   );
 };
 
-const WorkloadsSection = ({ workloads, onUpdate }: { workloads: any[], onUpdate: () => void }) => {
+const WorkloadsSection = ({ workloads, onUpdate, readOnly = false }: { workloads: any[], onUpdate: () => void, readOnly?: boolean }) => {
   const [academicYear, setAcademicYear] = useState("");
   const [term, setTerm] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -1363,6 +1344,11 @@ const WorkloadsSection = ({ workloads, onUpdate }: { workloads: any[], onUpdate:
       toast({ title: "กรุณากรอกข้อมูลให้ครบถ้วนและเลือกไฟล์", variant: "destructive" });
       return;
     }
+    const termNum = parseInt(term, 10);
+    if (isNaN(termNum) || termNum < 1 || termNum > 3) {
+      toast({ title: "เทอมต้องเป็น 1, 2 หรือ 3 เท่านั้น", variant: "destructive" });
+      return;
+    }
     setUploading(true);
     const formData = new FormData();
     formData.append("action", "upload-workload");
@@ -1370,7 +1356,7 @@ const WorkloadsSection = ({ workloads, onUpdate }: { workloads: any[], onUpdate:
     formData.append("term", term);
     formData.append("file", file);
     try {
-      const res = await api.post("/index.php?page=manage-faculty-extras", formData, {
+      const res = await api.post("/index.php?page=manage-faculty-extras&action=upload-workload", formData, {
         headers: { "Content-Type": "multipart/form-data" }
       });
       if (res.data.status === "success") {
@@ -1395,7 +1381,7 @@ const WorkloadsSection = ({ workloads, onUpdate }: { workloads: any[], onUpdate:
       const formData = new FormData();
       formData.append("action", "delete-workload");
       formData.append("id", id);
-      const res = await api.post("/index.php?page=manage-faculty-extras", formData);
+      const res = await api.post("/index.php?page=manage-faculty-extras&action=delete-workload", formData);
       if (res.data.status === "success") {
         toast({ title: "ลบเรียบร้อยแล้ว" });
         onUpdate();
@@ -1412,17 +1398,19 @@ const WorkloadsSection = ({ workloads, onUpdate }: { workloads: any[], onUpdate:
       <div className="flex items-center gap-2 mb-4">
         <h3 className="font-semibold text-foreground text-base">ภาระงานสอน</h3>
       </div>
-      <div className="bg-muted/20 p-4 rounded-xl border border-border space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Input placeholder="ปีการศึกษา เช่น 2566" value={academicYear} onChange={(e) => setAcademicYear(e.target.value)} />
-          <Input placeholder="เทอม เช่น 1" value={term} onChange={(e) => setTerm(e.target.value)} />
-          <Input type="file" accept=".xls,.xlsx,.csv,.pdf,.doc,.docx" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+      {!readOnly && (
+        <div className="bg-muted/20 p-4 rounded-xl border border-border space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Input placeholder="ปีการศึกษา เช่น 2566" value={academicYear} onChange={(e) => setAcademicYear(e.target.value)} />
+            <Input placeholder="เทอม เช่น 1" value={term} onChange={(e) => setTerm(e.target.value)} />
+            <Input type="file" accept=".xls,.xlsx,.csv,.pdf,.doc,.docx" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+          </div>
+          <Button onClick={handleUpload} disabled={uploading}>
+            {uploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+            อัปโหลดภาระงานสอน
+          </Button>
         </div>
-        <Button onClick={handleUpload} disabled={uploading}>
-          {uploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
-          อัปโหลดภาระงานสอน
-        </Button>
-      </div>
+      )}
       {workloads && workloads.length > 0 && (
         <Table>
           <TableHeader>
@@ -1439,22 +1427,39 @@ const WorkloadsSection = ({ workloads, onUpdate }: { workloads: any[], onUpdate:
                 <TableCell>{w.academic_year}</TableCell>
                 <TableCell>{w.term}</TableCell>
                 <TableCell>{new Date(w.uploaded_at).toLocaleDateString('th-TH')}</TableCell>
-                <TableCell className="text-right flex justify-end gap-2">
-                  <Button variant="outline" size="sm" asChild>
-                    <a href={`${apiBaseUrl}/${w.file_path}`} target="_blank" rel="noopener noreferrer"><Download className="h-4 w-4" /></a>
-                  </Button>
-                  <Button variant="destructive" size="sm" onClick={() => handleDelete(w.id)}><Trash2 className="h-4 w-4" /></Button>
+                <TableCell className="text-right flex justify-end items-center gap-2">
+                  {/* โหมดดูอย่างเดียวให้เปิดดูได้อย่างเดียว ไม่มีปุ่มดาวน์โหลด */}
+                  {readOnly ? (
+                    <a
+                      href={`${apiBaseUrl}/${w.file_path}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline"
+                    >
+                      เปิดดู
+                    </a>
+                  ) : (
+                    <>
+                      <Button variant="outline" size="sm" asChild>
+                        <a href={`${apiBaseUrl}/${w.file_path}`} target="_blank" rel="noopener noreferrer"><Download className="h-4 w-4" /></a>
+                      </Button>
+                      <Button variant="destructive" size="sm" onClick={() => handleDelete(w.id)}><Trash2 className="h-4 w-4" /></Button>
+                    </>
+                  )}
                 </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       )}
+      {readOnly && (!workloads || workloads.length === 0) && (
+        <p className="text-sm text-muted-foreground">ยังไม่มีข้อมูลภาระงานสอนในระบบ</p>
+      )}
     </div>
   );
 };
 
-const PersonnelDevelopmentsSection = ({ developments, onUpdate }: { developments: any[], onUpdate: () => void }) => {
+const PersonnelDevelopmentsSection = ({ developments, onUpdate, readOnly = false }: { developments: any[], onUpdate: () => void, readOnly?: boolean }) => {
   const [trainingDate, setTrainingDate] = useState("");
   const [trainingTopic, setTrainingTopic] = useState("");
   const [learnings, setLearnings] = useState("");
@@ -1475,7 +1480,7 @@ const PersonnelDevelopmentsSection = ({ developments, onUpdate }: { developments
     formData.append("learnings", learnings);
     if (file) formData.append("file", file);
     try {
-      const res = await api.post("/index.php?page=manage-faculty-extras", formData, {
+      const res = await api.post("/index.php?page=manage-faculty-extras&action=add-development", formData, {
         headers: { "Content-Type": "multipart/form-data" }
       });
       if (res.data.status === "success") {
@@ -1501,7 +1506,7 @@ const PersonnelDevelopmentsSection = ({ developments, onUpdate }: { developments
       const formData = new FormData();
       formData.append("action", "delete-development");
       formData.append("id", id);
-      const res = await api.post("/index.php?page=manage-faculty-extras", formData);
+      const res = await api.post("/index.php?page=manage-faculty-extras&action=delete-development", formData);
       if (res.data.status === "success") {
         toast({ title: "ลบเรียบร้อยแล้ว" });
         onUpdate();
@@ -1518,30 +1523,32 @@ const PersonnelDevelopmentsSection = ({ developments, onUpdate }: { developments
       <div className="flex items-center gap-2 mb-4">
         <h3 className="font-semibold text-foreground text-base">การพัฒนาบุคลากร</h3>
       </div>
-      <div className="bg-muted/20 p-4 rounded-xl border border-border space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>วันที่อบรม</Label>
-            <Input type="date" value={trainingDate} onChange={(e) => setTrainingDate(e.target.value)} />
+      {!readOnly && (
+        <div className="bg-muted/20 p-4 rounded-xl border border-border space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>วันที่อบรม</Label>
+              <Input type="date" value={trainingDate} onChange={(e) => setTrainingDate(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>หัวข้ออบรม/พัฒนาบุคลากร</Label>
+              <Input placeholder="กรอกหัวข้อ" value={trainingTopic} onChange={(e) => setTrainingTopic(e.target.value)} />
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <Label>สิ่งที่ได้จากการอบรม</Label>
+              <Textarea placeholder="กรอกรายละเอียด..." value={learnings} onChange={(e) => setLearnings(e.target.value)} rows={2} />
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <Label>อัปโหลดรูปเกียรติบัตร (ถ้ามี)</Label>
+              <Input type="file" accept=".jpg,.jpeg,.png,.webp,.pdf" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+            </div>
           </div>
-          <div className="space-y-2">
-            <Label>หัวข้ออบรม/พัฒนาบุคลากร</Label>
-            <Input placeholder="กรอกหัวข้อ" value={trainingTopic} onChange={(e) => setTrainingTopic(e.target.value)} />
-          </div>
-          <div className="space-y-2 md:col-span-2">
-            <Label>สิ่งที่ได้จากการอบรม</Label>
-            <Textarea placeholder="กรอกรายละเอียด..." value={learnings} onChange={(e) => setLearnings(e.target.value)} rows={2} />
-          </div>
-          <div className="space-y-2 md:col-span-2">
-            <Label>อัปโหลดรูปเกียรติบัตร (ถ้ามี)</Label>
-            <Input type="file" accept=".jpg,.jpeg,.png,.webp,.pdf" onChange={(e) => setFile(e.target.files?.[0] || null)} />
-          </div>
+          <Button onClick={handleUpload} disabled={uploading}>
+            {uploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+            บันทึกการพัฒนาบุคลากร
+          </Button>
         </div>
-        <Button onClick={handleUpload} disabled={uploading}>
-          {uploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
-          บันทึกการพัฒนาบุคลากร
-        </Button>
-      </div>
+      )}
       {developments && developments.length > 0 && (
         <Table>
           <TableHeader>
@@ -1567,12 +1574,17 @@ const PersonnelDevelopmentsSection = ({ developments, onUpdate }: { developments
                   ) : "-"}
                 </TableCell>
                 <TableCell className="text-right">
-                  <Button variant="destructive" size="sm" onClick={() => handleDelete(d.id)}><Trash2 className="h-4 w-4" /></Button>
+                  {!readOnly && (
+                    <Button variant="destructive" size="sm" onClick={() => handleDelete(d.id)}><Trash2 className="h-4 w-4" /></Button>
+                  )}
                 </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
+      )}
+      {readOnly && (!developments || developments.length === 0) && (
+        <p className="text-sm text-muted-foreground">ยังไม่มีข้อมูลการพัฒนาบุคลากรในระบบ</p>
       )}
     </div>
   );

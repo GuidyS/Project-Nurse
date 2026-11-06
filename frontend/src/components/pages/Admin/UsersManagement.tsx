@@ -9,8 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Edit, Trash2, MoreHorizontal, Upload, Users as UsersIcon, CalendarClock, Info, Eye, EyeOff } from "lucide-react";
-import { onlyEnglish, onlyThai } from "@/lib/nameInput";
+import { Loader2, Edit, Trash2, MoreHorizontal, Upload, Download, Users as UsersIcon, CalendarClock, Info, Eye, EyeOff, UserCog } from "lucide-react";
+import { onlyThai } from "@/lib/nameInput";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import api from "@/lib/axios";
 import { ConfirmActionDialog } from "@/components/shared/ConfirmActionDialog";
@@ -19,8 +19,9 @@ import { ImportDataDialog, type ImportDataTypeOption } from "@/components/shared
 import { AcademicSettingsDialog, formatCutoff, type AcademicSettings } from "./AcademicSettingsDialog";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { SearchInput } from "@/components/shared/SearchInput";
-import RolesManagement from "./RolesManagement";
 import { TableStateRow } from "@/components/shared/TableStateRow";
+import { AssignRoleDialog } from "@/components/pages/Admin/AssignRoleDialog";
+import { downloadUserImportTemplate } from "@/lib/userImportTemplate";
 
 interface User {
   id: string;
@@ -28,11 +29,13 @@ interface User {
   fullName: string;
   role: "admin" | "student" | "teacher" | "unassigned";
   teacherSubRole?: string;
-  secondaryPositions?: string[];
   status: "active" | "inactive";
-  academicStatus?: string | null;
+  /** สถานะการศึกษาของนักศึกษา (Active/OnLeave/Resigned) — null ถ้าไม่ใช่นักศึกษา */
+  personStatus?: string | null;
+  personStatusLabel?: string | null;
+  /** true เมื่อสถานะการศึกษาทำให้เข้าใช้งานระบบไม่ได้ */
+  isBlocked?: boolean;
   createdAt: string;
-  accountMissing?: boolean;
 }
 
 type RoleTab = "teacher" | "student" | "admin" | "unassigned";
@@ -43,10 +46,13 @@ const STUDENT_STATUS_OPTIONS = [
   { value: "OnLeave", label: "พักการเรียน" },
   { value: "Resigned", label: "ลาออก" },
 ];
-const studentStatusLabel = (status?: string | null) =>
-  STUDENT_STATUS_OPTIONS.find((option) => option.value === status)?.label || status || "ไม่ระบุ";
 const STUDENT_STATUS_NEEDS_REASON = ["OnLeave", "Resigned"];
-const STUDENT_STATUS_REASONS = ["ปัญหาการเงิน", "ปัญหาสุขภาพ"];
+// เหตุผลแยกตามสถานะ — พักการเรียนเป็นการหยุดชั่วคราว จึงเลือกได้เฉพาะเหตุผลที่กลับมาเรียนต่อได้
+const STUDENT_STATUS_REASONS: Record<string, string[]> = {
+  OnLeave: ["ปัญหาการเงิน", "ปัญหาสุขภาพ"],
+  Resigned: ["ปัญหาการเงิน", "ย้ายที่เรียน", "ปัญหาสุขภาพ", "โดนรีไทร์"],
+};
+const statusReasonOptions = (status: string): string[] => STUDENT_STATUS_REASONS[status] ?? [];
 const FACULTY_STATUS_OPTIONS = [
   { value: "Active", label: "คงอยู่" },
   { value: "Resigned", label: "ลาออก" },
@@ -86,11 +92,11 @@ const roleTabs: { value: RoleTab; label: string }[] = [
 const subRoleLabels: Record<string, string> = {
   dean: "คณบดี",
   instructor: "อาจารย์ประจำ",
+  research: "อาจารย์งานวิจัย",
   course_instructor: "อาจารย์ประจำหลักสูตร",
   project_manager: "อาจารย์รับผิดชอบโครงการ",
   program_manager: "อาจารย์รับผิดชอบหลักสูตร",
   advisor: "อาจารย์ที่ปรึกษา",
-  research: "อาจารย์งานวิจัย",
   practical_instructor: "อาจารย์ภาคปฏิบัติ",
   dummy: "อาจารย์สมมติ",
 };
@@ -109,25 +115,23 @@ const studentPdfOptions = [
 ];
 
 const userImportTypes: ImportDataTypeOption[] = [
-  { value: "students", label: "ข้อมูลนักศึกษา", icon: UsersIcon, description: "นำเข้ารายชื่อนักศึกษาใหม่", templateColumns: ["student_id", "title", "first_name_th", "last_name_th", "first_name_en", "last_name_en", "gender", "birth_date", "email", "phone", "year_level", "hometown_province", "height", "weight", "bmi", "home_phone", "home_address", "status", "graduation_date", "dropout_date", "dropout_reason", "admission_year"] },
-  { value: "teachers", label: "ข้อมูลอาจารย์", icon: UsersIcon, description: "นำเข้ารายชื่ออาจารย์", templateColumns: ["faculty_id", "title", "first_name_th", "last_name_th", "first_name_en", "last_name_en", "gender", "birth_date", "email", "phone", "current_address", "nursing_council_no", "license_expiry", "start_work_date", "academic_position_date", "status"] },
+  { value: "students", label: "ข้อมูลนักศึกษา", icon: UsersIcon, description: "นำเข้ารายชื่อนักศึกษาใหม่" },
+  { value: "teachers", label: "ข้อมูลอาจารย์", icon: UsersIcon, description: "นำเข้ารายชื่ออาจารย์" },
 ];
 
 export default function UsersManagement() {
-  const currentUserId = (() => {
-    try {
-      const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
-      return storedUser.user_id == null ? null : String(storedUser.user_id);
-    } catch {
-      return null;
-    }
-  })();
   const [users, setUsers] = useState<User[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [roleTab, setRoleTab] = useState<RoleTab>("teacher");
   const [isImportOpen, setIsImportOpen] = useState(false);
-  const [creatingAccountId, setCreatingAccountId] = useState<string | null>(null);
-  const [showRoles, setShowRoles] = useState(false);
+  const [roleUser, setRoleUser] = useState<User | null>(null);
+  const actor = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("user") || "{}");
+    } catch {
+      return {};
+    }
+  })();
   // 🎯 States สำหรับ Dialog แก้ไขข้อมูลเชิงลึก
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
@@ -174,21 +178,6 @@ export default function UsersManagement() {
       setUsers(response.data);
     } catch (error) {
       toast({ title: "โหลดข้อมูลล้มเหลว", variant: "destructive" });
-    }
-  };
-
-  const createStudentAccount = async (user: User) => {
-    setCreatingAccountId(user.id);
-    try {
-      const response = await api.post('/index.php?page=manage-user', {
-        action: 'create_student_account', user_id: user.id, student_id: user.email,
-      });
-      toast({ title: 'สร้างบัญชีสำเร็จ', description: response.data?.message });
-      await fetchUsers();
-    } catch (error: any) {
-      toast({ title: 'สร้างบัญชีไม่สำเร็จ', description: error?.response?.data?.message || 'กรุณาตรวจสอบข้อมูลนักศึกษา', variant: 'destructive' });
-    } finally {
-      setCreatingAccountId(null);
     }
   };
 
@@ -263,8 +252,8 @@ export default function UsersManagement() {
       toast({ title: "ลบผู้ใช้สำเร็จ" });
       setIsDeleteUserOpen(false);
       setPendingDeleteUserId(null);
-    } catch (error: any) {
-      toast({ title: "ลบผู้ใช้ล้มเหลว", description: error?.response?.data?.message, variant: "destructive" });
+    } catch (error) {
+      toast({ title: "ลบผู้ใช้ล้มเหลว", variant: "destructive" });
     } finally {
       setIsDeletingUser(false);
     }
@@ -377,46 +366,56 @@ export default function UsersManagement() {
   const selectedPdfLink = pdfLinks[selectedPdfField] || "";
   const selectedPdfLabel = pdfOptions.find((option) => option.value === selectedPdfField)?.label || "เอกสาร";
 
-  const PdfUploadSection = ({ description }: { description: string }) => (
+  // readOnly = เจ้าของข้อมูลเป็นคนกรอกเอง ผู้ดูแลระบบดูได้อย่างเดียว (ใช้กับนักศึกษา)
+  const PdfUploadSection = ({ description, readOnly = false }: { description: string; readOnly?: boolean }) => (
     <div className="col-span-2 rounded-lg border p-4 space-y-4">
       <div className="flex items-center gap-2">
         <Upload className="h-4 w-4 text-primary" />
-        <Label className="text-base font-semibold">บันทึกลิงก์เอกสาร Google Drive</Label>
+        <Label className="text-base font-semibold">
+          {readOnly ? "เอกสาร Google Drive" : "บันทึกลิงก์เอกสาร Google Drive"}
+        </Label>
       </div>
 
-      <div className="space-y-2">
-        <Label>ประเภทเอกสารที่ต้องการบันทึกลิงก์</Label>
-        <Select value={selectedPdfField} onValueChange={setSelectedPdfField}>
-          <SelectTrigger>
-            <SelectValue placeholder="เลือกประเภทเอกสาร" />
-          </SelectTrigger>
-          <SelectContent>
-            {pdfOptions.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="space-y-2">
-        <Label>ลิงก์ Google Drive (ต้องตั้งค่าเป็น Anyone with the link)</Label>
-        <Input 
-          type="url" 
-          placeholder="https://drive.google.com/file/d/..."
-          value={pdfLinks[selectedPdfField] || ""}
-          onChange={(e) => handlePdfLinkChange(selectedPdfField, e.target.value)}
-        />
-      </div>
-
-      {savedDocuments.length > 0 && (
+      {!readOnly && (
         <div className="space-y-2">
-          <p className="text-xs font-medium text-muted-foreground">เอกสารที่อัปโหลดแล้ว ({savedDocuments.length})</p>
+          <Label>ประเภทเอกสารที่ต้องการบันทึกลิงก์</Label>
+          <Select value={selectedPdfField} onValueChange={setSelectedPdfField}>
+            <SelectTrigger>
+              <SelectValue placeholder="เลือกประเภทเอกสาร" />
+            </SelectTrigger>
+            <SelectContent>
+              {pdfOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {!readOnly && (
+        <div className="space-y-2">
+          <Label>ลิงก์ Google Drive (ต้องตั้งค่าเป็น Anyone with the link)</Label>
+          <Input
+            type="url"
+            placeholder="https://drive.google.com/file/d/..."
+            value={pdfLinks[selectedPdfField] || ""}
+            onChange={(e) => handlePdfLinkChange(selectedPdfField, e.target.value)}
+          />
+        </div>
+      )}
+
+      {savedDocuments.length > 0 ? (
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-muted-foreground">
+            {readOnly ? `เอกสารที่บันทึกไว้ (${savedDocuments.length})` : `เอกสารที่อัปโหลดแล้ว (${savedDocuments.length})`}
+          </p>
           <div className="space-y-2">
             {savedDocuments.map((doc) => {
               const docKey = `${doc.portfolio_id || ""}:${doc.file_path}`;
               const isDeleting = deletingDocKey === docKey;
+              const isLink = typeof doc.file_path === "string" && doc.file_path.startsWith("http");
               return (
                 <div
                   key={docKey}
@@ -424,26 +423,41 @@ export default function UsersManagement() {
                 >
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-foreground">{doc.title}</p>
-                    <p className="truncate text-xs text-muted-foreground">{doc.file_name}</p>
+                    {isLink ? (
+                      <a
+                        href={doc.file_path}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="truncate block text-xs text-primary hover:underline"
+                      >
+                        {doc.file_path}
+                      </a>
+                    ) : (
+                      <p className="truncate text-xs text-muted-foreground">{doc.file_name}</p>
+                    )}
                     {!doc.available && (
                       <p className="text-[11px] text-amber-600">ไฟล์ไม่อยู่บนเซิร์ฟเวอร์แล้ว</p>
                     )}
                   </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                    disabled={isDeleting || isSaving}
-                    onClick={() => openDeleteDocConfirm(doc)}
-                  >
-                    {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                  </Button>
+                  {!readOnly && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      disabled={isDeleting || isSaving}
+                      onClick={() => openDeleteDocConfirm(doc)}
+                    >
+                      {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                    </Button>
+                  )}
                 </div>
               );
             })}
           </div>
         </div>
+      ) : (
+        readOnly && <p className="text-sm text-muted-foreground italic">ยังไม่มีเอกสารที่นักศึกษาบันทึกไว้</p>
       )}
 
       <p className="text-xs text-muted-foreground">{description}</p>
@@ -454,16 +468,29 @@ export default function UsersManagement() {
     <>
       <div className="app-page">
         <PageHeader
-          title={showRoles ? "จัดการ Role" : "จัดการข้อมูลผู้ใช้"}
-          description={showRoles ? "มอบหมายและถอด Role ของผู้ใช้ในระบบ" : "สร้างบัญชีจากข้อมูลอาจารย์/นักศึกษา แก้ไข ลบ และมอบบทบาท"}
+          title="จัดการผู้ใช้"
+          description="สร้างบัญชีจากข้อมูลอาจารย์/นักศึกษา แก้ไข ลบ และมอบบทบาท"
           actions={<>
-            <Button variant={showRoles ? "secondary" : "outline"} aria-pressed={showRoles} onClick={() => { setShowRoles((value) => !value); fetchUsers(); }}>
-              {showRoles ? "กลับไปรายชื่อผู้ใช้" : "จัดการ Role"}
-            </Button>
             <Button variant="outline" className="gap-2" onClick={() => setIsAcademicSettingsOpen(true)}>
               <CalendarClock className="h-4 w-4" />
               ตั้งค่าปีการศึกษา
             </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="gap-2">
+                  <Download className="h-4 w-4" />
+                  ดาวน์โหลดแพทเทิร์น
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => downloadUserImportTemplate("teachers")}>
+                  แพทเทิร์นข้อมูลอาจารย์
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => downloadUserImportTemplate("students")}>
+                  แพทเทิร์นข้อมูลนักศึกษา
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button variant="outline" className="gap-2" onClick={() => setIsImportOpen(true)}>
               <Upload className="h-4 w-4" />
               Import ข้อมูล
@@ -471,7 +498,7 @@ export default function UsersManagement() {
           </>}
         />
 
-        {showRoles ? <RolesManagement /> : <Card className="app-section-card">
+        <Card className="app-section-card">
           <CardHeader className="space-y-4">
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <div>
@@ -505,7 +532,7 @@ export default function UsersManagement() {
             <Table className="min-w-[980px] table-fixed">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[28%]">รายชื่อ</TableHead>
+                  <TableHead className="w-[28%]">ผู้ใช้</TableHead>
                   <TableHead className="w-[14%]">รหัสประจำตัว</TableHead>
                   <TableHead className="w-[22%]">บทบาท</TableHead>
                   <TableHead className="w-[11%]">สถานะ</TableHead>
@@ -536,48 +563,59 @@ export default function UsersManagement() {
                           {user.teacherSubRole && (
                             <Badge variant="secondary" className="text-xs">{subRoleLabels[user.teacherSubRole]}</Badge>
                           )}
-                          {user.role === "admin" && user.secondaryPositions?.map((position) => (
-                            <Badge key={position} variant="secondary" className="text-xs">{subRoleLabels[position] || position}</Badge>
-                          ))}
-                          {user.accountMissing && <Badge variant="secondary">ยังไม่มีบัญชีเข้าสู่ระบบ</Badge>}
                         </div>
                       </TableCell>
                       <TableCell>
-                        {user.role === "student" ? <div className="flex flex-col gap-1"><Badge variant="outline">{studentStatusLabel(user.academicStatus)}</Badge>{user.accountMissing && <span className="text-xs text-muted-foreground">รอสร้างบัญชี</span>}</div> : <Badge
-                          variant={user.status === "active" ? "default" : "destructive"}
-                          className={user.status === "active" ? "bg-success" : "bg-destructive text-destructive-foreground"}
-                        >
-                          {user.status === "active" ? "ใช้งาน" : "ระงับ"}
-                        </Badge>}
+                        {/* นักศึกษาที่พักการเรียน/ลาออก ให้แสดงสถานะการศึกษาแทน เพราะเข้าใช้งานระบบไม่ได้แล้ว */}
+                        {user.isBlocked ? (
+                          <Badge variant="outline" className="border-amber-300 bg-amber-100 text-amber-900">
+                            {user.personStatusLabel}
+                          </Badge>
+                        ) : (
+                          <Badge
+                            variant={user.status === "active" ? "default" : "destructive"}
+                            className={user.status === "active" ? "bg-success" : "bg-destructive text-destructive-foreground"}
+                          >
+                            {user.status === "active" ? "ใช้งาน" : "ระงับ"}
+                          </Badge>
+                        )}
                       </TableCell>
                       <TableCell className="text-muted-foreground">{user.createdAt}</TableCell>
                       <TableCell className="text-right">
-                        {user.accountMissing ? <Button type="button" variant="outline" size="sm" disabled={creatingAccountId === user.id} onClick={() => createStudentAccount(user)}>
-                          {creatingAccountId === user.id ? 'กำลังสร้าง...' : 'สร้างบัญชี'}
-                        </Button> : <DropdownMenu>
+                        <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button
                               variant="ghost"
                               size="icon"
                               className="text-muted-foreground hover:bg-muted hover:text-foreground"
+                              aria-label={`จัดการผู้ใช้ ${user.fullName}`}
                             >
                               <MoreHorizontal className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem onClick={() => handleEditClick(user.id)} className="gap-2"><Edit className="h-4 w-4" /> แก้ไขข้อมูล</DropdownMenuItem>
-                            {user.id !== currentUserId && <DropdownMenuItem onClick={() => openToggleConfirm(user.id)} className="gap-2">
+                            {Number(actor.role_id) === 1 && user.role !== "student" && (
+                              <DropdownMenuItem
+                                disabled={String(actor.user_id) === String(user.id)}
+                                onSelect={() => setRoleUser(user)}
+                                className="gap-2"
+                              >
+                                <UserCog className="h-4 w-4" /> จัดการ Role/ตำแหน่ง
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem onClick={() => openToggleConfirm(user.id)} className="gap-2">
                               {user.status === "active" ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                               {user.status === "active" ? "ระงับการใช้งาน" : "เปิดใช้งาน"}
-                            </DropdownMenuItem>}
-                            {user.id !== currentUserId && <DropdownMenuItem
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
                               onClick={() => openDeleteUserConfirm(user.id)}
                               className="gap-2 text-destructive hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive"
                             >
                               <Trash2 className="h-4 w-4" /> ลบ
-                            </DropdownMenuItem>}
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
-                        </DropdownMenu>}
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))
@@ -585,10 +623,18 @@ export default function UsersManagement() {
               </TableBody>
             </Table>
           </CardContent>
-        </Card>}
+        </Card>
       </div>
 
       {/* 🎯 Dialog แก้ไขข้อมูลแบบฟอร์มยาว */}
+      {roleUser && roleUser.role !== "student" && (
+        <AssignRoleDialog
+          key={roleUser.id}
+          user={{ id: roleUser.id, fullName: roleUser.fullName, role: roleUser.role }}
+          onClose={() => setRoleUser(null)}
+          onSaved={fetchUsers}
+        />
+      )}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="app-dialog-3xl">
           <DialogHeader>
@@ -602,8 +648,6 @@ export default function UsersManagement() {
                 <div className="col-span-2 space-y-2 sm:max-w-[50%] sm:pr-2"><Label>คำนำหน้า</Label><Input value={detailForm.title || ""} onChange={e => setDetailForm({...detailForm, title: onlyThai(e.target.value)})} /></div>
                 <div className="space-y-2"><Label>ชื่อภาษาไทย</Label><Input value={detailForm.first_name_th || ""} onChange={e => setDetailForm({...detailForm, first_name_th: onlyThai(e.target.value)})} placeholder="ภาษาไทยเท่านั้น" /></div>
                 <div className="space-y-2"><Label>นามสกุลภาษาไทย</Label><Input value={detailForm.last_name_th || ""} onChange={e => setDetailForm({...detailForm, last_name_th: onlyThai(e.target.value)})} placeholder="ภาษาไทยเท่านั้น" /></div>
-                <div className="space-y-2"><Label>ชื่อภาษาอังกฤษ</Label><Input value={detailForm.first_name_en || ""} onChange={e => setDetailForm({...detailForm, first_name_en: onlyEnglish(e.target.value)})} placeholder="English only" /></div>
-                <div className="space-y-2"><Label>นามสกุลภาษาอังกฤษ</Label><Input value={detailForm.last_name_en || ""} onChange={e => setDetailForm({...detailForm, last_name_en: onlyEnglish(e.target.value)})} placeholder="English only" /></div>
                 <div className="space-y-2"><Label>เพศ</Label><Input value={detailForm.gender || ""} onChange={e => setDetailForm({...detailForm, gender: e.target.value})} /></div>
                 <div className="space-y-2"><Label>ว/ด/ป เกิด</Label><Input type="date" value={detailForm.birth_date || ""} onChange={e => setDetailForm({...detailForm, birth_date: e.target.value})} /></div>
                 <div className="space-y-2"><Label>อีเมล</Label><Input type="email" value={detailForm.email || ""} onChange={e => setDetailForm({...detailForm, email: e.target.value})} /></div>
@@ -644,14 +688,12 @@ export default function UsersManagement() {
                 <div className="hidden sm:block" />
                 <ReadOnlyField label="ชื่อภาษาไทย" value={detailForm.first_name_th} />
                 <ReadOnlyField label="นามสกุลภาษาไทย" value={detailForm.last_name_th} />
-                <ReadOnlyField label="ชื่อภาษาอังกฤษ" value={detailForm.first_name_en} />
-                <ReadOnlyField label="นามสกุลภาษาอังกฤษ" value={detailForm.last_name_en} />
                 <ReadOnlyField label="เพศ" value={detailForm.gender} />
                 <ReadOnlyField label="ว/ด/ป เกิด" value={detailForm.birth_date} />
                 <ReadOnlyField label="อีเมล" value={detailForm.email} />
                 <ReadOnlyField label="เบอร์โทรศัพท์" value={detailForm.phone} />
 
-                <ReadOnlyField label="ปีที่รับเข้าศึกษา" value={detailForm.admission_year} note="ใช้ปีที่บันทึกไว้ และใช้รหัสนักศึกษาเมื่อไม่มีข้อมูลปีเข้าศึกษา" />
+                <ReadOnlyField label="ปีที่รับเข้าศึกษา" value={detailForm.admission_year} note="กำหนดจากรหัสนักศึกษา แก้ไขไม่ได้" />
                 <ReadOnlyField
                   label="ชั้นปี"
                   value={detailForm.year_level}
@@ -679,7 +721,10 @@ export default function UsersManagement() {
                       setDetailForm({
                         ...detailForm,
                         status: value,
-                        dropout_reason: value === "Active" ? "" : detailForm.dropout_reason,
+                        // เหตุผลเดิมอาจไม่มีในรายการของสถานะใหม่ ต้องล้างทิ้งไม่ให้ค้าง
+                        dropout_reason: statusReasonOptions(value).includes(detailForm.dropout_reason)
+                          ? detailForm.dropout_reason
+                          : "",
                       })
                     }
                   >
@@ -696,12 +741,12 @@ export default function UsersManagement() {
                   <div className="space-y-2">
                     <Label>เหตุผล</Label>
                     <Select
-                      value={STUDENT_STATUS_REASONS.includes(detailForm.dropout_reason) ? detailForm.dropout_reason : ""}
+                      value={statusReasonOptions(detailForm.status).includes(detailForm.dropout_reason) ? detailForm.dropout_reason : ""}
                       onValueChange={(value) => setDetailForm({ ...detailForm, dropout_reason: value })}
                     >
                       <SelectTrigger><SelectValue placeholder="เลือกเหตุผล" /></SelectTrigger>
                       <SelectContent>
-                        {STUDENT_STATUS_REASONS.map(reason => (
+                        {statusReasonOptions(detailForm.status).map(reason => (
                           <SelectItem key={reason} value={reason}>{reason}</SelectItem>
                         ))}
                       </SelectContent>
@@ -712,17 +757,10 @@ export default function UsersManagement() {
                 {STUDENT_STATUS_NEEDS_REASON.includes(detailForm.status) && detailForm.dropout_date && (
                   <ReadOnlyField label="วันที่เปลี่ยนสถานะ" value={detailForm.dropout_date} note="ระบบบันทึกให้อัตโนมัติ" />
                 )}
-                <div className="col-span-2 space-y-2 rounded-lg border p-4">
-                  <Label className="font-semibold">เอกสารและลิงก์ของนักศึกษา (ดูอย่างเดียว)</Label>
-                  {savedDocuments.length === 0 ? <p className="text-sm text-muted-foreground">ยังไม่มีเอกสาร</p> : savedDocuments.map((doc) => (
-                    <div key={`${doc.portfolio_id || ""}:${doc.file_path}`} className="text-sm">
-                      <span className="font-medium">{doc.title}: </span>
-                      {/^https:\/\/drive\.google\.com\//i.test(doc.file_path)
-                        ? <a href={doc.file_path} target="_blank" rel="noopener noreferrer" className="text-primary underline">เปิดลิงก์ Google Drive</a>
-                        : <span className="text-muted-foreground">{doc.file_name}</span>}
-                    </div>
-                  ))}
-                </div>
+                <PdfUploadSection
+                  readOnly
+                  description="นักศึกษาเป็นผู้บันทึกลิงก์เองที่หน้า Portfolio — ผู้ดูแลระบบดูได้อย่างเดียว"
+                />
               </>
             )}
           </div>
@@ -745,7 +783,7 @@ export default function UsersManagement() {
         onOpenChange={setIsImportOpen}
         importTypes={userImportTypes}
         title="Import ข้อมูลผู้ใช้"
-        description="นำเข้าข้อมูลนักศึกษาและอาจารย์จากไฟล์ Excel หรือ CSV"
+        description="นำเข้าข้อมูลนักศึกษาและอาจารย์จากไฟล์ Excel"
         onImported={fetchUsers}
       />
 

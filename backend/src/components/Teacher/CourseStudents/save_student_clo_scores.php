@@ -105,6 +105,12 @@ try {
             cloScoreFail(($target['clo_code'] ?? 'CLO') . " ยังไม่ได้ผูก Sub PLO จึงยังให้คะแนนไม่ได้");
         }
 
+        // คะแนนเต็มของแต่ละ Sub PLO ตั้งไว้ที่หน้า "จัดการ CLO รายวิชา"
+        $maxByCode = [];
+        foreach ($target['sub_plos'] as $sub) {
+            $maxByCode[(string)$sub['code']] = $sub['max_score'] ?? null;
+        }
+
         foreach ($allowedCodes as $code) {
             if (!array_key_exists($code, $scores)) {
                 continue; // ไม่ได้ส่งมา = ไม่แตะของเดิม
@@ -117,8 +123,13 @@ try {
                 cloScoreFail("คะแนน Sub PLO $code ต้องเป็นตัวเลข");
             } else {
                 $value = (float)$raw;
-                if ($value < 0 || $value > 100) {
-                    cloScoreFail("คะแนน Sub PLO $code ต้องอยู่ระหว่าง 0-100");
+                $max = $maxByCode[$code] ?? null;
+                if ($max === null) {
+                    cloScoreFail("Sub PLO $code ยังไม่ได้กำหนดคะแนนที่หน้า \"จัดการ CLO รายวิชา\" จึงยังให้คะแนนไม่ได้");
+                }
+                if ($value < 0 || $value > (float)$max) {
+                    $maxLabel = rtrim(rtrim(number_format((float)$max, 2, '.', ''), '0'), '.');
+                    cloScoreFail("คะแนน Sub PLO $code ต้องอยู่ระหว่าง 0-$maxLabel");
                 }
             }
 

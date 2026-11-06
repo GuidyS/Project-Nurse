@@ -16,14 +16,12 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
-import * as XLSX from "xlsx";
 
 export interface ImportDataTypeOption {
   value: string;
   label: string;
   description: string;
   icon?: LucideIcon;
-  templateColumns?: string[];
 }
 
 interface ImportHistory {
@@ -44,7 +42,7 @@ interface ImportDataDialogProps {
   onImported?: (importType: string) => void | Promise<void>;
 }
 
-const allowedExtensions = [".xlsx", ".xls", ".csv"];
+const allowedExtensions = [".xlsx", ".xls"];
 
 const apiErrorMessage = (error: unknown, fallback: string) => {
   const maybeError = error as { response?: { data?: { message?: string } } };
@@ -56,7 +54,7 @@ export function ImportDataDialog({
   onOpenChange,
   importTypes,
   title = "Import ข้อมูล",
-  description = "อัปโหลดไฟล์ Excel หรือ CSV เพื่อนำเข้าข้อมูลเข้าสู่ระบบ",
+  description = "อัปโหลดไฟล์ Excel เพื่อนำเข้าข้อมูลเข้าสู่ระบบ",
   onImported,
 }: ImportDataDialogProps) {
   const { toast } = useToast();
@@ -111,7 +109,7 @@ export function ImportDataDialog({
     if (!isAllowed) {
       toast({
         title: "ไฟล์ไม่ถูกต้อง",
-        description: "กรุณาเลือกไฟล์ .xlsx, .xls หรือ .csv เท่านั้น",
+        description: "กรุณาเลือกไฟล์ .xlsx หรือ .xls เท่านั้น",
         variant: "destructive",
       });
       return;
@@ -183,16 +181,6 @@ export function ImportDataDialog({
   };
 
   const selectedTypeLabel = importTypes.find((type) => type.value === selectedType)?.label ?? "";
-  const selectedTemplate = importTypes.find((type) => type.value === selectedType)?.templateColumns;
-
-  const downloadTemplate = () => {
-    if (!selectedTemplate?.length) return;
-    const workbook = XLSX.utils.book_new();
-    const sheet = XLSX.utils.aoa_to_sheet([selectedTemplate]);
-    sheet['!cols'] = selectedTemplate.map((header) => ({ wch: Math.max(16, header.length + 2) }));
-    XLSX.utils.book_append_sheet(workbook, sheet, "Template");
-    XLSX.writeFile(workbook, `template_${selectedType}.xlsx`);
-  };
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !isUploading && onOpenChange(nextOpen)}>
@@ -233,11 +221,6 @@ export function ImportDataDialog({
           )}
 
           <div className="space-y-3">
-            {selectedTemplate && (
-              <Button type="button" variant="outline" onClick={downloadTemplate}>
-                <FileSpreadsheet className="mr-2 h-4 w-4" />ดาวน์โหลดแพทเทิร์น
-              </Button>
-            )}
             {importTypes.length === 1 && selectedTypeLabel && (
               <p className="text-sm font-medium text-foreground">{selectedTypeLabel}</p>
             )}
@@ -252,12 +235,12 @@ export function ImportDataDialog({
             >
               <Upload className="mb-3 h-9 w-9 text-primary" />
               <p className="font-medium text-foreground">เลือกไฟล์หรือลากไฟล์มาวางที่นี่</p>
-              <p className="mt-1 text-xs text-muted-foreground">รองรับ .xlsx, .xls, .csv</p>
+              <p className="mt-1 text-xs text-muted-foreground">รองรับ .xlsx และ .xls</p>
               <Input
                 ref={fileInputRef}
                 id={uploadInputId}
                 type="file"
-                accept=".xlsx,.xls,.csv"
+                accept=".xlsx,.xls"
                 className="hidden"
                 onChange={handleFileChange}
               />

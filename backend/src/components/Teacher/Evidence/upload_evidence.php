@@ -62,8 +62,7 @@ try {
                     file_name,
                     file_data,
                     mime_type,
-                    file_category,
-                    verified
+                    file_category
                 ) VALUES (
                     :student_id,
                     :title,
@@ -71,8 +70,7 @@ try {
                     :file_name,
                     :file_data,
                     :mime_type,
-                    :file_category,
-                    0
+                    :file_category
                 )";
         $stmt = $pdo->prepare($sql);
         $stmt->execute([

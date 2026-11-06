@@ -8,6 +8,7 @@
 - คู่มือติดตั้งเดิม: `README.md`
 - กฎไฟล์อัปโหลด: `backend/src/uploads/README.md`
 - ขอบเขตล่าสุด: ระบบนี้ตัดเรื่องการให้เกรด/ให้คะแนนออกแล้ว ห้ามเพิ่ม flow เกรดหรือคะแนนใหม่
+- ระบบไม่มี workflow อนุมัติหรือยืนยันรับรองหลักฐานภายในแล้ว ห้ามเพิ่มคำขอ/ปุ่ม/API อนุมัติใหม่; เก็บประวัติเดิมและ audit log ไว้ ข้อมูล IRB เป็นผลรับรองจากภายนอกเท่านั้น
 
 ## 2. เทคโนโลยีที่ใช้
 | ส่วน | เทคโนโลยี |
@@ -99,7 +100,7 @@
 - endpoint download/delete ต้องป้องกัน path traversal และ cross-user access
 
 ## 8. ขอบเขตฟังก์ชัน
-- Admin/SuperAdmin: users, roles, reports, approvals, audit logs, import/export
+- Admin/SuperAdmin: users, roles, reports, audit logs, import/export
 - Teacher: นักศึกษาที่รับผิดชอบ, advising notes, curriculum/CLO/PLO/YLO, projects, documents, performance, tasks, evidence
 - Student: profile, notifications, transcript/portfolio, document upload/download
 - รายงานระดับผู้บริหารอาจมีข้อมูลสรุปที่อ่อนไหว ต้องจำกัดสิทธิ์ให้แคบ

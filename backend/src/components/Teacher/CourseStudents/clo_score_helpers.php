@@ -2,13 +2,12 @@
 /**
  * ตัวช่วยจัดการคะแนน CLO รายบุคคล
  *
- * ตรรกะการคิดคะแนน (ตามที่คณะกำหนด)
- *  - Sub PLO แต่ละตัวเต็ม 100 คะแนน
- *  - คะแนนของ CLO   = ผลรวมคะแนน Sub PLO ของ CLO นั้น ÷ จำนวน Sub PLO ของ CLO นั้น
- *  - คะแนนรวมรายวิชา = ผลรวมคะแนน CLO ทุกตัว ÷ จำนวน CLO ทั้งหมดของวิชา
+ * ตรรกะการคิดคะแนน (ตามโครงสร้างคะแนนที่กำหนดในหน้า "จัดการ CLO รายวิชา")
+ *  - รายวิชาหนึ่งมีคะแนนเต็ม 100 แบ่งให้ Sub PLO ของแต่ละ CLO (max_score)
+ *  - คะแนนของ CLO   = ผลรวมคะแนน Sub PLO ของ CLO นั้น
+ *  - คะแนนรวมรายวิชา = ผลรวมคะแนน CLO ทุกตัว (เต็ม 100)
  *
- * CLO ที่ยังไม่ได้กรอกคะแนนเลยจะถือว่า "ยังไม่ประเมิน" (null) และไม่ถูกนำไปหาร
- * แต่จำนวนตัวหารของคะแนนรวมยังคงเป็นจำนวน CLO ทั้งหมดของวิชา เพื่อไม่ให้คะแนนสูงเกินจริง
+ * Sub PLO ที่ยังไม่กรอกคะแนนจะไม่ถูกนำมาบวก และ CLO ที่ยังไม่กรอกเลยถือว่า "ยังไม่ประเมิน" (null)
  */
 
 if (!function_exists('cloScoreEnsureTable')) {
@@ -60,10 +59,10 @@ if (!function_exists('cloScoreLoadForSubject')) {
 
 if (!function_exists('cloScoreCalcClo')) {
     /**
-     * คะแนนของ CLO หนึ่งตัว = เฉลี่ยคะแนน Sub PLO ที่ผูกกับ CLO นั้น
+     * คะแนนของ CLO หนึ่งตัว = ผลรวมคะแนน Sub PLO ที่ผูกกับ CLO นั้น
      *
      * @param array $subPloCodes  รหัส Sub PLO ที่ CLO นี้ผูกไว้ เช่น ['1.1','2.1']
-     * @param array $scores       คะแนนที่กรอกไว้ ['1.1' => 100, ...]
+     * @param array $scores       คะแนนที่กรอกไว้ ['1.1' => 20, ...]
      * @return float|null         null = ยังไม่ได้กรอกคะแนนสักตัว
      */
     function cloScoreCalcClo(array $subPloCodes, array $scores): ?float
@@ -85,15 +84,13 @@ if (!function_exists('cloScoreCalcClo')) {
             return null;
         }
 
-        // หารด้วยจำนวน Sub PLO ทั้งหมดของ CLO เสมอ (ไม่ใช่เฉพาะตัวที่กรอก)
-        // เพื่อให้ "กรอกครบทุกตัวเต็ม 100" ได้ CLO = 100 พอดี
-        return round($sum / count($subPloCodes), 2);
+        return round($sum, 2);
     }
 }
 
 if (!function_exists('cloScoreCalcOverall')) {
     /**
-     * คะแนนรวมรายวิชา = ผลรวมคะแนน CLO ทุกตัว ÷ จำนวน CLO ทั้งหมดของวิชา
+     * คะแนนรวมรายวิชา = ผลรวมคะแนน CLO ทุกตัว (เต็ม 100 ตามที่แบ่งไว้)
      *
      * @param array $cloScores  [clo_id => float|null]
      * @param int   $totalClos  จำนวน CLO ทั้งหมดของวิชา
@@ -117,7 +114,7 @@ if (!function_exists('cloScoreCalcOverall')) {
             return null;
         }
 
-        return round($sum / $totalClos, 2);
+        return round($sum, 2);
     }
 }
 
@@ -128,14 +125,34 @@ if (!function_exists('cloScoreBuildHeaders')) {
      */
     function cloScoreBuildHeaders(PDO $db, string $subjectCode): array
     {
+        require_once __DIR__ . '/../../../config/curriculum_outcomes.php';
+
         $frameworkId = getActiveFrameworkId($db);
         $rawClos = [];
         $subCatalog = [];
         $ploCatalog = [];
+        $scoreMap = [];   // [clo_id][sub code] => ['max_score'=>, 'pass_score'=>]
 
         if ($frameworkId && curriculumTablesReady($db) && curriculumHasRelationalData($db, $frameworkId)) {
             $rawClos = listClosBySubjectCode($db, $frameworkId, $subjectCode);
-            $subCatalog = getSubPloCatalogFromTables($db, $frameworkId);
+            // Sub PLO ใช้เฉพาะชั้นปี (YLO) ของรายวิชา เพราะรหัสซ้ำกันได้ระหว่างชั้นปี
+            $subjectYlo = outcomesSubjectYlo($db, $subjectCode);
+            $subCatalog = $subjectYlo === null
+                ? []
+                : array_map(
+                    static fn(array $row): array => [
+                        'code' => $row['code'],
+                        'plo' => $row['plo_code'],
+                        'description' => $row['description'],
+                    ],
+                    outcomesSubPlos($db, $frameworkId, $subjectYlo)
+                );
+            foreach (outcomesSubjectCloScores($db, $frameworkId, $subjectCode) as $row) {
+                $scoreMap[$row['clo_id']][$row['code']] = [
+                    'max_score' => $row['max_score'],
+                    'pass_score' => $row['pass_score'],
+                ];
+            }
             $ploCatalog = getPloCatalogFromTables($db, $frameworkId);
         } else {
             $data = loadActiveMappingData($db);
@@ -170,10 +187,14 @@ if (!function_exists('cloScoreBuildHeaders')) {
 
             $subPlos = [];
             foreach ($subCodes as $code) {
+                $score = $scoreMap[$cloId][(string)$code] ?? ['max_score' => null, 'pass_score' => null];
                 $subPlos[] = [
                     'code' => (string)$code,
                     'plo' => $subDesc[(string)$code]['plo'] ?? null,
                     'description' => $subDesc[(string)$code]['description'] ?? '',
+                    // คะแนนเต็ม/เกณฑ์ผ่าน ตั้งไว้ที่หน้า "จัดการ CLO รายวิชา"
+                    'max_score' => $score['max_score'],
+                    'pass_score' => $score['pass_score'],
                 ];
             }
 
@@ -185,6 +206,19 @@ if (!function_exists('cloScoreBuildHeaders')) {
                 ];
             }
 
+            $cloMax = 0.0;
+            $cloPass = 0.0;
+            $hasMax = false;
+            foreach ($subPlos as $sub) {
+                if ($sub['max_score'] !== null) {
+                    $cloMax += (float)$sub['max_score'];
+                    $hasMax = true;
+                }
+                if ($sub['pass_score'] !== null) {
+                    $cloPass += (float)$sub['pass_score'];
+                }
+            }
+
             $headers[] = [
                 'clo_id' => $cloId,
                 'clo_code' => $clo['clo_code'] ?? $clo['code'] ?? ('CLO' . ($index + 1)),
@@ -192,6 +226,8 @@ if (!function_exists('cloScoreBuildHeaders')) {
                 'ylo' => $clo['ylo_id'] ?? null,
                 'plos' => $plos,
                 'sub_plos' => $subPlos,
+                'max_score' => $hasMax ? round($cloMax, 2) : null,
+                'pass_score' => $hasMax ? round($cloPass, 2) : null,
             ];
         }
 

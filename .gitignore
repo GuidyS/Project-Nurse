@@ -31,8 +31,8 @@ dist-ssr
 # backend
 
 config.php
-
 /mysql-data
+/mysql-data-backup
 .agents
 .codex-devlogs
 skills-lock.json

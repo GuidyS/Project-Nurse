@@ -19,12 +19,6 @@ function assignStudentsTypes(): array
             'position_id' => 3, // อาจารย์ที่ปรึกษา
             'legacy' => ['หลัก'],
         ],
-        'practical' => [
-            'label' => 'อาจารย์ปฏิบัติ',
-            'limit' => 8,
-            'position_id' => 4, // อาจารย์ปฏิบัติ
-            'legacy' => [],
-        ],
     ];
 }
 
@@ -32,7 +26,7 @@ function assignStudentsResolveType(?string $type): array
 {
     $types = assignStudentsTypes();
     if ($type === null || !isset($types[$type])) {
-        throw new InvalidArgumentException('ประเภทอาจารย์ไม่ถูกต้อง (ต้องเป็น advisor หรือ practical)');
+        return $types['advisor'] + ['key' => 'advisor'];
     }
 
     return $types[$type] + ['key' => $type];

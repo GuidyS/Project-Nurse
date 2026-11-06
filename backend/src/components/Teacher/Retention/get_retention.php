@@ -3,15 +3,19 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-require_once __DIR__ . '/../../../config/config.php';
-
+header('Access-Control-Allow-Origin: ' . (in_array($_SERVER['HTTP_ORIGIN'] ?? '', ['http://localhost:5173', 'http://127.0.0.1:5173'], true) ? ($_SERVER['HTTP_ORIGIN'] ?? '') : 'http://localhost:5173'));
+header('Vary: Origin');
+header("Access-Control-Allow-Credentials: true");
+header("Access-Control-Allow-Methods: GET, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type, Authorization");
 header("Content-Type: application/json; charset=UTF-8");
 
-if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
-    http_response_code(405);
-    echo json_encode(["status" => "error", "message" => "Method not allowed"]);
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
     exit();
 }
+
+define('APP_DEBUG', true);
 
 if (!isset($_SESSION['user_id'])) {
     http_response_code(401);
@@ -20,32 +24,22 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 try {
-    $pdo = new Connect();
-    $accessStmt = $pdo->prepare(
-        'SELECT u.role_id,
-                EXISTS(
-                    SELECT 1 FROM user_position up
-                    WHERE up.user_id = u.user_id AND up.position_id = 1
-                ) AS is_dean
-         FROM users u
-         WHERE u.user_id = :user_id
-         LIMIT 1'
+    $pdo = new PDO(
+        "mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4",
+        "MYSQL_USER",
+        "MYSQL_PASSWORD",
+        [
+            PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            PDO::ATTR_EMULATE_PREPARES   => false,
+        ]
     );
-    $accessStmt->execute([':user_id' => $_SESSION['user_id']]);
-    $access = $accessStmt->fetch();
-    $roleId = (int)($access['role_id'] ?? 0);
-    $isDean = (int)($access['is_dean'] ?? 0) === 1;
-    if ($roleId !== 1 && !($roleId === 2 && $isDean)) {
-        http_response_code(403);
-        echo json_encode(["status" => "error", "message" => "Forbidden"]);
-        exit();
-    }
-} catch (Throwable $e) {
+} catch (PDOException $e) {
     error_log("[Retention] DB Connection Error: " . $e->getMessage());
     http_response_code(500);
     echo json_encode([
         "status"  => "error",
-        "message" => "เชื่อมต่อฐานข้อมูลไม่สำเร็จ",
+        "message" => APP_DEBUG ? ("เชื่อมต่อฐานข้อมูลไม่สำเร็จ: " . $e->getMessage()) : "เชื่อมต่อฐานข้อมูลไม่สำเร็จ",
     ], JSON_UNESCAPED_UNICODE);
     exit();
 }
@@ -215,13 +209,13 @@ try {
     http_response_code(500);
     echo json_encode([
         "status"  => "error",
-        "message" => "เกิดข้อผิดพลาดในการดึงข้อมูล กรุณาลองใหม่อีกครั้ง",
+        "message" => APP_DEBUG ? $e->getMessage() : "เกิดข้อผิดพลาดในการดึงข้อมูล กรุณาลองใหม่อีกครั้ง",
     ], JSON_UNESCAPED_UNICODE);
 } catch (Throwable $e) {
     error_log("[Retention] Unexpected Error: " . $e->getMessage());
     http_response_code(500);
     echo json_encode([
         "status"  => "error",
-        "message" => "เกิดข้อผิดพลาดที่ไม่คาดคิด",
+        "message" => APP_DEBUG ? $e->getMessage() : "เกิดข้อผิดพลาดที่ไม่คาดคิด",
     ], JSON_UNESCAPED_UNICODE);
 }

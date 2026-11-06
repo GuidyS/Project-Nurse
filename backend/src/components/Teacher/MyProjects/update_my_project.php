@@ -21,25 +21,12 @@ function update_my_project_nullable_number(mixed $value, string $label): ?float
     return (float) $value;
 }
 
-function update_my_project_nullable_percent(mixed $value): ?float
-{
-    if ($value === null || $value === '') {
-        return null;
-    }
-
-    if (!is_numeric($value)) {
-        throw new InvalidArgumentException('ความคืบหน้าต้องเป็นตัวเลข');
-    }
-
-    return max(0, min(100, (float) $value));
-}
-
 try {
-    $projectId = isset($input['project_id']) ? (int) $input['project_id'] : 0;
+    $projectId = project_validate_code($input['project_id'] ?? null);
     $nameTh = trim((string) ($input['project_name_th'] ?? ''));
 
-    if ($projectId <= 0 || $nameTh === '') {
-        project_json(["status" => "error", "message" => "กรุณาระบุรหัสโครงการและชื่อโครงการภาษาไทย"], 400);
+    if ($projectId === '' || $nameTh === '') {
+        project_json(["status" => "error", "message" => "กรุณาระบุรหัสโครงการและชื่อโครงการ"], 400);
         exit;
     }
 
@@ -57,21 +44,18 @@ try {
 
     my_project_ensure_member_table($db);
     $memberFacultyIds = my_project_normalize_member_faculty_ids($db, $input, $facultyId);
-    $memberCount = count($memberFacultyIds) + 1;
 
     if (!empty($input['start_date']) && !empty($input['end_date']) && $input['end_date'] < $input['start_date']) {
         project_json(["status" => "error", "message" => "วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่มต้น"], 400);
         exit;
     }
 
-    $hasBudgetInput = array_key_exists('budget_allocated', $input) || array_key_exists('budget_spent', $input);
-    $hasProgressInput = array_key_exists('progress_percent', $input);
-    $budgetAllocated = $hasBudgetInput ? update_my_project_nullable_number($input['budget_allocated'] ?? null, 'งบประมาณที่ได้รับ') : null;
+    $hasBudgetInput = array_key_exists('budget_proposed', $input) || array_key_exists('budget_spent', $input);
+    $budgetProposed = $hasBudgetInput ? update_my_project_nullable_number($input['budget_proposed'] ?? null, 'งบเสนอ') : null;
     $budgetSpent = $hasBudgetInput ? update_my_project_nullable_number($input['budget_spent'] ?? null, 'งบที่ใช้จริง') : null;
-    $progressPercent = $hasProgressInput ? update_my_project_nullable_percent($input['progress_percent'] ?? null) : null;
 
-    if ($budgetAllocated !== null && $budgetAllocated < 0) {
-        project_json(["status" => "error", "message" => "งบประมาณที่ได้รับต้องไม่ติดลบ"], 400);
+    if ($budgetProposed !== null && $budgetProposed < 0) {
+        project_json(["status" => "error", "message" => "งบเสนอต้องไม่ติดลบ"], 400);
         exit;
     }
 
@@ -82,13 +66,9 @@ try {
 
     $fields = [
         'project_name_th = :project_name_th',
-        'project_name_en = :project_name_en',
-        'description = :description',
     ];
     $params = [
         ':project_name_th' => $nameTh,
-        ':project_name_en' => trim((string) ($input['project_name_en'] ?? '')),
-        ':description' => trim((string) ($input['description'] ?? '')),
         ':project_id' => $projectId,
     ];
 
@@ -120,75 +100,22 @@ try {
         $params[':end_date'] = !empty($input['end_date']) ? $input['end_date'] : null;
     }
 
-    $fields[] = "mapping_json = JSON_SET(COALESCE(mapping_json, JSON_OBJECT()), '$.member_count', :member_count)";
-    $params[':member_count'] = $memberCount;
-
     $db->beginTransaction();
+    $currentProject = project_u_guard($db, $projectId);
+    $projectId = (string)$currentProject['project_id'];
+    project_u_require_root($db, $projectId);
+    if (isset($input['academic_year']) && (int)$input['academic_year'] !== (int)$currentProject['academic_year']) {
+        throw new ProjectConflict('โครงการของปีใหม่ต้องสร้างเป็นรายการใหม่');
+    }
 
     $stmt = $db->prepare('UPDATE project SET ' . implode(', ', $fields) . ' WHERE project_id = :project_id');
     $stmt->execute($params);
 
     my_project_replace_faculty_members($db, $projectId, $memberFacultyIds);
 
-    if ($hasBudgetInput) {
-        $deleteBudgetStmt = $db->prepare('DELETE FROM project_budget_years WHERE project_id = :project_id');
-        $deleteBudgetStmt->execute([':project_id' => $projectId]);
-
-        if ($budgetAllocated !== null || $budgetSpent !== null) {
-            $fiscalYear = isset($input['academic_year']) && $input['academic_year'] !== '' && $input['academic_year'] !== null
-                ? (int) $input['academic_year']
-                : (int) date('Y') + 543;
-            $budgetStmt = $db->prepare("
-                INSERT INTO project_budget_years (
-                    project_id,
-                    fiscal_year,
-                    budget_allocated,
-                    budget_spent
-                ) VALUES (
-                    :project_id,
-                    :fiscal_year,
-                    :budget_allocated,
-                    :budget_spent
-                )
-            ");
-            $budgetStmt->execute([
-                ':project_id' => $projectId,
-                ':fiscal_year' => $fiscalYear,
-                ':budget_allocated' => $budgetAllocated ?? 0,
-                ':budget_spent' => $budgetSpent ?? 0,
-            ]);
-        }
-    }
-
-    if ($hasProgressInput) {
-        $deleteProgressStmt = $db->prepare('DELETE FROM project_progress_logs WHERE project_id = :project_id');
-        $deleteProgressStmt->execute([':project_id' => $projectId]);
-
-        if ($progressPercent !== null) {
-            $progressStmt = $db->prepare("
-                INSERT INTO project_progress_logs (
-                    project_id,
-                    period_label,
-                    planned_percent,
-                    actual_percent,
-                    logged_at
-                ) VALUES (
-                    :project_id,
-                    :period_label,
-                    :planned_percent,
-                    :actual_percent,
-                    :logged_at
-                )
-            ");
-            $progressStmt->execute([
-                ':project_id' => $projectId,
-                ':period_label' => 'อัปเดตความคืบหน้า',
-                ':planned_percent' => 100,
-                ':actual_percent' => $progressPercent,
-                ':logged_at' => !empty($input['start_date']) ? $input['start_date'] : date('Y-m-d'),
-            ]);
-        }
-    }
+    project_u_metadata($db, $projectId, $input);
+    project_u_save_flat_budget($db, $projectId, $input);
+    project_u_save_activities($db, $projectId, $input);
 
     $db->commit();
 
@@ -206,6 +133,6 @@ try {
         $db->rollBack();
     }
 
-    project_json(["status" => "error", "message" => $e->getMessage()], 500);
+    project_json(["status" => "error", "message" => $e->getMessage()], project_error_status($e));
 }
 ?>

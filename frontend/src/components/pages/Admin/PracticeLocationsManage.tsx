@@ -59,21 +59,15 @@ export default function PracticeLocationsManage() {
 
   useEffect(() => { fetchData(); }, []);
 
-  const handleDownloadTemplate = () => {
-    const workbook = XLSX.utils.book_new();
-    const sheet = XLSX.utils.aoa_to_sheet([["ประเภท", "ชื่อสถานที่", "สถานะ MOU", "รายวิชา"]]);
-    sheet['!cols'] = [{ wch: 26 }, { wch: 42 }, { wch: 22 }, { wch: 34 }];
-    XLSX.utils.book_append_sheet(workbook, sheet, "แหล่งฝึก");
-    const help = XLSX.utils.aoa_to_sheet([
-      ["วิธีกรอกแพทเทิร์น"],
-      ["กรอกหนึ่งสถานที่ต่อหนึ่งแถวในชีต แหล่งฝึก"],
-      ["ประเภทที่ใช้ได้: โรงพยาบาล, โรงพยาบาลส่งเสริมสุขภาพตำบล, ศูนย์สุขภาพ"],
-      ["ชื่อสถานที่ต้องไม่ว่าง; สถานะ MOU และรายวิชาเว้นว่างได้"],
-    ]);
-    help['!cols'] = [{ wch: 85 }];
-    XLSX.utils.book_append_sheet(workbook, help, "คำแนะนำ");
-    XLSX.writeFile(workbook, "แบบฟอร์มนำเข้าแหล่งฝึกภาคปฏิบัติ.xlsx");
-  };
+ const handleDownloadTemplate = () => {
+  const link = document.createElement("a");
+  // ใช้ import.meta.env.BASE_URL เพื่ออ้างอิง path ที่ถูกต้องของ public folder
+  link.href = `${import.meta.env.BASE_URL}template_practice_locations.xlsx`;
+  link.download = "แบบฟอร์มนำเข้าแหล่งฝึกภาคปฏิบัติ.xlsx";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -86,24 +80,8 @@ export default function PracticeLocationsManage() {
         const worksheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json<ExcelRow>(worksheet, { header: 1 });
         const newLocations: LocationItem[] = [];
-        const isNewTemplate = String(jsonData[0]?.[0] ?? "").trim() === "ประเภท";
         for (let i = 1; i < jsonData.length; i++) {
           const row = jsonData[i];
-          if (isNewTemplate && row?.some((cell) => String(cell ?? "").trim() !== "")) {
-            const type = String(row[0] ?? "").trim();
-            const name = String(row[1] ?? "").trim();
-            if (!name || !["โรงพยาบาล", "โรงพยาบาลส่งเสริมสุขภาพตำบล", "ศูนย์สุขภาพ"].includes(type)) {
-              throw new Error(`แถว ${i + 1}: กรุณาระบุประเภทและชื่อสถานที่ให้ถูกต้อง`);
-            }
-            newLocations.push({
-              hospital_name: type === "โรงพยาบาล" ? name : "",
-              sub_district_hospital: type === "โรงพยาบาลส่งเสริมสุขภาพตำบล" ? name : "",
-              health_center: type === "ศูนย์สุขภาพ" ? name : "",
-              mou_status: String(row[2] ?? "").trim(),
-              subject_name: String(row[3] ?? "").trim(),
-            });
-            continue;
-          }
           if (row && row.length > 0 && (row[0] || row[1] || row[2])) {
             newLocations.push({
               hospital_name: row[0] ? String(row[0]).trim() : "",
@@ -114,14 +92,14 @@ export default function PracticeLocationsManage() {
             });
           }
         }
-        
+
         if (newLocations.length > 0) {
           await handleAutoSave(newLocations);
         } else {
           toast({ title: "ไฟล์ว่างเปล่า", description: "ไม่พบข้อมูลในไฟล์ Excel", variant: "destructive" });
         }
       } catch (err) {
-        toast({ title: "เกิดข้อผิดพลาด", description: err instanceof Error ? err.message : "ไฟล์ Excel ไม่ถูกต้องตามรูปแบบ", variant: "destructive" });
+        toast({ title: "เกิดข้อผิดพลาด", description: "ไฟล์ Excel ไม่ถูกต้องตามรูปแบบ", variant: "destructive" });
       }
       if (fileInputRef.current) fileInputRef.current.value = "";
     };
@@ -132,10 +110,10 @@ export default function PracticeLocationsManage() {
     try {
       setLoading(true);
       const res = await api.post("/index.php?page=practice-locations", { locations: locationsToSave });
-      
+
       if (res.data?.status === "success") {
-        toast({ title: "ดำเนินการสำเร็จ", description: res.data.message }); 
-        fetchData(); 
+        toast({ title: "ดำเนินการสำเร็จ", description: res.data.message });
+        fetchData();
         return true;
       } else {
         throw new Error(res.data?.message || "บันทึกล้มเหลว");
@@ -150,7 +128,7 @@ export default function PracticeLocationsManage() {
 
   const submitManualAdd = async () => {
     if (!newLocation.name.trim()) return toast({ title: "ข้อมูลไม่ครบ", description: "กรุณาระบุชื่อสถานที่", variant: "destructive" });
-    
+
     setIsSavingManual(true);
     const payload: LocationItem = {
       hospital_name: addType === 'hospital' ? newLocation.name : "",
@@ -189,7 +167,7 @@ export default function PracticeLocationsManage() {
   };
 
   const dataWithIndex = data.map((item, index) => ({ ...item, originalIndex: index }));
-  
+
   // กรองข้อมูลว่างทิ้ง
   const hospitals = dataWithIndex.filter(d => d.hospital_name && String(d.hospital_name).trim() !== "");
   const subDistricts = dataWithIndex.filter(d => d.sub_district_hospital && String(d.sub_district_hospital).trim() !== "");
@@ -208,12 +186,12 @@ export default function PracticeLocationsManage() {
   });
 
   const renderLocationTable = (
-    title: string, 
-    items: typeof dataWithIndex, 
-    nameKey: "hospital_name" | "sub_district_hospital" | "health_center", 
+    title: string,
+    items: typeof dataWithIndex,
+    nameKey: "hospital_name" | "sub_district_hospital" | "health_center",
     typeValue: "hospital" | "sub_district" | "health_center",
-    icon: React.ReactNode, 
-    borderColorClass: string, 
+    icon: React.ReactNode,
+    borderColorClass: string,
     titleColorClass: string
   ) => {
     return (
@@ -225,9 +203,9 @@ export default function PracticeLocationsManage() {
               <Badge variant="secondary" className="bg-background shadow-sm border text-foreground font-medium">
                 {items.length} แห่ง
               </Badge>
-              <Button 
-                size="sm" 
-                variant="outline" 
+              <Button
+                size="sm"
+                variant="outline"
                 className="h-7 px-2 text-xs border-primary/20 text-primary hover:bg-primary/10 hover:text-primary transition-colors"
                 onClick={() => { setAddType(typeValue); setAddModalOpen(true); }}
               >
@@ -297,7 +275,7 @@ export default function PracticeLocationsManage() {
           </Button>
           <input type="file" accept=".xlsx, .xls" className="hidden" ref={fileInputRef} onChange={handleFileUpload} />
           <Button className="gap-2 bg-primary hover:bg-primary/90" onClick={() => fileInputRef.current?.click()} disabled={loading}>
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />} 
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
             นำเข้า Excel
           </Button>
         </div>
@@ -317,7 +295,7 @@ export default function PracticeLocationsManage() {
               <CardHeader className="bg-muted/30 border-b pb-4"><CardTitle className="text-base flex items-center gap-2"><BookOpen className="h-5 w-5 text-primary" /> สรุปรายวิชา</CardTitle></CardHeader>
               <CardContent className="p-0">
                 <ul className="divide-y divide-border">
-                  {Object.entries(summary.subjects).length === 0 ? <li className="p-4 text-center text-sm text-muted-foreground">ไม่มีข้อมูล</li> : 
+                  {Object.entries(summary.subjects).length === 0 ? <li className="p-4 text-center text-sm text-muted-foreground">ไม่มีข้อมูล</li> :
                     Object.entries(summary.subjects).map(([subject, count]) => (
                       <li key={subject} className="p-3.5 flex justify-between items-center hover:bg-muted/20"><span className="text-sm font-medium">{subject}</span><Badge variant="secondary" className="rounded-full">{count}</Badge></li>
                   ))}
@@ -339,7 +317,7 @@ export default function PracticeLocationsManage() {
           <div className="bg-background rounded-xl shadow-xl w-full max-w-md overflow-hidden border">
             <div className="flex items-center justify-between border-b px-5 py-4 bg-muted/30">
               <h2 className="text-lg font-semibold flex items-center gap-2">
-                <Plus className="h-5 w-5 text-primary" /> 
+                <Plus className="h-5 w-5 text-primary" />
                 เพิ่มข้อมูล{addType === 'hospital' ? 'โรงพยาบาล' : addType === 'sub_district' ? 'รพ.สต.' : 'อนามัย'}
               </h2>
               <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => setAddModalOpen(false)}>
@@ -349,9 +327,9 @@ export default function PracticeLocationsManage() {
             <div className="p-5 space-y-4">
               <div className="space-y-1.5">
                 <label className="text-sm font-medium text-foreground">ชื่อสถานที่ <span className="text-destructive">*</span></label>
-                <input 
-                  type="text" 
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" 
+                <input
+                  type="text"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   placeholder="เช่น โรงพยาบาลศิริราช"
                   value={newLocation.name}
                   onChange={(e) => setNewLocation({...newLocation, name: e.target.value})}
@@ -360,7 +338,7 @@ export default function PracticeLocationsManage() {
               </div>
               <div className="space-y-1.5">
                 <label className="text-sm font-medium text-foreground">สถานะ MOU</label>
-                <select 
+                <select
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   value={newLocation.mou}
                   onChange={(e) => setNewLocation({...newLocation, mou: e.target.value})}
@@ -372,9 +350,9 @@ export default function PracticeLocationsManage() {
               </div>
               <div className="space-y-1.5">
                 <label className="text-sm font-medium text-foreground">วิชาที่ฝึก</label>
-                <input 
-                  type="text" 
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" 
+                <input
+                  type="text"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   placeholder="เช่น การพยาบาลอนามัยชุมชน"
                   value={newLocation.subject}
                   onChange={(e) => setNewLocation({...newLocation, subject: e.target.value})}

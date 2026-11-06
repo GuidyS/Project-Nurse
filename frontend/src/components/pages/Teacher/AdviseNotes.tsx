@@ -72,9 +72,7 @@ export default function AdviseNotes() {
     try {
       const res = await api.get('/index.php?page=get-advise-students');
       if (res.data.status === 'success') setStudents(res.data.data || []);
-    } catch {
-      toast({ title: 'ข้อผิดพลาด', description: 'ไม่สามารถโหลดรายชื่อนักศึกษาในความดูแลได้', variant: 'destructive' });
-    }
+    } catch { /* dropdown ว่างแต่หน้าใช้งานได้ */ }
   };
 
   useEffect(() => {
@@ -156,7 +154,6 @@ export default function AdviseNotes() {
                       ))}
                     </SelectContent>
                   </Select>
-                  {students.length === 0 && <p className="text-sm text-muted-foreground">ยังไม่มีนักศึกษาในความดูแล</p>}
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="topic">หัวข้อ</Label>

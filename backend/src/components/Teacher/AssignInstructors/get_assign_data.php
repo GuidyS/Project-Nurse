@@ -14,18 +14,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit();
 
 try {
     $db = new Connect();
-    if (!isset($_SESSION['user_id'])) {
-        http_response_code(401);
-        echo json_encode(['status' => 'error', 'message' => 'Unauthorized']);
-        exit();
-    }
-    $roleStmt = $db->prepare('SELECT role_id FROM users WHERE user_id = ? LIMIT 1');
-    $roleStmt->execute([$_SESSION['user_id']]);
-    if (!in_array((int)$roleStmt->fetchColumn(), [1, 2], true)) {
-        http_response_code(403);
-        echo json_encode(['status' => 'error', 'message' => 'ไม่มีสิทธิ์ดูข้อมูลการมอบหมายอาจารย์'], JSON_UNESCAPED_UNICODE);
-        exit();
-    }
 
     // 1. ดึงรายชื่ออาจารย์ทั้งหมดมาทำ Lookup
     $sql_faculty = "SELECT faculty_id as id, CONCAT(IFNULL(title,''), ' ', first_name_th, ' ', last_name_th) as name FROM faculty";
@@ -72,7 +60,6 @@ try {
 
     // 4. รายวิชา — ตามหลักสูตรที่ใช้งานในระบบ (ตั้งค่าที่หน้า "จัดการหลักสูตร")
     //    ถ้ายังไม่มีหลักสูตรในระบบ ใช้รายวิชาทั้งหมดจากตาราง subject แบบเดิม
-    subjectTermEnsureColumn($db);
     $curriculumSubjects = activeCurriculumSubjects($db);
     if ($curriculumSubjects !== null) {
         $subjects = array_map(static fn(array $subject): array => [
@@ -80,19 +67,17 @@ try {
             'subject_code' => $subject['subject_code'],
             'subject_name_th' => $subject['subject_name'],
             'credit' => $subject['credit'],
-            'semester' => $subject['semester'],
-            'academic_year' => $subject['academic_year'],
         ], $curriculumSubjects);
     } else {
-        $sql_subject = "SELECT subject_id, subject_code, subject_name_th, credit, semester, academic_year FROM subject WHERE is_active = 1 ORDER BY subject_code ASC";
+        $sql_subject = "SELECT subject_id, subject_code, subject_name_th, credit FROM subject WHERE is_active = 1 ORDER BY subject_code ASC";
         $subjects = $db->query($sql_subject)->fetchAll(PDO::FETCH_ASSOC);
     }
 
     // จำนวนวิชาของอาจารย์แต่ละคน นับเฉพาะวิชาที่แสดงในหน้านี้
-    $listedCodes = array_fill_keys(array_map(static fn(array $s): string => strtolower((string)$s['subject_code']), $subjects), true);
+    $listedCodes = array_fill_keys(array_map(static fn(array $s): string => mb_strtolower((string)$s['subject_code']), $subjects), true);
     $instructorCourseCounts = [];
     foreach ($instructorMap as $code => $fid) {
-        if (!empty($fid) && isset($listedCodes[strtolower((string)$code)])) {
+        if (!empty($fid) && isset($listedCodes[mb_strtolower((string)$code)])) {
             $instructorCourseCounts[$fid] = ($instructorCourseCounts[$fid] ?? 0) + 1;
         }
     }
@@ -110,9 +95,6 @@ try {
             "credits" => (int)$s['credit'],
             // วิชาที่มีเฉพาะในหลักสูตรยังไม่มีข้อมูลลงทะเบียน
             "students" => $s['subject_id'] !== null ? ($enrollment[$s['subject_id']] ?? 0) : 0,
-            "semester" => $s['semester'] === null ? null : (int)$s['semester'],
-            "academic_year" => $s['academic_year'] === null ? null : (int)$s['academic_year'],
-            "term_label" => subjectTermLabel($s['semester'], $s['academic_year']),
             "instructor_id" => (string)$instructorId,
             "instructor" => $instructorName
         ];

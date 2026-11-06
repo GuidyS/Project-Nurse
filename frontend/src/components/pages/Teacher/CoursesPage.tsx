@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { BookOpen, Users, Edit, Loader2, Save, Search } from "lucide-react";
+import { Edit, Loader2, Save, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -36,7 +36,6 @@ interface Course {
   name: string;
   credits: number;
   students: number;
-  semester: string;
   section: string;
   cloCount: number;
   instructor?: string;
@@ -121,9 +120,6 @@ const CoursesPage = () => {
           name: course.name,
           credits: Number(course.credits),
           students: Number(course.students),
-          // backend คำนวณข้อความภาคเรียนให้แล้ว ("1/2567" หรือ "-" ถ้ายังไม่กำหนด)
-          // ห้าม fallback เป็นค่าคงที่ เพราะจะกลายเป็นข้อมูลปลอม
-          semester: course.term_label || "-",
           section: course.section || "1",
           cloCount: Number(course.cloCount || 0),
           instructor: course.instructor,
@@ -476,36 +472,8 @@ const CoursesPage = () => {
       {/* Header */}
       <div className="app-page-header">
         <div>
-          <h1 className="app-page-title">รายวิชาที่สอน</h1>
+          <h1 className="app-page-title">รายวิชาที่สอน {courses.length} วิชา</h1>
           <p className="app-page-description">จัดการรายวิชาและบันทึกผลการเรียน</p>
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-card rounded-xl shadow-card p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-primary/10 rounded-lg">
-              <BookOpen className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-foreground">{courses.length}</p>
-              <p className="text-xs text-muted-foreground">รายวิชาทั้งหมด</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-card rounded-xl shadow-card p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-success/10 rounded-lg">
-              <Users className="h-5 w-5 text-success" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-foreground">
-                {courses.reduce((sum, c) => sum + c.students, 0)}
-              </p>
-              <p className="text-xs text-muted-foreground">นักศึกษาทั้งหมด</p>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -518,7 +486,6 @@ const CoursesPage = () => {
               <TableHead>ชื่อวิชา</TableHead>
               <TableHead>หน่วยกิต</TableHead>
               <TableHead>นักศึกษา</TableHead>
-              <TableHead>ภาคเรียน</TableHead>
               <TableHead>CLO</TableHead>
               <TableHead>อาจารย์ผู้รับผิดชอบ</TableHead>
               <TableHead className="text-right">การดำเนินการ</TableHead>
@@ -527,13 +494,13 @@ const CoursesPage = () => {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={8} className="py-10 text-center">
+                <TableCell colSpan={7} className="py-10 text-center">
                   <Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" />
                 </TableCell>
               </TableRow>
             ) : courses.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
+                <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
                   ไม่มีรายวิชาที่คุณรับผิดชอบ
                 </TableCell>
               </TableRow>
@@ -547,9 +514,6 @@ const CoursesPage = () => {
                   </TableCell>
                   <TableCell className="text-muted-foreground">{course.credits}</TableCell>
                   <TableCell className="text-muted-foreground">{course.students} คน</TableCell>
-                  <TableCell>
-                    <Badge variant="secondary">{course.semester}</Badge>
-                  </TableCell>
                   <TableCell>
                     <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">
                       {course.cloCount} CLO
@@ -615,7 +579,7 @@ const CoursesPage = () => {
               </Select>
               {scoringCourse && (
                 <span className="text-sm font-normal text-muted-foreground">
-                  กลุ่ม {scoringCourse.section} · ภาคเรียน {scoringCourse.semester} · เกณฑ์ผ่าน {formatScore(passScore)} คะแนน
+                  กลุ่ม {scoringCourse.section} · เกณฑ์ผ่าน {formatScore(passScore)} คะแนน
                 </span>
               )}
             </DialogTitle>

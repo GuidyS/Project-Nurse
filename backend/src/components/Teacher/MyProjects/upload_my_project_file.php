@@ -8,7 +8,7 @@ project_require_admin_write($auth);
 $targetPath = null;
 
 try {
-    $projectId = project_request_int('project_id', 'post');
+    $projectId = project_request_code('post');
     if ($projectId === null || !isset($_FILES['file'])) {
         project_json(["status" => "error", "message" => "กรุณาระบุรหัสโครงการและแนบไฟล์"], 400);
         exit;
@@ -26,6 +26,9 @@ try {
         exit;
     }
 
+    $db->beginTransaction();
+    project_u_guard($db, $projectId);
+    project_u_require_root($db, $projectId);
     $file = $_FILES['file'];
     if ($file['error'] !== UPLOAD_ERR_OK) {
         project_json(["status" => "error", "message" => "เกิดข้อผิดพลาดระหว่างการอัปโหลดไฟล์"], 400);
@@ -102,7 +105,7 @@ try {
         exit;
     }
 
-    $projectName = $project['project_name_th'] ?: ($project['project_name_en'] ?: 'Project #' . $projectId);
+    $projectName = trim((string) ($project['project_name_th'] ?? '')) ?: 'โครงการ #' . $projectId;
     $stmt = $db->prepare("
         INSERT INTO project_documents (
             project_id,
@@ -122,7 +125,7 @@ try {
             :project,
             'proposal',
             :date,
-            'pending',
+            'available',
             :file_path,
             :file_name,
             :mime_type,
@@ -142,19 +145,23 @@ try {
         ':uploaded_by' => $auth['user_id'],
     ]);
 
+    $documentId = (int) $db->lastInsertId();
+    project_u_document_link($db, $projectId, $documentId, $_POST);
+    $db->commit();
     logAudit($db, $auth['user_id'], 'create', 'project_docs', "อัปโหลดไฟล์โครงการ {$projectName} (ไฟล์: {$originalName})");
 
     project_json([
         "status" => "success",
         "message" => "อัปโหลดไฟล์โครงการสำเร็จ",
-        "doc_id" => (int) $db->lastInsertId(),
+        "doc_id" => $documentId,
         "file_path" => $publicPath,
     ]);
 } catch (Exception $e) {
+    if ($db->inTransaction()) $db->rollBack();
     if ($targetPath && is_file($targetPath)) {
         @unlink($targetPath);
     }
 
-    project_json(["status" => "error", "message" => $e->getMessage()], 400);
+    project_json(["status" => "error", "message" => $e->getMessage()], project_error_status($e));
 }
 ?>

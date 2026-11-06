@@ -153,3 +153,62 @@ if (!function_exists('cloAccessRequireAdmin')) {
         exit();
     }
 }
+
+/**
+ * แปลงรายการ Sub PLO ที่ผู้ใช้ติ๊ก ให้เหลือเฉพาะตัวที่อยู่ใน YLO ของรายวิชา
+ * พร้อมหา PLO แม่ของ Sub PLO เหล่านั้น (ใช้แทนการเลือก YLO เองแบบเดิม)
+ *
+ * @param array $selectedCodes  รหัส Sub PLO ที่ติ๊กมา เช่น ['1.1','2.1']
+ * @param array $scoreInput     ['1.1' => ['max_score'=>..,'pass_score'=>..], ...] หรือ list ของ ['code'=>..]
+ * @return array{0: string[], 1: string[], 2: array} [sub_plo codes, plo codes, score entries]
+ */
+function cloResolveSubPloSelection(
+    PDO $pdo,
+    int $frameworkId,
+    int $subjectYlo,
+    $selectedCodes,
+    $scoreInput
+): array {
+    require_once __DIR__ . '/../../../config/curriculum_outcomes.php';
+
+    $allowed = [];
+    foreach (outcomesSubPlos($pdo, $frameworkId, $subjectYlo) as $sub) {
+        $allowed[$sub['code']] = $sub;
+    }
+
+    $codes = [];
+    foreach ((array)$selectedCodes as $code) {
+        $code = trim((string)$code);
+        if ($code !== '' && isset($allowed[$code]) && !in_array($code, $codes, true)) {
+            $codes[] = $code;
+        }
+    }
+
+    $ploCodes = [];
+    foreach ($codes as $code) {
+        $plo = $allowed[$code]['plo_code'];
+        if (!in_array($plo, $ploCodes, true)) {
+            $ploCodes[] = $plo;
+        }
+    }
+    usort($ploCodes, fn($a, $b) => outcomesPloNumber($a) <=> outcomesPloNumber($b));
+
+    // คะแนนรับได้ทั้งแบบ map (รหัส => ค่า) และแบบ list ที่มีคีย์ code
+    $scores = [];
+    foreach ((array)$scoreInput as $key => $value) {
+        if (!is_array($value)) {
+            continue;
+        }
+        $code = trim((string)($value['code'] ?? $key));
+        if ($code === '' || !in_array($code, $codes, true)) {
+            continue;
+        }
+        $scores[] = [
+            'sub_plo_id' => $allowed[$code]['id'],
+            'max_score' => $value['max_score'] ?? null,
+            'pass_score' => $value['pass_score'] ?? null,
+        ];
+    }
+
+    return [$codes, $ploCodes, $scores];
+}

@@ -7,6 +7,8 @@ $db = project_db();
 $auth = project_require_auth($db, ['PROJECT_DOCS_MANAGE']);
 project_require_admin_write($auth);
 
+$uploadedFile = null;
+$committed = false;
 try {
     $documentId = project_request_int('document_id', 'post');
     $name = trim((string) ($_POST['name'] ?? ''));
@@ -65,6 +67,8 @@ try {
         exit;
     }
 
+    $db->beginTransaction();
+    project_u_guard($db, (string)$document['project_id']);
     $uploadedFile = null;
     if (isset($_FILES['file']) && ($_FILES['file']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
         $facultyId = $document['responsible_faculty_id'] !== null
@@ -121,6 +125,10 @@ try {
     ");
     $stmt->execute($params);
 
+    project_u_document_link($db, (string)$document['project_id'], $documentId, $_POST);
+    $db->commit();
+    $committed = true;
+
     if ($uploadedFile !== null || $hasAttachmentUrl) {
         project_document_delete_file($document['file_path'] ?? null);
     }
@@ -134,6 +142,8 @@ try {
         "file_path" => $uploadedFile['file_path'] ?? ($hasAttachmentUrl ? $attachmentUrl : ($document['file_path'] ?? null)),
     ]);
 } catch (Exception $e) {
-    project_json(["status" => "error", "message" => $e->getMessage()], 400);
+    if ($db->inTransaction()) $db->rollBack();
+    if (!$committed && $uploadedFile !== null) project_document_delete_file($uploadedFile['file_path']);
+    project_json(["status" => "error", "message" => $e->getMessage()], project_error_status($e));
 }
 ?>
