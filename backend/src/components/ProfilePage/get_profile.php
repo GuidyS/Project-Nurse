@@ -5,11 +5,7 @@ require_once __DIR__ . '/../Teacher/LicenseReminder/license_reminder_helpers.php
 require_once __DIR__ . '/../../config/audit_helper.php';
 require_once __DIR__ . '/../../config/academic_helper.php';
 require_once __DIR__ . '/../../config/name_validation.php';
-<<<<<<< HEAD
-require_once __DIR__ . '/faculty_profile_helpers.php';
-=======
 require_once __DIR__ . '/../../config/student_license_helper.php';
->>>>>>> b329531cc7f1869e64fcd6d0e7b6039df236ca4c
 
 if (!isset($_SESSION['user_id'])) {
     http_response_code(401);
@@ -83,118 +79,6 @@ function buildCurrentAuthPayload(PDO $db, int $userId): array {
 /**
  * Expand stored faculty file values (plain path, Drive URL, or JSON array of paths).
  */
-<<<<<<< HEAD
-const STUDENT_LICENSE_EVIDENCE_MAX_BYTES = 5 * 1024 * 1024;
-const STUDENT_LICENSE_EVIDENCE_MIME_EXTENSIONS = [
-    'application/pdf' => 'pdf',
-    'application/x-pdf' => 'pdf',
-    'application/octet-stream' => 'pdf',
-    'image/jpeg' => 'jpg',
-    'image/png' => 'png',
-];
-
-function studentLicenseEnsureSchema(PDO $db): void
-{
-    $columns = [
-        'license_first_attempt_passed' => "ALTER TABLE student ADD COLUMN license_first_attempt_passed TINYINT(1) NOT NULL DEFAULT 0 COMMENT 'ผ่านสอบใบประกอบวิชาชีพครั้งแรก'",
-        'license_first_attempt_passed_at' => "ALTER TABLE student ADD COLUMN license_first_attempt_passed_at DATETIME DEFAULT NULL COMMENT 'วันที่บันทึกว่าผ่านสอบใบประกอบวิชาชีพครั้งแรก'",
-        'license_first_attempt_evidence_path' => "ALTER TABLE student ADD COLUMN license_first_attempt_evidence_path VARCHAR(255) DEFAULT NULL COMMENT 'ไฟล์หลักฐานผ่านสอบใบประกอบวิชาชีพครั้งแรก'",
-        'license_first_attempt_evidence_name' => "ALTER TABLE student ADD COLUMN license_first_attempt_evidence_name VARCHAR(255) DEFAULT NULL COMMENT 'ชื่อไฟล์หลักฐานผ่านสอบใบประกอบวิชาชีพครั้งแรก'",
-        'license_within_one_year_passed' => "ALTER TABLE student ADD COLUMN license_within_one_year_passed TINYINT(1) NOT NULL DEFAULT 0 COMMENT 'ผ่านสอบใบประกอบวิชาชีพภายใน 1 ปี'",
-        'license_within_one_year_passed_at' => "ALTER TABLE student ADD COLUMN license_within_one_year_passed_at DATETIME DEFAULT NULL COMMENT 'วันที่บันทึกว่าผ่านสอบใบประกอบวิชาชีพภายใน 1 ปี'",
-        'license_within_one_year_evidence_path' => "ALTER TABLE student ADD COLUMN license_within_one_year_evidence_path VARCHAR(255) DEFAULT NULL COMMENT 'ไฟล์หลักฐานผ่านสอบใบประกอบวิชาชีพภายใน 1 ปี'",
-        'license_within_one_year_evidence_name' => "ALTER TABLE student ADD COLUMN license_within_one_year_evidence_name VARCHAR(255) DEFAULT NULL COMMENT 'ชื่อไฟล์หลักฐานผ่านสอบใบประกอบวิชาชีพภายใน 1 ปี'",
-    ];
-
-    foreach ($columns as $column => $alterSql) {
-        $stmt = $db->prepare("
-            SELECT COUNT(*)
-            FROM INFORMATION_SCHEMA.COLUMNS
-            WHERE TABLE_SCHEMA = DATABASE()
-              AND TABLE_NAME = 'student'
-              AND COLUMN_NAME = :column
-        ");
-        $stmt->execute([':column' => $column]);
-        if ((int)$stmt->fetchColumn() === 0) {
-            $db->exec($alterSql);
-        }
-    }
-}
-
-function studentLicenseBool($value): bool
-{
-    if (is_bool($value)) {
-        return $value;
-    }
-    $normalized = strtolower(trim((string)$value));
-    return in_array($normalized, ['1', 'true', 'yes', 'on'], true);
-}
-
-function studentLicenseUploadedFile(string $fieldName): ?array
-{
-    if (!isset($_FILES[$fieldName]) || !is_array($_FILES[$fieldName])) {
-        return null;
-    }
-    $file = $_FILES[$fieldName];
-    if (($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
-        return null;
-    }
-    return $file;
-}
-
-function studentLicenseSaveEvidence(array $file, string $studentId, string $prefix): array
-{
-    $uploadErrors = [
-        UPLOAD_ERR_INI_SIZE => "ไฟล์หลักฐานใหญ่เกิน upload_max_filesize ของ PHP",
-        UPLOAD_ERR_FORM_SIZE => "ไฟล์หลักฐานใหญ่เกินขนาดที่ฟอร์มกำหนด",
-        UPLOAD_ERR_PARTIAL => "ไฟล์หลักฐานอัปโหลดมาไม่ครบ",
-        UPLOAD_ERR_NO_TMP_DIR => "ไม่พบ temporary upload directory",
-        UPLOAD_ERR_CANT_WRITE => "ไม่สามารถเขียนไฟล์หลักฐานลง disk ได้",
-        UPLOAD_ERR_EXTENSION => "PHP extension หยุดการอัปโหลดหลักฐาน",
-    ];
-
-    if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || !is_uploaded_file($file['tmp_name'] ?? '')) {
-        throw new Exception($uploadErrors[$file['error'] ?? UPLOAD_ERR_NO_FILE] ?? "อัปโหลดไฟล์หลักฐานไม่สำเร็จ");
-    }
-
-    if (($file['size'] ?? 0) > STUDENT_LICENSE_EVIDENCE_MAX_BYTES) {
-        throw new Exception("ไฟล์หลักฐานต้องมีขนาดไม่เกิน 5 MB");
-    }
-
-    $extension = strtolower(pathinfo((string)($file['name'] ?? ''), PATHINFO_EXTENSION));
-    $mime = mime_content_type($file['tmp_name']) ?: '';
-    $allowedExtension = STUDENT_LICENSE_EVIDENCE_MIME_EXTENSIONS[$mime] ?? null;
-    if ($allowedExtension === null || !in_array($extension, ['pdf', 'jpg', 'jpeg', 'png'], true)) {
-        throw new Exception("รองรับหลักฐานเฉพาะไฟล์ PDF, JPG หรือ PNG");
-    }
-    if ($extension === 'jpeg') {
-        $extension = 'jpg';
-    }
-    if ($allowedExtension !== $extension && !($allowedExtension === 'jpg' && $extension === 'jpeg')) {
-        throw new Exception("ชนิดไฟล์หลักฐานไม่ตรงกับนามสกุลไฟล์");
-    }
-
-    $safeOwner = preg_replace('/[^A-Za-z0-9_-]/', '_', $studentId);
-    $relativeDir = 'uploads/user-documents/' . $safeOwner;
-    $absoluteDir = __DIR__ . '/../../' . $relativeDir;
-    if (!is_dir($absoluteDir) && !mkdir($absoluteDir, 0775, true)) {
-        throw new Exception("ไม่สามารถสร้างโฟลเดอร์เก็บหลักฐานได้");
-    }
-
-    $fileName = $prefix . '_' . date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . '.' . $extension;
-    $targetPath = $absoluteDir . DIRECTORY_SEPARATOR . $fileName;
-    if (!move_uploaded_file($file['tmp_name'], $targetPath)) {
-        throw new Exception("ไม่สามารถบันทึกไฟล์หลักฐานได้");
-    }
-
-    $rawOriginalName = basename((string)$file['name']);
-    $originalName = function_exists('mb_substr') ? mb_substr($rawOriginalName, 0, 255) : substr($rawOriginalName, 0, 255);
-    return [
-        'path' => $relativeDir . '/' . $fileName,
-        'name' => $originalName !== '' ? $originalName : $fileName,
-    ];
-}
-=======
 function normalizeStoredFilePaths($value): array
 {
     if ($value === null) {
@@ -237,7 +121,6 @@ const FACULTY_PROFILE_IMAGE_MIME_EXTENSIONS = [
 ];
 
 // Note: studentLicenseEnsureSchema and helpers are loaded from student_license_helper.php
->>>>>>> b329531cc7f1869e64fcd6d0e7b6039df236ca4c
 
 
 try {
@@ -421,10 +304,6 @@ try {
             $rawWeight = isset($input['weight']) ? trim((string)$input['weight']) : '';
             $weight    = ($rawWeight !== '' && is_numeric($rawWeight)) ? floatval($rawWeight) : null;
 
-<<<<<<< HEAD
-=======
-
->>>>>>> b329531cc7f1869e64fcd6d0e7b6039df236ca4c
             $bmi = null;
             if ($height && $weight && $height > 0) {
                 $hMeter = $height / 100.0;
