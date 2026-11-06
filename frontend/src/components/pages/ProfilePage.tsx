@@ -106,9 +106,6 @@ export default function ProfilePage({
   const [licensePreviewUrl, setLicensePreviewUrl] = useState("");
   const [licenseFileError, setLicenseFileError] = useState("");
   const licenseInputRef = useRef<HTMLInputElement>(null);
-  const [studentLicenseEvidenceFiles, setStudentLicenseEvidenceFiles] = useState<Record<string, File | null>>({});
-  const [studentLicenseEvidenceErrors, setStudentLicenseEvidenceErrors] = useState<Record<string, string>>({});
-  const studentLicenseEvidenceRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const { toast } = useToast();
 
@@ -162,27 +159,6 @@ export default function ProfilePage({
     setLicenseFile(file);
   };
 
-  const handleStudentLicenseEvidenceChange = (fieldName: string, e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] ?? null;
-    e.target.value = "";
-    if (!file) return;
-    if (!STUDENT_LICENSE_EVIDENCE_TYPES.includes(file.type)) {
-      setStudentLicenseEvidenceErrors((prev) => ({
-        ...prev,
-        [fieldName]: "รองรับเฉพาะไฟล์ PDF, JPG หรือ PNG",
-      }));
-      return;
-    }
-    if (file.size > STUDENT_LICENSE_EVIDENCE_MAX_BYTES) {
-      setStudentLicenseEvidenceErrors((prev) => ({
-        ...prev,
-        [fieldName]: "ไฟล์หลักฐานต้องมีขนาดไม่เกิน 5 MB",
-      }));
-      return;
-    }
-    setStudentLicenseEvidenceErrors((prev) => ({ ...prev, [fieldName]: "" }));
-    setStudentLicenseEvidenceFiles((prev) => ({ ...prev, [fieldName]: file }));
-  };
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -213,13 +189,6 @@ export default function ProfilePage({
 
   const handleCheckboxChange = (name: string, checked: boolean | "indeterminate") => {
     setFormData((prev: any) => ({ ...prev, [name]: checked === true ? 1 : 0 }));
-    if (checked !== true) {
-      const item = STUDENT_LICENSE_ITEMS.find((licenseItem) => licenseItem.passedField === name);
-      if (item) {
-        setStudentLicenseEvidenceFiles((prev) => ({ ...prev, [item.fileField]: null }));
-        setStudentLicenseEvidenceErrors((prev) => ({ ...prev, [item.fileField]: "" }));
-      }
-    }
   };
 
   // ฟังก์ชันคำนวณ BMI อัตโนมัติ
@@ -243,31 +212,8 @@ export default function ProfilePage({
         return;
       }
 
-      if (userRole === "student") {
-        for (const item of STUDENT_LICENSE_ITEMS) {
-          if (!isPassedValue(formData[item.passedField])) continue;
-          const hasNewEvidence = Boolean(studentLicenseEvidenceFiles[item.fileField]);
-          const hasExistingEvidence = Boolean(formData[item.pathField] || profileData?.[item.pathField]);
-          if (!hasNewEvidence && !hasExistingEvidence) {
-            toast({
-              title: "กรุณาแนบหลักฐาน",
-              description: `ต้องแนบหลักฐานสำหรับ${item.label}`,
-              variant: "destructive",
-            });
-            return;
-          }
-          if (studentLicenseEvidenceErrors[item.fileField]) {
-            toast({
-              title: "ไฟล์หลักฐานไม่ถูกต้อง",
-              description: studentLicenseEvidenceErrors[item.fileField],
-              variant: "destructive",
-            });
-            return;
-          }
-        }
-      }
-
       setIsSaving(true);
+<<<<<<< HEAD
       const hasStudentLicenseEvidenceFiles =
         userRole === "student" &&
         STUDENT_LICENSE_ITEMS.some((item) => Boolean(studentLicenseEvidenceFiles[item.fileField]));
@@ -292,6 +238,9 @@ export default function ProfilePage({
       } else {
         res = await api.post("/index.php?page=profile", profilePayload);
       }
+=======
+      const res = await api.post("/index.php?page=profile", formData);
+>>>>>>> b329531cc7f1869e64fcd6d0e7b6039df236ca4c
       if (res.data.status === "success") {
         // บันทึกข้อมูลแล้วค่อยอัปโหลดรูปใบประกอบวิชาชีพ (ถ้าเลือกรูปใหม่)
         if (userRole === "teacher" && licenseFile) {
@@ -315,8 +264,6 @@ export default function ProfilePage({
         }
         toast({ title: "อัปเดตข้อมูลส่วนตัวเรียบร้อยแล้ว" });
         setEditing(false);
-        setStudentLicenseEvidenceFiles({});
-        setStudentLicenseEvidenceErrors({});
         fetchProfile();
       } else {
         toast({
@@ -384,8 +331,6 @@ export default function ProfilePage({
               });
               setLicenseFile(null);
               setLicenseFileError(""); 
-              setStudentLicenseEvidenceFiles({});
-              setStudentLicenseEvidenceErrors({});
               setEditing(true); 
             }}
           >
@@ -855,91 +800,11 @@ export default function ProfilePage({
               </div>
             )}
 
-            {/* หมวดที่ 3: ข้อมูลการสอบใบประกอบวิชาชีพ (เฉพาะ Student) */}
-            {userRole === "student" && (
-              <div className="space-y-4">
-                <h4 className="font-semibold text-primary border-b border-border pb-1">
-                  3. ข้อมูลการสอบใบประกอบวิชาชีพ
-                </h4>
-                <div className="grid gap-4">
-                  {STUDENT_LICENSE_ITEMS.map((item) => {
-                    const checked = isPassedValue(formData[item.passedField]);
-                    const existingPath = formData[item.pathField] || profileData?.[item.pathField];
-                    const existingUrl = resolveUploadUrl(existingPath, apiBaseUrl);
-                    const selectedFile = studentLicenseEvidenceFiles[item.fileField];
-                    const evidenceError = studentLicenseEvidenceErrors[item.fileField];
-                    return (
-                      <div key={item.key} className="rounded-lg border border-border p-4 space-y-3">
-                        <div className="flex items-start gap-3">
-                          <Checkbox
-                            id={item.passedField}
-                            checked={checked}
-                            onCheckedChange={(value) => handleCheckboxChange(item.passedField, value)}
-                            disabled={isSaving}
-                          />
-                          <div className="space-y-1">
-                            <Label htmlFor={item.passedField} className="font-medium">
-                              {item.label}
-                            </Label>
-                            <p className="text-xs text-muted-foreground">
-                              เมื่อติ๊กแล้วต้องแนบหลักฐาน ระบบจะบันทึกวันที่ตามเวลาที่กดบันทึกข้อมูล
-                            </p>
-                          </div>
-                        </div>
-
-                        {checked && (
-                          <div className="ml-7 flex flex-wrap items-center gap-3">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => studentLicenseEvidenceRefs.current[item.fileField]?.click()}
-                              disabled={isSaving}
-                            >
-                              <Upload className="mr-2 h-4 w-4" />
-                              {selectedFile || existingUrl ? "เปลี่ยนหลักฐาน" : "แนบหลักฐาน"}
-                            </Button>
-                            <input
-                              ref={(node) => {
-                                studentLicenseEvidenceRefs.current[item.fileField] = node;
-                              }}
-                              type="file"
-                              accept="application/pdf,image/jpeg,image/png"
-                              className="hidden"
-                              onChange={(e) => handleStudentLicenseEvidenceChange(item.fileField, e)}
-                            />
-                            <div className="min-w-0 text-xs text-muted-foreground">
-                              {selectedFile ? (
-                                <p className="truncate">ไฟล์ใหม่: {selectedFile.name}</p>
-                              ) : existingUrl ? (
-                                <a
-                                  href={existingUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1 text-primary hover:underline"
-                                >
-                                  <FileText className="h-3.5 w-3.5" />
-                                  {formData[item.nameField] || "ดูหลักฐานเดิม"}
-                                </a>
-                              ) : (
-                                <p>PDF, JPG หรือ PNG ขนาดไม่เกิน 5 MB</p>
-                              )}
-                              {evidenceError && <p className="text-red-600">{evidenceError}</p>}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
             {/* หมวดที่ 3: ข้อมูลครอบครัว (เฉพาะ Student) */}
             {userRole === "student" && (
               <div className="space-y-4">
                 <h4 className="font-semibold text-primary border-b border-border pb-1">
-                  4. ข้อมูลครอบครัว (บิดา-มารดา)
+                  3. ข้อมูลครอบครัว (บิดา-มารดา)
                 </h4>
 
                 {/* ข้อมูลบิดา */}

@@ -4,11 +4,18 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
 interface ExportButtonProps {
+<<<<<<< HEAD
   data?: Record<string, unknown>[];
+=======
+  data?: any[];
+>>>>>>> b329531cc7f1869e64fcd6d0e7b6039df236ca4c
   reportName?: string;
   className?: string;
+  onExport?: () => void;
+  onClick?: () => void;
 }
 
+<<<<<<< HEAD
 const csvCell = (value: unknown) => {
   const text = value === null || value === undefined ? "" : String(value);
   const safeText = /^[=+\-@]/.test(text) ? `'${text}` : text;
@@ -24,6 +31,26 @@ const ExportButton: React.FC<ExportButtonProps> = ({
     if (data.length === 0) {
       toast.error("ไม่มีข้อมูลสำหรับส่งออก");
       return;
+=======
+const ExportButton: React.FC<ExportButtonProps> = ({ 
+  data = [], 
+  reportName = "export-data", 
+  className,
+  onExport,
+  onClick,
+}) => {
+  const handleExport = () => {
+    if (onExport) {
+      onExport();
+      return;
+    }
+    if (onClick) {
+      onClick();
+      return;
+    }
+    if (data.length === 0 && reportName === "Audit-Log") {
+       console.log("Preparing export for:", reportName);
+>>>>>>> b329531cc7f1869e64fcd6d0e7b6039df236ca4c
     }
 
     const headers = Array.from(new Set(data.flatMap((row) => Object.keys(row))));
@@ -48,7 +75,7 @@ const ExportButton: React.FC<ExportButtonProps> = ({
       variant="outline"
       size="sm"
       onClick={handleExport}
-      className={`flex items-center gap-2 ${className}`}
+      className={`flex items-center gap-2 ${className || ""}`}
     >
       <Download size={16} />
       <span>ส่งออกข้อมูล</span>

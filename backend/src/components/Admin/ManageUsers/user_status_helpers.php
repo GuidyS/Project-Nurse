@@ -10,9 +10,11 @@
 function studentStatusOptions(): array
 {
     return [
-        'Active'   => 'คงอยู่',
-        'OnLeave'  => 'พักการเรียน',
-        'Resigned' => 'ลาออก',
+        'Active'    => 'คงอยู่',
+        'Graduated' => 'สำเร็จการศึกษา',
+        'OnLeave'   => 'พักการเรียน',
+        'Resigned'  => 'ลาออก',
+        'Retired'   => 'พ้นสภาพ',
     ];
 }
 
@@ -25,40 +27,19 @@ function facultyStatusOptions(): array
     ];
 }
 
-/**
- * เหตุผลที่เลือกได้เมื่อนักศึกษาพักการเรียนหรือลาออก (แยกรายการตามสถานะ)
- * พักการเรียนเป็นการหยุดชั่วคราว จึงใช้ได้เฉพาะเหตุผลที่กลับมาเรียนต่อได้
- */
-function studentStatusReasons(?string $status = null): array
+/** เหตุผลที่เลือกได้เมื่อนักศึกษาพักการเรียน ลาออก หรือพ้นสภาพ */
+function studentStatusReasons(): array
 {
-    $byStatus = [
-        'OnLeave'  => ['ปัญหาการเงิน', 'ปัญหาสุขภาพ'],
-        'Resigned' => ['ปัญหาการเงิน', 'ย้ายที่เรียน', 'ปัญหาสุขภาพ', 'โดนรีไทร์'],
-    ];
-
-    if ($status === null) {
-        return $byStatus; // ส่งทั้งแผนที่ให้หน้าเว็บไปใช้
-    }
-
-    return $byStatus[$status] ?? [];
+    return ['ปัญหาการเงิน', 'ย้ายที่เรียน', 'ปัญหาสุขภาพ', 'โดนรีไทร์'];
 }
 
 /** สถานะที่ต้องระบุเหตุผล */
 function studentStatusNeedsReason(string $status): bool
 {
-    return in_array($status, ['OnLeave', 'Resigned'], true);
+    return in_array($status, ['OnLeave', 'Resigned', 'Retired', 'Dropout', 'พักการเรียน', 'ลาออก', 'พ้นสภาพ'], true);
 }
 
-/**
- * สถานะที่ทำให้นักศึกษาเข้าใช้งานระบบไม่ได้
- * ตรวจจาก student.status โดยตรง ไม่ไปยุ่งกับ users.status เพื่อไม่ให้สองค่าขัดกัน
- */
-function studentStatusBlocksLogin(string $status): bool
-{
-    return in_array($status, ['OnLeave', 'Resigned'], true);
-}
-
-/** เพิ่มค่าใหม่ใน enum ของคอลัมน์ status (ทำครั้งเดียว ปลอดภัยถ้ารันซ้ำ) */
+/** ปรับคอลัมน์ status ให้เป็น VARCHAR(50) เพื่อรองรับทุกสถานะและป้องกัน Warning 1265 Data truncated */
 function userStatusEnsureSchema(PDO $db): void
 {
     static $ready = false;
@@ -66,35 +47,17 @@ function userStatusEnsureSchema(PDO $db): void
         return;
     }
 
-    $needed = [
-        'student' => ['Active', 'Graduted', 'Dropout', 'Retired', 'OnLeave', 'Resigned'],
-        'faculty' => ['Active', 'Retired', 'Resigned'],
-    ];
-
-    foreach ($needed as $table => $values) {
+    foreach (['student', 'faculty'] as $table) {
         $stmt = $db->prepare("
-            SELECT COLUMN_TYPE FROM information_schema.COLUMNS
+            SELECT DATA_TYPE FROM information_schema.COLUMNS
             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = 'status'
         ");
         $stmt->execute([$table]);
-        $type = (string)$stmt->fetchColumn();
-        if ($type === '' || stripos($type, 'enum') !== 0) {
-            continue; // ไม่ใช่ enum (เช่น varchar) ไม่ต้องแก้
+        $type = strtolower((string)$stmt->fetchColumn());
+        if ($type === 'enum') {
+            $default = $table === 'student' ? "'คงอยู่'" : "'Active'";
+            $db->exec("ALTER TABLE `{$table}` MODIFY COLUMN `status` VARCHAR(50) DEFAULT {$default}");
         }
-
-        $missing = false;
-        foreach ($values as $value) {
-            if (stripos($type, "'{$value}'") === false) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            continue;
-        }
-
-        $enumList = implode(',', array_map(static fn(string $v): string => "'" . $v . "'", $values));
-        $db->exec("ALTER TABLE `{$table}` MODIFY COLUMN `status` ENUM({$enumList}) DEFAULT 'Active'");
     }
 
     $ready = true;
@@ -110,16 +73,22 @@ function normalizeUserStatusInput(string $role, $statusInput, $reasonInput, ?str
     $options = $role === 'student' ? studentStatusOptions() : facultyStatusOptions();
     $status = trim((string)$statusInput);
 
+    // รองรับทั้งกรณีหน้าเว็บส่งมาเป็น label ภาษาไทย (เช่น "ลาออก") หรือ key ภาษาอังกฤษ (เช่น "Resigned")
+    $reverseMap = array_flip($options);
+    if (isset($reverseMap[$status])) {
+        $status = $reverseMap[$status];
+    }
+
     if ($status === '') {
         $status = $currentStatus ?: 'Active';
     }
 
-    // ค่าเดิมในฐานข้อมูลที่ไม่มีในตัวเลือกใหม่ (เช่น Graduted) ให้คงไว้ได้ถ้าไม่ได้แก้
+    // ค่าเดิมในฐานข้อมูลที่ไม่มีในตัวเลือกใหม่ (เช่น Graduted, Retired) ให้คงไว้ได้ถ้าไม่ได้แก้
     if (!isset($options[$status])) {
         if ($currentStatus !== null && $status === $currentStatus) {
             return ['status' => $status, 'reason' => $reasonInput !== null ? trim((string)$reasonInput) : null];
         }
-        throw new InvalidArgumentException('สถานะไม่ถูกต้อง');
+        throw new InvalidArgumentException('สถานะไม่ถูกต้อง: ' . $status);
     }
 
     $reason = $reasonInput !== null ? trim((string)$reasonInput) : '';
@@ -129,8 +98,8 @@ function normalizeUserStatusInput(string $role, $statusInput, $reasonInput, ?str
             if ($reason === '') {
                 throw new InvalidArgumentException('กรุณาเลือกเหตุผลของสถานะ ' . $options[$status]);
             }
-            if (!in_array($reason, studentStatusReasons($status), true)) {
-                throw new InvalidArgumentException('เหตุผลต้องเลือกจากรายการของสถานะ ' . $options[$status]);
+            if (!in_array($reason, studentStatusReasons(), true)) {
+                throw new InvalidArgumentException('เหตุผลต้องเลือกจากรายการที่กำหนดไว้');
             }
         } else {
             $reason = ''; // คงอยู่ = ไม่มีเหตุผล
