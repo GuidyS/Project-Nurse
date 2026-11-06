@@ -28,7 +28,7 @@ Frontend ใช้ Vite + React + TypeScript เป็นโครงหลั�
 ## การติดตั้งและรัน
 
 * **Directory:** `frontend/`
-* **File:** `.env`
+* **File:** `src/.env` สำหรับ URL ของ Backend
 
 ```bash
 npm install
@@ -66,26 +66,15 @@ npm run lint
 
 ## Environment Variables
 
-Frontend เรียก Backend ผ่าน `src/lib/axios.ts` โดยอ่านค่าจาก:
+Frontend เรียก Backend ผ่าน `src/lib/axios.ts` และ Vite ตั้งค่า `envDir` เป็น `frontend/src` จึงต้องสร้าง `frontend/src/.env` ดังนี้:
 
 ```env
 VITE_API_BASE_URL=http://localhost:8080
 ```
 
-แนะนำให้สร้างไฟล์ `.env` ไว้ที่โฟลเดอร์ `frontend/`:
-
-```bash
-frontend/.env
-```
-
-ตัวอย่าง:
+ค่าของ Docker Compose เช่น SMTP ให้อยู่ใน `.env` ที่ root ข้าง `docker-compose.yml` แยกจากไฟล์ของ Frontend และห้าม commit รหัสผ่านขึ้น Git:
 
 ```env
-# Base URL สำหรับเชื่อมต่อ Backend API
-VITE_API_BASE_URL = http://localhost:8080
-
-# คัดลอกไฟล์นี้เป็น .env (วางข้าง docker-compose.yml) แล้วกรอกค่าจริง จากนั้นรัน: docker compose up -d backend
-# .env อยู่ใน .gitignore แล้ว — ห้าม commit รหัสผ่านขึ้น git
 
 # ---------- อีเมลแจ้งเตือน (ใบประกอบวิชาชีพใกล้หมดอายุ) ----------
 # ถ้าเว้น SMTP_HOST ว่าง ระบบยังแจ้งเตือนในระบบได้ แต่จะไม่ส่งอีเมล
@@ -113,7 +102,7 @@ APP_URL=http://localhost:5173
 PROJECT_REMINDER_EMAIL=nus1@siam.edu
 ```
 
-ถ้าไม่ได้ตั้งค่านี้ axios จะไม่มี base URL ชัดเจน และ API เช่น `/index.php?page=login` อาจยิงผิดที่
+ถ้าไม่ได้ตั้ง `VITE_API_BASE_URL` ใน `frontend/src/.env` axios จะไม่มี base URL ชัดเจน และ API เช่น `/index.php?page=login` อาจยิงผิดที่
 
 ## โครงสร้างสำคัญ
 
@@ -398,7 +387,7 @@ npm install
 
 ถ้า API ไม่ทำงาน:
 
-1. เช็ก `frontend/.env`
+1. เช็ก `frontend/src/.env` และรีสตาร์ต Vite หลังแก้ค่า
 2. เช็กว่า Backend เปิดอยู่ที่ `http://localhost:8080`
 3. เช็ก CORS ใน Backend
 4. ดู console log ใน browser
