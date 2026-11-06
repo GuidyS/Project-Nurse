@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Edit, Trash2, MoreHorizontal, Upload, Download, UserCog, Users as UsersIcon, CalendarClock, Info, Eye, EyeOff, ShieldCheck, FileText } from "lucide-react";
-import { onlyEnglish, onlyThai } from "@/lib/nameInput";
+import { onlyThai } from "@/lib/nameInput";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import api from "@/lib/axios";
 import { ConfirmActionDialog } from "@/components/shared/ConfirmActionDialog";
@@ -198,9 +198,25 @@ export default function UsersManagement() {
   const fetchUsers = async () => {
     try {
       const response = await api.get("/index.php?page=get-users");
-      setUsers(response.data);
-    } catch (error) {
-      toast({ title: "โหลดข้อมูลล้มเหลว", variant: "destructive" });
+      const payload = response.data;
+      const userRows = Array.isArray(payload)
+        ? payload
+        : Array.isArray(payload?.data)
+          ? payload.data
+          : null;
+
+      if (!userRows) {
+        throw new Error(payload?.message || "รูปแบบข้อมูลผู้ใช้จากระบบไม่ถูกต้อง");
+      }
+
+      setUsers(userRows);
+    } catch (error: any) {
+      setUsers([]);
+      toast({
+        title: "โหลดข้อมูลล้มเหลว",
+        description: error?.response?.data?.message || error?.message || "ไม่สามารถโหลดข้อมูลผู้ใช้ได้",
+        variant: "destructive",
+      });
     }
   };
 
@@ -796,7 +812,7 @@ export default function UsersManagement() {
 
                 {isStudentStatusReasonNeeded(detailForm.status) && detailForm.dropout_date && (
                   <ReadOnlyField label="วันที่เปลี่ยนสถานะ" value={detailForm.dropout_date} note="ระบบบันทึกให้อัตโนมัติ" />
-                )}.
+                )}
 
                 {/* 🎯 หมวดข้อมูลการสอบใบประกอบวิชาชีพ (Admin เป็นผู้กรอก) */}
                 <div className="col-span-2 rounded-lg border border-border p-4 space-y-4 bg-muted/10">

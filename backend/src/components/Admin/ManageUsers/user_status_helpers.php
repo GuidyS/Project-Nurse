@@ -39,6 +39,12 @@ function studentStatusNeedsReason(string $status): bool
     return in_array($status, ['OnLeave', 'Resigned', 'Retired', 'Dropout', 'พักการเรียน', 'ลาออก', 'พ้นสภาพ'], true);
 }
 
+/** สถานะการศึกษาที่ไม่อนุญาตให้นักศึกษาเข้าใช้งานระบบ */
+function studentStatusBlocksLogin(string $status): bool
+{
+    return studentStatusNeedsReason($status);
+}
+
 /** ปรับคอลัมน์ status ให้เป็น VARCHAR(50) เพื่อรองรับทุกสถานะและป้องกัน Warning 1265 Data truncated */
 function userStatusEnsureSchema(PDO $db): void
 {

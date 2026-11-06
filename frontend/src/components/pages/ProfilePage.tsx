@@ -213,34 +213,7 @@ export default function ProfilePage({
       }
 
       setIsSaving(true);
-<<<<<<< HEAD
-      const hasStudentLicenseEvidenceFiles =
-        userRole === "student" &&
-        STUDENT_LICENSE_ITEMS.some((item) => Boolean(studentLicenseEvidenceFiles[item.fileField]));
-      const profilePayload = { ...formData };
-      if (userRole === "student") {
-        delete profilePayload.gpa;
-      }
-
-      let res;
-      if (hasStudentLicenseEvidenceFiles) {
-        const payload = new FormData();
-        payload.append("profile", JSON.stringify(profilePayload));
-        for (const item of STUDENT_LICENSE_ITEMS) {
-          const file = studentLicenseEvidenceFiles[item.fileField];
-          if (file) {
-            payload.append(item.fileField, file);
-          }
-        }
-        res = await api.post("/index.php?page=profile", payload, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
-      } else {
-        res = await api.post("/index.php?page=profile", profilePayload);
-      }
-=======
       const res = await api.post("/index.php?page=profile", formData);
->>>>>>> b329531cc7f1869e64fcd6d0e7b6039df236ca4c
       if (res.data.status === "success") {
         // บันทึกข้อมูลแล้วค่อยอัปโหลดรูปใบประกอบวิชาชีพ (ถ้าเลือกรูปใหม่)
         if (userRole === "teacher" && licenseFile) {
