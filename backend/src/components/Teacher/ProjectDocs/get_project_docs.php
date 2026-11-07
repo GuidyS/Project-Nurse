@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../ProjectShared/project_helpers.php';
+require_once __DIR__ . '/../../../config/storage.php';
 
 $db = project_db();
 project_require_auth($db, ['PROJECT_DOCS_MANAGE']);
@@ -45,6 +46,11 @@ try {
     $docsStmt = $db->prepare($docsSql);
     $docsStmt->execute($params);
     $docs = project_u_documents($docsStmt->fetchAll(PDO::FETCH_ASSOC));
+    foreach ($docs as &$doc) {
+        $doc['file'] = storageDescriptor($db, $doc['file_path'] ?? null, $doc['file_name'] ?? null);
+        $doc['file_url'] = $doc['file']['url'];
+    }
+    unset($doc);
 
     $projects = $db->query("
         SELECT

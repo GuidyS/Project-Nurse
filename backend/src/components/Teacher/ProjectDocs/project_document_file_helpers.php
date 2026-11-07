@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../../../config/storage.php';
 
 function project_document_base_upload_dir(): string
 {
@@ -91,42 +92,19 @@ function project_document_validate_file(array $file): array
     ];
 }
 
-function project_document_upload_file(array $file, int $facultyId): array
+function project_document_upload_file(PDO $db, array $file, int $facultyId, ?string $resourceId = null): array
 {
     $meta = project_document_validate_file($file);
-    $baseProjectDocsDir = project_document_base_upload_dir();
-
-    if (!is_dir($baseProjectDocsDir) && !mkdir($baseProjectDocsDir, 0755, true)) {
-        throw new RuntimeException("ไม่สามารถสร้างโฟลเดอร์อัปโหลดได้");
-    }
-
-    $facultyDirName = (string) $facultyId;
-    $uploadDir = $baseProjectDocsDir . $facultyDirName . DIRECTORY_SEPARATOR;
-    if (!is_dir($uploadDir) && !mkdir($uploadDir, 0755, true)) {
-        throw new RuntimeException("ไม่สามารถสร้างโฟลเดอร์อัปโหลดสำหรับอาจารย์ได้");
-    }
-
-    $baseUploadDir = realpath($baseProjectDocsDir);
-    $realUploadDir = realpath($uploadDir);
-    if (
-        !$baseUploadDir ||
-        !$realUploadDir ||
-        strpos($realUploadDir . DIRECTORY_SEPARATOR, $baseUploadDir . DIRECTORY_SEPARATOR) !== 0
-    ) {
-        throw new RuntimeException("ตำแหน่งจัดเก็บไฟล์ไม่ถูกต้อง");
-    }
-
-    $safeName = preg_replace('/[^A-Za-z0-9._-]/', '_', $meta['original_name']);
-    $fileName = date('YmdHis') . '_' . bin2hex(random_bytes(8)) . '_' . $safeName;
-    $targetPath = $realUploadDir . DIRECTORY_SEPARATOR . $fileName;
-    $publicPath = 'uploads/project_docs/' . $facultyDirName . '/' . $fileName;
-
-    if (!move_uploaded_file($file['tmp_name'], $targetPath)) {
-        throw new RuntimeException("ไม่สามารถย้ายไฟล์ไปยังโฟลเดอร์เซิร์ฟเวอร์ได้");
-    }
+    $stored = storagePutUploadedFile($db, $file, [
+        'owner_type' => 'faculty', 'owner_id' => (string)$facultyId,
+        'resource_type' => 'project_document', 'resource_id' => $resourceId,
+        'access_scope' => 'project_member_admin', 'mime_type' => $meta['mime_type'],
+    ]);
 
     return [
-        'file_path' => $publicPath,
+        'file_path' => $stored['reference'],
+        'storage_id' => $stored['id'],
+        'storage_key' => $stored['object_key'],
         'file_name' => $meta['original_name'],
         'mime_type' => $meta['mime_type'],
         'file_size' => $meta['file_size'],
@@ -175,8 +153,12 @@ function project_document_resolve_safe_path(?string $publicPath): ?string
     return $fullPath;
 }
 
-function project_document_delete_file(?string $publicPath): void
+function project_document_delete_file(PDO $db, ?string $publicPath): void
 {
+    if (storageReferenceId($publicPath)) {
+        storageDeleteReference($db, $publicPath);
+        return;
+    }
     $fullPath = project_document_resolve_safe_path($publicPath);
     if ($fullPath === null || !file_exists($fullPath)) {
         return;

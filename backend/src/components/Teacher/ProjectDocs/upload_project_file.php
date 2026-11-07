@@ -8,6 +8,7 @@ $auth = project_require_auth($db, ['PROJECT_DOCS_MANAGE']);
 project_require_admin_write($auth);
 
 $uploadedPathForCleanup = null;
+$uploadedKeyForCleanup = null;
 
 function project_document_request_text(string $key): string
 {
@@ -83,8 +84,9 @@ try {
             $auth,
             $document['responsible_faculty_id'] !== null ? (int) $document['responsible_faculty_id'] : null
         );
-        $uploadedFile = project_document_upload_file($_FILES['file'], $facultyId);
+        $uploadedFile = project_document_upload_file($db, $_FILES['file'], $facultyId, (string)$document['project_id']);
         $uploadedPathForCleanup = $uploadedFile['file_path'];
+        $uploadedKeyForCleanup = $uploadedFile['storage_key'] ?? null;
 
         $stmt = $db->prepare("
             UPDATE project_documents
@@ -107,13 +109,18 @@ try {
         project_u_document_link($db, (string)$document['project_id'], $documentId, $_POST);
         $db->commit();
         $uploadedPathForCleanup = null;
+        $uploadedKeyForCleanup = null;
         try {
-            project_document_delete_file($document['file_path'] ?? null);
+            project_document_delete_file($db, $document['file_path'] ?? null);
         } catch (Exception $cleanupException) {
             // Keep the successful replacement even if the previous file cannot be removed.
         }
 
-        logAudit($db, $auth['user_id'], 'update', 'project_documents', "อัปโหลด/แก้ไขไฟล์เอกสารโครงการ (ID: {$documentId}, ชื่อไฟล์: {$uploadedFile['file_name']})");
+        try {
+            logAudit($db, $auth['user_id'], 'update', 'project_documents', "อัปโหลด/แก้ไขไฟล์เอกสารโครงการ (ID: {$documentId}, ชื่อไฟล์: {$uploadedFile['file_name']})");
+        } catch (Throwable $auditError) {
+            error_log('Project document audit log failed: ' . $auditError->getMessage());
+        }
 
         project_json([
             "status" => "success",
@@ -159,8 +166,9 @@ try {
     ]);
 
     $newDocumentId = (int) $db->lastInsertId();
-    $uploadedFile = project_document_upload_file($_FILES['file'], $facultyId);
+    $uploadedFile = project_document_upload_file($db, $_FILES['file'], $facultyId, (string)$projectId);
     $uploadedPathForCleanup = $uploadedFile['file_path'];
+    $uploadedKeyForCleanup = $uploadedFile['storage_key'] ?? null;
 
     $updateStmt = $db->prepare("
         UPDATE project_documents
@@ -183,8 +191,13 @@ try {
     project_u_document_link($db, $projectId, $newDocumentId, $_POST);
     $db->commit();
     $uploadedPathForCleanup = null;
+    $uploadedKeyForCleanup = null;
 
-    logAudit($db, $auth['user_id'], 'create', 'project_documents', "เพิ่มไฟล์เอกสารโครงการใหม่ (ID: {$newDocumentId}, ชื่อ: {$name}, ไฟล์: {$uploadedFile['file_name']})");
+    try {
+        logAudit($db, $auth['user_id'], 'create', 'project_documents', "เพิ่มไฟล์เอกสารโครงการใหม่ (ID: {$newDocumentId}, ชื่อ: {$name}, ไฟล์: {$uploadedFile['file_name']})");
+    } catch (Throwable $auditError) {
+        error_log('Project document audit log failed: ' . $auditError->getMessage());
+    }
 
     project_json([
         "status" => "success",
@@ -192,13 +205,13 @@ try {
         "doc_id" => $newDocumentId,
         "file_path" => $uploadedFile['file_path'],
     ]);
-} catch (Exception $e) {
+} catch (Throwable $e) {
     if ($db->inTransaction()) {
         $db->rollBack();
     }
 
     if ($uploadedPathForCleanup !== null) {
-        project_document_delete_file($uploadedPathForCleanup);
+        storageDeleteObjectKey($uploadedKeyForCleanup);
     }
 
     project_json(["status" => "error", "message" => $e->getMessage()], project_error_status($e));

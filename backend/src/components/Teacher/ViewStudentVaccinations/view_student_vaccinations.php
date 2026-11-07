@@ -6,6 +6,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 if (session_status() == PHP_SESSION_NONE) { session_start(); }
 require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/../../../config/storage.php';
 
 header("Content-Type: application/json; charset=UTF-8");
 
@@ -61,6 +62,11 @@ try {
     $stmt2 = $db->prepare($query);
     $stmt2->execute([':sid' => $targetStudentId]);
     $rows = $stmt2->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    foreach ($rows as &$row) {
+        $row['file'] = storageDescriptor($db, $row['evidence_file_path'] ?? null);
+        $row['evidence_file_url'] = $row['file']['url'];
+    }
+    unset($row);
 
     echo json_encode(["status" => "success", "data" => $rows], JSON_UNESCAPED_UNICODE);
 } catch (Exception $e) {

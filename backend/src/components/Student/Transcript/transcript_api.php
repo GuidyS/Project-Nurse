@@ -28,12 +28,14 @@ if (!$student_raw_id) {
 }
 
 require_once __DIR__ . '/../../../config/config.php'; 
+require_once __DIR__ . '/../../../config/storage.php';
 if (file_exists(__DIR__ . '/../../../config/academic_helper.php')) {
     require_once __DIR__ . '/../../../config/academic_helper.php';
 }
 
 try {
     $db = new Connect();
+    $pendingStorageReference = null;
     $student_session_id = trim((string)$student_raw_id);
 
     // ตรวจสอบข้อมูลผู้ใช้ในกรณีที่เป็น user_id
@@ -63,26 +65,31 @@ try {
             }
 
             $file = $_FILES['file'];
+            if ((int)($file['size'] ?? 0) <= 0 || (int)$file['size'] > 10 * 1024 * 1024) {
+                throw new Exception("ไฟล์ใบลงทะเบียนต้องมีขนาดไม่เกิน 10 MB");
+            }
             $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
             if (!in_array($ext, ['pdf', 'jpg', 'jpeg', 'png', 'webp'])) {
                 throw new Exception("รองรับเฉพาะไฟล์ PDF, JPG, PNG หรือ WEBP เท่านั้น");
             }
 
-            $uploadDir = __DIR__ . '/../../../uploads/student-documents/' . $student_session_id . '/';
-            if (!is_dir($uploadDir)) {
-                mkdir($uploadDir, 0777, true);
+            $mime = mime_content_type($file['tmp_name']) ?: 'application/octet-stream';
+            if (!in_array($mime, ['application/pdf','image/jpeg','image/png','image/webp'], true)) {
+                throw new Exception("ชนิดไฟล์ใบลงทะเบียนไม่ถูกต้อง");
             }
-
-            $filename = 'reg_' . uniqid() . '.' . $ext;
-            $dest = $uploadDir . $filename;
-            if (!move_uploaded_file($file['tmp_name'], $dest)) {
-                throw new Exception("ไม่สามารถบันทึกไฟล์ได้");
-            }
-
-            $dbPath = 'uploads/student-documents/' . $student_session_id . '/' . $filename;
+            $stored = storagePutUploadedFile($db, $file, [
+                'owner_type' => 'student', 'owner_id' => $student_session_id,
+                'resource_type' => 'course_registration', 'access_scope' => 'student_advisor_admin',
+                'mime_type' => $mime,
+            ]);
+            $dbPath = $stored['reference'];
+            $pendingStorageReference = $stored['reference'];
 
             $stmt = $db->prepare("INSERT INTO student_course_registrations (student_id, academic_year, semester, course_count, file_path) VALUES (?, ?, ?, ?, ?)");
             $stmt->execute([$student_session_id, $academicYear, $semester, $courseCount, $dbPath]);
+            $db->prepare('UPDATE storage_objects SET resource_id=:rid WHERE storage_id=:id')
+               ->execute([':rid' => $db->lastInsertId(), ':id' => $stored['id']]);
+            $pendingStorageReference = null;
 
             ob_clean();
             echo json_encode(["status" => "success", "message" => "อัปโหลดใบลงทะเบียนเรียนเรียบร้อยแล้ว"], JSON_UNESCAPED_UNICODE);
@@ -97,11 +104,8 @@ try {
             $stmt->execute([$id, $student_session_id]);
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
             if ($row) {
-                $fullPath = __DIR__ . '/../../../' . $row['file_path'];
-                if (file_exists($fullPath)) {
-                    @unlink($fullPath);
-                }
                 $db->prepare("DELETE FROM student_course_registrations WHERE id = ? AND student_id = ?")->execute([$id, $student_session_id]);
+                storageDeleteReference($db, $row['file_path']);
             }
 
             ob_clean();
@@ -279,6 +283,11 @@ try {
     $stmtReg = $db->prepare("SELECT id, academic_year, semester, course_count, file_path, uploaded_at FROM student_course_registrations WHERE student_id = ? ORDER BY academic_year DESC, semester DESC, id DESC");
     $stmtReg->execute([$student_session_id]);
     $registrations = $stmtReg->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    foreach ($registrations as &$registration) {
+        $registration['file'] = storageDescriptor($db, $registration['file_path'] ?? null);
+        $registration['file_url'] = $registration['file']['url'];
+    }
+    unset($registration);
 
     // ดึงใบรายงานผลการเรียน/เกรดแต่ละเทอม
     $stmtGrades = $db->prepare("SELECT id, academic_year, semester, gpa, file_path, uploaded_at FROM student_term_grades WHERE student_id = ? ORDER BY academic_year DESC, semester DESC, id DESC");
@@ -295,7 +304,8 @@ try {
         ]
     ], JSON_UNESCAPED_UNICODE);
 
-} catch (Exception $e) {
+} catch (Throwable $e) {
+    if (!empty($pendingStorageReference)) storageDeleteReference($db, $pendingStorageReference);
     ob_clean();
     http_response_code(400);
     echo json_encode(["status" => "error", "message" => $e->getMessage()], JSON_UNESCAPED_UNICODE);

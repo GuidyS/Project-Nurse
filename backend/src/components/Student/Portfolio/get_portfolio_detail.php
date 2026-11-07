@@ -4,6 +4,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 // อ้างอิงพาร์ทรากหลักของเซิร์ฟเวอร์ Docker อย่างปลอดภัย ป้องกันปัญหาหาไฟล์ไม่เจอ
 require_once __DIR__ . '/../../../config/config.php'; 
+require_once __DIR__ . '/../../../config/storage.php';
 
 header('Access-Control-Allow-Origin: ' . (in_array($_SERVER['HTTP_ORIGIN'] ?? '', ['http://localhost:5173', 'http://127.0.0.1:5173'], true) ? ($_SERVER['HTTP_ORIGIN'] ?? '') : 'http://localhost:5173'));
 header('Vary: Origin');
@@ -79,7 +80,8 @@ try {
 
     if ($portfolio_detail) {
         // เสริม URL สัมบูรณ์ (Absolute URL) ให้กับไฟล์แนบ เพื่อให้หน้าบ้านสามารถส่งเปิดดูไฟล์ (Preview) ได้ทันที
-        $portfolio_detail['fileUrl'] = portfolio_detail_file_url($portfolio_detail['file_path'] ?? $portfolio_detail['filePath'] ?? null);
+        $portfolio_detail['file'] = storageDescriptor($db, $portfolio_detail['file_path'] ?? null, $portfolio_detail['file_name'] ?? null);
+        $portfolio_detail['fileUrl'] = $portfolio_detail['file']['url'] ?? portfolio_detail_file_url($portfolio_detail['file_path'] ?? $portfolio_detail['filePath'] ?? null);
 
         echo json_encode([
             "status" => "success",

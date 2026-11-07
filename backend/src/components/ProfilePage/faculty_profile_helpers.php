@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../../config/storage.php';
 /**
  * ฟังก์ชันช่วยเหลือเกี่ยวกับไฟล์และเอกสารของอาจารย์
  *
@@ -245,7 +246,7 @@ function resolveFacultyProfilePictureUrl(string $rawPath, string $facultyId): ?s
 
     $driveId = extractGoogleDriveId($path);
     if ($driveId) {
-        return cacheGoogleDriveProfilePicture($facultyId, $driveId);
+        return 'https://drive.google.com/thumbnail?id=' . rawurlencode($driveId) . '&sz=w256';
     }
 
     $picture = resolveFacultyFileUrl($path, true);
@@ -258,6 +259,18 @@ function resolveFacultyProfilePictureUrl(string $rawPath, string $facultyId): ?s
 function resolveFacultyFileUrl(string $rawPath, bool $preferDirectImage = false): array
 {
     $path = trim($rawPath);
+    $storageId = storageReferenceId($path);
+    if ($storageId) {
+        static $storageDb = null;
+        $storageDb = $storageDb instanceof PDO ? $storageDb : new Connect();
+        $file = storageDescriptor($storageDb, $path);
+        return [
+            'file_path' => $path,
+            'file_url' => $file['url'],
+            'source' => 'object_storage',
+            'available' => $file['available'],
+        ];
+    }
     $driveId = extractGoogleDriveId($path);
 
     if ($driveId) {

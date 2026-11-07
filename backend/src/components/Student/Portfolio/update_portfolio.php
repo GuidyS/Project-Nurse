@@ -2,6 +2,7 @@
 if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../config/audit_helper.php';
+require_once __DIR__ . '/../../../config/storage.php';
 
 header("Content-Type: application/json; charset=UTF-8");
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit(); }
@@ -92,6 +93,9 @@ try {
     $sql .= " WHERE portfolio_id = :id AND student_id = :sid";
     $updateStmt = $db->prepare($sql);
     $updateStmt->execute($params);
+    if ($googleDriveLink !== '' && storageReferenceId($existing['file_path'] ?? null)) {
+        storageDeleteReference($db, $existing['file_path']);
+    }
 
     logAudit($db, $_SESSION['user_id'] ?? null, 'update', 'portfolio', "แก้ไขผลงาน: {$title} (ID: {$itemId})");
 

@@ -7,6 +7,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
 import { Activity, Save, Loader2, AlertCircle, ImagePlus, X, ClipboardList, Calendar } from "lucide-react";
 import api from "@/lib/axios";
+import { resolveStoredFileUrl } from "@/lib/fileUrl";
 
 // UI Components สำหรับ Dialog ยืนยัน
 import {
@@ -22,6 +23,8 @@ import {
 
 interface EvidenceFile {
   path: string;
+  url?: string | null;
+  available?: boolean;
   date: string;
 }
 
@@ -67,9 +70,7 @@ export default function StudentHealthRecordsPage() {
   } | null>(null);
 
   const getImageUrl = (path: string) => {
-    const baseUrl = api.defaults.baseURL || "";
-    const rootUrl = baseUrl.replace(/\/api\/?$/, "");
-    return `${rootUrl}/${path}`;
+    return resolveStoredFileUrl(path, api.defaults.baseURL);
   };
 
   const calculateBMI = useCallback((heightStr: string, weightStr: string): string => {
@@ -237,8 +238,15 @@ export default function StudentHealthRecordsPage() {
       <div className="flex flex-wrap gap-5 items-start pt-1">
         {existing.map((img, idx) => (
           <div key={`old-${idx}`} className="flex flex-col items-center gap-2">
-             <div className="relative group w-20 h-20 rounded-lg overflow-hidden border bg-muted cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all shrink-0 shadow-sm" onClick={() => setPreviewImage(getImageUrl(img.path))}>
-                <img src={getImageUrl(img.path)} alt="Evidence" className="w-full h-full object-cover" />
+             <div
+               className={`relative group w-20 h-20 rounded-lg overflow-hidden border bg-muted transition-all shrink-0 shadow-sm ${img.available === false ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:ring-2 hover:ring-primary/50"}`}
+               onClick={() => img.available !== false && setPreviewImage(img.url || getImageUrl(img.path))}
+             >
+                {img.available === false ? (
+                  <span className="flex h-full items-center justify-center px-1 text-center text-[10px] text-muted-foreground">ไม่พบไฟล์ต้นฉบับ</span>
+                ) : (
+                  <img src={img.url || getImageUrl(img.path)} alt="Evidence" className="w-full h-full object-cover" />
+                )}
                 <button onClick={(e) => requestDelete(yearLevel, category, "existing", img.path, e)} className="absolute -top-1 -right-1 bg-destructive text-white rounded-full p-1 shadow-md hover:bg-red-600 z-10 transition-transform hidden group-hover:block" title="ลบรูปภาพ">
                   <X className="h-4 w-4" />
                 </button>

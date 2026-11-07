@@ -79,7 +79,7 @@ try {
             exit;
         }
 
-        $uploadedFile = project_document_upload_file($_FILES['file'], $facultyId);
+        $uploadedFile = project_document_upload_file($db, $_FILES['file'], $facultyId, (string)$document['project_id']);
     }
 
     $params = [
@@ -130,7 +130,7 @@ try {
     $committed = true;
 
     if ($uploadedFile !== null || $hasAttachmentUrl) {
-        project_document_delete_file($document['file_path'] ?? null);
+        project_document_delete_file($db, $document['file_path'] ?? null);
     }
 
     $fileAction = $uploadedFile !== null ? ', อัปโหลดไฟล์ใหม่' : ($hasAttachmentUrl ? ', เปลี่ยนเป็น URL link' : '');
@@ -143,7 +143,7 @@ try {
     ]);
 } catch (Exception $e) {
     if ($db->inTransaction()) $db->rollBack();
-    if (!$committed && $uploadedFile !== null) project_document_delete_file($uploadedFile['file_path']);
+    if (!$committed && $uploadedFile !== null) storageDeleteObjectKey($uploadedFile['storage_key'] ?? null);
     project_json(["status" => "error", "message" => $e->getMessage()], project_error_status($e));
 }
 ?>

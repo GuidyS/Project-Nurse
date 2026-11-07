@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../ProjectShared/project_helpers.php';
+require_once __DIR__ . '/../../../config/storage.php';
 require_once __DIR__ . '/my_project_member_helpers.php';
 
 $db = project_db();
@@ -129,6 +130,7 @@ try {
     $docsStmt->execute($params);
     foreach ($docsStmt->fetchAll(PDO::FETCH_ASSOC) as $document) {
         $projectKey = (string) $document['project_id'];
+        $file = storageDescriptor($db, $document['file_path'] ?? null, $document['file_name'] ?? null);
         $documentsByProject[$projectKey][] = [
             "id" => (int) $document['id'],
             "name" => $document['name'],
@@ -138,6 +140,8 @@ try {
             "file_name" => $document['file_name'],
             "mime_type" => $document['mime_type'],
             "file_size" => $document['file_size'] !== null ? (int) $document['file_size'] : null,
+            "file" => $file,
+            "file_url" => $file['url'],
         ];
     }
 

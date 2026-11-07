@@ -7,6 +7,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 if (session_status() == PHP_SESSION_NONE) { session_start(); }
 require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../config/audit_helper.php';
+require_once __DIR__ . '/../../../config/storage.php';
+
+const HEALTH_EVIDENCE_MAX_BYTES = 5 * 1024 * 1024;
 
 if (!isset($_SESSION['user_id'])) {
     http_response_code(401);
@@ -15,11 +18,31 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 // ฟังก์ชันแปลงวันที่ของไฟล์เป็นภาษาไทย
-function getFileThaiDate($filePath) {
-    if (!file_exists($filePath)) return 'ไม่ทราบวันที่';
+function getFileThaiDate($reference) {
+    $filePath = storageLegacyAbsolutePath($reference);
+    if (!$filePath) return 'ไม่ทราบวันที่';
     $time = filemtime($filePath);
     $thaiYear = date('Y', $time) + 543;
     return date('d/m/', $time) . $thaiYear;
+}
+
+function healthUploadedFileAt(array $files, int $index): array {
+    return [
+        'name' => $files['name'][$index] ?? '', 'type' => $files['type'][$index] ?? '',
+        'tmp_name' => $files['tmp_name'][$index] ?? '', 'error' => $files['error'][$index] ?? UPLOAD_ERR_NO_FILE,
+        'size' => $files['size'][$index] ?? 0,
+    ];
+}
+
+function healthEvidenceMime(array $file): string {
+    if (($file['size'] ?? 0) <= 0 || (int)$file['size'] > HEALTH_EVIDENCE_MAX_BYTES) {
+        throw new InvalidArgumentException('ไฟล์หลักฐานสุขภาพต้องมีขนาดไม่เกิน 5 MB');
+    }
+    $mime = mime_content_type($file['tmp_name']) ?: '';
+    if (!in_array($mime, ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'], true)) {
+        throw new InvalidArgumentException('รองรับหลักฐานสุขภาพเฉพาะ JPG, PNG, WEBP หรือ PDF');
+    }
+    return $mime;
 }
 
 try {
@@ -38,11 +61,6 @@ try {
     $student_id = $user['username'];
     $method = $_SERVER['REQUEST_METHOD'];
 
-    $uploadDir = __DIR__ . '/../../../uploads/health_records/';
-    if (!is_dir($uploadDir)) {
-        mkdir($uploadDir, 0777, true);
-    }
-
     // [GET] ดึงข้อมูลและหาวันที่อัปโหลดของแต่ละไฟล์
     if ($method === 'GET') {
         $query = "SELECT * FROM student_health_records WHERE student_id = :sid ORDER BY year_level ASC";
@@ -56,9 +74,11 @@ try {
             $row['evidence_images_with_date'] = [];
             if (is_array($evidenceArray)) {
                 foreach ($evidenceArray as $path) {
+                    $descriptor = storageDescriptor($db, $path);
                     $row['evidence_images_with_date'][] = [
                         'path' => $path,
-                        'date' => getFileThaiDate(__DIR__ . '/../../../' . $path)
+                        'url' => $descriptor['url'], 'available' => $descriptor['available'],
+                        'date' => getFileThaiDate($path)
                     ];
                 }
             }
@@ -68,9 +88,11 @@ try {
             $row['admission_images_with_date'] = [];
             if (is_array($admissionArray)) {
                 foreach ($admissionArray as $path) {
+                    $descriptor = storageDescriptor($db, $path);
                     $row['admission_images_with_date'][] = [
                         'path' => $path,
-                        'date' => getFileThaiDate(__DIR__ . '/../../../' . $path)
+                        'url' => $descriptor['url'], 'available' => $descriptor['available'],
+                        'date' => getFileThaiDate($path)
                     ];
                 }
             }
@@ -92,6 +114,10 @@ try {
 
         $totalDeleted = 0;
         $totalUploaded = 0;
+        $uploadedObjects = [];
+        $referencesToDelete = [];
+        $legacyPathsToDelete = [];
+        $transactionCommitted = false;
 
         $db->beginTransaction();
         try {
@@ -105,19 +131,21 @@ try {
                 
                 // ลบรูปทั่วไป
                 $oldImages = $oldRecord && !empty($oldRecord['evidence_images']) ? json_decode($oldRecord['evidence_images'], true) : [];
-                $existingImagesToKeep = $item['existing_images'] ?? [];
+                $requestedImagesToKeep = array_values(array_filter($item['existing_images'] ?? [], 'is_string'));
+                $existingImagesToKeep = array_values(array_intersect($oldImages ?: [], $requestedImagesToKeep));
                 foreach (array_diff($oldImages ?: [], $existingImagesToKeep) as $delPath) {
-                    $fullPath = __DIR__ . '/../../../' . $delPath;
-                    if (file_exists($fullPath) && is_file($fullPath)) { unlink($fullPath); }
+                    if (storageReferenceId($delPath)) $referencesToDelete[] = $delPath;
+                    else $legacyPathsToDelete[] = $delPath;
                     $totalDeleted++;
                 }
 
                 // ลบรูปผลตรวจปี 1
                 $oldAdmission = $oldRecord && !empty($oldRecord['admission_health_check']) ? json_decode($oldRecord['admission_health_check'], true) : [];
-                $existingAdmissionToKeep = $item['existing_admission_images'] ?? [];
+                $requestedAdmissionToKeep = array_values(array_filter($item['existing_admission_images'] ?? [], 'is_string'));
+                $existingAdmissionToKeep = array_values(array_intersect($oldAdmission ?: [], $requestedAdmissionToKeep));
                 foreach (array_diff($oldAdmission ?: [], $existingAdmissionToKeep) as $delPath) {
-                    $fullPath = __DIR__ . '/../../../' . $delPath;
-                    if (file_exists($fullPath) && is_file($fullPath)) { unlink($fullPath); }
+                    if (storageReferenceId($delPath)) $referencesToDelete[] = $delPath;
+                    else $legacyPathsToDelete[] = $delPath;
                     $totalDeleted++;
                 }
 
@@ -127,12 +155,16 @@ try {
                     $fileArray = $_FILES['images_' . $year_level];
                     for ($i = 0; $i < count($fileArray['name']); $i++) {
                         if ($fileArray['error'][$i] === UPLOAD_ERR_OK) {
-                            $ext = strtolower(pathinfo($fileArray['name'][$i], PATHINFO_EXTENSION));
-                            $newName = "health_{$student_id}_y{$year_level}_" . uniqid() . ".{$ext}";
-                            if (move_uploaded_file($fileArray['tmp_name'][$i], $uploadDir . $newName)) {
-                                $newUploadedPaths[] = "uploads/health_records/" . $newName;
-                                $totalUploaded++;
-                            }
+                            $single = healthUploadedFileAt($fileArray, $i);
+                            $mime = healthEvidenceMime($single);
+                            $stored = storagePutUploadedFile($db, $single, [
+                                'owner_type' => 'student', 'owner_id' => $student_id,
+                                'resource_type' => 'health_evidence', 'resource_id' => (string)$year_level,
+                                'access_scope' => 'student_advisor_admin', 'mime_type' => $mime,
+                            ]);
+                            $newUploadedPaths[] = $stored['reference'];
+                            $uploadedObjects[] = $stored;
+                            $totalUploaded++;
                         }
                     }
                 }
@@ -142,12 +174,16 @@ try {
                     $fileArray = $_FILES['admission_images_1'];
                     for ($i = 0; $i < count($fileArray['name']); $i++) {
                         if ($fileArray['error'][$i] === UPLOAD_ERR_OK) {
-                            $ext = strtolower(pathinfo($fileArray['name'][$i], PATHINFO_EXTENSION));
-                            $newName = "admission_{$student_id}_y1_" . uniqid() . ".{$ext}";
-                            if (move_uploaded_file($fileArray['tmp_name'][$i], $uploadDir . $newName)) {
-                                $newAdmissionPaths[] = "uploads/health_records/" . $newName;
-                                $totalUploaded++;
-                            }
+                            $single = healthUploadedFileAt($fileArray, $i);
+                            $mime = healthEvidenceMime($single);
+                            $stored = storagePutUploadedFile($db, $single, [
+                                'owner_type' => 'student', 'owner_id' => $student_id,
+                                'resource_type' => 'admission_health_evidence', 'resource_id' => '1',
+                                'access_scope' => 'student_advisor_admin', 'mime_type' => $mime,
+                            ]);
+                            $newAdmissionPaths[] = $stored['reference'];
+                            $uploadedObjects[] = $stored;
+                            $totalUploaded++;
                         }
                     }
                 }
@@ -194,17 +230,29 @@ try {
                 ]);
             }
             $db->commit();
+            $transactionCommitted = true;
+
+            foreach (array_unique($referencesToDelete) as $referenceToDelete) {
+                storageDeleteReference($db, $referenceToDelete);
+            }
+            foreach (array_unique($legacyPathsToDelete) as $legacyPathToDelete) {
+                $fullPath = storageLegacyAbsolutePath($legacyPathToDelete);
+                if ($fullPath) unlink($fullPath);
+            }
 
             $logMsg = "บันทึกข้อมูลภาวะสุขภาพนักศึกษา รหัส: {$student_id}";
             if ($totalUploaded > 0) $logMsg .= " (แนบรูปเพิ่ม {$totalUploaded} ไฟล์)";
-            logAudit($db, $_SESSION['user_id'] ?? null, 'update', 'student_health_records', $logMsg);
-
-            if ($totalDeleted > 0) {
-                logAudit($db, $_SESSION['user_id'] ?? null, 'delete', 'student_health_records', "ลบรูปภาพหลักฐานภาวะสุขภาพนักศึกษา รหัส: {$student_id} จำนวน {$totalDeleted} ไฟล์");
+            try {
+                logAudit($db, $_SESSION['user_id'] ?? null, 'update', 'student_health_records', $logMsg);
+                if ($totalDeleted > 0) {
+                    logAudit($db, $_SESSION['user_id'] ?? null, 'delete', 'student_health_records', "ลบรูปภาพหลักฐานภาวะสุขภาพนักศึกษา รหัส: {$student_id} จำนวน {$totalDeleted} ไฟล์");
+                }
+            } catch (Throwable $auditError) {
+                error_log('Health record audit log failed: ' . $auditError->getMessage());
             }
 
         } catch (Throwable $e) {
-            $db->rollBack();
+            if ($db->inTransaction()) $db->rollBack();
             throw $e;
         }
 
@@ -213,7 +261,10 @@ try {
     }
 
 } catch (Throwable $e) {
-    http_response_code(500);
+    if (isset($uploadedObjects) && empty($transactionCommitted)) {
+        foreach ($uploadedObjects as $uploadedObject) storageDeleteObjectKey($uploadedObject['object_key'] ?? null);
+    }
+    http_response_code($e instanceof InvalidArgumentException ? 400 : 500);
     echo json_encode(["status" => "error", "message" => $e->getMessage()], JSON_UNESCAPED_UNICODE);
 }
 ?>

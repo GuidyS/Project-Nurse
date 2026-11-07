@@ -25,8 +25,13 @@ services:
       dockerfile: DockerFile
     depends_on:
       - db
+      - minio
     volumes:
       - ./backend/src:/var/www/html/
+      - backend-vendor:/var/www/html/vendor
+    command: >
+      sh -c "composer install --no-interaction --prefer-dist --working-dir=/var/www/html
+      && apache2-foreground"
     ports:
       - "8080:80"
     environment:
@@ -42,6 +47,26 @@ services:
       - APP_URL=${APP_URL:-http://localhost:5173}
       # 📧 อีเมลคณะที่รับแจ้งเตือน "โครงการใกล้สิ้นสุด" (แจ้งแอดมินในระบบด้วย)
       - PROJECT_REMINDER_EMAIL=${PROJECT_REMINDER_EMAIL:-nus1@siam.edu}
+      # Private S3-compatible object storage. Keep real secrets in the root .env.
+      - STORAGE_ENDPOINT=${STORAGE_ENDPOINT:-http://minio:9000}
+      - STORAGE_REGION=${STORAGE_REGION:-us-east-1}
+      - STORAGE_BUCKET=${STORAGE_BUCKET:-nurse-mis-files}
+      - STORAGE_ACCESS_KEY=${STORAGE_ACCESS_KEY:-nurse-mis-local}
+      - STORAGE_SECRET_KEY=${STORAGE_SECRET_KEY:-nurse-mis-local-secret}
+      - STORAGE_PATH_STYLE=${STORAGE_PATH_STYLE:-true}
+      - STORAGE_LEGACY_FALLBACK=${STORAGE_LEGACY_FALLBACK:-true}
+
+  minio:
+    image: bitnamilegacy/minio@sha256:451fe6858cb770cc9d0e77ba811ce287420f781c7c1b806a386f6896471a349c
+    restart: always
+    environment:
+      MINIO_ROOT_USER: ${STORAGE_ACCESS_KEY:-nurse-mis-local}
+      MINIO_ROOT_PASSWORD: ${STORAGE_SECRET_KEY:-nurse-mis-local-secret}
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    volumes:
+      - minio-data:/bitnami/minio/data
 
   # Database
   db:
@@ -70,3 +95,7 @@ services:
       PMA_HOST: db
     depends_on:
       - db
+
+volumes:
+  minio-data:
+  backend-vendor:

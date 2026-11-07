@@ -2,6 +2,7 @@
 if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/../../../config/config.php'; 
 require_once __DIR__ . '/../../../config/audit_helper.php'; 
+require_once __DIR__ . '/../../../config/storage.php';
 
 header("Content-Type: application/json; charset=UTF-8");
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit(); }
@@ -33,6 +34,9 @@ function portfolio_validate_google_drive_link(string $url): void
 }
 
 try {
+    $db = new Connect();
+    $uploadedObjectKey = null;
+    $transactionCommitted = false;
     $rawInput = file_get_contents('php://input');
     $jsonInput = json_decode($rawInput, true);
     if (!is_array($jsonInput)) {
@@ -71,14 +75,14 @@ try {
         $mimeType = 'text/uri-list';
     }
 
+    $db->beginTransaction();
+
     // ระบบจัดการไฟล์อัปโหลด
     if ($googleDriveLink === '' && $hasUploadedFile) {
-        $uploadDir = __DIR__ . '/../../../uploads/portfolio/';
-        if (!file_exists($uploadDir)) {
-            mkdir($uploadDir, 0755, true);
-        }
-
         $file = $_FILES['file'];
+        if ((int)($file['size'] ?? 0) <= 0 || (int)$file['size'] > 10 * 1024 * 1024) {
+            throw new InvalidArgumentException("ไฟล์ผลงานต้องมีขนาดไม่เกิน 10 MB");
+        }
         $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
         $allowed = ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'];
 
@@ -87,20 +91,25 @@ try {
         }
 
         $mimeType = mime_content_type($file['tmp_name']) ?: null;
+        $allowedMimes = [
+            'application/pdf','image/jpeg','image/png','application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        ];
+        if (!$mimeType || !in_array($mimeType, $allowedMimes, true)) {
+            throw new InvalidArgumentException("ชนิดไฟล์ไม่ตรงกับไฟล์ที่อนุญาต");
+        }
         $fileCategory = in_array($ext, ['jpg', 'jpeg', 'png']) ? 'image' : 'document';
 
-        $newFileName = "PORT_" . $student_id . "_" . time() . "_" . uniqid() . "." . $ext;
-        $destPath = $uploadDir . $newFileName;
-
-        if (move_uploaded_file($file['tmp_name'], $destPath)) {
-            $fileName = $file['name'];
-            $filePath = 'uploads/portfolio/' . $newFileName;
-        } else {
-            throw new Exception("ไม่สามารถอัปโหลดไฟล์ได้");
-        }
+        $stored = storagePutUploadedFile($db, $file, [
+            'owner_type' => 'student', 'owner_id' => $student_id,
+            'resource_type' => 'portfolio', 'access_scope' => 'student_advisor_admin',
+            'mime_type' => $mimeType,
+        ]);
+        $fileName = $stored['name'];
+        $filePath = $stored['reference'];
+        $uploadedObjectKey = $stored['object_key'];
     }
 
-    $db = new Connect();
     $sql = "INSERT INTO portfolio (student_id, title, type, description, file_name, file_path, mime_type, file_category) 
             VALUES (:sid, :title, :type, :desc, :fname, :fpath, :mime_type, :file_category)";
     
@@ -118,14 +127,28 @@ try {
 
     // บันทึกประวัติการสร้างผลงานลง Audit Log
     $newId = $db->lastInsertId();
-    logAudit($db, $_SESSION['user_id'] ?? null, 'create', 'portfolio', "เพิ่มผลงาน: " . ($title ?: 'ไม่มีชื่อผลงาน') . ($newId ? " (ID: {$newId})" : ""));
+    if (isset($stored['id'])) {
+        $db->prepare('UPDATE storage_objects SET resource_id = :resource_id WHERE storage_id = :id')
+           ->execute([':resource_id' => $newId, ':id' => $stored['id']]);
+    }
+    $db->commit();
+    $transactionCommitted = true;
+    try {
+        logAudit($db, $_SESSION['user_id'] ?? null, 'create', 'portfolio', "เพิ่มผลงาน: " . ($title ?: 'ไม่มีชื่อผลงาน') . ($newId ? " (ID: {$newId})" : ""));
+    } catch (Throwable $auditError) {
+        error_log('Portfolio audit log failed: ' . $auditError->getMessage());
+    }
 
     echo json_encode(["status" => "success", "message" => "เพิ่มผลงานสำเร็จ"]);
 
 } catch (InvalidArgumentException $e) {
+    if (isset($db) && $db->inTransaction()) $db->rollBack();
+    if (!empty($uploadedObjectKey) && empty($transactionCommitted)) storageDeleteObjectKey($uploadedObjectKey);
     http_response_code(400);
     echo json_encode(["status" => "error", "message" => $e->getMessage()], JSON_UNESCAPED_UNICODE);
-} catch (Exception $e) {
+} catch (Throwable $e) {
+    if (isset($db) && $db->inTransaction()) $db->rollBack();
+    if (!empty($uploadedObjectKey) && empty($transactionCommitted)) storageDeleteObjectKey($uploadedObjectKey);
     http_response_code(500);
     echo json_encode(["status" => "error", "message" => $e->getMessage()]);
 }

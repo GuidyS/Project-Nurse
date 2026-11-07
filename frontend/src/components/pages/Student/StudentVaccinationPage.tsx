@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
 import { Save, Loader2, Trash2, PlusCircle, Calendar, Upload, FileCheck, ExternalLink, X } from "lucide-react";
 import api from "@/lib/axios";
+import { resolveStoredFileUrl } from "@/lib/fileUrl";
 
 interface DoseItem {
   id: string;
@@ -25,6 +26,8 @@ interface VaccineGroup {
   evidence_attached: boolean;
   evidence_file: File | null;
   evidence_file_path?: string;
+  evidence_file_url?: string | null;
+  stored_file_available?: boolean;
   advisor_name: string;
   remark: string;
   doses: DoseItem[];
@@ -112,6 +115,8 @@ export default function StudentVaccinationPage() {
               evidence_attached: Boolean(Number(row.evidence_attached)),
               evidence_file: null,
               evidence_file_path: row.evidence_file_path || "",
+              evidence_file_url: row.evidence_file_url || row.file?.url || null,
+              stored_file_available: row.file?.available !== false,
               advisor_name: row.advisor_name || "",
               remark: row.remark || "",
               doses: []
@@ -442,15 +447,18 @@ export default function StudentVaccinationPage() {
                                 </p>
                               )}
 
-                              {group.evidence_file_path && !group.evidence_file && (
+                              {group.evidence_file_path && !group.evidence_file && group.stored_file_available !== false && (
                                 <a
-                                  href={`${apiBaseUrl}/${group.evidence_file_path}`}
+                                  href={resolveStoredFileUrl(group.evidence_file_url || group.evidence_file_path, apiBaseUrl)}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline"
                                 >
                                   <ExternalLink className="h-3 w-3" /> เปิดดูหลักฐานเดิม
                                 </a>
+                              )}
+                              {group.evidence_file_path && !group.evidence_file && group.stored_file_available === false && (
+                                <span className="text-[11px] text-muted-foreground">ไม่พบไฟล์ต้นฉบับ</span>
                               )}
                             </div>
                           )}

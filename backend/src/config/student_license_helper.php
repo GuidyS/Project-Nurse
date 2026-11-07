@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/storage.php';
 /**
  * student_license_helper.php
  * ตัวช่วยจัดการ schema และไฟล์หลักฐานการสอบใบประกอบวิชาชีพของนักศึกษา
@@ -79,7 +80,7 @@ function studentLicenseUploadedFile(string $fieldName): ?array
 /**
  * บันทึกไฟล์หลักฐานการสอบใบประกอบวิชาชีพของนักศึกษา
  */
-function studentLicenseSaveEvidence(array $file, string $studentId, string $prefix): array
+function studentLicenseSaveEvidence(array $file, string $studentId, string $prefix, ?PDO $db = null): array
 {
     $uploadErrors = [
         UPLOAD_ERR_INI_SIZE => "ไฟล์หลักฐานใหญ่เกิน upload_max_filesize ของ PHP",
@@ -112,35 +113,29 @@ function studentLicenseSaveEvidence(array $file, string $studentId, string $pref
         throw new Exception("ชนิดไฟล์หลักฐานไม่ตรงกับนามสกุลไฟล์");
     }
 
-    $safeOwner = preg_replace('/[^A-Za-z0-9_-]/', '_', $studentId);
-    $relativeDir = 'uploads/user-documents/' . $safeOwner;
-    $baseDir = realpath(__DIR__ . '/../') ?: (__DIR__ . '/../');
-    $absoluteDir = $baseDir . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relativeDir);
-    if (!is_dir($absoluteDir) && !mkdir($absoluteDir, 0775, true)) {
-        throw new Exception("ไม่สามารถสร้างโฟลเดอร์เก็บหลักฐานได้");
-    }
-
-    $fileName = $prefix . '_' . date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . '.' . $extension;
-    $targetPath = $absoluteDir . DIRECTORY_SEPARATOR . $fileName;
-    if (!move_uploaded_file($file['tmp_name'], $targetPath)) {
-        throw new Exception("ไม่สามารถบันทึกไฟล์หลักฐานได้");
-    }
-
-    $rawOriginalName = basename((string)$file['name']);
-    $originalName = function_exists('mb_substr') ? mb_substr($rawOriginalName, 0, 255) : substr($rawOriginalName, 0, 255);
+    if (!$db) throw new RuntimeException('Database connection is required for Object Storage uploads');
+    $stored = storagePutUploadedFile($db, $file, [
+        'owner_type' => 'student', 'owner_id' => $studentId,
+        'resource_type' => 'student_license_evidence', 'resource_id' => $prefix,
+        'access_scope' => 'student_advisor_admin', 'mime_type' => $mime,
+    ]);
     return [
-        'path' => $relativeDir . '/' . $fileName,
-        'name' => $originalName !== '' ? $originalName : $fileName,
+        'path' => $stored['reference'],
+        'name' => $stored['name'],
     ];
 }
 
 /**
  * ลบไฟล์หลักฐานเดิม (ถ้ามีและอยู่ใน uploads/user-documents/)
  */
-function studentLicenseDeleteEvidence(?string $relativePath): bool
+function studentLicenseDeleteEvidence(?string $relativePath, ?PDO $db = null): bool
 {
     if (empty($relativePath)) {
         return false;
+    }
+    if (storageReferenceId($relativePath)) {
+        if ($db) storageDeleteReference($db, $relativePath);
+        return $db !== null;
     }
     $normalized = ltrim(str_replace('\\', '/', $relativePath), '/');
     if ($normalized === '' || str_contains($normalized, '..')) {

@@ -1,11 +1,13 @@
 <?php
 require_once __DIR__ . '/../ProjectShared/project_helpers.php';
 require_once __DIR__ . '/../../../config/audit_helper.php';
+require_once __DIR__ . '/../../../config/storage.php';
 
 $db = project_db();
 $auth = project_require_auth($db, ['PROJECT_MY_VIEW']);
 project_require_admin_write($auth);
-$targetPath = null;
+$uploadedReference = null;
+$uploadedObjectKey = null;
 
 try {
     $projectId = project_request_code('post');
@@ -67,43 +69,14 @@ try {
         exit;
     }
 
-    $baseProjectDocsDir = __DIR__ . '/../../../uploads/project_docs/';
-    if (!is_dir($baseProjectDocsDir) && !mkdir($baseProjectDocsDir, 0755, true)) {
-        project_json(["status" => "error", "message" => "ไม่สามารถสร้างโฟลเดอร์อัปโหลดได้"], 500);
-        exit;
-    }
-
-    $baseUploadDir = realpath($baseProjectDocsDir);
-    if (!$baseUploadDir) {
-        project_json(["status" => "error", "message" => "โฟลเดอร์อัปโหลดไม่ถูกต้อง"], 500);
-        exit;
-    }
-
-    $facultyDirName = (string) $facultyId;
-    $uploadDir = $baseUploadDir . DIRECTORY_SEPARATOR . $facultyDirName;
-    if (!is_dir($uploadDir) && !mkdir($uploadDir, 0755, true)) {
-        project_json(["status" => "error", "message" => "ไม่สามารถสร้างโฟลเดอร์อัปโหลดของอาจารย์ได้"], 500);
-        exit;
-    }
-
-    $realUploadDir = realpath($uploadDir);
-    if (
-        !$realUploadDir ||
-        strpos($realUploadDir . DIRECTORY_SEPARATOR, $baseUploadDir . DIRECTORY_SEPARATOR) !== 0
-    ) {
-        project_json(["status" => "error", "message" => "ตำแหน่งจัดเก็บไฟล์ไม่ถูกต้อง"], 500);
-        exit;
-    }
-
-    $safeName = preg_replace('/[^A-Za-z0-9._-]/', '_', $originalName) ?: 'project_file';
-    $fileName = date('YmdHis') . '_' . bin2hex(random_bytes(8)) . '_' . $safeName;
-    $targetPath = $realUploadDir . DIRECTORY_SEPARATOR . $fileName;
-    $publicPath = 'uploads/project_docs/' . $facultyDirName . '/' . $fileName;
-
-    if (!move_uploaded_file($file['tmp_name'], $targetPath)) {
-        project_json(["status" => "error", "message" => "ไม่สามารถย้ายไฟล์ไปยังโฟลเดอร์เซิร์ฟเวอร์ได้"], 500);
-        exit;
-    }
+    $stored = storagePutUploadedFile($db, $file, [
+        'owner_type' => 'faculty', 'owner_id' => (string)$facultyId,
+        'resource_type' => 'project_document', 'resource_id' => (string)$projectId,
+        'access_scope' => 'project_member_admin', 'mime_type' => $detectedMime,
+    ]);
+    $publicPath = $stored['reference'];
+    $uploadedReference = $publicPath;
+    $uploadedObjectKey = $stored['object_key'];
 
     $projectName = trim((string) ($project['project_name_th'] ?? '')) ?: 'โครงการ #' . $projectId;
     $stmt = $db->prepare("
@@ -148,7 +121,13 @@ try {
     $documentId = (int) $db->lastInsertId();
     project_u_document_link($db, $projectId, $documentId, $_POST);
     $db->commit();
-    logAudit($db, $auth['user_id'], 'create', 'project_docs', "อัปโหลดไฟล์โครงการ {$projectName} (ไฟล์: {$originalName})");
+    $uploadedReference = null;
+    $uploadedObjectKey = null;
+    try {
+        logAudit($db, $auth['user_id'], 'create', 'project_docs', "อัปโหลดไฟล์โครงการ {$projectName} (ไฟล์: {$originalName})");
+    } catch (Throwable $auditError) {
+        error_log('Project document audit log failed: ' . $auditError->getMessage());
+    }
 
     project_json([
         "status" => "success",
@@ -156,11 +135,9 @@ try {
         "doc_id" => $documentId,
         "file_path" => $publicPath,
     ]);
-} catch (Exception $e) {
+} catch (Throwable $e) {
     if ($db->inTransaction()) $db->rollBack();
-    if ($targetPath && is_file($targetPath)) {
-        @unlink($targetPath);
-    }
+    if ($uploadedReference) storageDeleteObjectKey($uploadedObjectKey);
 
     project_json(["status" => "error", "message" => $e->getMessage()], project_error_status($e));
 }

@@ -14,6 +14,7 @@ import { Loader2, Edit, Trash2, MoreHorizontal, Upload, Download, UserCog, Users
 import { onlyThai } from "@/lib/nameInput";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import api from "@/lib/axios";
+import { resolveStoredFileUrl } from "@/lib/fileUrl";
 import { ConfirmActionDialog } from "@/components/shared/ConfirmActionDialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ImportDataDialog, type ImportDataTypeOption } from "@/components/shared/ImportDataDialog";
@@ -81,10 +82,7 @@ const ReadOnlyField = ({ label, value, note }: { label: string; value?: string |
 const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8080").replace(/\/$/, "");
 
 const resolveUploadUrl = (path: unknown, baseUrl: string) => {
-  const raw = String(path ?? "").trim();
-  if (!raw) return "";
-  if (/^https?:\/\//i.test(raw)) return raw;
-  return `${baseUrl}/${raw.replace(/^\//, "")}`;
+  return resolveStoredFileUrl(path, baseUrl);
 };
 
 const calculateBmi = (height?: string | number, weight?: string | number) => {
@@ -163,6 +161,7 @@ export default function UsersManagement() {
     title: string;
     file_name: string;
     file_path: string;
+    file_url?: string | null;
     available?: boolean;
     portfolio_id?: number | null;
   }>>([]);
@@ -474,7 +473,8 @@ export default function UsersManagement() {
             {savedDocuments.map((doc) => {
               const docKey = `${doc.portfolio_id || ""}:${doc.file_path}`;
               const isDeleting = deletingDocKey === docKey;
-              const isLink = typeof doc.file_path === "string" && doc.file_path.startsWith("http");
+              const documentUrl = resolveStoredFileUrl(doc.file_url || doc.file_path, apiBaseUrl);
+              const isLink = Boolean(documentUrl) && doc.available !== false;
               return (
                 <div
                   key={docKey}
@@ -484,12 +484,12 @@ export default function UsersManagement() {
                     <p className="truncate text-sm font-medium text-foreground">{doc.title}</p>
                     {isLink ? (
                       <a
-                        href={doc.file_path}
+                        href={documentUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="truncate block text-xs text-primary hover:underline"
                       >
-                        {doc.file_path}
+                        {doc.file_name || "เปิดเอกสาร"}
                       </a>
                     ) : (
                       <p className="truncate text-xs text-muted-foreground">{doc.file_name}</p>

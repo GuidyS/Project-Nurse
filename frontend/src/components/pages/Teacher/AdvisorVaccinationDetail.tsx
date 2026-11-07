@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { ShieldAlert, Loader2, ChevronLeft, ExternalLink } from "lucide-react";
 import api from "@/lib/axios";
+import { resolveStoredFileUrl } from "@/lib/fileUrl";
 import type { AdvisorDetailPanelProps } from "./advisorStudent";
 
 interface DoseItem {
@@ -25,6 +26,8 @@ interface VaccineGroup {
   immunity_status: "none_uninfected" | "none_infected" | "has_immunity" | "";
   evidence_attached: boolean;
   evidence_file_path?: string;
+  evidence_file_url?: string | null;
+  stored_file_available?: boolean;
   advisor_name: string;
   remark: string;
   doses: DoseItem[];
@@ -63,6 +66,8 @@ export default function AdvisorVaccinationDetail({ student, onBack }: AdvisorDet
                 immunity_status: (row.immunity_status as any) || "",
                 evidence_attached: Boolean(Number(row.evidence_attached)),
                 evidence_file_path: row.evidence_file_path || "",
+                evidence_file_url: row.evidence_file_url || row.file?.url || null,
+                stored_file_available: row.file?.available !== false,
                 advisor_name: row.advisor_name || "",
                 remark: row.remark || "",
                 doses: []
@@ -219,10 +224,10 @@ export default function AdvisorVaccinationDetail({ student, onBack }: AdvisorDet
                             </div>
 
                             {/* ลิงก์เปิดดูหลักฐานแนบ (คลิกได้ปกติ) */}
-                            {group.evidence_file_path && (
+                            {group.evidence_file_path && group.stored_file_available !== false && (
                               <div className="pt-1 pointer-events-auto">
                                 <a
-                                  href={`${apiBaseUrl}/${group.evidence_file_path}`}
+                                  href={resolveStoredFileUrl(group.evidence_file_url || group.evidence_file_path, apiBaseUrl)}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline font-medium"
@@ -230,6 +235,9 @@ export default function AdvisorVaccinationDetail({ student, onBack }: AdvisorDet
                                   <ExternalLink className="h-3.5 w-3.5" /> เปิดดูหลักฐานแนบ
                                 </a>
                               </div>
+                            )}
+                            {group.evidence_file_path && group.stored_file_available === false && (
+                              <p className="pt-1 text-[11px] text-muted-foreground">ไม่พบไฟล์ต้นฉบับ</p>
                             )}
                           </div>
                         </div>

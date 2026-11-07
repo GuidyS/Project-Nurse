@@ -26,5 +26,11 @@ RUN echo "upload_max_filesize=50M\npost_max_size=120M\nmax_file_uploads=50" > /u
 RUN a2enmod rewrite
 RUN echo "ServerName localhost" >> /etc/apache2/apache2.conf
 
+# Uploaded/runtime files are never served directly. Authenticated PHP endpoints
+# are the only supported way to read user documents.
+RUN printf '<Directory /var/www/html/uploads>\n    Require all denied\n</Directory>\n' \
+    > /etc/apache2/conf-available/deny-uploads.conf \
+    && a2enconf deny-uploads
+
 # ตั้งค่าสิทธิ์โฟลเดอร์ html ให้ Apache อ่านไฟล์ได้ (โค้ดเดิมของคุณ)
 RUN chown -R www-data:www-data /var/www/html && chmod -R 755 /var/www/html

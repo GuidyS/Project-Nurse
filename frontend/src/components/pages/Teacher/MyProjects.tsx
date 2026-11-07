@@ -27,6 +27,7 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
+import { resolveStoredFileUrl } from "@/lib/fileUrl";
 
 interface ProjectDocument {
   id: number;
@@ -37,7 +38,11 @@ interface ProjectDocument {
   file_name: string | null;
   mime_type: string | null;
   file_size: number | null;
+  file_url?: string | null;
+  file?: { available?: boolean; url?: string | null };
 }
+
+const isDocumentAvailable = (document: ProjectDocument) => Boolean(document.file_path) && document.file?.available !== false;
 
 interface ProjectFacultyMember {
   faculty_id: number;
@@ -195,7 +200,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080
 const PROJECT_ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
 const isExternalDocumentUrl = (document: ProjectDocument) => /^https?:\/\//i.test(document.file_path || '');
 const getFileUrl = (filePath: string) =>
-  /^https?:\/\//i.test(filePath) ? filePath : `${API_BASE_URL}/${filePath.replace(/^\/+/, '')}`;
+  resolveStoredFileUrl(filePath, API_BASE_URL);
 
 const getAttachmentUrlType = (value: string): Exclude<ProjectAttachmentType, 'file'> => {
   try {
@@ -401,15 +406,15 @@ export default function MyProjects() {
   };
 
   const openDocument = (document: ProjectDocument) => {
-    if (!document.file_path) return;
-    window.open(getFileUrl(document.file_path), '_blank');
+    if (!isDocumentAvailable(document)) return;
+    window.open(getFileUrl(document.file_url || document.file?.url || document.file_path!), '_blank');
   };
 
   const downloadDocument = (document: ProjectDocument) => {
-    if (!document.file_path) return;
+    if (!isDocumentAvailable(document)) return;
 
     const link = window.document.createElement('a');
-    link.href = getFileUrl(document.file_path);
+    link.href = getFileUrl(document.file_url || document.file?.url || document.file_path!);
     link.download = document.file_name || document.name;
     link.click();
   };
@@ -433,7 +438,7 @@ export default function MyProjects() {
               <button
                 type="button"
                 className="flex w-full flex-col items-center gap-2 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={!document.file_path}
+                disabled={!isDocumentAvailable(document)}
                 title={fileMeta}
                 onClick={() => openDocument(document)}
               >
@@ -448,7 +453,7 @@ export default function MyProjects() {
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7 bg-background/80"
-                  disabled={!document.file_path}
+                  disabled={!isDocumentAvailable(document)}
                   onClick={() => openDocument(document)}
                 >
                   <Eye className="h-4 w-4" />
@@ -458,12 +463,15 @@ export default function MyProjects() {
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7 bg-background/80"
-                  disabled={!document.file_path}
+                  disabled={!isDocumentAvailable(document)}
                   onClick={() => downloadDocument(document)}
                 >
                   <Download className="h-4 w-4" />
                 </Button>
               </div>
+              {document.file_path && document.file?.available === false && (
+                <span className="text-[10px] text-muted-foreground">ไม่พบไฟล์ต้นฉบับ</span>
+              )}
             </div>
           );
         })}
@@ -487,7 +495,7 @@ export default function MyProjects() {
             key={documentItem.id}
             type="button"
             className="flex flex-col items-center gap-2 rounded-md bg-background px-2 py-3 text-center transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={!documentItem.file_path}
+            disabled={!isDocumentAvailable(documentItem)}
             onClick={() => openDocument(documentItem)}
             title={getDocumentOpenLabel(documentItem)}
             aria-label={`เปิดเอกสาร ${documentItem.name || getDocumentDisplayName(documentItem)}`}
@@ -497,6 +505,9 @@ export default function MyProjects() {
               <p className="max-w-[7rem] truncate text-center text-[13px] font-semibold text-foreground">{documentItem.name}</p>
               <p className="truncate text-xs text-muted-foreground">{formatDate(documentItem.date)}</p>
               <p className="truncate text-xs text-muted-foreground">{getDocumentDisplayName(documentItem)}</p>
+              {documentItem.file_path && documentItem.file?.available === false && (
+                <p className="text-[10px] text-muted-foreground">ไม่พบไฟล์ต้นฉบับ</p>
+              )}
             </div>
           </button>
         ))}

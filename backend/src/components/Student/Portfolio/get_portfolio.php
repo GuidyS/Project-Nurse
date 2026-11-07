@@ -1,6 +1,7 @@
 <?php
 if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/../../../config/config.php'; 
+require_once __DIR__ . '/../../../config/storage.php';
 
 header("Content-Type: application/json; charset=UTF-8");
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit(); }
@@ -41,7 +42,8 @@ try {
     $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     foreach ($items as &$item) {
-        $item['fileUrl'] = portfolio_file_url($item['file_path'] ?? null);
+        $item['file'] = storageDescriptor($db, $item['file_path'] ?? null, $item['file_name'] ?? null);
+        $item['fileUrl'] = $item['file']['url'] ?? portfolio_file_url($item['file_path'] ?? null);
     }
     unset($item);
 

@@ -34,15 +34,20 @@ try {
     $deleteStmt->execute([':document_id' => $documentId]);
 
     $db->commit();
-    project_document_delete_file($document['file_path'] ?? null);
+    try { project_document_delete_file($db, $document['file_path'] ?? null); }
+    catch (Throwable $deleteError) { error_log('Project object delete failed: ' . $deleteError->getMessage()); }
 
-    logAudit($db, $auth['user_id'], 'delete', 'project_documents', "ลบเอกสารโครงการ ID: {$documentId} ชื่อ: {$document['name']} (project_id: {$document['project_id']})");
+    try {
+        logAudit($db, $auth['user_id'], 'delete', 'project_documents', "ลบเอกสารโครงการ ID: {$documentId} ชื่อ: {$document['name']} (project_id: {$document['project_id']})");
+    } catch (Throwable $auditError) {
+        error_log('Project document audit log failed: ' . $auditError->getMessage());
+    }
 
     project_json([
         "status" => "success",
         "message" => "ลบเอกสารโครงการสำเร็จ",
     ]);
-} catch (Exception $e) {
+} catch (Throwable $e) {
     if ($db->inTransaction()) $db->rollBack();
     project_json(["status" => "error", "message" => $e->getMessage()], project_error_status($e));
 }

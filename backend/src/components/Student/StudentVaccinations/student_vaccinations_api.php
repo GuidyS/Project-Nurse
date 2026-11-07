@@ -7,6 +7,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 if (session_status() == PHP_SESSION_NONE) { session_start(); }
 require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../config/audit_helper.php';
+require_once __DIR__ . '/../../../config/storage.php';
 
 if (!isset($_SESSION['user_id'])) {
     http_response_code(401);
@@ -19,6 +20,8 @@ const MAX_EVIDENCE_SIZE = 5 * 1024 * 1024; // 5MB
 
 try {
     $db = new Connect;
+    $newStorageReferences = [];
+    $transactionCommitted = false;
 
     $stmt = $db->prepare("SELECT username, role_id FROM users WHERE user_id = :id");
     $stmt->execute([':id' => $_SESSION['user_id']]);
@@ -46,6 +49,11 @@ try {
         $stmt = $db->prepare($query);
         $stmt->execute([':sid' => $student_id]);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        foreach ($rows as &$row) {
+            $row['file'] = storageDescriptor($db, $row['evidence_file_path'] ?? null);
+            $row['evidence_file_url'] = $row['file']['url'];
+        }
+        unset($row);
 
         echo json_encode(["status" => "success", "data" => $rows], JSON_UNESCAPED_UNICODE);
         exit;
@@ -67,11 +75,9 @@ try {
             exit;
         }
 
-        $uploadDir = __DIR__ . '/../../../uploads/vaccine_evidence/' . $student_id . '/';
-        if (!is_dir($uploadDir)) {
-            mkdir($uploadDir, 0777, true);
-        }
-
+        $oldEvidenceStmt = $db->prepare("SELECT DISTINCT evidence_file_path FROM student_vaccinations WHERE student_id=:sid AND evidence_file_path IS NOT NULL AND evidence_file_path<>''");
+        $oldEvidenceStmt->execute([':sid'=>$student_id]);
+        $oldEvidencePaths = array_values(array_filter(array_map('strval', $oldEvidenceStmt->fetchAll(PDO::FETCH_COLUMN) ?: [])));
         $groupEvidencePaths = [];
         foreach ($vaccinations as $item) {
             $groupId = $item['group_id'] ?? ($item['sequence_no'] ?? null);
@@ -81,13 +87,20 @@ try {
             if (isset($_FILES[$fileKey]) && $_FILES[$fileKey]['error'] === UPLOAD_ERR_OK) {
                 $fileInfo = $_FILES[$fileKey];
                 $ext = strtolower(pathinfo($fileInfo['name'], PATHINFO_EXTENSION));
-                if (in_array($ext, ALLOWED_EVIDENCE_EXT, true) && $fileInfo['size'] <= MAX_EVIDENCE_SIZE) {
-                    $newFileName = 'vaccine_' . preg_replace('/[^a-zA-Z0-9_]/', '', (string)$groupId) . '_' . time() . '_' . uniqid() . '.' . $ext;
-                    $targetFile = $uploadDir . $newFileName;
-                    if (move_uploaded_file($fileInfo['tmp_name'], $targetFile)) {
-                        $groupEvidencePaths[$groupId] = 'uploads/vaccine_evidence/' . $student_id . '/' . $newFileName;
-                    }
+                if (!in_array($ext, ALLOWED_EVIDENCE_EXT, true) || (int)$fileInfo['size'] <= 0 || (int)$fileInfo['size'] > MAX_EVIDENCE_SIZE) {
+                    throw new InvalidArgumentException('ไฟล์หลักฐานต้องเป็น PDF, JPG หรือ PNG และขนาดไม่เกิน 5 MB');
                 }
+                $mime = mime_content_type($fileInfo['tmp_name']) ?: 'application/octet-stream';
+                if (!in_array($mime, ['application/pdf', 'image/jpeg', 'image/png'], true)) {
+                    throw new InvalidArgumentException('ชนิดเนื้อหาไฟล์หลักฐานไม่ตรงกับไฟล์ที่รองรับ');
+                }
+                $stored = storagePutUploadedFile($db, $fileInfo, [
+                    'owner_type' => 'student', 'owner_id' => $student_id,
+                    'resource_type' => 'vaccination_evidence', 'resource_id' => (string)$groupId,
+                    'access_scope' => 'student_advisor_admin', 'mime_type' => $mime,
+                ]);
+                $groupEvidencePaths[$groupId] = $stored['reference'];
+                $newStorageReferences[] = $stored['reference'];
             }
         }
 
@@ -116,7 +129,9 @@ try {
             foreach ($vaccinations as $item) {
                 $groupId = $item['group_id'] ?? ($item['sequence_no'] ?? null);
                 $receivedDate = !empty($item['received_date']) ? $item['received_date'] : null;
-                $evidencePath = $groupEvidencePaths[$groupId] ?? ($item['evidence_file_path'] ?: null);
+                $requestedExistingPath = trim((string)($item['evidence_file_path'] ?? ''));
+                $existingPath = in_array($requestedExistingPath, $oldEvidencePaths, true) ? $requestedExistingPath : null;
+                $evidencePath = $groupEvidencePaths[$groupId] ?? $existingPath;
 
                 $advisorNameInput = trim($item['advisor_name'] ?? '');
                 $matchedAdvisorId = null;
@@ -155,12 +170,29 @@ try {
             }
 
             $db->commit();
+            $transactionCommitted = true;
+
+            $retainedPaths = array_values(array_unique(array_filter(array_merge($oldEvidencePaths, $newStorageReferences), function ($reference) use ($vaccinations, $groupEvidencePaths) {
+                foreach ($vaccinations as $item) {
+                    $groupId = $item['group_id'] ?? ($item['sequence_no'] ?? null);
+                    $requested = trim((string)($item['evidence_file_path'] ?? ''));
+                    if (($groupEvidencePaths[$groupId] ?? null) === $reference || $requested === $reference) return true;
+                }
+                return false;
+            })));
+            foreach (array_diff($oldEvidencePaths, $retainedPaths) as $obsoleteReference) {
+                storageDeleteReference($db, $obsoleteReference);
+            }
 
             // บันทึก Audit Log เมื่อข้อมูลวัคซีนถูก commit สำเร็จ
-            logAudit($db, $_SESSION['user_id'] ?? null, 'update', 'student_vaccinations', "บันทึกประวัติการรับวัคซีนนักศึกษา รหัส: {$student_id}");
+            try {
+                logAudit($db, $_SESSION['user_id'] ?? null, 'update', 'student_vaccinations', "บันทึกประวัติการรับวัคซีนนักศึกษา รหัส: {$student_id}");
+            } catch (Throwable $auditError) {
+                error_log('Vaccination audit log failed: ' . $auditError->getMessage());
+            }
 
         } catch (Throwable $e) {
-            $db->rollBack();
+            if ($db->inTransaction()) $db->rollBack();
             throw $e;
         }
 
@@ -169,6 +201,9 @@ try {
     }
 
 } catch (Throwable $e) {
-    http_response_code(500);
+    if (isset($newStorageReferences) && empty($transactionCommitted)) {
+        foreach ($newStorageReferences as $newReference) storageDeleteReference($db, $newReference);
+    }
+    http_response_code($e instanceof InvalidArgumentException ? 400 : 500);
     echo json_encode(["status" => "error", "message" => $e->getMessage()], JSON_UNESCAPED_UNICODE);
 }

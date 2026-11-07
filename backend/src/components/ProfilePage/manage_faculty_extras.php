@@ -1,6 +1,7 @@
 <?php
 if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/../../config/config.php';
+require_once __DIR__ . '/../../config/storage.php';
 
 if (!isset($_SESSION['user_id'])) {
     http_response_code(401);
@@ -81,25 +82,33 @@ try {
         if ($file['error'] !== UPLOAD_ERR_OK) {
             throw new Exception("เกิดข้อผิดพลาดในการอัปโหลดไฟล์ (รหัส: " . $file['error'] . ")");
         }
+        if ((int)($file['size'] ?? 0) <= 0 || (int)$file['size'] > 10 * 1024 * 1024) {
+            throw new Exception("ไฟล์ภาระงานต้องมีขนาดไม่เกิน 10 MB");
+        }
 
         $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
         if (!in_array($ext, ['xls', 'xlsx', 'csv', 'pdf', 'doc', 'docx'])) {
             throw new Exception("Invalid file type");
         }
+        $mime = mime_content_type($file['tmp_name']) ?: '';
+        if (!in_array($mime, [
+            'application/pdf','text/csv','text/plain','application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        ], true)) throw new Exception("File content type is not allowed");
 
-        $uploadDir = __DIR__ . '/../../uploads/faculty-extras/' . $facultyId . '/';
-        if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
-        
-        $filename = uniqid('wl_') . '.' . $ext;
-        $dest = $uploadDir . $filename;
-        if (!move_uploaded_file($file['tmp_name'], $dest)) {
-            throw new Exception("Failed to save file");
-        }
-        
-        $dbPath = 'uploads/faculty-extras/' . $facultyId . '/' . $filename;
+        $db->beginTransaction();
+        $stored = storagePutUploadedFile($db, $file, [
+            'owner_type' => 'faculty', 'owner_id' => $facultyId,
+            'resource_type' => 'faculty_workload', 'access_scope' => 'owner_admin', 'mime_type' => $mime,
+        ]);
+        $dbPath = $stored['reference'];
 
         $stmt = $db->prepare("INSERT INTO faculty_teaching_workloads (faculty_id, academic_year, term, file_path) VALUES (?, ?, ?, ?)");
         $stmt->execute([$facultyId, $academicYear, $term, $dbPath]);
+        $db->prepare('UPDATE storage_objects SET resource_id=:rid WHERE storage_id=:id')
+           ->execute([':rid' => $db->lastInsertId(), ':id' => $stored['id']]);
+        $db->commit();
         
         echo json_encode(["status" => "success", "message" => "อัปโหลดเรียบร้อยแล้ว", "path" => $dbPath], JSON_UNESCAPED_UNICODE);
     } 
@@ -110,9 +119,12 @@ try {
         $stmt->execute([$id, $facultyId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         if ($row) {
-            $fullPath = __DIR__ . '/../../' . $row['file_path'];
-            if (file_exists($fullPath)) @unlink($fullPath);
             $db->prepare("DELETE FROM faculty_teaching_workloads WHERE id = ? AND faculty_id = ?")->execute([$id, $facultyId]);
+            if (storageReferenceId($row['file_path'])) storageDeleteReference($db, $row['file_path']);
+            else {
+                $fullPath = storageLegacyAbsolutePath($row['file_path']);
+                if ($fullPath) @unlink($fullPath);
+            }
         }
         echo json_encode(["status" => "success", "message" => "ลบเรียบร้อยแล้ว"], JSON_UNESCAPED_UNICODE);
     }
@@ -123,24 +135,34 @@ try {
         if (!$trainingDate || !$trainingTopic) throw new Exception("ข้อมูลไม่ครบถ้วน");
 
         $dbPath = null;
+        $db->beginTransaction();
         if (isset($_FILES['file']) && $_FILES['file']['error'] === UPLOAD_ERR_OK) {
             $file = $_FILES['file'];
+            if ((int)($file['size'] ?? 0) <= 0 || (int)$file['size'] > 5 * 1024 * 1024) {
+                throw new Exception("ไฟล์ประกาศนียบัตรต้องมีขนาดไม่เกิน 5 MB");
+            }
             $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
             if (!in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'pdf'])) {
                 throw new Exception("Invalid file type for certificate");
             }
-            $uploadDir = __DIR__ . '/../../uploads/faculty-extras/' . $facultyId . '/';
-            if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
-            
-            $filename = uniqid('cert_') . '.' . $ext;
-            $dest = $uploadDir . $filename;
-            if (move_uploaded_file($file['tmp_name'], $dest)) {
-                $dbPath = 'uploads/faculty-extras/' . $facultyId . '/' . $filename;
+            $mime = mime_content_type($file['tmp_name']) ?: '';
+            if (!in_array($mime, ['image/jpeg','image/png','image/webp','application/pdf'], true)) {
+                throw new Exception("Certificate content type is not allowed");
             }
+            $stored = storagePutUploadedFile($db, $file, [
+                'owner_type' => 'faculty', 'owner_id' => $facultyId,
+                'resource_type' => 'faculty_training_certificate', 'access_scope' => 'owner_admin', 'mime_type' => $mime,
+            ]);
+            $dbPath = $stored['reference'];
         }
 
         $stmt = $db->prepare("INSERT INTO faculty_personnel_development (faculty_id, training_date, training_topic, learnings, certificate_file) VALUES (?, ?, ?, ?, ?)");
         $stmt->execute([$facultyId, $trainingDate, $trainingTopic, $learnings, $dbPath]);
+        if (isset($stored['id'])) {
+            $db->prepare('UPDATE storage_objects SET resource_id=:rid WHERE storage_id=:id')
+               ->execute([':rid' => $db->lastInsertId(), ':id' => $stored['id']]);
+        }
+        $db->commit();
         
         echo json_encode(["status" => "success", "message" => "บันทึกเรียบร้อยแล้ว"], JSON_UNESCAPED_UNICODE);
     }
@@ -150,17 +172,25 @@ try {
         $stmt = $db->prepare("SELECT certificate_file FROM faculty_personnel_development WHERE id = ? AND faculty_id = ?");
         $stmt->execute([$id, $facultyId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        if ($row && $row['certificate_file']) {
-            $fullPath = __DIR__ . '/../../' . $row['certificate_file'];
-            if (file_exists($fullPath)) @unlink($fullPath);
-        }
         $db->prepare("DELETE FROM faculty_personnel_development WHERE id = ? AND faculty_id = ?")->execute([$id, $facultyId]);
+        if ($row && $row['certificate_file']) {
+            if (storageReferenceId($row['certificate_file'])) storageDeleteReference($db, $row['certificate_file']);
+            else {
+                $fullPath = storageLegacyAbsolutePath($row['certificate_file']);
+                if ($fullPath) @unlink($fullPath);
+            }
+        }
         echo json_encode(["status" => "success", "message" => "ลบเรียบร้อยแล้ว"], JSON_UNESCAPED_UNICODE);
     }
     else {
         throw new Exception("Invalid action");
     }
-} catch (Exception $e) {
+} catch (Throwable $e) {
+    if ($db->inTransaction()) {
+        $objectKey = $stored['object_key'] ?? null;
+        $db->rollBack();
+        storageDeleteObjectKey($objectKey);
+    }
     http_response_code(400);
     echo json_encode(["status" => "error", "message" => $e->getMessage()], JSON_UNESCAPED_UNICODE);
 }

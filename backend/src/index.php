@@ -29,6 +29,10 @@
 
     switch ($page) {
 
+            case 'file-access':
+                require_once 'components/FileStorage/file_access.php';
+                break;
+
             case 'get-approval-requests':
             case 'create-approval-request':
             case 'approve-request':

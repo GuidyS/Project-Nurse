@@ -3,6 +3,7 @@
 if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../config/audit_helper.php';
+require_once __DIR__ . '/../../../config/storage.php';
 require_once __DIR__ . '/license_reminder_helpers.php';
 
 header("Content-Type: application/json; charset=UTF-8");
@@ -59,32 +60,30 @@ try {
         licenseImageRespond(400, ["status" => "error", "message" => "รองรับเฉพาะรูปภาพ JPG, PNG หรือ WEBP"]);
     }
 
-    $owner = preg_replace('/[^A-Za-z0-9_-]/', '_', (string)$user['faculty_id']);
-    $relativeDir = 'uploads/user-documents/' . $owner;
-    $absoluteDir = __DIR__ . '/../../../' . $relativeDir;
-    if (!is_dir($absoluteDir) && !mkdir($absoluteDir, 0775, true)) {
-        throw new RuntimeException('สร้างโฟลเดอร์เก็บไฟล์ไม่สำเร็จ');
-    }
-
-    $fileName = 'license_image_' . date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . '.' . LICENSE_IMAGE_TYPES[$mime];
-    if (!move_uploaded_file($file['tmp_name'], $absoluteDir . '/' . $fileName)) {
-        throw new RuntimeException('บันทึกไฟล์ลงเซิร์ฟเวอร์ไม่สำเร็จ');
-    }
-    $relativePath = $relativeDir . '/' . $fileName;
+    $db->beginTransaction();
+    $stored = storagePutUploadedFile($db, $file, [
+        'owner_type' => 'faculty', 'owner_id' => (string)$user['faculty_id'],
+        'resource_type' => 'faculty_license_image', 'resource_id' => (string)$user['faculty_id'],
+        'access_scope' => 'owner_admin', 'mime_type' => $mime,
+    ]);
+    $relativePath = $stored['reference'];
 
     $db->prepare("UPDATE faculty SET license_image = ? WHERE faculty_id = ?")
        ->execute([$relativePath, $user['faculty_id']]);
+    $db->commit();
 
     // ลบรูปเก่า — เฉพาะรูปใบประกอบวิชาชีพในโฟลเดอร์ของเจ้าของเท่านั้น
     $old = (string)($user['license_image'] ?? '');
-    if ($old !== '' && dirname($old) === $relativeDir && str_starts_with(basename($old), 'license_image_')) {
-        $oldAbsolute = __DIR__ . '/../../../' . $old;
-        if (is_file($oldAbsolute)) {
-            @unlink($oldAbsolute);
-        }
+    if ($old !== '') {
+        try { storageDeleteReference($db, $old); }
+        catch (Throwable $deleteError) { error_log('Old license image delete failed: ' . $deleteError->getMessage()); }
     }
 
-    logAudit($db, $_SESSION['user_id'] ?? null, 'update', 'license_images', "อัปโหลด/เปลี่ยนรูปใบประกอบวิชาชีพ (faculty_id: {$user['faculty_id']})");
+    try {
+        logAudit($db, $_SESSION['user_id'] ?? null, 'update', 'license_images', "อัปโหลด/เปลี่ยนรูปใบประกอบวิชาชีพ (faculty_id: {$user['faculty_id']})");
+    } catch (Throwable $auditError) {
+        error_log('License image audit log failed: ' . $auditError->getMessage());
+    }
 
     licenseImageRespond(200, [
         "status" => "success",
@@ -92,5 +91,7 @@ try {
         "data" => ["license_image" => $relativePath],
     ]);
 } catch (Throwable $e) {
+    if (isset($db) && $db->inTransaction()) $db->rollBack();
+    if (isset($stored['object_key'])) storageDeleteObjectKey($stored['object_key']);
     licenseImageRespond(500, ["status" => "error", "message" => $e->getMessage()]);
 }

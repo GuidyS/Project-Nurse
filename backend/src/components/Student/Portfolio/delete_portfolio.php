@@ -2,6 +2,7 @@
 if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/../../../config/config.php'; 
 require_once __DIR__ . '/../../../config/audit_helper.php'; 
+require_once __DIR__ . '/../../../config/storage.php';
 
 header("Content-Type: application/json; charset=UTF-8");
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit(); }
@@ -29,17 +30,16 @@ try {
         exit();
     }
 
-    // 2. ลบไฟล์จริงบนเซิร์ฟเวอร์
-    if (!empty($item['file_path'])) {
-        $fullPath = '/var/www/html/' . $item['file_path'];
-        if (file_exists($fullPath)) {
-            unlink($fullPath);
-        }
-    }
-
-    // 3. ลบแถวข้อมูลออกจากฐานข้อมูล
+    // 2. ลบแถวข้อมูลก่อน แล้วจึงลบ object เพื่อไม่ให้ DB ชี้ไปยังไฟล์ที่ถูกลบแล้ว
     $delStmt = $db->prepare("DELETE FROM portfolio WHERE portfolio_id = :id AND student_id = :sid");
     $delStmt->execute([':id' => $item_id, ':sid' => $student_id]);
+
+    if (storageReferenceId($item['file_path'] ?? null)) {
+        storageDeleteReference($db, $item['file_path']);
+    } elseif (!empty($item['file_path']) && !preg_match('/^https:\/\//i', $item['file_path'])) {
+        $fullPath = storageLegacyAbsolutePath($item['file_path']);
+        if ($fullPath) unlink($fullPath);
+    }
 
     // 4. บันทึก Audit Log เฉพาะเมื่อมีรายการถูกลบจริง
     $itemTitle = !empty($item['title']) ? ": " . $item['title'] : "";

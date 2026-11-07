@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Upload, FileText, Award, FolderOpen, Plus, Eye, Download, Trash2, Calendar, Loader2, ExternalLink, Pencil } from "lucide-react";
 import api from "@/lib/axios";
 import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
+import { resolveStoredFileUrl } from "@/lib/fileUrl";
 
 type PortfolioType = "certificate" | "project" | "activity" | "award";
 
@@ -26,6 +27,7 @@ interface PortfolioItem {
   file_path?: string | null;
   filePath?: string | null;
   fileUrl?: string | null;
+  file?: { available?: boolean; url?: string | null };
   mime_type?: string | null;
   file_category?: string | null;
 }
@@ -65,13 +67,13 @@ const getPortfolioFileName = (item?: Partial<PortfolioItem> | null) => {
 };
 
 const getPortfolioFileUrl = (item?: Partial<PortfolioItem> | null) => {
-  if (item?.fileUrl) return item.fileUrl;
+  if (item?.file?.available === false) return "";
+  if (item?.file?.url) return resolveStoredFileUrl(item.file.url, API_BASE_URL);
+  if (item?.fileUrl) return resolveStoredFileUrl(item.fileUrl, API_BASE_URL);
 
   const filePath = getPortfolioFilePath(item);
   if (!filePath) return "";
-  if (isExternalUrl(filePath)) return filePath;
-
-  return `${API_BASE_URL}/${filePath.replace(/^\/+/, "")}`;
+  return resolveStoredFileUrl(filePath, API_BASE_URL);
 };
 
 const getPortfolioTypeLabel = (type?: string | null) =>
@@ -459,6 +461,9 @@ const Portfolio = () => {
                             เปิดดู <ExternalLink className="h-3 w-3" />
                           </a>
                         </Button>
+                      )}
+                      {getPortfolioFilePath(detailItem) && detailItem.file?.available === false && (
+                        <span className="text-sm text-muted-foreground">ไม่พบไฟล์ต้นฉบับ</span>
                       )}
                     </div>
                   )}

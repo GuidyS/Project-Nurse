@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import {  Loader2, ChevronLeft, Search } from "lucide-react";
+import {  Loader2, ChevronLeft, Search, ExternalLink } from "lucide-react";
 import api from "@/lib/axios";
+import { resolveStoredFileUrl } from "@/lib/fileUrl";
 import type { AdvisorDetailPanelProps, StudentListItem } from "./advisorStudent";
 import AdvisorVaccinationDetail from "./AdvisorVaccinationDetail";
 import AdvisorCompetencyDetail from "./AdvisorCompetencyDetail";
@@ -23,6 +24,13 @@ interface HealthRecordItem {
   bmi: string;
   overall_status: "healthy" | "has_health_issue";
   health_issue_detail: string;
+  evidence_images_with_files?: HealthEvidenceFile[];
+  admission_images_with_files?: HealthEvidenceFile[];
+}
+
+interface HealthEvidenceFile {
+  path: string;
+  file?: { name?: string | null; url?: string | null; available?: boolean };
 }
 
 // แผง "ข้อมูลสุขภาพ" ของนักศึกษา 1 คน (โหมดดูอย่างเดียว)
@@ -130,6 +138,30 @@ function AdvisorHealthDetail({ student, onBack }: AdvisorDetailPanelProps) {
                     </div>
                   )}
                 </div>
+                {[
+                  ["หลักฐานสุขภาพ", record.evidence_images_with_files || []],
+                  ["หลักฐานตรวจสุขภาพแรกเข้า", record.admission_images_with_files || []],
+                ].map(([label, files]) => {
+                  const evidenceFiles = files as HealthEvidenceFile[];
+                  if (evidenceFiles.length === 0) return null;
+                  return (
+                    <div key={label as string} className="space-y-2 border-t border-border/50 pt-3">
+                      <p className="text-sm font-medium">{label as string}</p>
+                      <div className="flex flex-wrap gap-2">
+                        {evidenceFiles.map((evidence, index) => evidence.file?.available === false ? (
+                          <span key={`${evidence.path}-${index}`} className="rounded border px-2 py-1 text-xs text-muted-foreground">ไม่พบไฟล์ต้นฉบับ</span>
+                        ) : (
+                          <Button key={`${evidence.path}-${index}`} variant="outline" size="sm" asChild>
+                            <a href={resolveStoredFileUrl(evidence.file?.url || evidence.path)} target="_blank" rel="noopener noreferrer">
+                              <ExternalLink className="mr-1 h-3.5 w-3.5" />
+                              {evidence.file?.name || `หลักฐาน ${index + 1}`}
+                            </a>
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
               </CardContent>
             </Card>
           ))}

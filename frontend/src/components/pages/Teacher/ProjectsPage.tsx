@@ -32,6 +32,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
+import { resolveStoredFileUrl } from "@/lib/fileUrl";
 import { navigateToProject } from "@/lib/projectNavigation";
 import { ConfirmActionDialog } from "@/components/shared/ConfirmActionDialog";
 import { ImportDataDialog, type ImportDataTypeOption } from "@/components/shared/ImportDataDialog";
@@ -62,7 +63,11 @@ interface ProjectDocument {
   file_name?: string | null;
   mime_type?: string | null;
   file_size?: number | null;
+  file_url?: string | null;
+  file?: { available?: boolean; url?: string | null };
 }
+
+const isProjectDocumentAvailable = (document: ProjectDocument) => Boolean(document.file_path) && document.file?.available !== false;
 interface ProjectActivity {
   id?: number;
   activity_name: string;
@@ -320,9 +325,7 @@ const formatDate = (value?: string | null) => {
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 const getProjectFileUrl = (filePath?: string | null) => {
-  if (!filePath) return "";
-  if (/^https?:\/\//i.test(filePath)) return filePath;
-  return `${API_BASE_URL}/${filePath.replace(/^\/+/, "")}`;
+  return resolveStoredFileUrl(filePath, API_BASE_URL);
 };
 
 const projectDocuments = (project?: Project | null) => (Array.isArray(project?.documents) ? project.documents : []);
@@ -765,8 +768,8 @@ const ProjectsPage = () => {
   };
 
   const openDocumentFile = (projectDocument: ProjectDocument) => {
-    if (!projectDocument.file_path) return;
-    window.open(getProjectFileUrl(projectDocument.file_path), "_blank", "noopener,noreferrer");
+    if (!isProjectDocumentAvailable(projectDocument)) return;
+    window.open(getProjectFileUrl(projectDocument.file_url || projectDocument.file?.url || projectDocument.file_path!), "_blank", "noopener,noreferrer");
   };
 
   const handleSaveDocumentEdit = async (event: FormEvent<HTMLFormElement>) => {
@@ -1921,10 +1924,13 @@ const ProjectsPage = () => {
                           <p className="truncate text-xs text-muted-foreground">{getDocumentDisplayName(documentItem)}</p>
                         </div>
                         <div className="flex flex-wrap gap-2">
-                          <Button type="button" variant="outline" size="sm" disabled={!documentItem.file_path} onClick={() => openDocumentFile(documentItem)}>
+                          <Button type="button" variant="outline" size="sm" disabled={!isProjectDocumentAvailable(documentItem)} onClick={() => openDocumentFile(documentItem)}>
                             <DocumentAttachmentIcon document={documentItem} className="mr-1 h-4 w-4" />
                             {getDocumentOpenLabel(documentItem)}
                           </Button>
+                          {documentItem.file_path && documentItem.file?.available === false && (
+                            <span className="self-center text-xs text-muted-foreground">ไม่พบไฟล์ต้นฉบับ</span>
+                          )}
                           <Button type="button" variant="outline" size="sm" className="text-red-600 hover:text-red-700" onClick={() => handleOpenDocumentDelete(documentItem)}>
                             <Trash2 className="mr-1 h-4 w-4" />
                             ลบ
@@ -2077,7 +2083,7 @@ const ProjectsPage = () => {
                         key={documentItem.id}
                         type="button"
                         className="flex flex-col items-center gap-2 rounded-md bg-background px-2 py-3 text-center transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
-                        disabled={!documentItem.file_path}
+                        disabled={!isProjectDocumentAvailable(documentItem)}
                         onClick={() => openDocumentFile(documentItem)}
                         title={getDocumentOpenLabel(documentItem)}
                         aria-label={`เปิดเอกสาร ${documentItem.name || getDocumentDisplayName(documentItem)}`}
@@ -2087,6 +2093,9 @@ const ProjectsPage = () => {
                           <p className="max-w-[7rem] truncate text-center text-[13px] font-semibold text-foreground">{documentItem.name}</p>
                           <p className="truncate text-xs text-muted-foreground">{formatDate(documentItem.date)}</p>
                           <p className="truncate text-xs text-muted-foreground">{getDocumentDisplayName(documentItem)}</p>
+                          {documentItem.file_path && documentItem.file?.available === false && (
+                            <p className="text-[10px] text-muted-foreground">ไม่พบไฟล์ต้นฉบับ</p>
+                          )}
                         </div>
                       </button>
                     ))}

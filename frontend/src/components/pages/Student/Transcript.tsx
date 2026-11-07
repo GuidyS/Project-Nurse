@@ -21,6 +21,7 @@ import {
   FileCheck,
 } from "lucide-react";
 import api from "@/lib/axios";
+import { resolveStoredFileUrl } from "@/lib/fileUrl";
 import { calculateAcademicInfo } from "@/components/pages/ProfilePage";
 
 interface StudentProfile {
@@ -41,6 +42,8 @@ interface RegistrationRecord {
   semester: string;
   course_count: number;
   file_path: string;
+  file_url?: string | null;
+  file?: { available?: boolean; url?: string | null };
   uploaded_at: string;
 }
 
@@ -488,12 +491,16 @@ const Transcript = () => {
                         {new Date(item.uploaded_at).toLocaleDateString("th-TH")}
                       </TableCell>
                       <TableCell className="text-center">
-                        <Button variant="outline" size="sm" asChild className="h-8 gap-1 text-xs">
-                          <a href={`${apiBaseUrl}/${item.file_path}`} target="_blank" rel="noopener noreferrer">
-                            <ExternalLink className="h-3.5 w-3.5" />
-                            เปิดดูไฟล์
-                          </a>
-                        </Button>
+                        {item.file?.available === false ? (
+                          <span className="text-xs text-muted-foreground">ไม่พบไฟล์ต้นฉบับ</span>
+                        ) : (
+                          <Button variant="outline" size="sm" asChild className="h-8 gap-1 text-xs">
+                            <a href={resolveStoredFileUrl(item.file_url || item.file_path, apiBaseUrl)} target="_blank" rel="noopener noreferrer">
+                              <ExternalLink className="h-3.5 w-3.5" />
+                              เปิดดูไฟล์
+                            </a>
+                          </Button>
+                        )}
                       </TableCell>
                       <TableCell className="text-right">
                         <Button
@@ -620,7 +627,7 @@ const Transcript = () => {
                       </TableCell>
                       <TableCell className="text-center">
                         <Button variant="outline" size="sm" asChild className="h-8 gap-1 text-xs">
-                          <a href={`${apiBaseUrl}/${item.file_path}`} target="_blank" rel="noopener noreferrer">
+                          <a href={resolveStoredFileUrl(item.file_path, apiBaseUrl)} target="_blank" rel="noopener noreferrer">
                             <ExternalLink className="h-3.5 w-3.5" />
                             เปิดดูไฟล์
                           </a>

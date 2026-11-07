@@ -111,7 +111,26 @@ APP_URL=http://localhost:5173
 # ---------- แจ้งเตือนโครงการใกล้สิ้นสุด (30 และ 14 วันก่อนวันสิ้นสุด, ไม่รวมโครงการที่เสร็จสิ้น/ยกเลิก) ----------
 # ส่งอีเมลไปที่อีเมลคณะ + แจ้งเตือนแอดมินในระบบ (ใช้ SMTP ชุดเดียวกับด้านบน)
 PROJECT_REMINDER_EMAIL=nus1@siam.edu
+
+# ---------- Private S3-compatible Object Storage ----------
+# Development ใช้ MinIO จาก docker-compose (Console: http://localhost:9001)
+# เปลี่ยนค่าจริงใน production และห้าม commit secret
+STORAGE_ENDPOINT=http://minio:9000
+STORAGE_REGION=us-east-1
+STORAGE_BUCKET=nurse-mis-files
+STORAGE_ACCESS_KEY=<set-in-local-dotenv>
+STORAGE_SECRET_KEY=<set-in-local-dotenv>
+STORAGE_PATH_STYLE=true
+# เปิดเฉพาะช่วง 30 วันหลังย้ายไฟล์เดิม
+STORAGE_LEGACY_FALLBACK=true
 ```
+
+ก่อนเปิดใช้ upload flow ใหม่ ให้รัน migration
+`backend/sql/migrations/2026-11-07-object-storage.sql` แล้วตรวจ dry-run ด้วย
+`docker compose exec backend php /var/www/html/scripts/migrate_object_storage.php`
+ก่อนใช้ `--apply` (credential ค่าเริ่มต้นใน Compose ใช้เฉพาะ development; production ต้องตั้งผ่าน environment).
+Docker Compose ติดตั้ง Composer dependencies ลง named volume `backend-vendor`
+อัตโนมัติ จึงไม่แก้หรือ commit ไฟล์ใน `backend/src/vendor/`.
 
 ถ้าไม่ได้ตั้งค่านี้ axios จะไม่มี base URL ชัดเจน และ API เช่น `/index.php?page=login` อาจยิงผิดที่
 

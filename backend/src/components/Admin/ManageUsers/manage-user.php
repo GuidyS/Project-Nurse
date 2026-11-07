@@ -6,6 +6,7 @@ require_once __DIR__ . '/user_status_helpers.php';
 require_once __DIR__ . '/../../../config/academic_helper.php';
 require_once __DIR__ . '/../../../config/name_validation.php';
 require_once __DIR__ . '/../../../config/student_license_helper.php';
+require_once __DIR__ . '/../../../config/storage.php';
 header('Access-Control-Allow-Origin: ' . (in_array($_SERVER['HTTP_ORIGIN'] ?? '', ['http://localhost:5173', 'http://127.0.0.1:5173'], true) ? ($_SERVER['HTTP_ORIGIN'] ?? '') : 'http://localhost:5173'));
 header('Vary: Origin');
 header("Access-Control-Allow-Credentials: true");
@@ -42,7 +43,7 @@ try {
         return ($fileInput['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE;
     }
 
-    function savePdfUploads(string $fieldName, string $ownerCode): array {
+    function savePdfUploads(PDO $db, string $fieldName, string $ownerCode): array {
         if (!isset($_FILES[$fieldName])) {
             return [];
         }
@@ -75,6 +76,7 @@ try {
             UPLOAD_ERR_EXTENSION => "PHP extension หยุดการอัปโหลด",
         ];
 
+        try {
         foreach ($files as $file) {
             if (($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
                 continue;
@@ -95,19 +97,16 @@ try {
                 throw new Exception("รองรับเฉพาะไฟล์ PDF เท่านั้น");
             }
 
-            $safeOwner = preg_replace('/[^A-Za-z0-9_-]/', '_', $ownerCode);
-            $uploadDir = __DIR__ . "/../../../uploads/user-documents/" . $safeOwner;
-            if (!is_dir($uploadDir)) {
-                mkdir($uploadDir, 0775, true);
-            }
-
-            $filename = $fieldName . "_" . date("Ymd_His") . "_" . bin2hex(random_bytes(4)) . ".pdf";
-            $targetPath = $uploadDir . "/" . $filename;
-            if (!move_uploaded_file($file['tmp_name'], $targetPath)) {
-                throw new Exception("ไม่สามารถบันทึกไฟล์ PDF ได้");
-            }
-
-            $savedPaths[] = "uploads/user-documents/" . $safeOwner . "/" . $filename;
+            $stored = storagePutUploadedFile($db, $file, [
+                'owner_type' => 'faculty', 'owner_id' => $ownerCode,
+                'resource_type' => 'faculty_document', 'resource_id' => $fieldName,
+                'access_scope' => 'owner_admin', 'mime_type' => $mime,
+            ]);
+            $savedPaths[] = $stored['reference'];
+        }
+        } catch (Throwable $e) {
+            foreach ($savedPaths as $savedPath) storageDeleteReference($db, $savedPath);
+            throw $e;
         }
 
         return $savedPaths;
@@ -254,12 +253,15 @@ try {
                 }
                 $seen[$normalized] = true;
                 $absolute = resolveUploadAbsolutePath($normalized);
+                $storedFile = storageDescriptor($db, $normalized, basename($normalized));
                 $documents[] = [
                     'field' => 'teaching_degree_file',
                     'title' => $label,
-                    'file_name' => basename($normalized),
+                    'file_name' => $storedFile['name'] ?: basename($normalized),
                     'file_path' => $normalized,
-                    'available' => $absolute !== null && is_file($absolute),
+                    'file_url' => $storedFile['url'],
+                    'file' => $storedFile,
+                    'available' => $storedFile['available'] || ($absolute !== null && is_file($absolute)),
                     'portfolio_id' => null,
                     'degree_id' => (int)$row['degree_id'],
                 ];
@@ -297,7 +299,11 @@ try {
         return $realFile;
     }
 
-    function deleteLocalUploadFile(string $relativePath): bool {
+    function deleteLocalUploadFile(PDO $db, string $relativePath): bool {
+        if (storageReferenceId($relativePath)) {
+            storageDeleteReference($db, $relativePath);
+            return true;
+        }
         $absolute = resolveUploadAbsolutePath($relativePath);
         if ($absolute && is_file($absolute)) {
             return @unlink($absolute);
@@ -319,12 +325,15 @@ try {
                 }
                 $seen[$normalized] = true;
                 $absolute = resolveUploadAbsolutePath($normalized);
+                $storedFile = storageDescriptor($db, $normalized, basename($normalized));
                 $documents[] = [
                     'field' => $field,
                     'title' => $label,
-                    'file_name' => basename($normalized),
+                    'file_name' => $storedFile['name'] ?: basename($normalized),
                     'file_path' => $normalized,
-                    'available' => $absolute !== null && is_file($absolute),
+                    'file_url' => $storedFile['url'],
+                    'file' => $storedFile,
+                    'available' => $storedFile['available'] || ($absolute !== null && is_file($absolute)),
                     'portfolio_id' => null,
                 ];
             }
@@ -399,12 +408,15 @@ try {
                 }
             }
             $absolute = $path !== '' ? resolveUploadAbsolutePath($path) : null;
+            $storedFile = storageDescriptor($db, $path, $fileName);
             $documents[] = [
                 'field' => $field,
                 'title' => $row['title'] ?: ($labels[$field] ?? 'เอกสาร Portfolio'),
-                'file_name' => $fileName,
+                'file_name' => $storedFile['name'] ?: $fileName,
                 'file_path' => $path,
-                'available' => $absolute !== null && is_file($absolute),
+                'file_url' => $storedFile['url'],
+                'file' => $storedFile,
+                'available' => $storedFile['available'] || ($absolute !== null && is_file($absolute)),
                 'portfolio_id' => isset($row['portfolio_id']) ? (int)$row['portfolio_id'] : null,
             ];
         }
@@ -536,8 +548,16 @@ try {
             }
 
             $safeOwner = preg_replace('/[^A-Za-z0-9_-]/', '_', (string)$u_info['username']);
-            if ($filePath !== '' && !str_starts_with($filePath, 'uploads/user-documents/' . $safeOwner . '/')) {
-                throw new Exception("พาธไฟล์ไม่ถูกต้องสำหรับผู้ใช้นี้");
+            if ($filePath !== '') {
+                $storageId = storageReferenceId($filePath);
+                if ($storageId) {
+                    $object = storageObjectById($db, $storageId);
+                    if (!$object || !hash_equals((string)$object['owner_id'], (string)$u_info['username'])) {
+                        throw new Exception("ไฟล์ไม่ถูกต้องสำหรับผู้ใช้นี้");
+                    }
+                } elseif (!str_starts_with($filePath, 'uploads/user-documents/' . $safeOwner . '/')) {
+                    throw new Exception("พาธไฟล์ไม่ถูกต้องสำหรับผู้ใช้นี้");
+                }
             }
 
             if ((int)$u_info['role_id'] === 3) {
@@ -580,7 +600,7 @@ try {
             }
 
             if ($filePath !== '') {
-                deleteLocalUploadFile($filePath);
+                deleteLocalUploadFile($db, $filePath);
             }
 
             $db->prepare("INSERT INTO audit_log (user_id, action_type, resource, details, ip_address) VALUES (?, 'delete', 'ผู้ใช้', ?, ?)")
@@ -612,11 +632,16 @@ try {
         }
 
         $uploadedDocuments = [];
+        $newLicenseStorageReferences = [];
+        $licenseEvidenceToDelete = [];
 
         $u_stmt = $db->prepare("SELECT username, role_id FROM users WHERE user_id = :id");
         $u_stmt->execute([':id' => $id]);
         $u_info = $u_stmt->fetch(PDO::FETCH_ASSOC);
         if (!$u_info) throw new Exception("ไม่พบผู้ใช้งานในระบบ");
+        studentLicenseEnsureSchema($db);
+        userStatusEnsureSchema($db);
+        $db->beginTransaction();
         
         $details = $input['details'] ?? [];
 
@@ -635,7 +660,7 @@ try {
 
             foreach ($studentPdfFields as $fileField => $meta) {
                 // Handle file uploads if any (legacy compatibility)
-                $uploadedPaths = savePdfUploads($fileField, $u_info['username']);
+                $uploadedPaths = savePdfUploads($db, $fileField, $u_info['username']);
 
                 // ลิงก์ Google Drive ของนักศึกษาเป็นข้อมูลที่เจ้าตัวบันทึกเองที่หน้า Portfolio
                 // ผู้ดูแลระบบดูได้อย่างเดียว จึงไม่รับค่า pdfLinks ที่ส่งมาจากหน้าจัดการผู้ใช้
@@ -707,13 +732,13 @@ try {
 
             if (isset($rawDetails['delete_license_first_attempt_evidence']) && studentLicenseBool($rawDetails['delete_license_first_attempt_evidence'])) {
                 if ($licenseFirstPath) {
-                    studentLicenseDeleteEvidence($licenseFirstPath);
+                    $licenseEvidenceToDelete[] = $licenseFirstPath;
                 }
                 $licenseFirstPath = null;
                 $licenseFirstName = null;
             } elseif (array_key_exists('license_first_attempt_evidence_path', $rawDetails) && empty($rawDetails['license_first_attempt_evidence_path'])) {
                 if ($licenseFirstPath) {
-                    studentLicenseDeleteEvidence($licenseFirstPath);
+                    $licenseEvidenceToDelete[] = $licenseFirstPath;
                 }
                 $licenseFirstPath = null;
                 $licenseFirstName = null;
@@ -724,13 +749,13 @@ try {
 
             if (isset($rawDetails['delete_license_within_one_year_evidence']) && studentLicenseBool($rawDetails['delete_license_within_one_year_evidence'])) {
                 if ($licenseWithinYearPath) {
-                    studentLicenseDeleteEvidence($licenseWithinYearPath);
+                    $licenseEvidenceToDelete[] = $licenseWithinYearPath;
                 }
                 $licenseWithinYearPath = null;
                 $licenseWithinYearName = null;
             } elseif (array_key_exists('license_within_one_year_evidence_path', $rawDetails) && empty($rawDetails['license_within_one_year_evidence_path'])) {
                 if ($licenseWithinYearPath) {
-                    studentLicenseDeleteEvidence($licenseWithinYearPath);
+                    $licenseEvidenceToDelete[] = $licenseWithinYearPath;
                 }
                 $licenseWithinYearPath = null;
                 $licenseWithinYearName = null;
@@ -739,21 +764,23 @@ try {
             $licenseEvidenceUploaded = false;
             if ($licenseFirstPassed && $licenseFirstFile !== null) {
                 if ($licenseFirstPath) {
-                    studentLicenseDeleteEvidence($licenseFirstPath);
+                    $licenseEvidenceToDelete[] = $licenseFirstPath;
                 }
-                $saved = studentLicenseSaveEvidence($licenseFirstFile, (string)$u_info['username'], 'license_first_attempt');
+                $saved = studentLicenseSaveEvidence($licenseFirstFile, (string)$u_info['username'], 'license_first_attempt', $db);
                 $licenseFirstPath = $saved['path'];
                 $licenseFirstName = $saved['name'];
+                $newLicenseStorageReferences[] = $saved['path'];
                 $licenseEvidenceUploaded = true;
             }
 
             if ($licenseWithinYearPassed && $licenseWithinYearFile !== null) {
                 if ($licenseWithinYearPath) {
-                    studentLicenseDeleteEvidence($licenseWithinYearPath);
+                    $licenseEvidenceToDelete[] = $licenseWithinYearPath;
                 }
-                $saved = studentLicenseSaveEvidence($licenseWithinYearFile, (string)$u_info['username'], 'license_within_one_year');
+                $saved = studentLicenseSaveEvidence($licenseWithinYearFile, (string)$u_info['username'], 'license_within_one_year', $db);
                 $licenseWithinYearPath = $saved['path'];
                 $licenseWithinYearName = $saved['name'];
+                $newLicenseStorageReferences[] = $saved['path'];
                 $licenseEvidenceUploaded = true;
             }
 
@@ -811,7 +838,7 @@ try {
             $details = array_merge($currentDetails, $details);
 
             foreach (facultyColumnPdfFields() as $fileField) {
-                $uploadedPaths = savePdfUploads($fileField, $u_info['username']);
+                $uploadedPaths = savePdfUploads($db, $fileField, $u_info['username']);
                 
                 // Add google drive link from pdfLinks if provided
                 if (!empty($input['pdfLinks'][$fileField])) {
@@ -826,7 +853,7 @@ try {
                 }
             }
 
-            $degreeUploads = savePdfUploads('teaching_degree_file', $u_info['username']);
+            $degreeUploads = savePdfUploads($db, 'teaching_degree_file', $u_info['username']);
             if (!empty($input['pdfLinks']['teaching_degree_file'])) {
                 $degreeUploads[] = trim($input['pdfLinks']['teaching_degree_file']);
             }
@@ -882,6 +909,17 @@ try {
         
         $db->prepare("INSERT INTO audit_log (user_id, action_type, resource, details, ip_address) VALUES (?, 'update', 'ผู้ใช้', ?, ?)")
            ->execute([$_SESSION['user_id'], "แก้ไขข้อมูลบัญชี: " . $u_info['username'], $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1']);
+        $db->commit();
+
+        foreach (array_unique($licenseEvidenceToDelete) as $obsoleteEvidence) {
+            if (!in_array($obsoleteEvidence, $newLicenseStorageReferences, true)) {
+                try {
+                    studentLicenseDeleteEvidence($obsoleteEvidence, $db);
+                } catch (Throwable $deleteError) {
+                    error_log('Deferred license evidence delete failed: ' . $deleteError->getMessage());
+                }
+            }
+        }
 
         echo json_encode(["status" => "success", "uploaded_documents" => $uploadedDocuments]);
         exit();
@@ -909,7 +947,21 @@ try {
         exit();
     }
 
-} catch (Exception $e) {
+} catch (Throwable $e) {
+    if (isset($db) && $db->inTransaction()) {
+        $rollbackReferences = [];
+        foreach (($uploadedDocuments ?? []) as $paths) {
+            foreach ((array)$paths as $path) if (storageReferenceId((string)$path)) $rollbackReferences[] = (string)$path;
+        }
+        foreach (($newLicenseStorageReferences ?? []) as $path) if (storageReferenceId((string)$path)) $rollbackReferences[] = (string)$path;
+        $rollbackObjectKeys = [];
+        foreach (array_unique($rollbackReferences) as $reference) {
+            $object = storageObjectById($db, storageReferenceId($reference));
+            if ($object) $rollbackObjectKeys[] = $object['object_key'];
+        }
+        $db->rollBack();
+        foreach ($rollbackObjectKeys as $objectKey) storageDeleteObjectKey($objectKey);
+    }
     http_response_code(400);
     echo json_encode(["status" => "error", "message" => $e->getMessage()]);
 }

@@ -12,6 +12,7 @@ import { useState, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
 import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
+import { resolveStoredFileUrl } from "@/lib/fileUrl";
 
 type EvidenceItem = {
   id: string;
@@ -20,6 +21,7 @@ type EvidenceItem = {
   type: string;
   title: string;
   url: string;
+  available?: boolean;
   date: string;
 };
 
@@ -156,10 +158,7 @@ export default function Evidence() {
   //ฟังค์ชัน ดู
 
   const getFileUrl = (urlPath: string) => {
-    if (!urlPath) return '#';
-    if (urlPath.startsWith('http')) return urlPath;
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
-    return `${baseUrl}/${urlPath}`;
+    return resolveStoredFileUrl(urlPath);
   };
 
   const handleView = (url: string) => {
@@ -167,7 +166,8 @@ export default function Evidence() {
       toast({ title: "ข้อผิดพลาด", description: "ไม่พบที่อยู่ไฟล์หลักฐาน", variant: "destructive" });
       return;
     }
-    const viewUrl = getFileUrl(url) + '&action=view';
+    const resolved = getFileUrl(url);
+    const viewUrl = resolved.includes('page=file-access') ? resolved : resolved + '&action=view';
     window.open(viewUrl, '_blank');
   };
 
@@ -177,7 +177,10 @@ export default function Evidence() {
       return;
     }
     
-    const downloadUrl = getFileUrl(url) + '&action=download';
+    const resolved = getFileUrl(url);
+    const downloadUrl = resolved.includes('page=file-access')
+      ? resolved.replace(/([?&])disposition=[^&]*/i, '$1disposition=attachment')
+      : resolved + '&action=download';
     
     const link = document.createElement('a');
     link.href = downloadUrl;
@@ -342,14 +345,15 @@ export default function Evidence() {
                     <TableCell>{evidence.date}</TableCell>
                     <TableCell>
                       <div className="flex gap-2">
-                        <Button variant="outline" size="sm" onClick={() => handleView(evidence.url)}>
+                        <Button variant="outline" size="sm" disabled={evidence.available === false} onClick={() => handleView(evidence.url)}>
                           <Eye className="mr-1 h-3 w-3" />
                           ดู
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => handleDownload(evidence.url, evidence.title)}>
+                        <Button variant="outline" size="sm" disabled={evidence.available === false} onClick={() => handleDownload(evidence.url, evidence.title)}>
                           <Download className="mr-1 h-3 w-3" />
                           ดาวน์โหลด
                         </Button>
+                        {evidence.available === false && <span className="self-center text-xs text-muted-foreground">ไม่พบไฟล์ต้นฉบับ</span>}
                         <Button variant="destructive" size="sm" onClick={() => openDeleteConfirm(evidence.id)}>
                           <Trash2 className="mr-1 h-3 w-3" />
                           ลบ

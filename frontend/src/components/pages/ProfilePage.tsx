@@ -40,6 +40,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useState, useEffect, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
+import { resolveStoredFileUrl } from "@/lib/fileUrl";
 import { onlyThai } from "@/lib/nameInput";
 
 // Helper สำหรับคำนวณปีการศึกษาและชั้นปี Real-time (ตัดรอบ 10 สิงหาคม)
@@ -940,10 +941,7 @@ const STUDENT_LICENSE_ITEMS = [
 const isPassedValue = (value: unknown) => value === true || value === 1 || value === "1" || value === "true";
 
 const resolveUploadUrl = (path: unknown, apiBaseUrl: string) => {
-  const raw = String(path ?? "").trim();
-  if (!raw) return "";
-  if (/^https?:\/\//i.test(raw)) return raw;
-  return `${apiBaseUrl}/${raw.replace(/^\//, "")}`;
+  return resolveStoredFileUrl(path, apiBaseUrl);
 };
 
 // จำนวนวันจากวันนี้ถึงวันหมดอายุ (เทียบเฉพาะวันที่)
@@ -1269,7 +1267,7 @@ const WorkloadsSection = ({ workloads, onUpdate, readOnly = false }: { workloads
                   {/* โหมดดูอย่างเดียวให้เปิดดูได้อย่างเดียว ไม่มีปุ่มดาวน์โหลด */}
                   {readOnly ? (
                     <a
-                      href={`${apiBaseUrl}/${w.file_path}`}
+                      href={resolveStoredFileUrl(w.file_path, apiBaseUrl)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-primary hover:underline"
@@ -1279,7 +1277,7 @@ const WorkloadsSection = ({ workloads, onUpdate, readOnly = false }: { workloads
                   ) : (
                     <>
                       <Button variant="outline" size="sm" asChild>
-                        <a href={`${apiBaseUrl}/${w.file_path}`} target="_blank" rel="noopener noreferrer"><Download className="h-4 w-4" /></a>
+                        <a href={resolveStoredFileUrl(w.file_path, apiBaseUrl)} target="_blank" rel="noopener noreferrer"><Download className="h-4 w-4" /></a>
                       </Button>
                       <Button variant="destructive" size="sm" onClick={() => handleDelete(w.id)}><Trash2 className="h-4 w-4" /></Button>
                     </>
