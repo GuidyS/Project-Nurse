@@ -78,7 +78,7 @@ try {
 }
 
 foreach ($filePaths as $filePath) {
-    try { project_document_delete_file((string)$filePath); }
+    try { project_document_delete_file($db, (string)$filePath); }
     catch (Throwable $e) { fwrite(STDERR, "Warning: one stored activity file could not be removed safely.\n"); }
 }
 $remainingActivities = (int)$db->query("SELECT COUNT(*) FROM annual_project_report_items WHERE row_type='activity'")->fetchColumn();

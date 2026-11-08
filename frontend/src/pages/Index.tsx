@@ -140,13 +140,13 @@ const Index = () => {
     // 2. หมวดทั่วไปที่ทุกคนเข้าถึงได้ (Public / All Roles)
     if (activeItem === "login") {
       return (
-        <LoginPage 
+        <LoginPage
           onLoginSuccess={(userData: unknown) => {
             if (!userData || typeof userData !== "object") return;
             const loginUser = userData as LoginUserPayload;
             const rId = Number(loginUser.role_id);
             const pId = Number(loginUser.position_id);
-            
+
             localStorage.setItem('user', JSON.stringify(loginUser));
 
             switch (rId) {
@@ -164,11 +164,11 @@ const Index = () => {
               default: setActiveItem("profile");
             }
           }}
-          onGoToRegister={() => setActiveItem("register")} 
+          onGoToRegister={() => setActiveItem("register")}
         />
       );
     }
-    
+
     if (activeItem === "register") return <RegisterPage onBackToLogin={() => setActiveItem("login")} />;
     if (activeItem === "profile") return <ProfilePage />;
     if (activeItem === "notifications") return <NotificationsPage />; //*
@@ -231,7 +231,7 @@ const Index = () => {
     // 4. 🔒 หมวดสิทธิ์คณบดี (Role 2 + Position 1) หรือ Admin
     const deanPages = [
       "dean-dashboard", "retention", "dean-teaching-workload", "dean-research-workload",
-      "dean-academic-service-workload", "dean-culture-workload"
+      "dean-project-workload", "dean-academic-service-workload", "dean-culture-workload"
     ];
     if (deanPages.includes(activeItem)) {
       if (roleId !== 1 && !(roleId === 2 && positionId === 1)) return <UnauthorizedView />;
@@ -240,8 +240,9 @@ const Index = () => {
         case "retention": return <Retention />;
         case "dean-teaching-workload": return <FacultyDimensionPage dimension="teaching" />;
         case "dean-research-workload": return <FacultyDimensionPage dimension="research" />;
-        case "dean-academic-service-workload": return <FacultyDimensionPage dimension="academic-service" />;
-        case "dean-culture-workload": return <FacultyDimensionPage dimension="culture" />;
+        case "dean-project-workload":
+        case "dean-academic-service-workload":
+        case "dean-culture-workload": return <FacultyDimensionPage dimension="projects" />;
       }
     }
 
@@ -254,7 +255,7 @@ const Index = () => {
       "students", "students-info", "my-research", "research-summary",
       "advisor-health-records-view"
     ];
-    
+
     if (teacherPages.includes(activeItem)) {
       if (activeItem === "research-summary" && !isResearchPreviewRoute && !canViewResearchSummary) return <UnauthorizedView />;
       if (!isResearchPreviewRoute && roleId !== 1 && roleId !== 2) return <UnauthorizedView />;
@@ -307,7 +308,7 @@ const Index = () => {
   }
 
   return (
-    <MainLayout 
+    <MainLayout
       onItemClick={handleItemClick}
       activeItem={activeItem}
     >

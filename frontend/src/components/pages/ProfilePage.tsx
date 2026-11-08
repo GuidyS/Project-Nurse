@@ -59,7 +59,7 @@ export const calculateAcademicInfo = (studentIdOrEntryYear: string | number) => 
   // 1. ดึงกรณีเป็น พ.ศ. 4 หลัก
   if (val.length === 4 && parseInt(val, 10) >= 2500 && parseInt(val, 10) <= 2600) {
     entryYear = parseInt(val, 10);
-  } 
+  }
   // 2. ดึงจาก 2 ตัวแรกของรหัสนักศึกษา (เช่น "6603400001" -> 66 -> 2566)
   else if (val.length >= 2) {
     const prefix = parseInt(val.substring(0, 2), 10);
@@ -107,6 +107,9 @@ export default function ProfilePage({
   const [licensePreviewUrl, setLicensePreviewUrl] = useState("");
   const [licenseFileError, setLicenseFileError] = useState("");
   const licenseInputRef = useRef<HTMLInputElement>(null);
+  const [studentLicenseEvidenceFiles, setStudentLicenseEvidenceFiles] = useState<Record<string, File | null>>({});
+  const [studentLicenseEvidenceErrors, setStudentLicenseEvidenceErrors] = useState<Record<string, string>>({});
+  const studentLicenseEvidenceRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const { toast } = useToast();
 
@@ -213,8 +216,55 @@ export default function ProfilePage({
         return;
       }
 
+      if (userRole === "student") {
+        for (const item of STUDENT_LICENSE_ITEMS) {
+          if (!isPassedValue(formData[item.passedField])) continue;
+          const hasNewEvidence = Boolean(studentLicenseEvidenceFiles[item.fileField]);
+          const hasExistingEvidence = Boolean(formData[item.pathField] || profileData?.[item.pathField]);
+          if (!hasNewEvidence && !hasExistingEvidence) {
+            toast({
+              title: "กรุณาแนบหลักฐาน",
+              description: `ต้องแนบหลักฐานสำหรับ${item.label}`,
+              variant: "destructive",
+            });
+            return;
+          }
+          if (studentLicenseEvidenceErrors[item.fileField]) {
+            toast({
+              title: "ไฟล์หลักฐานไม่ถูกต้อง",
+              description: studentLicenseEvidenceErrors[item.fileField],
+              variant: "destructive",
+            });
+            return;
+          }
+        }
+      }
+
       setIsSaving(true);
-      const res = await api.post("/index.php?page=profile", formData);
+      const hasStudentLicenseEvidenceFiles =
+        userRole === "student" &&
+        STUDENT_LICENSE_ITEMS.some((item) => Boolean(studentLicenseEvidenceFiles[item.fileField]));
+      const profilePayload = { ...formData };
+      if (userRole === "student") {
+        delete profilePayload.gpa;
+      }
+
+      let res;
+      if (hasStudentLicenseEvidenceFiles) {
+        const payload = new FormData();
+        payload.append("profile", JSON.stringify(profilePayload));
+        for (const item of STUDENT_LICENSE_ITEMS) {
+          const file = studentLicenseEvidenceFiles[item.fileField];
+          if (file) {
+            payload.append(item.fileField, file);
+          }
+        }
+        res = await api.post("/index.php?page=profile", payload, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+      } else {
+        res = await api.post("/index.php?page=profile", profilePayload);
+      }
       if (res.data.status === "success") {
         // บันทึกข้อมูลแล้วค่อยอัปโหลดรูปใบประกอบวิชาชีพ (ถ้าเลือกรูปใหม่)
         if (userRole === "teacher" && licenseFile) {
@@ -238,6 +288,8 @@ export default function ProfilePage({
         }
         toast({ title: "อัปเดตข้อมูลส่วนตัวเรียบร้อยแล้ว" });
         setEditing(false);
+        setStudentLicenseEvidenceFiles({});
+        setStudentLicenseEvidenceErrors({});
         fetchProfile();
       } else {
         toast({
@@ -289,7 +341,7 @@ export default function ProfilePage({
           </p>
         </div>
       </div>
-      
+
       {/* 🎯 ส่วนหัว Card ข้อมูลส่วนตัว */}
       <div className="bg-card rounded-2xl shadow-lg p-8 relative">
         {/* โหมดดูอย่างเดียวไม่สร้างปุ่มแก้ไขเลย ไม่ใช่แค่ซ่อนด้วย CSS */}
@@ -304,8 +356,10 @@ export default function ProfilePage({
                 home_address: profileData.home_address || profileData.address || ""
               });
               setLicenseFile(null);
-              setLicenseFileError(""); 
-              setEditing(true); 
+              setLicenseFileError("");
+              setStudentLicenseEvidenceFiles({});
+              setStudentLicenseEvidenceErrors({});
+              setEditing(true);
             }}
           >
             <Edit className="h-4 w-4" />
@@ -447,7 +501,7 @@ export default function ProfilePage({
                   <div className="flex items-center gap-2 mb-4">
                     <h3 className="font-semibold text-foreground text-base">ข้อมูลครอบครัว (บิดา-มารดา)</h3>
                   </div>
-                  
+
                   <div className="bg-muted/20 p-4 rounded-xl border border-border space-y-4">
                     <div className="grid md:grid-cols-2 gap-6">
                       {/* ข้อมูลบิดา */}
@@ -778,7 +832,7 @@ export default function ProfilePage({
             {userRole === "student" && (
               <div className="space-y-4">
                 <h4 className="font-semibold text-primary border-b border-border pb-1">
-                  3. ข้อมูลครอบครัว (บิดา-มารดา)
+                  4. ข้อมูลครอบครัว (บิดา-มารดา)
                 </h4>
 
                 {/* ข้อมูลบิดา */}

@@ -50,4 +50,3 @@ function adminRequireAccess(PDO $db): int
 
     return $userId;
 }
-

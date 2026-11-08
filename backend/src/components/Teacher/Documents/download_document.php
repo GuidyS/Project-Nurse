@@ -5,7 +5,7 @@ $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USE
 
 if (isset($_GET['id'])) {
     $id = $_GET['id'];
-    
+
     $sql = "SELECT file_name, file_path FROM tqf_documents WHERE id = :id";
     $stmt = $pdo->prepare($sql);
     $stmt->execute([':id' => $id]);
@@ -14,7 +14,7 @@ if (isset($_GET['id'])) {
     if ($doc && !empty($doc['file_path'])) {
         $path = $doc['file_path'];
         $fileName = !empty($doc['file_name']) ? basename($doc['file_name']) : 'document';
-        
+
         // If it's an external link, redirect to it
         if (preg_match('/^https?:\/\//', $path)) {
             // Check if it is a Google Drive link to convert to direct download

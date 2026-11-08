@@ -2,7 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { FileText, Save, Edit, Loader2, Search } from 'lucide-react';
+import { AlertCircle, FileText, Save, Edit, Loader2, Search } from 'lucide-react';
 import { useState, useEffect, useMemo } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
@@ -34,6 +34,7 @@ export default function CLOMap() {
   
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [courseSearch, setCourseSearch] = useState('');
   const [yloFilter, setYloFilter] = useState<string>(YLO_FILTER_ALL);
 
@@ -41,13 +42,17 @@ export default function CLOMap() {
   const fetchMapData = async () => {
     try {
       setIsLoading(true);
+      setLoadError('');
       const response = await api.get('/index.php?page=get-clo-map');
       if (response.data.status === 'success') {
         setCourses(response.data.data.courses || []);
         setPlos(response.data.data.plos || []);
         setCloMap(response.data.data.cloMap || {});
+      } else {
+        setLoadError(response.data?.message || 'ไม่สามารถดึงข้อมูล CLO Map ได้');
       }
     } catch (error) {
+      setLoadError('ไม่สามารถดึงข้อมูล CLO Map ได้ กรุณาลองอีกครั้ง');
       toast({ title: "ข้อผิดพลาด", description: "ไม่สามารถดึงข้อมูล CLO Map ได้", variant: "destructive" });
     } finally {
       setIsLoading(false);
@@ -106,6 +111,14 @@ export default function CLOMap() {
 
   if (isLoading) {
     return <div className="flex h-96 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+  }
+
+  if (loadError) {
+    return <div className="flex min-h-64 flex-col items-center justify-center rounded-xl bg-card p-8 text-center">
+      <AlertCircle className="mb-3 h-10 w-10 text-destructive" />
+      <p className="mb-4 text-sm text-muted-foreground">{loadError}</p>
+      <Button variant="outline" onClick={fetchMapData}>ลองอีกครั้ง</Button>
+    </div>;
   }
 
 return (

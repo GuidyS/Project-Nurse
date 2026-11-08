@@ -77,6 +77,8 @@ try {
 
     [$typeSql, $typeParams] = assignStudentsTypeCondition($type, 'sam');
 
+    // The academic-year helper may create a settings table and implicitly commit a MySQL transaction.
+    $academicYear = currentAcademicYear(null, $db);
     $db->beginTransaction();
 
     $movedCount = 0;
@@ -102,7 +104,6 @@ try {
 
     $insert = $db->prepare("INSERT INTO student_advisor_mapping (student_id, faculty_id, advisor_type, academic_year)
                             VALUES (?, ?, ?, ?)");
-    $academicYear = currentAcademicYear(null, $db);
     foreach ($studentIds as $sid) {
         $insert->execute([$sid, $facultyId, $type['key'], $academicYear]);
     }

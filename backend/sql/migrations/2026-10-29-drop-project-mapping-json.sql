@@ -70,4 +70,7 @@ DELIMITER ;
 
 CALL drop_project_mapping_json_if_ready();
 DROP PROCEDURE IF EXISTS drop_project_mapping_json_if_ready;
+<<<<<<< HEAD
 
+=======
+>>>>>>> b00a7e61152fcedf164f85a4af9f896da0fc3780

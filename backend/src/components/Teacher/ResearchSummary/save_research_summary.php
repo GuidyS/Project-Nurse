@@ -17,6 +17,9 @@ try {
     $stmt = $db->prepare('SELECT faculty_id FROM faculty WHERE faculty_id = ?');
     $stmt->execute([$facultyId]);
     if (!$stmt->fetchColumn()) researchFail(422, 'ไม่พบอาจารย์');
+    // academicYearBoundary/currentAcademicYear can create system_settings on first use.
+    // Resolve it before any transaction so MySQL DDL cannot commit a pending add/update/remove.
+    currentAcademicYear(null, $db);
     if ($action === 'add') {
         $year = filter_var($input['year'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 2500, 'max_range' => 2700]]);
         $mode = $input['year_mode'] ?? '';

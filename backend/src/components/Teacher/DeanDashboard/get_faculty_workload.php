@@ -32,6 +32,17 @@ function summarizeProjectRecords(array $records): array
     ];
 }
 
+function projectWorkloadCategory(string $type): string
+{
+    return in_array($type, ['academic_service', 'culture', 'teaching', 'research', 'quality_assurance'], true)
+        ? $type : 'other';
+}
+
+function emptyProjectWorkloadCategories(): array
+{
+    return array_fill_keys(['academic_service', 'culture', 'teaching', 'research', 'quality_assurance', 'other'], 0);
+}
+
 try {
     $db = new Connect();
 
@@ -112,6 +123,7 @@ try {
             ],
             'academic_service' => [],
             'culture' => [],
+            'projects' => ['total' => 0, 'categories' => emptyProjectWorkloadCategories(), 'records' => []],
         ];
     }
 
@@ -262,6 +274,31 @@ try {
     project_u_ready($db);
     $projectRows=project_u_catalogue($db,project_u_rows($db,"SELECT p.*,CONCAT_WS(' ',f.title,f.first_name_th,f.last_name_th) AS responsible_name FROM project p LEFT JOIN faculty f ON f.faculty_id=p.responsible_faculty_id WHERE p.academic_year=?",[$academicYear]));
     $byCode=[]; foreach ($projectRows as $p) if (!$p['merge_pending']) $byCode[$p['project_id']]=$p;
+    $allProjectIds = [];
+    $projectFaculty = 0;
+    $projectCategories = emptyProjectWorkloadCategories();
+    foreach ($projectRows as $project) {
+        $facultyId = (string)($project['responsible_faculty_id'] ?? '');
+        if (!isset($faculty[$facultyId])) continue;
+
+        $category = projectWorkloadCategory((string)($project['project_type'] ?? ''));
+        $projectId = (string)$project['project_id'];
+        $projectName = trim((string)($project['project_name_th'] ?? ''));
+        if ($projectName === '') {
+            $projectName = trim((string)($project['project_name_en'] ?? '')) ?: ('โครงการ #' . $projectId);
+        }
+        $faculty[$facultyId]['projects']['categories'][$category]++;
+        $faculty[$facultyId]['projects']['records'][] = [
+            'id' => $projectId,
+            'project_name' => $projectName,
+            'activity_name' => null,
+            'row_type' => 'project',
+            'strategy' => (string)($project['strategy'] ?? ''),
+            'category' => $category,
+        ];
+        $allProjectIds[$projectId] = true;
+        $projectCategories[$category]++;
+    }
     foreach (project_u_bundle($db,$academicYear)['rows'] as $row) {
         $master=$byCode[$row['project_id']] ?? null; if (!$master) continue;
         $facultyId=(string)($master['responsible_faculty_id'] ?? ''); $category=$master['project_type'];
@@ -295,12 +332,13 @@ try {
 
         $person['academic_service'] = summarizeProjectRecords($person['academic_service']);
         $person['culture'] = summarizeProjectRecords($person['culture']);
+        $person['projects']['total'] = count($person['projects']['records']);
+        if ($person['projects']['total'] > 0) $projectFaculty++;
 
         $activeDimensions = 0;
         if ($person['teaching']['courses'] > 0) $activeDimensions++;
         if ($researchCount > 0) $activeDimensions++;
-        if ($person['academic_service']['items'] > 0) $activeDimensions++;
-        if ($person['culture']['items'] > 0) $activeDimensions++;
+        if ($person['projects']['total'] > 0) $activeDimensions++;
         $person['active_dimensions'] = $activeDimensions;
 
         $totalCourses += $person['teaching']['courses'];
@@ -364,6 +402,11 @@ try {
                     'projects' => count($cultureProjectNames),
                     'items' => count($cultureRecordIds),
                     'faculty' => $cultureFaculty,
+                ],
+                'projects' => [
+                    'total' => count($allProjectIds),
+                    'faculty' => $projectFaculty,
+                    'categories' => $projectCategories,
                 ],
             ],
             'faculty' => array_values($faculty),

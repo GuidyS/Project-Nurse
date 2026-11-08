@@ -174,4 +174,7 @@ ORDER BY project_id, issue_code;
 SELECT CASE WHEN COUNT(*) = 0 THEN 'ready_for_phase_1_deploy' ELSE 'blocked_fix_issues_and_rerun' END AS migration_status,
        COUNT(*) AS issue_count
 FROM tmp_project_mapping_json_issues;
+<<<<<<< HEAD
 
+=======
+>>>>>>> b00a7e61152fcedf164f85a4af9f896da0fc3780

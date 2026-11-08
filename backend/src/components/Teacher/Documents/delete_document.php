@@ -12,7 +12,7 @@ $input = json_decode(file_get_contents("php://input"), true);
 try {
     if (!empty($input['document_id'])) {
         $id = $input['document_id'];
-        
+
         // ดึงชื่อไฟล์และรหัสวิชาก่อนลบ เพื่อนำไปใส่ใน Log
         $infoSql = "SELECT file_name, subject_code, tqf_type, file_path FROM tqf_documents WHERE id = :id LIMIT 1";
         $infoStmt = $pdo->prepare($infoSql);
@@ -36,10 +36,10 @@ try {
         $docName = $docInfo ? "{$docInfo['tqf_type']} ({$docInfo['file_name']})" : "ID: $id";
         $docCourse = $docInfo ? " รายวิชา: {$docInfo['subject_code']}" : "";
         logAudit(
-            $pdo, 
-            $_SESSION['user_id'] ?? null, 
-            'delete', 
-            'documents', 
+            $pdo,
+            $_SESSION['user_id'] ?? null,
+            'delete',
+            'documents',
             "ลบเอกสาร $docName$docCourse"
         );
 
