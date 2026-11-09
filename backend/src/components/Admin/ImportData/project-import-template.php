@@ -106,12 +106,7 @@ try {
         'รหัสโครงการ', 'ชื่อโครงการ', 'รหัสผู้ดำเนินโครงการ', 'ปีการศึกษา',
         'ประเภทโครงการ', 'ยุทธศาสตร์', 'สถานะ', 'วันที่เริ่มต้น', 'วันที่สิ้นสุด',
         'รหัสผู้เข้าร่วมโครงการ', 'รหัส PLO', 'รหัส CLO', 'แผนงาน',
-        'วัตถุประสงค์', 'KPI', 'ลำดับรายงาน', 'ชื่อกิจกรรม', 'ลิงก์ Google Drive',
-        'มหาวิทยาลัยสยาม - งบเสนอ', 'มหาวิทยาลัยสยาม - งบใช้จริง', 'มหาวิทยาลัยสยาม - หมายเหตุ',
-        'โรงพยาบาลธนบุรี - งบเสนอ', 'โรงพยาบาลธนบุรี - งบใช้จริง', 'โรงพยาบาลธนบุรี - หมายเหตุ',
-        'คณะพยาบาลศาสตร์ - งบเสนอ', 'คณะพยาบาลศาสตร์ - งบใช้จริง', 'คณะพยาบาลศาสตร์ - หมายเหตุ',
-        'หน่วยงานภายนอก - งบเสนอ', 'หน่วยงานภายนอก - งบใช้จริง', 'หน่วยงานภายนอก - หมายเหตุ',
-        'ยังไม่ระบุแหล่งเงิน - งบเสนอ', 'ยังไม่ระบุแหล่งเงิน - งบใช้จริง', 'ยังไม่ระบุแหล่งเงิน - หมายเหตุ',
+        'วัตถุประสงค์', 'KPI', 'ลำดับรายงาน', 'งบรวมทั้งหมด',
     ];
 
     $spreadsheet = new Spreadsheet();
@@ -120,36 +115,32 @@ try {
         $projects,
         'โครงการ',
         $projectHeaders,
-        [18,42,34,14,26,46,20,16,16,38,24,24,32,38,30,14,38,48,18,18,30,18,18,30,18,18,30,18,18,30,18,18,30],
-        ['A','C','J','K','L','Q','R'],
+        [18,42,34,14,26,46,20,16,16,38,24,24,32,38,30,14,20],
+        ['A','C','J','K','L'],
         ['A', 'B', 'C', 'D']
     );
     $projects->getStyle('H2:I' . PROJECT_TEMPLATE_MAX_ROW)->getNumberFormat()->setFormatCode('dd/mm/yyyy');
-    $projects->getComment('A1')->getText()->createTextRun("แถวแรกของแต่ละรหัสเป็นโครงการหลัก แถวกิจกรรมให้กรอกรหัสเดิมซ้ำและเว้นข้อมูลโครงการ/งบประมาณ");
-    $projects->getComment('Q1')->getText()->createTextRun("กรอกเฉพาะแถวกิจกรรม และต้องกรอกคู่กับลิงก์ Google Drive");
-    $projects->getComment('S1')->getText()->createTextRun("งบประมาณกรอกเฉพาะแถวโครงการหลัก กิจกรรมย่อยไม่มีงบแยก");
-    foreach ([['S','T'],['V','W'],['Y','Z'],['AB','AC'],['AE','AF']] as [$start,$end]) {
-        $projects->getStyle($start.'2:'.$end.PROJECT_TEMPLATE_MAX_ROW)->getNumberFormat()->setFormatCode('#,##0.00');
-    }
+    $projects->getComment('Q1')->getText()->createTextRun("งบรวมทั้งหมดของโครงการ หน่วยบาท รองรับทศนิยมไม่เกิน 2 ตำแหน่ง");
+    $projects->getStyle('Q2:Q' . PROJECT_TEMPLATE_MAX_ROW)->getNumberFormat()->setFormatCode('#,##0.00');
 
-    $projects->fromArray(['บุคลากร', 'ประเภทโครงการ', 'สถานะโครงการ'], null, 'AH1');
+    $projects->fromArray(['บุคลากร', 'ประเภทโครงการ', 'สถานะโครงการ'], null, 'R1');
     foreach ($facultyOptions as $index => $option) {
-        $projects->setCellValueExplicit('AH' . ($index + 2), $option, DataType::TYPE_STRING);
+        $projects->setCellValueExplicit('R' . ($index + 2), $option, DataType::TYPE_STRING);
     }
     $projectTypes = ['บริการวิชาการ', 'ทำนุบำรุงศิลปวัฒนธรรม', 'การเรียนการสอน', 'วิจัย', 'การประกันคุณภาพ', 'อื่นๆ/ยังไม่จำแนก'];
     foreach ($projectTypes as $index => $option) {
-        $projects->setCellValueExplicit('AI' . ($index + 2), $option, DataType::TYPE_STRING);
+        $projects->setCellValueExplicit('S' . ($index + 2), $option, DataType::TYPE_STRING);
     }
     $projectStatuses = ['กำลังดำเนินการ', 'เสร็จสิ้น'];
     foreach ($projectStatuses as $index => $option) {
-        $projects->setCellValueExplicit('AJ' . ($index + 2), $option, DataType::TYPE_STRING);
+        $projects->setCellValueExplicit('T' . ($index + 2), $option, DataType::TYPE_STRING);
     }
 
     $facultyLastRow = max(2, count($facultyOptions) + 1);
-    $spreadsheet->addNamedRange(new NamedRange('ProjectFacultyOptions', $projects, '$AH$2:$AH$' . $facultyLastRow));
-    $spreadsheet->addNamedRange(new NamedRange('ProjectTypeOptions', $projects, '$AI$2:$AI$7'));
-    $spreadsheet->addNamedRange(new NamedRange('ProjectStatusOptions', $projects, '$AJ$2:$AJ$3'));
-    foreach (['AH','AI','AJ'] as $column) $projects->getColumnDimension($column)->setVisible(false);
+    $spreadsheet->addNamedRange(new NamedRange('ProjectFacultyOptions', $projects, '$R$2:$R$' . $facultyLastRow));
+    $spreadsheet->addNamedRange(new NamedRange('ProjectTypeOptions', $projects, '$S$2:$S$7'));
+    $spreadsheet->addNamedRange(new NamedRange('ProjectStatusOptions', $projects, '$T$2:$T$3'));
+    foreach (['R','S','T'] as $column) $projects->getColumnDimension($column)->setVisible(false);
 
     projectTemplateAddListValidation($projects, 'C2:C' . PROJECT_TEMPLATE_MAX_ROW, 'ProjectFacultyOptions', 'เลือกผู้ดำเนินโครงการจากรายชื่อ');
     projectTemplateAddListValidation($projects, 'E2:E' . PROJECT_TEMPLATE_MAX_ROW, 'ProjectTypeOptions', 'เลือกประเภทโครงการ');
@@ -161,6 +152,19 @@ try {
         'เลือกหนึ่งคน หรือพิมพ์หลายรายการคั่นด้วยจุลภาค อัฒภาค หรือขึ้นบรรทัดใหม่',
         false
     );
+
+    $activities = $spreadsheet->createSheet();
+    projectTemplatePrepareSheet(
+        $activities,
+        'กิจกรรมย่อย',
+        ['รหัสโครงการ', 'ชื่อกิจกรรม', 'ลิงก์ Google Drive', 'ลำดับกิจกรรม'],
+        [18, 42, 58, 16],
+        ['A', 'B', 'C'],
+        ['A', 'B', 'C']
+    );
+    $activities->getComment('A1')->getText()->createTextRun('กรอกรหัสโครงการที่มีอยู่ในชีตโครงการหรือมีอยู่ในระบบแล้ว');
+    $activities->getComment('C1')->getText()->createTextRun('รองรับเฉพาะ https://drive.google.com หรือ https://docs.google.com');
+    $activities->getStyle('D2:D' . PROJECT_TEMPLATE_MAX_ROW)->getNumberFormat()->setFormatCode('0');
 
     $spreadsheet->setActiveSheetIndex(0);
     logAudit(

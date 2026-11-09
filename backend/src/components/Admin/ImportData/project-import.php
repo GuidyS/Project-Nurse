@@ -27,6 +27,7 @@ function project_import_definitions(): array
                 'objective' => ['objective', 'วัตถุประสงค์'],
                 'kpi' => ['kpi', 'KPI'],
                 'sort_order' => ['sort_order', 'ลำดับรายงาน'],
+                'total_budget' => ['total_budget', 'งบรวมทั้งหมด'],
                 'activity_name' => ['activity_name', 'ชื่อกิจกรรม'],
                 'google_drive_url' => ['google_drive_url', 'ลิงก์ Google Drive'],
                 'university_proposed' => ['university_proposed', 'มหาวิทยาลัยสยาม - งบเสนอ'],
@@ -44,6 +45,32 @@ function project_import_definitions(): array
                 'unspecified_proposed' => ['unspecified_proposed', 'ยังไม่ระบุแหล่งเงิน - งบเสนอ'],
                 'unspecified_actual' => ['unspecified_actual', 'ยังไม่ระบุแหล่งเงิน - งบใช้จริง'],
                 'unspecified_note' => ['unspecified_note', 'ยังไม่ระบุแหล่งเงิน - หมายเหตุ'],
+            ],
+        ],
+        'activities' => [
+            'sheet' => 'กิจกรรมย่อย',
+            'required' => ['project_id', 'activity_name', 'google_drive_url'],
+            'dates' => [],
+            'aliases' => [
+                'project_id' => ['project_id', 'รหัสโครงการ'],
+                'activity_code' => ['activity_code', 'รหัสกิจกรรม'],
+                'activity_name' => ['activity_name', 'ชื่อกิจกรรม'],
+                'google_drive_url' => ['google_drive_url', 'ลิงก์ Google Drive'],
+                'sort_order' => ['sort_order', 'ลำดับกิจกรรม'],
+            ],
+        ],
+        'budgets' => [
+            'sheet' => 'งบประมาณ',
+            'required' => ['project_id'],
+            'dates' => [],
+            'aliases' => [
+                'project_id' => ['project_id', 'รหัสโครงการ'],
+                'activity_code' => ['activity_code', 'รหัสกิจกรรม'],
+                'activity_name' => ['activity_name', 'ชื่อกิจกรรม'],
+                'source_key' => ['budget_source', 'source_key', 'แหล่งงบประมาณ'],
+                'proposed' => ['budget_proposed', 'proposed', 'งบเสนอ'],
+                'actual' => ['budget_spent', 'actual', 'งบใช้จริง'],
+                'note' => ['budget_note', 'note', 'หมายเหตุงบประมาณ'],
             ],
         ],
     ];
@@ -352,22 +379,38 @@ function project_import_unique_rows(array $rows, array $fields, string $label): 
     }
 }
 
-function project_import_master_budget(PDO $db,string $code,array $row): int
+function project_import_legacy_wide_budget(array $row): array
 {
-    $root=project_u_require_root($db,$code); $budgets=project_u_budget($db,$root); $count=0;
+    $sum = null;
+    $ignored = 0;
     foreach (array_keys(project_u_sources()) as $source) {
-        $proposed=$row[$source.'_proposed']??null; $actual=$row[$source.'_actual']??null; $note=$row[$source.'_note']??null;
-        if ($proposed===null && $actual===null && $note===null) continue;
-        $cell=$budgets[$source]??[];
-        try {
-            if ($proposed!==null) $cell['proposed']=project_u_number(project_u_cents($proposed));
-            if ($actual!==null) $cell['actual']=project_u_number(project_u_cents($actual));
-        } catch (InvalidArgumentException $e) { project_import_error($row,$e->getMessage()); }
-        if ($note!==null) $cell['note']=trim((string)$note);
-        $budgets[$source]=$cell; $count++;
+        $proposed = $row[$source . '_proposed'] ?? null;
+        if ($proposed !== null) {
+            try { $sum = ($sum ?? 0) + (project_u_cents($proposed) ?? 0); }
+            catch (InvalidArgumentException $e) { project_import_error($row, $e->getMessage()); }
+        }
+        if (($row[$source . '_actual'] ?? null) !== null || ($row[$source . '_note'] ?? null) !== null) $ignored++;
     }
-    if ($count>0) { project_u_write_budget($db,$root,$budgets); project_u_sync_cache($db,$code); }
-    return $count;
+    if (($row['total_budget'] ?? null) !== null && $sum !== null) {
+        project_import_error($row, 'ห้ามกรอกงบรวมทั้งหมดพร้อมคอลัมน์งบรูปแบบเดิม');
+    }
+    return ['value' => project_u_number($sum), 'has_legacy' => $sum !== null, 'ignored' => $ignored];
+}
+
+function project_import_apply_row_budget(PDO $db, string $code, array $row): array
+{
+    $legacy = project_import_legacy_wide_budget($row);
+    $hasTotalColumn = isset($row['__present_fields']['total_budget']);
+    if ($legacy['has_legacy']) {
+        project_u_save_total_budget($db, $code, ['total_budget' => $legacy['value']]);
+        return ['changed' => true, 'explicit' => true, 'ignored' => $legacy['ignored']];
+    }
+    if ($hasTotalColumn) {
+        try { project_u_save_total_budget($db, $code, ['total_budget' => $row['total_budget']]); }
+        catch (InvalidArgumentException $e) { project_import_error($row, $e->getMessage()); }
+        return ['changed' => true, 'explicit' => ($row['total_budget'] ?? null) !== null, 'ignored' => $legacy['ignored']];
+    }
+    return ['changed' => false, 'explicit' => false, 'ignored' => $legacy['ignored']];
 }
 
 function project_import_is_activity_row(array $row): bool
@@ -379,7 +422,7 @@ function project_import_validate_activity_row(array $row): void
 {
     $name=trim((string)($row['activity_name']??'')); $url=trim((string)($row['google_drive_url']??''));
     if ($name==='' || $url==='') project_import_error($row,'แถวกิจกรรมต้องระบุชื่อกิจกรรมและลิงก์ Google Drive ให้ครบ');
-    $activityFields=['activity_name','google_drive_url'];
+    $activityFields=['activity_name','google_drive_url','sort_order','activity_code'];
     foreach (array_keys($row['__present_fields']??[]) as $field) {
         if ($field==='project_id' || in_array($field,$activityFields,true)) continue;
         if (($row[$field]??null)!==null) project_import_error($row,'แถวกิจกรรมกรอกได้เฉพาะรหัสโครงการ ชื่อกิจกรรม และลิงก์ Google Drive');
@@ -392,45 +435,89 @@ function processProjectWorkbook(string $filePath, PDO $db): array
     project_u_ready($db);
     $definitions = project_import_definitions();
     $spreadsheet = IOFactory::load($filePath);
-    $projectSheet = $spreadsheet->getSheetByName($definitions['projects']['sheet']) ?: $spreadsheet->getActiveSheet();
-    $rows=project_import_sheet_rows($projectSheet,$definitions['projects']);
-    if (!$rows) throw new InvalidArgumentException('ไม่พบข้อมูลโครงการในไฟล์');
-    $masters=[]; $activityNames=[]; $projectRows=0; $activityRows=0;
-    foreach ($rows as $row) {
+    $projectSheet = $spreadsheet->getSheetByName($definitions['projects']['sheet']);
+    if ($projectSheet === null) {
+        $activeSheet = $spreadsheet->getActiveSheet();
+        $reservedSheets = [$definitions['activities']['sheet'], $definitions['budgets']['sheet']];
+        if (!in_array($activeSheet->getTitle(), $reservedSheets, true)) $projectSheet = $activeSheet;
+    }
+    $projectInput=$projectSheet===null ? [] : project_import_sheet_rows($projectSheet,$definitions['projects']);
+    $activityInput=[]; $budgetInput=[];
+    $activitySheet=$spreadsheet->getSheetByName($definitions['activities']['sheet']);
+    if ($activitySheet!==null) $activityInput=project_import_sheet_rows($activitySheet,$definitions['activities']);
+    $budgetSheet=$spreadsheet->getSheetByName($definitions['budgets']['sheet']);
+    if ($budgetSheet!==null) $budgetInput=project_import_sheet_rows($budgetSheet,$definitions['budgets']);
+    if (!$projectInput && !$activityInput && !$budgetInput) throw new InvalidArgumentException('ไม่พบข้อมูลโครงการในไฟล์');
+
+    $masters=[]; $activityNames=[]; $projectRows=[]; $activityRows=$activityInput;
+    foreach ($projectInput as $row) {
         try { $code=project_validate_code(project_import_required($row,'project_id','รหัสโครงการ')); }
         catch (InvalidArgumentException $e) { project_import_error($row,$e->getMessage()); }
         $key=mb_strtolower($code,'UTF-8');
         if (project_import_is_activity_row($row)) {
             if (!isset($masters[$key])) project_import_error($row,'ต้องมีแถวโครงการหลักของรหัสนี้ก่อนแถวกิจกรรม');
-            project_import_validate_activity_row($row);
-            $nameKey=mb_strtolower(trim((string)$row['activity_name']),'UTF-8');
-            if (isset($activityNames[$key][$nameKey])) project_import_error($row,'ชื่อกิจกรรมซ้ำกับแถว '.$activityNames[$key][$nameKey]);
-            $activityNames[$key][$nameKey]=$row['__row']; $activityRows++;
+            $activityRows[]=$row;
         } else {
             if (isset($masters[$key])) project_import_error($row,'รหัสโครงการหลักซ้ำกับแถว '.$masters[$key]);
-            $masters[$key]=$row['__row']; $projectRows++;
+            $masters[$key]=$row['__row']; $projectRows[]=$row;
         }
+    }
+    foreach ($activityRows as $row) {
+        project_import_validate_activity_row($row);
+        try { $code=project_validate_code(project_import_required($row,'project_id','รหัสโครงการ')); }
+        catch (InvalidArgumentException $e) { project_import_error($row,$e->getMessage()); }
+        $key=mb_strtolower($code,'UTF-8'); $nameKey=mb_strtolower(trim((string)$row['activity_name']),'UTF-8');
+        if (isset($activityNames[$key][$nameKey])) project_import_error($row,'ชื่อกิจกรรมซ้ำกับแถว '.$activityNames[$key][$nameKey]);
+        $activityNames[$key][$nameKey]=$row['__row'];
     }
 
     $db->beginTransaction();
     try {
-        $codes=[]; $budgetCount=0; $sortOrders=[];
-        foreach ($rows as $row) {
-            if (!project_import_is_activity_row($row)) {
-                $code=project_import_project($db,$row); $key=mb_strtolower($code,'UTF-8'); $codes[$key]=$code;
-                $budgetCount+=project_import_master_budget($db,$code,$row);
-                $root=project_u_require_root($db,$code);
-                $sortOrders[$key]=(int)project_u_query($db,"SELECT COALESCE(MAX(sort_order),-1)+1 FROM annual_project_report_items WHERE parent_item_id=? AND row_type='activity'",[$root])->fetchColumn();
-            } else {
-                $requested=project_validate_code((string)$row['project_id']); $key=mb_strtolower($requested,'UTF-8'); $code=$codes[$key]??$requested;
-                project_u_merge_activity($db,$code,(string)$row['activity_name'],(string)$row['google_drive_url'],$sortOrders[$key]++);
-            }
+        $codes=[]; $budgetProjects=[]; $explicitTotals=[]; $ignoredLegacy=0; $sortOrders=[];
+        foreach ($projectRows as $row) {
+            $code=project_import_project($db,$row); $key=mb_strtolower($code,'UTF-8'); $codes[$key]=$code;
+            $budgetResult=project_import_apply_row_budget($db,$code,$row); $ignoredLegacy+=$budgetResult['ignored'];
+            if ($budgetResult['changed']) $budgetProjects[$key]=$code;
+            if ($budgetResult['explicit']) $explicitTotals[$key]=$row;
+        }
+
+        $legacyProjectTotals=[]; $legacyActivityBudgetRows=[]; $legacyCodes=[];
+        foreach ($budgetInput as $row) {
+            try { $code=project_validate_code(project_import_required($row,'project_id','รหัสโครงการ')); }
+            catch (InvalidArgumentException $e) { project_import_error($row,$e->getMessage()); }
+            $key=mb_strtolower($code,'UTF-8');
+            $legacyCodes[$key]=$code;
+            if (($row['actual']??null)!==null || ($row['note']??null)!==null || ($row['source_key']??null)!==null) $ignoredLegacy++;
+            if (($row['proposed']??null)===null) continue;
+            try { $amount=project_u_cents($row['proposed']); }
+            catch (InvalidArgumentException $e) { project_import_error($row,$e->getMessage()); }
+            if (trim((string)($row['activity_code']??''))!=='' || trim((string)($row['activity_name']??''))!=='') { $legacyActivityBudgetRows[$key][]=$row; continue; }
+            $legacyProjectTotals[$key]=($legacyProjectTotals[$key]??0)+($amount??0);
+        }
+        foreach ($legacyActivityBudgetRows as $key=>$rows) {
+            if (!array_key_exists($key,$legacyProjectTotals)) project_import_error($rows[0],'พบเฉพาะงบกิจกรรมย่อย กรุณาระบุงบเสนอระดับโครงการเพื่อแปลงเป็นงบรวมทั้งหมด');
+        }
+        foreach ($legacyProjectTotals as $key=>$cents) {
+            if (isset($explicitTotals[$key])) project_import_error($explicitTotals[$key],'ห้ามกรอกงบรวมทั้งหมดพร้อมชีตงบประมาณรูปแบบเดิม');
+            $requested=project_validate_code((string)($codes[$key]??$legacyCodes[$key]));
+            $code=$codes[$key]??(string)project_u_guard($db,$requested)['project_id'];
+            project_u_require_root($db,$code); project_u_save_total_budget($db,$code,['total_budget'=>project_u_number($cents)]);
+            $codes[$key]=$code; $budgetProjects[$key]=$code;
+        }
+
+        foreach ($activityRows as $row) {
+            $requested=project_validate_code((string)$row['project_id']); $key=mb_strtolower($requested,'UTF-8');
+            $code=$codes[$key]??(string)project_u_guard($db,$requested)['project_id']; $root=project_u_require_root($db,$code);
+            if (!isset($sortOrders[$key])) $sortOrders[$key]=(int)project_u_query($db,"SELECT COALESCE(MAX(sort_order),-1)+1 FROM annual_project_report_items WHERE parent_item_id=? AND row_type='activity'",[$root])->fetchColumn();
+            $sort=project_import_sort_order($row,'sort_order'); if ($sort===null) $sort=$sortOrders[$key]++;
+            project_u_merge_activity($db,$code,(string)$row['activity_name'],(string)$row['google_drive_url'],$sort); $codes[$key]=$code;
         }
         $db->commit();
         return [
-            'recordCount' => count($rows),
+            'recordCount' => count($projectRows)+count($activityRows),
             'rowKeys' => array_values($codes),
-            'counts' => ['projects'=>$projectRows,'activities'=>$activityRows,'budgets'=>$budgetCount],
+            'counts' => ['projects'=>count($projectRows),'activities'=>count($activityRows),'total_budgets'=>count($budgetProjects)],
+            'warnings' => $ignoredLegacy>0 ? ["ข้ามข้อมูลงบรูปแบบเดิม {$ignoredLegacy} ช่อง (งบใช้จริง แหล่งเงิน หรือหมายเหตุ)"] : [],
         ];
     } catch (Throwable $e) {
         if ($db->inTransaction()) $db->rollBack();

@@ -43,15 +43,9 @@ try {
             p.status,
             p.start_date,
             p.end_date,
+            p.total_budget,
             COALESCE(pfm.members, 0)
-                + CASE WHEN p.responsible_faculty_id IS NULL THEN 0 ELSE 1 END AS members,
-            COALESCE(pb.budget, 0) AS budget,
-            COALESCE(pb.spent, 0) AS spent,
-            COALESCE(pb.budget, 0) AS budget_proposed,
-            COALESCE(pb.spent, 0) AS budget_spent,
-            pb.project_budget_years_id,
-            pb.fiscal_year,
-            pb.budget_note
+                + CASE WHEN p.responsible_faculty_id IS NULL THEN 0 ELSE 1 END AS members
         FROM project p
         LEFT JOIN faculty f ON f.faculty_id = p.responsible_faculty_id
         LEFT JOIN (
@@ -59,16 +53,6 @@ try {
             FROM project_faculty_members
             GROUP BY project_id
         ) pfm ON pfm.project_id = p.project_id
-        LEFT JOIN (
-            SELECT project_id,
-                   MAX(project_budget_years_id) AS project_budget_years_id,
-                   MAX(fiscal_year) AS fiscal_year,
-                   SUM(COALESCE(budget_proposed, 0)) AS budget,
-                   SUM(COALESCE(budget_spent, 0)) AS spent,
-                   MAX(result) AS budget_note
-            FROM project_budget_years
-            GROUP BY project_id
-        ) pb ON pb.project_id = p.project_id
     ";
 
     if (!empty($where)) {

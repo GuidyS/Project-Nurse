@@ -3,16 +3,17 @@ function project_merge_queue(PDO $db, int $year): array {
     $projects=project_u_rows($db,'SELECT p.id,p.project_id,p.project_name_th,p.academic_year,p.responsible_faculty_id,p.project_type,l.report_item_id FROM project p LEFT JOIN project_report_links l ON l.project_id=p.project_id WHERE p.academic_year=? ORDER BY p.id',[$year]);
     $reports=project_u_rows($db,"SELECT i.* FROM annual_project_report_items i LEFT JOIN project_report_links l ON l.report_item_id=i.id WHERE i.academic_year=? AND i.row_type='project' AND l.project_id IS NULL ORDER BY i.id",[$year]);
     foreach ($reports as &$r) {
-        $r['budgets']=(object)project_u_budget($db,(int)$r['id']); $r['activities']=project_u_activities($db,(int)$r['id']);
+        $legacyBudget=project_u_budget($db,(int)$r['id']);
+        $r['total_budget']=project_u_number(project_u_total($legacyBudget,'proposed')); $r['activities']=project_u_activities($db,(int)$r['id']);
         $r['documents']=project_u_rows($db,'SELECT d.* FROM annual_project_report_documents d JOIN annual_project_report_items i ON i.id=d.report_item_id WHERE i.id=? OR i.parent_item_id=?',[$r['id'],$r['id']]);
     }
     $orphans=project_u_rows($db,"SELECT i.* FROM annual_project_report_items i LEFT JOIN annual_project_report_items parent ON parent.id=i.parent_item_id WHERE i.academic_year=? AND i.row_type='activity' AND (parent.id IS NULL OR parent.row_type<>'project') ORDER BY i.id",[$year]);
-    foreach ($orphans as &$a) {$a['budgets']=(object)project_u_budget($db,(int)$a['id']); $a['documents']=project_u_rows($db,'SELECT * FROM annual_project_report_documents WHERE report_item_id=?',[$a['id']]);} unset($a);
+    foreach ($orphans as &$a) {$a['documents']=project_u_rows($db,'SELECT * FROM annual_project_report_documents WHERE report_item_id=?',[$a['id']]);} unset($a);
     $legacy=project_u_rows($db,"SELECT a.source_id,a.project_id,a.payload_json FROM project_merge_audit a LEFT JOIN project p ON p.project_id=a.project_id WHERE a.operation='original' AND a.source_type='budget' AND COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(a.payload_json,'$.fiscal_year')) AS UNSIGNED),p.academic_year)=? AND NOT EXISTS(SELECT 1 FROM project_merge_audit r WHERE r.operation='reviewed' AND r.source_type='budget' AND r.source_id=a.source_id)",[$year]);
     foreach ($legacy as &$b) {$b['original']=json_decode($b['payload_json'],true);unset($b['payload_json']);}
     return ['projects'=>$projects,'reports'=>$reports,'orphan_activities'=>$orphans,'legacy_budgets'=>$legacy,'pending'=>project_u_pending($db,$year),
         'periodStatus'=>project_u_query($db,'SELECT status FROM project_report_periods WHERE academic_year=?',[$year])->fetchColumn() ?: 'open',
-        'faculty'=>project_u_rows($db,"SELECT faculty_id,CONCAT_WS(' ',title,first_name_th,last_name_th) AS name FROM faculty ORDER BY faculty_id"),'sources'=>project_u_sources()];
+        'faculty'=>project_u_rows($db,"SELECT faculty_id,CONCAT_WS(' ',title,first_name_th,last_name_th) AS name FROM faculty ORDER BY faculty_id")];
 }
 function project_merge_commit(PDO $db,array $input,int $user): string {
     $year=project_u_year($input['academic_year'] ?? null);project_u_lock_year($db,$year);
@@ -59,17 +60,16 @@ function project_merge_commit(PDO $db,array $input,int $user): string {
         $targetProject=project_u_guard($db,$target);$target=$targetProject['project_id'];
         $sourceYear=$original['fiscal_year'] ?? $year;
         if ((int)$sourceYear!== (int)$targetProject['academic_year']) throw new ProjectConflict('ยอดต่างปีต้องตรวจย้ายไปโครงการของปีนั้น');
-        if (!($decision['confirm_actual'] ?? false)) throw new InvalidArgumentException('ต้องยืนยันยอดงบใช้จริงที่เลือกก่อนกระทบยอด');
         $choice=$decision['decision'] ?? '';
-        if ($choice==='proposed') {
-            $targetBudget=project_u_budget($db,project_u_require_root($db,$target));
-            if ($original['legacy_amount']===null || project_u_total($targetBudget,'proposed')!==project_u_cents($original['legacy_amount'])) {
-                throw new ProjectConflict('ยอดงบเสนอที่เลือกต้องตรงกับยอดเดิมเมื่อเลือกย้ายเป็นงบเสนอ หากเลือกยอดอื่นให้เก็บยอดเดิมเป็นประวัติพร้อมเหตุผล');
+        if ($choice==='total' || $choice==='proposed') {
+            $targetTotal=project_u_cents(project_u_project($db,$target)['total_budget'] ?? null);
+            if ($original['legacy_amount']===null || $targetTotal!==project_u_cents($original['legacy_amount'])) {
+                throw new ProjectConflict('งบรวมทั้งหมดต้องตรงกับยอดเดิม หากเลือกยอดอื่นให้เก็บยอดเดิมเป็นประวัติพร้อมเหตุผล');
             }
         } elseif ($choice==='history') {
             if (trim((string)($decision['reason'] ?? ''))==='') throw new InvalidArgumentException('กรุณาระบุเหตุผลที่เก็บยอดเดิมเฉพาะในประวัติ');
         } else throw new InvalidArgumentException('กรุณาเลือกความหมายของยอดเดิมทีละรายการ');
-        project_u_archive($db,'budget',$sourceId,$target,['original'=>$original,'decision'=>$decision,'resolved_budgets'=>project_u_budget($db,project_u_require_root($db,$target))],$user,'reviewed');
+        project_u_archive($db,'budget',$sourceId,$target,['original'=>$original,'decision'=>$decision,'resolved_total_budget'=>project_u_project($db,$target)['total_budget'] ?? null],$user,'reviewed');
     }
     // Preserve original document IDs in the archive; migrate each URL exactly once.
     $documents=project_u_rows($db,'SELECT d.* FROM annual_project_report_documents d JOIN annual_project_report_items i ON i.id=d.report_item_id WHERE i.id=? OR i.parent_item_id=?',[$root,$root]);

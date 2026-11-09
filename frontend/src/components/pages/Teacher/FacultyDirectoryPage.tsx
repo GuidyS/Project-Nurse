@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronRight, Loader2, RefreshCw, Search, Users } from "lucide-react";
 import api from "@/lib/axios";
+import { resolveStoredFileUrl } from "@/lib/fileUrl";
 import ProfilePage from "@/components/pages/ProfilePage";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -199,7 +200,7 @@ export default function FacultyDirectoryPage() {
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <Avatar className="h-9 w-9 border">
-                            {person.profile_picture && <AvatarImage src={person.profile_picture} alt={person.name} />}
+                            {person.profile_picture && <AvatarImage src={resolveStoredFileUrl(person.profile_picture)} alt={person.name} />}
                             <AvatarFallback className="text-xs">{person.name.trim().charAt(0) || "อ"}</AvatarFallback>
                           </Avatar>
                           <div>

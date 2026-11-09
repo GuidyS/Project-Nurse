@@ -20,8 +20,16 @@ try {
 
     project_u_guard($db, $projectId);
     if (project_u_code_pending($db, $projectId)) throw new ProjectConflict('ต้องตรวจข้อมูลเดิมก่อนลบโครงการ');
+    $legacyProjectBudgetCount = (int) project_u_query($db, 'SELECT COUNT(*) FROM project_budget_years WHERE project_id=?', [$projectId])->fetchColumn();
+    if ($legacyProjectBudgetCount > 0) throw new ProjectConflict('ไม่สามารถลบโครงการที่มีข้อมูลงบเดิมได้ เนื่องจากต้องเก็บไว้เป็นประวัติ');
     $root = project_u_root($db, $projectId);
     if ($root !== null) {
+        $legacyBudgetCount = (int) project_u_query(
+            $db,
+            'SELECT COUNT(*) FROM annual_project_report_budgets b JOIN annual_project_report_items i ON i.id=b.report_item_id WHERE i.id=? OR i.parent_item_id=?',
+            [$root, $root]
+        )->fetchColumn();
+        if ($legacyBudgetCount > 0) throw new ProjectConflict('ไม่สามารถลบโครงการที่มีข้อมูลงบเดิมได้ เนื่องจากต้องเก็บไว้เป็นประวัติ');
         project_u_query($db, 'DELETE FROM project_report_links WHERE project_id=?', [$projectId]);
         project_u_query($db, 'DELETE FROM annual_project_report_items WHERE parent_item_id=?', [$root]);
         project_u_query($db, 'DELETE FROM annual_project_report_items WHERE id=?', [$root]);

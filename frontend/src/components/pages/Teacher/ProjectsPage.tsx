@@ -74,13 +74,6 @@ interface ProjectActivity {
   google_drive_url: string;
   sort_order?: number;
 }
-interface ProjectActivity {
-  id?: number;
-  activity_name: string;
-  google_drive_url: string;
-  sort_order?: number;
-}
-
 interface Project {
   merge_pending?: boolean;
   read_only?: boolean;
@@ -95,16 +88,8 @@ interface Project {
   status?: ProjectStatus | null;
   start_date?: string | null;
   end_date?: string | null;
-  project_budget_years_id?: number | null;
   fiscal_year?: number | null;
-  budget?: string | number | null;
-  spent?: string | number | null;
-  budget_source?: string;
-  multiple_budget_sources?: boolean;
-  budget_proposed?: string | number | null;
-  budget_spent?: string | number | null;
-  budget_note?: string | null;
-  result?: string | null;
+  total_budget?: string | number | null;
   members?: string | number | null;
   member_details?: ProjectMember[];
   member_names?: string[];
@@ -136,10 +121,7 @@ interface ProjectFormData {
   start_date: string;
   end_date: string;
   status: ProjectStatus;
-  budget_proposed: string;
-  budget_spent: string;
-  budget_source: string;
-  budget_note: string;
+  total_budget: string;
   has_sub_activities: boolean;
   activities: ProjectActivity[];
 }
@@ -205,7 +187,6 @@ const projectStrategies = [
   "ยุทธศาสตร์ที่ 6: ทำนุบำรุงศิลปวัฒนธรรม",
 ];
 const UNSPECIFIED_STRATEGY = "__unspecified_strategy__";
-const BUDGET_SOURCE_PREFIX = "แหล่งงบ: ";
 const optionalText = (value?: string | null) => value?.trim() || "-";
 
 const projectImportTypes: ImportDataTypeOption[] = [
@@ -213,7 +194,7 @@ const projectImportTypes: ImportDataTypeOption[] = [
     value: "projects",
     label: "ข้อมูลโครงการ",
     icon: Upload,
-    description: "Excel ชีตเดียว: แถวแรกเป็นโครงการหลัก แถวถัดไปใช้ project_id เดิมพร้อมชื่อกิจกรรมและลิงก์ Google Drive",
+    description: "Excel 2 ชีต: โครงการพร้อมงบรวมทั้งหมด และกิจกรรมย่อยพร้อมลิงก์ Google Drive",
   },
 ];
 
@@ -242,10 +223,7 @@ const createInitialFormData = (): ProjectFormData => ({
   start_date: "",
   end_date: "",
   status: "active",
-  budget_proposed: "",
-  budget_spent: "",
-  budget_source: "",
-  budget_note: "",
+  total_budget: "",
   has_sub_activities: false,
   activities: [],
 });
@@ -373,9 +351,7 @@ const projectAcademicYear = (project: Project) => project.academic_year ?? proje
 const projectDisplayName = (project: Project) => (project.project_name_th || "").trim() || `โครงการ #${project.project_id}`;
 const projectStrategyName = (project: Project) => project.strategy?.trim() || "ยังไม่ระบุ";
 
-const projectBudgetProposed = (project: Project) => project.budget_proposed ?? project.budget ?? null;
-const projectBudgetSpent = (project: Project) => project.budget_spent ?? project.spent ?? null;
-const projectBudgetNote = (project: Project) => project.budget_note ?? project.result ?? "";
+const projectTotalBudget = (project: Project) => project.total_budget ?? null;
 
 const projectResponsibleName = (project: Project) => {
   const responsibleName = (project.responsible_name || "").trim();
@@ -408,25 +384,6 @@ const projectMemberFacultyIds = (project: Project) => {
   return projectFacultyMembers(project)
     .map((member) => Number(member.id || 0))
     .filter((id) => Number.isFinite(id) && id > 0);
-};
-
-const parseBudgetNote = (raw?: string | null) => {
-  const text = raw?.trim() || "";
-  try {
-    const parsed: unknown = JSON.parse(text);
-    if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && ("source" in parsed || "note" in parsed)) {
-      const budget = parsed as { source?: unknown; note?: unknown };
-      return {
-        source: typeof budget.source === "string" ? budget.source.trim() : "",
-        note: typeof budget.note === "string" ? budget.note.trim() : "",
-      };
-    }
-  } catch { /* Legacy notes can be plain text. */ }
-  const [sourcePart, ...rest] = text.split(" | ");
-  if (sourcePart.startsWith(BUDGET_SOURCE_PREFIX)) {
-    return { source: sourcePart.slice(BUDGET_SOURCE_PREFIX.length).trim(), note: rest.join(" | ").trim() };
-  }
-  return { source: "", note: text };
 };
 
 const ProjectsPage = () => {
@@ -943,7 +900,6 @@ const ProjectsPage = () => {
 
   const handleOpenEditModal = (project: Project) => {
     if (!canManageProjects || project.read_only) return;
-    const budget = parseBudgetNote(projectBudgetNote(project));
     setEditMode(true);
     setFormData({
       project_id: project.project_id.toString(),
@@ -956,10 +912,7 @@ const ProjectsPage = () => {
       start_date: project.start_date || "",
       end_date: project.end_date || "",
       status: normalizeStatus(project.status),
-      budget_proposed: projectBudgetProposed(project)?.toString() || "",
-      budget_spent: projectBudgetSpent(project)?.toString() || "",
-      budget_source: project.budget_source || "",
-      budget_note: budget.note,
+      total_budget: projectTotalBudget(project)?.toString() || "",
       has_sub_activities: Boolean(project.has_sub_activities || project.activities?.length),
       activities: (project.activities || []).map((activity, index) => ({
         id: activity.id,
@@ -1019,13 +972,9 @@ const ProjectsPage = () => {
       return "กรุณาระบุปีการศึกษา พ.ศ. 2500-2700";
     }
 
-    const budgetProposed = formData.budget_proposed === "" ? null : Number(formData.budget_proposed);
-    const budgetSpent = formData.budget_spent === "" ? null : Number(formData.budget_spent);
-    if (budgetProposed !== null && (!Number.isFinite(budgetProposed) || budgetProposed < 0)) {
-      return "งบเสนอต้องเป็นตัวเลขไม่ติดลบ";
-    }
-    if (budgetSpent !== null && (!Number.isFinite(budgetSpent) || budgetSpent < 0)) {
-      return "งบใช้จริงต้องเป็นตัวเลขไม่ติดลบ";
+    const totalBudget = formData.total_budget === "" ? null : Number(formData.total_budget);
+    if (totalBudget !== null && (!Number.isFinite(totalBudget) || totalBudget < 0)) {
+      return "งบรวมทั้งหมดต้องเป็นตัวเลขไม่ติดลบ";
     }
 
     if (formData.start_date && formData.end_date && formData.end_date < formData.start_date) {
@@ -1095,7 +1044,6 @@ const ProjectsPage = () => {
     return null;
   };
 
-  const budgetsRequireDetails = editMode && Boolean(projects.find(p => p.project_id === formData.project_id)?.multiple_budget_sources);
   const handleSaveProject = async () => {
     if (!canManageProjects) return;
 
@@ -1120,6 +1068,7 @@ const ProjectsPage = () => {
         start_date: formData.start_date || null,
         end_date: formData.end_date || null,
         status: formData.status,
+        total_budget: formData.total_budget === "" ? null : Number(formData.total_budget),
         has_sub_activities: formData.has_sub_activities,
         activities: formData.has_sub_activities ? formData.activities.map((activity, index) => ({
           ...(activity.id ? { id: activity.id } : {}),
@@ -1127,10 +1076,6 @@ const ProjectsPage = () => {
           google_drive_url: activity.google_drive_url.trim(),
           sort_order: index,
         })) : [],
-        ...(!budgetsRequireDetails ? { budget_proposed: formData.budget_proposed === "" ? null : Number(formData.budget_proposed),
-        budget_spent: formData.budget_spent === "" ? null : Number(formData.budget_spent),
-        budget_source: formData.budget_source.trim(),
-        budget_note: formData.budget_note.trim() } : {}),
       };
 
       const res = await api.post(endpoint, payload);
@@ -1494,7 +1439,7 @@ const ProjectsPage = () => {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-48">
                       {!project.merge_pending && <DropdownMenuItem onClick={() => navigateToProject("project-reports", project.project_id, "reports")}>ดูรายงานโครงการ</DropdownMenuItem>}
-                      {!project.merge_pending && <DropdownMenuItem onClick={() => setDetailsCode(project.project_id)}>กิจกรรมย่อยและงบโครงการ</DropdownMenuItem>}
+                      {!project.merge_pending && <DropdownMenuItem onClick={() => setDetailsCode(project.project_id)}>กิจกรรมย่อย งบรวม และเอกสาร</DropdownMenuItem>}
                       <DropdownMenuItem className="gap-2" onClick={() => handleOpenViewModal(project)}>
                         <Eye className="h-4 w-4 text-blue-500" /> ดูรายละเอียด
                       </DropdownMenuItem>
@@ -1529,18 +1474,14 @@ const ProjectsPage = () => {
                 </div>
 
                 <div className="space-y-3 mt-4 pt-4 border-t border-slate-100">
-                  <div className="grid grid-cols-1 gap-3 text-xs text-muted-foreground sm:grid-cols-3">
+                  <div className="grid grid-cols-1 gap-3 text-xs text-muted-foreground sm:grid-cols-2">
                     <div>
                       <p>ปีการศึกษา</p>
                       <p className="mt-1 font-medium text-foreground">{project.academic_year || project.fiscal_year || "-"}</p>
                     </div>
                     <div>
-                      <p>งบเสนอ</p>
-                      <p className="mt-1 font-medium text-foreground">{formatCurrency(projectBudgetProposed(project))} บาท</p>
-                    </div>
-                    <div>
-                      <p>งบใช้จริง</p>
-                      <p className="mt-1 font-medium text-foreground">{formatCurrency(projectBudgetSpent(project))} บาท</p>
+                      <p>งบรวมทั้งหมด</p>
+                      <p className="mt-1 font-medium text-foreground">{formatCurrency(projectTotalBudget(project))} บาท</p>
                     </div>
                   </div>
                   <div className="flex items-center justify-between text-xs">
@@ -1801,44 +1742,19 @@ const ProjectsPage = () => {
                 </div>
               )}
             </div>
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-2">
               <div className="grid gap-2">
-                <Label>งบเสนอ (บาท)</Label>
+                <Label>งบรวมทั้งหมด (บาท)</Label>
                 <Input
                   type="number"
                   min="0"
-                  disabled={budgetsRequireDetails}
-                  value={formData.budget_proposed}
-                  onChange={(e) => setFormData({ ...formData, budget_proposed: e.target.value })}
-                  placeholder="0"
+                  step="0.01"
+                  value={formData.total_budget}
+                  onChange={(e) => setFormData({ ...formData, total_budget: e.target.value })}
+                  placeholder="ยังไม่ระบุ"
                 />
+                <p className="text-xs text-muted-foreground">กิจกรรมย่อยใช้ยอดเดียวกับโครงการหลักและไม่มีงบแยก</p>
               </div>
-              <div className="grid gap-2">
-                <Label>งบใช้จริง (บาท)</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  disabled={budgetsRequireDetails}
-                  value={formData.budget_spent}
-                  onChange={(e) => setFormData({ ...formData, budget_spent: e.target.value })}
-                  placeholder="0"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label>แหล่งงบประมาณ</Label>
-                <Select disabled={budgetsRequireDetails} value={formData.budget_source || "unspecified"} onValueChange={value => setFormData({ ...formData, budget_source: value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Object.entries({ university: 'มหาวิทยาลัยสยาม', thonburiHospital: 'โรงพยาบาลธนบุรี', nursingFaculty: 'คณะพยาบาลศาสตร์', external: 'หน่วยงานภายนอก', unspecified: 'ยังไม่ระบุแหล่งเงิน' }).map(([key, label]) => <SelectItem key={key} value={key}>{label}</SelectItem>)}</SelectContent></Select>
-                <p className="text-xs text-muted-foreground">หากมีหลายแหล่งเงิน ให้แก้ที่เมนูกิจกรรมย่อยและงบโครงการ</p>
-              </div>
-            </div>
-            <div className="grid gap-2">
-              <Label>หมายเหตุงบประมาณ</Label>
-              <Textarea
-                disabled={budgetsRequireDetails}
-                value={formData.budget_note}
-                onChange={(e) => setFormData({ ...formData, budget_note: e.target.value })}
-                placeholder="ระบุรายละเอียดเพิ่มเติม เช่น ไม่ใช้งบ, รอดำเนินการ, งบจากภายนอก"
-                rows={2}
-              />
             </div>
             {!editMode && (
               <div className="space-y-3 rounded-lg border bg-muted/20 p-4">
@@ -2053,19 +1969,9 @@ const ProjectsPage = () => {
                   <p className="font-medium text-foreground">{formatDate(viewProject.end_date)}</p>
                 </div>
                 <div className="space-y-1 rounded-lg border bg-muted/30 p-3">
-                  <p className="text-muted-foreground">งบเสนอ</p>
-                  <p className="font-medium text-foreground">{formatCurrency(projectBudgetProposed(viewProject))} บาท</p>
+                  <p className="text-muted-foreground">งบรวมทั้งหมด</p>
+                  <p className="font-medium text-foreground">{formatCurrency(projectTotalBudget(viewProject))} บาท</p>
                 </div>
-                <div className="space-y-1 rounded-lg border bg-muted/30 p-3">
-                  <p className="text-muted-foreground">งบใช้จริง</p>
-                  <p className="font-medium text-foreground">{formatCurrency(projectBudgetSpent(viewProject))} บาท</p>
-                </div>
-              </div>
-              <div className="space-y-1">
-                <p className="text-muted-foreground">หมายเหตุงบประมาณ</p>
-                <p className="font-medium text-foreground whitespace-pre-wrap rounded-lg border bg-muted/30 p-3">
-                  {optionalText(parseBudgetNote(projectBudgetNote(viewProject)).note)}
-                </p>
               </div>
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-2">

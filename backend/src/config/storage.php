@@ -164,6 +164,12 @@ function storageCanAccess(PDO $db, array $object, array $user): bool
     if (($object['access_scope'] ?? '') === 'authenticated') return true;
     if (in_array($object['owner_type'], ['student', 'faculty'], true) && hash_equals((string)$object['owner_id'], $username)) return true;
 
+    if (($object['access_scope'] ?? '') === 'faculty_profile_directory' && $roleId === 2) {
+        $stmt = $db->prepare('SELECT 1 FROM user_position WHERE user_id = :user_id AND position_id = 1 LIMIT 1');
+        $stmt->execute([':user_id' => $user['user_id']]);
+        return (bool)$stmt->fetchColumn();
+    }
+
     if (($object['access_scope'] ?? '') === 'student_advisor_admin' && $roleId === 2) {
         $stmt = $db->prepare('SELECT 1 FROM student_advisor_mapping WHERE student_id = :sid AND faculty_id = :fid LIMIT 1');
         $stmt->execute([':sid' => $object['owner_id'], ':fid' => $username]);

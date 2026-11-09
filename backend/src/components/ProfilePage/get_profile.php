@@ -189,6 +189,7 @@ try {
             } else {
                 $profile['profile_picture_url'] = null;
             }
+            unset($profile['profile_picture']);
 
             $profile = array_merge($profile, $authPayload);
             echo json_encode(["status" => "success", "role" => "teacher", "data" => $profile], JSON_UNESCAPED_UNICODE);

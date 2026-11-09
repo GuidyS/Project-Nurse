@@ -1,5 +1,15 @@
 # Project row ID
 
+## งบรวมทั้งหมดระดับโครงการ (2026-11-09)
+
+ใน maintenance window ให้สำรองฐานและหยุดการเขียนข้อมูลโครงการ จากนั้นรัน migration
+`2026-11-09-project-total-budget.sql` ให้เสร็จก่อน deploy โค้ดใหม่ migration จะเพิ่ม `project.total_budget`
+แล้ว backfill จากผลรวมงบเสนอของรายการโครงการหลัก หากไม่มีรายละเอียดจึง fallback
+จาก `project_budget_years.budget_proposed` เฉพาะปีเดียวกับโครงการ ไม่ใช้ยอดจริงทดแทน
+
+หลัง deploy ข้อมูลใหม่อ่านและเขียนเฉพาะ `project.total_budget` ตารางงบเดิมและ snapshot
+เดิมคงไว้เป็นประวัติ ห้ามลบหรือเขียนทับเพื่อปรับให้ตรงกับยอดใหม่
+
 Apply `2026-10-25-project-id-auto-increment.sql` manually before deploying the
 updated Project endpoints to an existing database. It assumes the supplied
 `MYSQL_DATABASE.sql` structure is already installed: `project.id` is the primary
@@ -149,6 +159,17 @@ local upload files after commit, and redacts activity arrays from closed snapsho
 and merge payloads while preserving audit/import rows. It does not run automatically.
 
 After the reset, activities contain only a name, display order and one Google Drive
-link. Project imports use the single `โครงการ` sheet: the first row for each
-`project_id` is the project master and following rows repeat only that code with an
-activity name and Google Drive link. Budgets exist only on the master row.
+link. The single-sheet import described by this migration is now a transitional
+legacy format; the 2026-11-09 format uses separate `โครงการ` and `กิจกรรมย่อย`
+sheets and stores one `total_budget` value on the project.
+
+## Private faculty profile pictures (2026-11-09)
+
+Back up the database and pause faculty edits. Apply
+`2026-11-09-faculty-profile-object-storage.sql` before deploying code that writes
+the `faculty_profile_directory` access scope. Deploy the backend and frontend,
+then run `php scripts/migrate_faculty_profile_images.php` as a dry-run. Review
+only the aggregate summary before rerunning it with `--apply`. The CLI migrates
+Google Drive profile images sequentially, validates image content, retries HTTP
+429 with backoff, and leaves failed legacy values untouched for an administrator
+to replace. Preview `--cleanup-local-cache` before combining it with `--apply`.

@@ -450,34 +450,28 @@ try {
         $research['trend'] = array_values($trendByYear);
     }
 
-    // 6) โครงการ งบประมาณ การเบิกจ่าย และความคืบหน้า (S-Curve Actual ล่าสุด)
+    // 6) โครงการและงบรวมทั้งหมด
     $projects = [
         'total' => 0,
         'active' => 0,
         'completed' => 0,
         'budget' => 0.0,
-        'spent' => 0.0,
-        'burn_rate' => 0.0,
-        'over_budget' => 0,
         'top_projects' => [],
     ];
     project_u_ready($db);
     $projectRows=project_u_catalogue($db,project_u_rows($db,'SELECT * FROM project WHERE academic_year=?',[$academicYear]));
     $projectRows=array_values(array_filter($projectRows,fn($p)=>!$p['merge_pending']));
     $summary=project_u_bundle($db,$academicYear)['summary'];
-    $projects['budget']=$summary['proposedTotal']; $projects['spent']=$summary['actualTotal'];
-    $projects['difference']=$summary['balance'];
+    $projects['budget']=$summary['totalBudget'];
     foreach ($projectRows as $row) {
         $projects['total']++;
         if ($row['status']==='completed') $projects['completed']++;
         if (in_array($row['status'],['active','in_progress'],true)) $projects['active']++;
-        if ($row['budget_proposed']!==null && $row['budget_spent']!==null && $row['budget_spent']>$row['budget_proposed']) $projects['over_budget']++;
     }
-    usort($projectRows,fn($a,$b)=>($b['budget_proposed']??-1)<=>($a['budget_proposed']??-1));
+    usort($projectRows,fn($a,$b)=>($b['total_budget']??-1)<=>($a['total_budget']??-1));
     foreach (array_slice($projectRows,0,6) as $row) $projects['top_projects'][]=[
         'name'=>trim((string)$row['project_name_th']) ?: 'โครงการ #'.$row['project_id'],
-        'budget'=>$row['budget_proposed'],'spent'=>$row['budget_spent']];
-    $projects['burn_rate']=$projects['budget']===null || $projects['spent']===null ? null : deanDashboardPercent($projects['spent'],$projects['budget']);
+        'budget'=>$row['total_budget']];
 
     // 7) หลักสูตรและเอกสาร QA: นับความครอบคลุมรายวิชาที่มีเอกสาร มคอ.
     $curriculumQa = [
@@ -544,9 +538,6 @@ try {
     }
     if ($advising['over_capacity_faculty'] > 0) {
         $alerts[] = ['tone' => 'warning', 'label' => "อาจารย์ที่ปรึกษาเกินสัดส่วน 1:12 จำนวน {$advising['over_capacity_faculty']} คน"];
-    }
-    if ($projects['over_budget'] > 0) {
-        $alerts[] = ['tone' => 'warning', 'label' => "โครงการใช้งบเกินกรอบ {$projects['over_budget']} โครงการ"];
     }
 
     deanDashboardRespond(200, [

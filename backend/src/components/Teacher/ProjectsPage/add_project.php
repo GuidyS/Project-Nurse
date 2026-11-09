@@ -9,36 +9,6 @@ $auth = project_require_auth($db, ['PROJECT_VIEW']);
 project_require_admin_write($auth);
 $input = project_payload();
 
-function project_page_nullable_number(mixed $value, string $label): ?float
-{
-    if ($value === null || $value === '') {
-        return null;
-    }
-
-    if (!is_numeric($value)) {
-        throw new InvalidArgumentException($label . 'ต้องเป็นตัวเลข');
-    }
-
-    return (float) $value;
-}
-
-function project_page_budget_result(array $input): ?string
-{
-    $source = trim((string)($input['budget_source'] ?? ''));
-    $note = trim((string)($input['budget_note'] ?? ''));
-    $parts = [];
-
-    if ($source !== '') {
-        $parts[] = 'แหล่งงบ: ' . $source;
-    }
-
-    if ($note !== '') {
-        $parts[] = $note;
-    }
-
-    return empty($parts) ? null : implode(' | ', $parts);
-}
-
 function project_page_responsible_faculty_id(PDO $db, array $input): int
 {
     $facultyId = filter_var($input['responsible_faculty_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
@@ -85,16 +55,7 @@ try {
 
     $status = project_normalize_status($input['status'] ?? 'active');
 
-    $budgetProposed = project_page_nullable_number($input['budget_proposed'] ?? null, 'งบเสนอ');
-    $budgetSpent = project_page_nullable_number($input['budget_spent'] ?? null, 'งบใช้จริง');
-    if ($budgetProposed !== null && $budgetProposed < 0) {
-        project_json(["status" => "error", "message" => "งบเสนอต้องไม่ติดลบ"], 400);
-        exit;
-    }
-    if ($budgetSpent !== null && $budgetSpent < 0) {
-        project_json(["status" => "error", "message" => "งบใช้จริงต้องไม่ติดลบ"], 400);
-        exit;
-    }
+    $totalBudget = project_u_total_budget($input['total_budget'] ?? null);
 
     $responsibleFacultyId = project_page_responsible_faculty_id($db, $input);
     my_project_ensure_member_table($db);
@@ -136,12 +97,11 @@ try {
     ]);
 
     $id = (int) $db->lastInsertId();
-    $budgetResult = project_page_budget_result($input);
     my_project_replace_faculty_members($db, $projectId, $memberFacultyIds);
 
     project_u_link_new($db, $projectId);
     project_u_metadata($db, $projectId, $input);
-    project_u_save_flat_budget($db, $projectId, $input);
+    project_u_save_total_budget($db, $projectId, ['total_budget' => $totalBudget]);
     project_u_save_activities($db, $projectId, $input);
 
     $db->commit();

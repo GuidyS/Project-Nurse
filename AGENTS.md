@@ -3,7 +3,7 @@
 ## 1. บริบทโปรเจค
 - ระบบนี้เป็น MIS ของคณะพยาบาล สำหรับจัดการข้อมูลภายในคณะและข้อมูลผู้ใช้งานหลายบทบาท
 - ข้อมูลส่วนใหญ่เป็นข้อมูลอ่อนไหว เช่น ข้อมูลนักศึกษา อาจารย์ การให้คำปรึกษา เอกสาร portfolio รายงานผู้บริหาร audit log และ import/export
-- เอกสาร requirement หลัก: `Functional-Requirement NSP02.md`
+- เอกสาร requirement หลัก: `Functional-Requirement_NSP02.md`
 - schema/ฐานข้อมูลหลัก: `MYSQL_DATABASE.sql`
 - คู่มือติดตั้งเดิม: `README.md`
 - กฎไฟล์อัปโหลด: `backend/src/uploads/README.md`
@@ -111,8 +111,8 @@
 | จุดประสงค์ | path |
 | --- | --- |
 | คู่มือติดตั้งโปรเจค | `README.md` |
-| functional requirements | `Functional-Requirement NSP02.md` |
-| DB dump/schema หลัก | `MYSQL_DATABASE (3-8-2569).sql` |
+| functional requirements | `Functional-Requirement_NSP02.md` |
+| DB dump/schema หลัก | `MYSQL_DATABASE.sql` |
 | Docker services | `docker-compose.yml` |
 | package/scripts ฝั่ง frontend | `frontend/package.json` |
 | root ของ frontend app | `frontend/src/App.tsx` |

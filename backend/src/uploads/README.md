@@ -69,6 +69,22 @@ php scripts/migrate_object_storage.php --retry-deletes
 php scripts/migrate_object_storage.php --retry-deletes --apply
 ```
 
+Faculty profile pictures use a dedicated migration because old values may be
+Google Drive URLs. Run the scope SQL migration first, then preview and apply:
+
+```bash
+php scripts/migrate_faculty_profile_images.php
+php scripts/migrate_faculty_profile_images.php --apply
+```
+
+Preview removal of legacy `profile_picture_*` caches only after successful
+object migration. Deletion still requires an explicit `--apply`:
+
+```bash
+php scripts/migrate_faculty_profile_images.php --cleanup-local-cache
+php scripts/migrate_faculty_profile_images.php --cleanup-local-cache --apply
+```
+
 ## Migrated from
 
 - `components/Admin/ImportData/uploads/imports/*` → `uploads/imports/*`

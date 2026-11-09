@@ -174,6 +174,18 @@ function schema_audit_run(PDO $db): array
     }
 
     $metrics = [];
+    if (schema_audit_table_exists($db, 'project')) {
+        $metrics['project_missing_total_budget_column'] = schema_audit_column_exists($db, 'project', 'total_budget') ? 0 : 1;
+        $metrics['project_missing_total_budget_nonnegative_check'] = schema_audit_count($db, "
+            SELECT CASE WHEN EXISTS (
+                SELECT 1 FROM information_schema.TABLE_CONSTRAINTS
+                WHERE CONSTRAINT_SCHEMA = DATABASE()
+                  AND TABLE_NAME = 'project'
+                  AND CONSTRAINT_NAME = 'chk_project_total_budget_nonnegative'
+                  AND CONSTRAINT_TYPE = 'CHECK'
+            ) THEN 0 ELSE 1 END
+        ");
+    }
     if (schema_audit_table_exists($db, 'project_documents')) {
         $metrics['project_documents_unlinked'] = schema_audit_count($db, "SELECT COUNT(*) FROM project_documents WHERE project_id IS NULL");
     }
@@ -220,7 +232,7 @@ function schema_audit_run(PDO $db): array
     }
 
     return [
-        'schema_version' => '2026-08-14.curriculum-documents-v1',
+        'schema_version' => '2026-11-09.project-total-budget-v1',
         'generated_at' => date('c'),
         'issue_count' => $issueCount,
         'missing_tables' => $missingTables,

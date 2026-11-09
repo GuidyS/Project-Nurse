@@ -41,7 +41,7 @@ interface DashboardData {
     retention_rate: number;
     graduation_rate: number;
     total_faculty: number;
-    total_budget: number;
+    total_budget: number | null;
     student_attention: number;
     alerts: number;
   };
@@ -112,12 +112,8 @@ interface DashboardData {
     total: number;
     active: number;
     completed: number;
-    budget: number;
-    spent: number;
-    burn_rate: number;
-    difference: number | null;
-    over_budget: number;
-    top_projects: { name: string; budget: number; spent: number; progress?: number }[];
+    budget: number | null;
+    top_projects: { name: string; budget: number | null; progress?: number }[];
   };
   curriculum_qa: {
     active_cycle: { id: number; start_year: number; end_year: number } | null;
@@ -329,7 +325,7 @@ export default function DeanDashboard() {
     { หัวข้อ: "งานวิจัยชื่อร่วม", ค่า: data.research.summary.co_author, รายละเอียด: "นับภาระงาน ไม่นับ KPI" },
     { หัวข้อ: "วิชาการ/ตำรา", ค่า: data.research.summary.academic, รายละเอียด: "แยกจาก KPI วิจัย" },
     { หัวข้อ: "จำนวนโครงการ", ค่า: data.projects.total, รายละเอียด: `ดำเนินการ ${data.projects.active} · เสร็จ ${data.projects.completed}` },
-    { หัวข้อ: "งบประมาณโครงการ", ค่า: data.projects.budget, รายละเอียด: `เบิกจ่าย ${data.projects.spent} บาท` },
+    { หัวข้อ: "งบรวมทั้งหมดของโครงการ", ค่า: data.projects.budget, รายละเอียด: `${data.projects.total} โครงการ` },
   ];
 
   return (
@@ -477,7 +473,7 @@ export default function DeanDashboard() {
         <SectionCard
           id="projects"
           title="โครงการและงบประมาณ"
-          description="งบประมาณ การเบิกจ่าย และจำนวนโครงการในปีการศึกษาที่เลือก"
+          description="งบรวมทั้งหมดและจำนวนโครงการในปีการศึกษาที่เลือก"
           action={(
             <Select value={String(data.academic_year)} onValueChange={(value) => setSelectedYear(Number(value))}>
               <SelectTrigger className="w-full sm:w-[180px]" aria-label="เลือกปีการศึกษา">
@@ -491,9 +487,8 @@ export default function DeanDashboard() {
             </Select>
           )}
         >
-          <div className="grid gap-3 sm:grid-cols-3">
-            <MiniMetric label="งบประมาณโครงการ" value={formatCurrency(data.projects.budget)} />
-            <MiniMetric label="เบิกจ่าย" value={formatCurrency(data.projects.spent)} detail={`Burn rate ${data.projects.burn_rate}%`} />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <MiniMetric label="งบรวมทั้งหมด" value={formatCurrency(data.projects.budget)} />
             <MiniMetric label="จำนวนโครงการ" value={`${formatNumber(data.projects.total)} โครงการ`} detail={`ดำเนินการ ${data.projects.active} · เสร็จ ${data.projects.completed}`} />
           </div>
           <div className="mt-4 h-[280px]">
@@ -505,8 +500,7 @@ export default function DeanDashboard() {
                   <YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 10 }} />
                   <Tooltip formatter={(value) => formatCurrency(Number(value))} />
                   <Legend />
-                  <Bar dataKey="budget" name="งบเสนอ" fill="#4f46e5" radius={[0, 5, 5, 0]} />
-                  <Bar dataKey="spent" name="เบิกจ่าย" fill="#f59e0b" radius={[0, 5, 5, 0]} />
+                  <Bar dataKey="budget" name="งบรวมทั้งหมด" fill="#4f46e5" radius={[0, 5, 5, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             )}

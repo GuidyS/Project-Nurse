@@ -12,6 +12,7 @@ import {
   Users,
 } from "lucide-react";
 import api from "@/lib/axios";
+import { resolveStoredFileUrl } from "@/lib/fileUrl";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -472,7 +473,7 @@ export default function FacultyWorkloadDashboard() {
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <Avatar className="h-9 w-9 border">
-                            {faculty.profile_picture && <AvatarImage src={faculty.profile_picture} alt={faculty.name} />}
+                            {faculty.profile_picture && <AvatarImage src={resolveStoredFileUrl(faculty.profile_picture)} alt={faculty.name} />}
                             <AvatarFallback className="text-xs">{initials(faculty.name)}</AvatarFallback>
                           </Avatar>
                           <div className="min-w-0">
@@ -537,7 +538,7 @@ export default function FacultyWorkloadDashboard() {
                 <div className="flex items-center gap-3 pr-8">
                   <Avatar className="h-12 w-12 border">
                     {selectedFaculty.profile_picture && (
-                      <AvatarImage src={selectedFaculty.profile_picture} alt={selectedFaculty.name} />
+                      <AvatarImage src={resolveStoredFileUrl(selectedFaculty.profile_picture)} alt={selectedFaculty.name} />
                     )}
                     <AvatarFallback>{initials(selectedFaculty.name)}</AvatarFallback>
                   </Avatar>

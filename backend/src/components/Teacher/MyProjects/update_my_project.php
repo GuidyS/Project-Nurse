@@ -8,19 +8,6 @@ $auth = project_require_auth($db, ['PROJECT_MY_VIEW']);
 project_require_admin_write($auth);
 $input = project_payload();
 
-function update_my_project_nullable_number(mixed $value, string $label): ?float
-{
-    if ($value === null || $value === '') {
-        return null;
-    }
-
-    if (!is_numeric($value)) {
-        throw new InvalidArgumentException($label . 'ต้องเป็นตัวเลข');
-    }
-
-    return (float) $value;
-}
-
 try {
     $projectId = project_validate_code($input['project_id'] ?? null);
     $nameTh = trim((string) ($input['project_name_th'] ?? ''));
@@ -50,19 +37,7 @@ try {
         exit;
     }
 
-    $hasBudgetInput = array_key_exists('budget_proposed', $input) || array_key_exists('budget_spent', $input);
-    $budgetProposed = $hasBudgetInput ? update_my_project_nullable_number($input['budget_proposed'] ?? null, 'งบเสนอ') : null;
-    $budgetSpent = $hasBudgetInput ? update_my_project_nullable_number($input['budget_spent'] ?? null, 'งบที่ใช้จริง') : null;
-
-    if ($budgetProposed !== null && $budgetProposed < 0) {
-        project_json(["status" => "error", "message" => "งบเสนอต้องไม่ติดลบ"], 400);
-        exit;
-    }
-
-    if ($budgetSpent !== null && $budgetSpent < 0) {
-        project_json(["status" => "error", "message" => "งบที่ใช้จริงต้องไม่ติดลบ"], 400);
-        exit;
-    }
+    if (array_key_exists('total_budget', $input)) project_u_total_budget($input['total_budget']);
 
     $fields = [
         'project_name_th = :project_name_th',
@@ -114,7 +89,7 @@ try {
     my_project_replace_faculty_members($db, $projectId, $memberFacultyIds);
 
     project_u_metadata($db, $projectId, $input);
-    project_u_save_flat_budget($db, $projectId, $input);
+    project_u_save_total_budget($db, $projectId, $input);
     project_u_save_activities($db, $projectId, $input);
 
     $db->commit();

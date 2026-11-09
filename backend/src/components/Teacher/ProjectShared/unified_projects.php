@@ -38,6 +38,9 @@ function project_u_ready(PDO $db): void {
     if (!(int)$db->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='annual_project_report_items' AND COLUMN_NAME='activity_code'")->fetchColumn()) {
         throw new ProjectConflict('กรุณารัน migration 2026-10-27-add-project-activity-code.sql ก่อนใช้งาน');
     }
+    if (!(int)$db->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='project' AND COLUMN_NAME='total_budget'")->fetchColumn()) {
+        throw new ProjectConflict('กรุณารัน migration 2026-11-09-project-total-budget.sql ก่อนใช้งาน');
+    }
 }
 function project_u_year(mixed $value): int {
     $year = filter_var($value, FILTER_VALIDATE_INT);
@@ -98,8 +101,15 @@ function project_u_cents(mixed $value): ?int {
     [$whole,$fraction] = array_pad(explode('.', (string)$value, 2), 2, '');
     return (int)$whole * 100 + (int)str_pad($fraction, 2, '0');
 }
-function project_u_decimal(?int $cents): ?string { return $cents===null ? null : intdiv($cents,100).'.'.str_pad((string)($cents%100),2,'0',STR_PAD_LEFT); }
 function project_u_number(?int $cents): ?float { return $cents === null ? null : $cents / 100; }
+function project_u_total_budget(mixed $value): ?float {
+    return project_u_number(project_u_cents($value));
+}
+function project_u_save_total_budget(PDO $db, string $code, array $input): void {
+    if (!array_key_exists('total_budget', $input)) return;
+    $value = project_u_total_budget($input['total_budget']);
+    project_u_query($db, 'UPDATE project SET total_budget=? WHERE project_id=?', [$value, $code]);
+}
 function project_u_budget(PDO $db, int $item): array {
     $result = [];
     foreach (project_u_rows($db, 'SELECT source_key,budget_type,SUM(amount) AS amount,MAX(note) AS note FROM annual_project_report_budgets WHERE report_item_id=? GROUP BY source_key,budget_type', [$item]) as $row) {
@@ -116,67 +126,12 @@ function project_u_total(array $budget, string $type): ?int {
     }
     return $sum;
 }
-function project_u_normalize_budget(array $budget): array {
-    $clean = [];
-    foreach ($budget as $source=>$cell) {
-        if (!array_key_exists($source, project_u_sources()) || !is_array($cell)) throw new InvalidArgumentException('แหล่งเงินไม่ถูกต้อง');
-        foreach (['proposed','actual'] as $type) {
-            $value = project_u_cents($cell[$type] ?? null);
-            if ($value !== null) $clean[$source][$type] = project_u_number($value);
-        }
-        if (isset($clean[$source])) $clean[$source]['note'] = trim((string)($cell['note'] ?? ''));
-    }
-    return $clean;
-}
-function project_u_validate_activity_budgets(array $root, array $activities): void {
-    foreach (project_u_sources() as $source=>$label) foreach (['proposed','actual'] as $type) {
-        $sum = 0;
-        foreach ($activities as $activity) $sum += project_u_cents($activity['budgets'][$source][$type] ?? null) ?? 0;
-        $cap = project_u_cents($root[$source][$type] ?? null);
-        if ($sum > ($cap ?? 0)) throw new ProjectConflict("งบกิจกรรมเกินยอดโครงการ: {$label} / " . ($type === 'proposed' ? 'งบเสนอ' : 'งบใช้จริง'));
-    }
-}
-function project_u_write_budget(PDO $db, int $item, array $budget): void {
-    project_u_query($db, 'DELETE FROM annual_project_report_budgets WHERE report_item_id=?', [$item]);
-    foreach ($budget as $source=>$cell) foreach (['proposed','actual'] as $type) {
-        $cents = project_u_cents($cell[$type] ?? null);
-        if ($cents !== null) project_u_query($db, 'INSERT INTO annual_project_report_budgets(report_item_id,budget_type,source_key,source_label,amount,note) VALUES (?,?,?,?,?,?)',
-            [$item,$type,$source,project_u_sources()[$source],project_u_decimal($cents),$cell['note'] ?? null]);
-    }
-}
-function project_u_sync_cache(PDO $db, string $code): void {
-    $p = project_u_project($db, $code); $root = project_u_require_root($db, $code); $budget = project_u_budget($db,$root);
-    project_u_query($db, 'INSERT INTO project_budget_years(project_id,fiscal_year,budget_proposed,budget_spent) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE budget_proposed=VALUES(budget_proposed),budget_spent=VALUES(budget_spent)',
-        [$p['project_id'],$p['academic_year'],project_u_decimal(project_u_total($budget,'proposed')),project_u_decimal(project_u_total($budget,'actual'))]);
-}
 function project_u_activities(PDO $db, int $root): array {
     $items = project_u_rows($db, "SELECT i.id,i.activity_name,i.sort_order,
         (SELECT d.file_path FROM project_documents d WHERE d.report_item_id=i.id AND d.report_document_type='activity_attachment' ORDER BY d.id DESC LIMIT 1) AS google_drive_url
         FROM annual_project_report_items i WHERE i.parent_item_id=? AND i.row_type='activity' ORDER BY i.sort_order,i.id",[$root]);
     foreach ($items as &$item) { $item['id']=(int)$item['id']; $item['sort_order']=(int)$item['sort_order']; }
     return $items;
-}
-function project_u_save_flat_budget(PDO $db, string $code, array $input): void {
-    $root = project_u_require_root($db,$code); $old = project_u_budget($db,$root);
-    if (!array_key_exists('budget_proposed',$input) && !array_key_exists('budget_spent',$input)) return;
-    $proposed = array_key_exists('budget_proposed',$input) ? project_u_cents($input['budget_proposed']) : project_u_total($old,'proposed');
-    $actual = array_key_exists('budget_spent',$input) ? project_u_cents($input['budget_spent']) : project_u_total($old,'actual');
-    $sourceInput=trim((string)($input['budget_source'] ?? ''));
-    $note=array_key_exists('budget_note',$input) ? trim((string)$input['budget_note']) : (count($old)===1 ? ($old[array_key_first($old)]['note']??'') : '');
-    $sameTotals=$proposed===project_u_total($old,'proposed') && $actual===project_u_total($old,'actual');
-    if (count($old)>1) {
-        if ($sameTotals && $sourceInput==='' && $note==='') return;
-        throw new ProjectConflict('กรุณาแก้งบที่เมนูกิจกรรมและงบแยกแหล่ง เพื่อรักษารายละเอียดแหล่งเงิน');
-    }
-    $source=count($old) ? array_key_first($old) : 'unspecified';
-    if ($sourceInput!=='') {
-        if (array_key_exists($sourceInput,project_u_sources())) $source=$sourceInput;
-        elseif (($matched=array_search($sourceInput,project_u_sources(),true))!==false) $source=$matched;
-        else $note=trim($sourceInput.($note!=='' ? ' · '.$note : ''));
-    }
-    if ($sameTotals && $source===(array_key_first($old)??'unspecified') && $note===($old[$source]['note']??'')) return;
-    $budget = project_u_normalize_budget([$source=>['proposed'=>project_u_number($proposed),'actual'=>project_u_number($actual),'note'=>$note]]);
-    project_u_write_budget($db,$root,$budget); project_u_sync_cache($db,$code);
 }
 function project_u_metadata(PDO $db, string $code, array $input): void {
     $root=project_u_require_root($db,$code);
@@ -210,6 +165,20 @@ function project_u_report_row(array $row): array {
         if ($doc['report_document_type'] === 'budget_document') $row['budgetDocumentUrl'] = $doc['file_path'];
         elseif ($doc['report_document_type'] === 'summary_report') $row['summaryReportUrl'] = $doc['file_path'];
     }
+    if (!array_key_exists('totalBudget', $row)) {
+        if (array_key_exists('proposedTotal', $row)) {
+            $row['totalBudget'] = $row['proposedTotal'];
+        } else {
+            $legacy = (array)($row['proposedBudget'] ?? []);
+            $sum = null;
+            foreach ($legacy as $cell) {
+                $amount = is_array($cell) ? ($cell['amount'] ?? null) : null;
+                if ($amount !== null && $amount !== '') $sum = ($sum ?? 0) + (project_u_cents($amount) ?? 0);
+            }
+            $row['totalBudget'] = project_u_number($sum);
+        }
+    }
+    unset($row['proposedBudget'], $row['actualBudget'], $row['proposedTotal'], $row['actualTotal']);
     $budget = !empty($row['budgetDocumentUrl']); $summary = !empty($row['summaryReportUrl']);
     $row['documentStatus'] = ['label' => $budget && $summary ? 'เอกสารครบ' : ($budget ? 'มีเอกสารงบประมาณ' : ($summary ? 'มีสรุปโครงการ' : 'รอดำเนินการ')),
         'code' => $budget && $summary ? 'complete' : ($budget ? 'budget_only' : ($summary ? 'summary_only' : 'missing'))];
@@ -257,9 +226,10 @@ function project_u_save_activities(PDO $db,string $code,array $input): void {
             project_u_query($db,"UPDATE project_documents SET name=?,project=?,type='summary',date=CURDATE(),status='available',file_path=?,file_name='Google Drive',mime_type=NULL,file_size=NULL,report_document_type='activity_attachment' WHERE id=?",[$name,$project['project_name_th']??$code,$url,$docId]);
             foreach (array_slice($docs,1) as $duplicate) project_u_query($db,'DELETE FROM project_documents WHERE id=?',[(int)$duplicate['id']]);
         } else project_u_query($db,"INSERT INTO project_documents(project_id,name,project,type,date,status,file_path,file_name,report_item_id,report_document_type) VALUES (?,?,?,'summary',CURDATE(),'available',?,'Google Drive',?,'activity_attachment')",[$code,$name,$project['project_name_th']??$code,$url,$id]);
-        project_u_query($db,'DELETE FROM annual_project_report_budgets WHERE report_item_id=?',[$id]);
     }
     foreach (array_keys($existingIds) as $id) if (!isset($kept[$id])) {
+        $legacyBudgetCount=(int)project_u_query($db,'SELECT COUNT(*) FROM annual_project_report_budgets WHERE report_item_id=?',[$id])->fetchColumn();
+        if ($legacyBudgetCount>0) throw new ProjectConflict('ไม่สามารถลบกิจกรรมที่มีข้อมูลงบเดิมได้ กรุณาเก็บกิจกรรมนี้ไว้เป็นประวัติ');
         project_u_query($db,'DELETE FROM project_documents WHERE report_item_id=?',[$id]);
         project_u_query($db,"DELETE FROM annual_project_report_items WHERE id=? AND parent_item_id=? AND row_type='activity'",[$id,$root]);
     }
@@ -273,7 +243,7 @@ function project_u_merge_activity(PDO $db,string $code,string $name,string $url,
         project_u_query($db,"INSERT INTO annual_project_report_items(academic_year,project_name,activity_name,row_type,parent_item_id,sort_order) VALUES (?,?,?,'activity',?,?)",[(int)$project['academic_year'],$name,$name,$root,$sortOrder]);
         $id=(int)$db->lastInsertId();
     }
-    project_u_query($db,'UPDATE annual_project_report_items SET project_name=?,activity_name=?,activity_code=NULL,responsible_person=NULL,plan_name=NULL,objective=NULL,kpi=NULL WHERE id=?',[$name,$name,$id]);
+    project_u_query($db,'UPDATE annual_project_report_items SET project_name=?,activity_name=?,activity_code=NULL,responsible_person=NULL,plan_name=NULL,objective=NULL,kpi=NULL,sort_order=? WHERE id=?',[$name,$name,$sortOrder,$id]);
     $docs=project_u_rows($db,"SELECT id FROM project_documents WHERE project_id=? AND report_item_id=? AND report_document_type='activity_attachment' ORDER BY id DESC FOR UPDATE",[$code,$id]);
     if ($docs) {
         $doc=(int)$docs[0]['id'];
@@ -281,11 +251,11 @@ function project_u_merge_activity(PDO $db,string $code,string $name,string $url,
         foreach (array_slice($docs,1) as $duplicate) project_u_query($db,'DELETE FROM project_documents WHERE id=?',[(int)$duplicate['id']]);
     }
     else project_u_query($db,"INSERT INTO project_documents(project_id,name,project,type,date,status,file_path,file_name,report_item_id,report_document_type) VALUES (?,?,?,'summary',CURDATE(),'available',?,'Google Drive',?,'activity_attachment')",[$code,$name,$project['project_name_th']??$code,$url,$id]);
-    project_u_query($db,'DELETE FROM annual_project_report_budgets WHERE report_item_id=?',[$id]); return $id;
+    return $id;
 }
 function project_u_save_details(PDO $db, string $code, array $input): void {
-    project_u_guard($db,$code); $root=project_u_require_root($db,$code); $budget=project_u_normalize_budget($input['budgets'] ?? []);
-    project_u_metadata($db,$code,$input); project_u_write_budget($db,$root,$budget); project_u_save_activities($db,$code,$input); project_u_sync_cache($db,$code);
+    project_u_guard($db,$code); project_u_require_root($db,$code);
+    project_u_metadata($db,$code,$input); project_u_save_total_budget($db,$code,$input); project_u_save_activities($db,$code,$input);
 }
 function project_u_snapshot(PDO $db, int $year): ?array {
     $json=project_u_query($db,'SELECT snapshot_json FROM project_report_snapshots WHERE academic_year=?',[$year])->fetchColumn();
@@ -297,15 +267,15 @@ function project_u_catalogue(PDO $db, array $projects, bool $live=false): array 
         unset($p['description']);
         $code=(string)$p['project_id']; $p['project_id']=$code; $year=(int)$p['academic_year']; $p['fiscal_year']=$year;
         if (!array_key_exists($year,$snapshots)) $snapshots[$year]=project_u_snapshot($db,$year);
-        if ($snapshots[$year]!==null && isset($snapshots[$year]['catalogue'][$code])) { $p=array_merge($p,$snapshots[$year]['catalogue'][$code]); unset($p['description']); $p['documents']=project_u_documents($p['documents'] ?? []); $p['read_only']=true; continue; }
+        if ($snapshots[$year]!==null && isset($snapshots[$year]['catalogue'][$code])) {
+            $p=array_merge($p,$snapshots[$year]['catalogue'][$code]); unset($p['description']);
+            if (!array_key_exists('total_budget',$p)) $p['total_budget']=$p['budget_proposed'] ?? $p['budget'] ?? null;
+            unset($p['budget'],$p['spent'],$p['budget_proposed'],$p['budget_spent'],$p['budget_source'],$p['budget_note'],$p['multiple_budget_sources']);
+            $p['documents']=project_u_documents($p['documents'] ?? []); $p['read_only']=true; continue;
+        }
         $root=project_u_root($db,$code); $p['report_item_id']=$root; $p['merge_pending']=$root===null || project_u_code_pending($db,$code) || (!$live && project_u_period($db,$year)==='review'); $p['read_only']=false;
         $p['activities']=$root===null ? [] : project_u_activities($db,$root); $p['has_sub_activities']=count($p['activities'])>0;
-        $b=$p['merge_pending'] ? [] : project_u_budget($db,$root);
-        $p['budget_proposed']=$p['budget']=project_u_number(project_u_total($b,'proposed'));
-        $p['budget_spent']=$p['spent']=project_u_number(project_u_total($b,'actual'));
-        $p['multiple_budget_sources']=count($b)>1;
-        $p['budget_source']=count($b)===1 ? array_key_first($b) : '';
-        $p['budget_note']=json_encode(['source'=>implode(', ',array_map(fn($key)=>project_u_sources()[$key],array_keys($b))),'note'=>implode(' · ',array_filter(array_column($b,'note')))],JSON_UNESCAPED_UNICODE);
+        $p['total_budget']=$p['merge_pending'] ? null : ($p['total_budget'] === null ? null : (float)$p['total_budget']);
         if ($root!==null) {
             $meta=project_u_query($db,'SELECT plan_name,objective,kpi,sort_order FROM annual_project_report_items WHERE id=?',[$root])->fetch(PDO::FETCH_ASSOC);
             $p=array_merge($p,$meta?:[]);
@@ -316,21 +286,17 @@ function project_u_catalogue(PDO $db, array $projects, bool $live=false): array 
 function project_u_bundle(PDO $db, int $year, bool $live=false): array {
     if (!$live && ($snapshot=project_u_snapshot($db,$year))!==null) return project_u_summarize(array_map('project_u_report_row',$snapshot['bundle']['rows']),$year,'closed');
     if (!$live && project_u_period($db,$year)==='review') return project_u_summarize([],$year,'review');
-    $items=project_u_rows($db,"SELECT i.*,p.project_id,p.project_name_th,p.strategy AS master_strategy,CONCAT_WS(' ',f.title,f.first_name_th,f.last_name_th) AS faculty_name FROM project_report_links l JOIN project p ON p.project_id=l.project_id JOIN annual_project_report_items root ON root.id=l.report_item_id JOIN annual_project_report_items i ON i.id=l.report_item_id OR i.parent_item_id=l.report_item_id LEFT JOIN faculty f ON f.faculty_id=p.responsible_faculty_id WHERE p.academic_year=? ORDER BY root.sort_order,p.id,(i.id=l.report_item_id) DESC,i.sort_order,i.id",[$year]);
+    $items=project_u_rows($db,"SELECT i.*,p.project_id,p.project_name_th,p.total_budget,p.strategy AS master_strategy,CONCAT_WS(' ',f.title,f.first_name_th,f.last_name_th) AS faculty_name FROM project_report_links l JOIN project p ON p.project_id=l.project_id JOIN annual_project_report_items root ON root.id=l.report_item_id JOIN annual_project_report_items i ON i.id=l.report_item_id OR i.parent_item_id=l.report_item_id LEFT JOIN faculty f ON f.faculty_id=p.responsible_faculty_id WHERE p.academic_year=? ORDER BY root.sort_order,p.id,(i.id=l.report_item_id) DESC,i.sort_order,i.id",[$year]);
     $rows=[];
     foreach ($items as $i) {
         if (project_u_code_pending($db,(string)$i['project_id'])) continue;
-        $isRoot=$i['row_type']==='project'; $id=(int)$i['id']; $budgets=project_u_budget($db,$id); $proposed=[]; $actual=[];
-        foreach ($budgets as $source=>$cell) {
-            if (isset($cell['proposed'])) $proposed[$source]=['amount'=>$cell['proposed'],'note'=>$cell['note']??''];
-            if (isset($cell['actual'])) $actual[$source]=['amount'=>$cell['actual'],'note'=>$cell['note']??''];
-        }
+        $isRoot=$i['row_type']==='project'; $id=(int)$i['id'];
         $documents=project_u_rows($db,'SELECT id,name,date,file_path,report_document_type FROM project_documents WHERE report_item_id=? ORDER BY id',[$id]);
         $row=['id'=>(string)$id,'project_id'=>(string)$i['project_id'],'academicYear'=>(string)$year,'strategy'=>$i['master_strategy'] ?: 'ไม่ระบุยุทธศาสตร์','planName'=>$i['plan_name'],'objective'=>$i['objective'],'kpi'=>$i['kpi'],
             'projectCode'=>$isRoot ? (string)$i['project_id'] : null,'parentProjectCode'=>$isRoot ? null : (string)$i['project_id'],
             'projectName'=>$isRoot ? (trim((string)$i['project_name_th']) ?: 'โครงการ #'.$i['project_id']) : $i['activity_name'],
             'activityName'=>$i['activity_name'],'responsiblePerson'=>$isRoot ? $i['faculty_name'] : $i['responsible_person'],'rowType'=>$i['row_type'],
-            'proposedBudget'=>(object)$proposed,'actualBudget'=>(object)$actual,'proposedTotal'=>project_u_number(project_u_total($budgets,'proposed')),'actualTotal'=>project_u_number(project_u_total($budgets,'actual')),'documents'=>$documents];
+            'totalBudget'=>$isRoot && $i['total_budget'] !== null ? (float)$i['total_budget'] : null,'documents'=>$documents];
         $rows[]=project_u_report_row($row);
     }
     return project_u_summarize($rows,$year,'open');
@@ -341,27 +307,36 @@ function project_u_summarize(array $rows, int $year, string $status): array {
         if (!$set) return 0.0;
         $total=0; foreach ($set as $r) { if ($r[$key]===null) return null; $total+=project_u_cents($r[$key]); } return $total/100;
     };
-    $p=$status==='review' ? null : $sum($roots,'proposedTotal'); $a=$status==='review' ? null : $sum($roots,'actualTotal');
+    $total=$status==='review' ? null : $sum($roots,'totalBudget');
     $strategies=[]; foreach (array_unique(array_column($rows,'strategy')) as $strategy) {
         $all=array_values(array_filter($rows,fn($r)=>$r['strategy']===$strategy)); $set=array_values(array_filter($all,fn($r)=>$r['rowType']==='project'));
-        $strategies[]=['strategy'=>$strategy,'projects'=>count($set),'activities'=>count($all)-count($set),'proposedTotal'=>$sum($set,'proposedTotal'),'actualTotal'=>$sum($set,'actualTotal'),'documents'=>count(array_filter($set,fn($r)=>$r['documentStatus']['code']==='complete'))];
+        $strategies[]=['strategy'=>$strategy,'projects'=>count($set),'activities'=>count($all)-count($set),'totalBudget'=>$sum($set,'totalBudget'),'documents'=>count(array_filter($set,fn($r)=>$r['documentStatus']['code']==='complete'))];
     }
-    $breakdown=[]; foreach (project_u_sources() as $source=>$label) {
-        $bp=null;$ba=null;foreach ($roots as $r) { $pc=((array)$r['proposedBudget'])[$source]['amount']??null; $ac=((array)$r['actualBudget'])[$source]['amount']??null; if ($pc!==null) $bp=($bp??0)+project_u_cents($pc); if ($ac!==null) $ba=($ba??0)+project_u_cents($ac); } $bp=project_u_number($bp);$ba=project_u_number($ba);
-        $breakdown[]=['key'=>$source,'label'=>$label,'proposedTotal'=>$bp,'actualTotal'=>$ba];
+    return ['academicYear'=>(string)$year,'periodStatus'=>$status,'rows'=>$rows,
+        'summary'=>['totalProjects'=>count($roots),'totalActivities'=>count($rows)-count($roots),'totalBudget'=>$total,'completeDocuments'=>count(array_filter($roots,fn($r)=>$r['documentStatus']['code']==='complete'))],
+        'strategySummaries'=>$strategies];
+}
+function project_u_normalize_details(array $details, ?float $fallback=null): array {
+    if (!array_key_exists('total_budget',$details)) {
+        $sum=null;
+        foreach ((array)($details['budgets'] ?? []) as $cell) {
+            if (is_array($cell) && array_key_exists('proposed',$cell) && $cell['proposed'] !== null && $cell['proposed'] !== '') {
+                $sum=($sum??0)+(project_u_cents($cell['proposed'])??0);
+            }
+        }
+        $details['total_budget']=$sum===null ? $fallback : project_u_number($sum);
     }
-    return ['academicYear'=>(string)$year,'periodStatus'=>$status,'rows'=>$rows,'budgetSources'=>array_map(fn($key,$label)=>['key'=>$key,'label'=>$label],array_keys(project_u_sources()),project_u_sources()),
-        'summary'=>['totalProjects'=>count($roots),'totalActivities'=>count($rows)-count($roots),'proposedTotal'=>$p,'actualTotal'=>$a,'balance'=>$p===null||$a===null?null:$p-$a,'completeDocuments'=>count(array_filter($roots,fn($r)=>$r['documentStatus']['code']==='complete'))],
-        'strategySummaries'=>$strategies,'budgetBreakdown'=>$breakdown];
+    unset($details['budgets'],$details['sources']);
+    return $details;
 }
 function project_u_details(PDO $db,string $code): array {
     $p=project_u_project($db,$code); $snapshot=project_u_snapshot($db,(int)$p['academic_year']);
-    if ($snapshot!==null && isset($snapshot['details'][$p['project_id']])) return array_replace($snapshot['details'][$p['project_id']],['read_only'=>true,'documents'=>project_u_documents($snapshot['details'][$p['project_id']]['documents'] ?? [])]);
+    if ($snapshot!==null && isset($snapshot['details'][$p['project_id']])) return project_u_normalize_details(array_replace($snapshot['details'][$p['project_id']],['read_only'=>true,'documents'=>project_u_documents($snapshot['details'][$p['project_id']]['documents'] ?? [])]),$p['total_budget']===null?null:(float)$p['total_budget']);
     $root=project_u_require_root($db,$p['project_id']);
     $meta=project_u_query($db,'SELECT plan_name,objective,kpi,sort_order FROM annual_project_report_items WHERE id=?',[$root])->fetch(PDO::FETCH_ASSOC);
     $activities=project_u_activities($db,$root);
-    return ['project_id'=>$p['project_id'],'report_item_id'=>$root,'academic_year'=>(int)$p['academic_year'],'strategy'=>$p['strategy']??'','project_name_th'=>$p['project_name_th'],'read_only'=>false,'has_sub_activities'=>count($activities)>0,
-        'budgets'=>(object)project_u_budget($db,$root),'activities'=>$activities,'sources'=>project_u_sources(),'documents'=>project_u_documents(project_u_rows($db,"SELECT id,name,date,file_path,report_item_id,report_document_type FROM project_documents WHERE project_id=? AND report_document_type<>'activity_attachment' ORDER BY report_item_id,id",[$p['project_id']]))]+($meta?:[]);
+    return ['project_id'=>$p['project_id'],'report_item_id'=>$root,'academic_year'=>(int)$p['academic_year'],'strategy'=>$p['strategy']??'','project_name_th'=>$p['project_name_th'],'total_budget'=>$p['total_budget']===null?null:(float)$p['total_budget'],'read_only'=>false,'has_sub_activities'=>count($activities)>0,
+        'activities'=>$activities,'documents'=>project_u_documents(project_u_rows($db,"SELECT id,name,date,file_path,report_item_id,report_document_type FROM project_documents WHERE project_id=? AND report_document_type<>'activity_attachment' ORDER BY report_item_id,id",[$p['project_id']]))]+($meta?:[]);
 }
 function project_u_pending(PDO $db,int $year): array {
     $projects=(int)project_u_query($db,'SELECT COUNT(*) FROM project p LEFT JOIN project_report_links l ON l.project_id=p.project_id WHERE p.academic_year=? AND l.project_id IS NULL',[$year])->fetchColumn();

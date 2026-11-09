@@ -8,6 +8,7 @@ require_once __DIR__ . '/../../../config/academic_calendar.php';
 require_once __DIR__ . '/../ProjectShared/unified_projects.php';
 // ใช้ตัวแยกบทบาทผู้แต่งชุดเดียวกับหน้า "สรุปผลงานวิจัย 5 ปี"
 require_once __DIR__ . '/../ResearchSummary/research_summary_helpers.php';
+require_once __DIR__ . '/../../ProfilePage/faculty_profile_helpers.php';
 
 header('Content-Type: application/json; charset=UTF-8');
 
@@ -106,7 +107,9 @@ try {
             'faculty_id' => $facultyId,
             'name' => $name !== '' ? $name : ('อาจารย์ ' . $facultyId),
             'first_name' => (string)($row['first_name_th'] ?? ''),
-            'profile_picture' => $row['profile_picture'] ?: null,
+            'profile_picture' => !empty($row['profile_picture'])
+                ? resolveFacultyProfilePictureUrl((string)$row['profile_picture'], $facultyId)
+                : null,
             'teaching' => [
                 'courses' => 0,
                 'clo' => 0,

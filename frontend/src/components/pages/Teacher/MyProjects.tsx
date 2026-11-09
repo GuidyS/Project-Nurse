@@ -66,13 +66,8 @@ interface Project {
   responsible_name?: string | null;
   type: string;
   status: string;
-  budget: number | null;
-  spent: number | null;
-  budget_proposed?: number | string | null;
-  budget_spent?: number | string | null;
-  project_budget_years_id?: number | null;
+  total_budget: number | null;
   fiscal_year?: number | null;
-  budget_note?: string | null;
   members: number;
   deadline: string;
   academic_year?: number | null;
@@ -160,8 +155,7 @@ interface CreateProjectForm {
   status: ProjectStatus;
   start_date: string;
   end_date: string;
-  budget_proposed: string;
-  budget_spent: string;
+  total_budget: string;
 }
 
 const createInitialForm = (): CreateProjectForm => ({
@@ -171,8 +165,7 @@ const createInitialForm = (): CreateProjectForm => ({
   status: 'active',
   start_date: '',
   end_date: '',
-  budget_proposed: '',
-  budget_spent: '',
+  total_budget: '',
 });
 
 const getStatusBadge = (status: string) => {
@@ -270,9 +263,7 @@ const normalizeStatus = (value?: string | null): ProjectStatus => {
   return 'active';
 };
 
-const projectBudgetProposed = (project: Project) => project.budget_proposed ?? project.budget ?? null;
-const projectBudgetSpent = (project: Project) => project.budget_spent ?? project.spent ?? null;
-const projectBudgetNote = (project: Project) => project.budget_note || '';
+const projectTotalBudget = (project: Project) => project.total_budget ?? null;
 
 const getProjectKey = (project: Project) => project.project_id;
 
@@ -382,8 +373,7 @@ export default function MyProjects() {
       status: (project.status as ProjectStatus) || 'active',
       start_date: project.start_date || '',
       end_date: project.end_date || '',
-      budget_proposed: project.budget != null ? String(project.budget) : '',
-      budget_spent: project.spent != null ? String(project.spent) : '',
+      total_budget: project.total_budget != null ? String(project.total_budget) : '',
     });
     setEditingProjectId(String(project.project_id));
     setSelectedFacultyIds(project.member_faculty_ids || []);
@@ -523,19 +513,14 @@ export default function MyProjects() {
     }
 
     const academicYear = createForm.academic_year === '' ? null : Number(createForm.academic_year);
-    const budgetProposed = createForm.budget_proposed === '' ? null : Number(createForm.budget_proposed);
-    const budgetSpent = createForm.budget_spent === '' ? null : Number(createForm.budget_spent);
+    const totalBudget = createForm.total_budget === '' ? null : Number(createForm.total_budget);
 
     if (academicYear !== null && (!Number.isFinite(academicYear) || academicYear <= 0)) {
       return 'ปีการศึกษาต้องเป็นตัวเลขมากกว่า 0';
     }
 
-    if (budgetProposed !== null && (!Number.isFinite(budgetProposed) || budgetProposed < 0)) {
-      return 'งบเสนอต้องไม่ติดลบ';
-    }
-
-    if (budgetSpent !== null && (!Number.isFinite(budgetSpent) || budgetSpent < 0)) {
-      return 'งบที่ใช้จริงต้องไม่ติดลบ';
+    if (totalBudget !== null && (!Number.isFinite(totalBudget) || totalBudget < 0)) {
+      return 'งบรวมทั้งหมดต้องไม่ติดลบ';
     }
 
     if (createForm.start_date && createForm.end_date && createForm.end_date < createForm.start_date) {
@@ -567,8 +552,7 @@ export default function MyProjects() {
       status: createForm.status,
       start_date: createForm.start_date || null,
       end_date: createForm.end_date || null,
-      budget_proposed: createForm.budget_proposed ? Number(createForm.budget_proposed) : null,
-      budget_spent: createForm.budget_spent ? Number(createForm.budget_spent) : null,
+      total_budget: createForm.total_budget ? Number(createForm.total_budget) : null,
       member_faculty_ids: selectedFacultyIds,
     };
 
@@ -769,14 +753,10 @@ export default function MyProjects() {
                       <span className="text-sm">กำหนดส่ง: {project.deadline}</span>
                     </div>
                   </div>
-                  <dl className="grid gap-4 rounded-lg bg-muted/40 p-4 sm:grid-cols-2">
+                  <dl className="grid gap-4 rounded-lg bg-muted/40 p-4">
                     <div className="min-w-0 space-y-1">
-                      <dt className="text-sm text-muted-foreground">งบเสนอ</dt>
-                      <dd className="break-words text-base font-semibold tabular-nums">{formatProjectBudget(project.budget)}</dd>
-                    </div>
-                    <div className="min-w-0 space-y-1">
-                      <dt className="text-sm text-muted-foreground">ใช้จริง</dt>
-                      <dd className="break-words text-base font-semibold tabular-nums">{formatProjectBudget(project.spent)}</dd>
+                      <dt className="text-sm text-muted-foreground">งบรวมทั้งหมด</dt>
+                      <dd className="break-words text-base font-semibold tabular-nums">{formatProjectBudget(project.total_budget)}</dd>
                     </div>
                   </dl>
                   {project.member_faculties && project.member_faculties.length > 0 && (
@@ -885,19 +865,9 @@ export default function MyProjects() {
                   <p className="font-medium text-foreground">{formatDate(viewProject.end_date)}</p>
                 </div>
                 <div className="space-y-1 rounded-lg border bg-muted/30 p-3">
-                  <p className="text-muted-foreground">งบเสนอ</p>
-                  <p className="font-medium text-foreground">{formatCurrency(projectBudgetProposed(viewProject))} บาท</p>
+                  <p className="text-muted-foreground">งบรวมทั้งหมด</p>
+                  <p className="font-medium text-foreground">{formatCurrency(projectTotalBudget(viewProject))} บาท</p>
                 </div>
-                <div className="space-y-1 rounded-lg border bg-muted/30 p-3">
-                  <p className="text-muted-foreground">งบใช้จริง</p>
-                  <p className="font-medium text-foreground">{formatCurrency(projectBudgetSpent(viewProject))} บาท</p>
-                </div>
-              </div>
-              <div className="space-y-1">
-                <p className="text-muted-foreground">แหล่งงบ/หมายเหตุ</p>
-                <p className="font-medium text-foreground whitespace-pre-wrap rounded-lg border bg-muted/30 p-3">
-                  {projectBudgetNote(viewProject) || '-'}
-                </p>
               </div>
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-2">
@@ -1063,30 +1033,17 @@ export default function MyProjects() {
               </div>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2">
                 <div className="grid gap-2">
-                  <Label htmlFor="project-budget-proposed">งบเสนอ</Label>
+                  <Label htmlFor="project-total-budget">งบรวมทั้งหมด (บาท)</Label>
                   <Input
-                    id="project-budget-proposed"
+                    id="project-total-budget"
                     type="number"
                     min="0"
                     step="0.01"
-                    value={createForm.budget_proposed}
-                    onChange={(event) => updateCreateForm('budget_proposed', event.target.value)}
-                    placeholder="0.00"
-                  />
-                </div>
-
-                <div className="grid gap-2">
-                  <Label htmlFor="project-budget-spent">งบที่ใช้จริง</Label>
-                  <Input
-                    id="project-budget-spent"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={createForm.budget_spent}
-                    onChange={(event) => updateCreateForm('budget_spent', event.target.value)}
-                    placeholder="0.00"
+                    value={createForm.total_budget}
+                    onChange={(event) => updateCreateForm('total_budget', event.target.value)}
+                    placeholder="ยังไม่ระบุ"
                   />
                 </div>
             </div>

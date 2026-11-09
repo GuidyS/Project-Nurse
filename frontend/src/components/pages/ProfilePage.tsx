@@ -360,9 +360,7 @@ export default function ProfilePage({
     userRole === "teacher"
       ? profileData.profile_picture_url || ""
       : profileData.profile_picture_url || profileData.profile_picture || "";
-  const profilePictureUrl = profilePictureRaw
-    ? (profilePictureRaw.startsWith("http") ? profilePictureRaw : `${apiBaseUrl}/${profilePictureRaw.replace(/^\//, "")}`)
-    : "";
+  const profilePictureUrl = resolveStoredFileUrl(profilePictureRaw, apiBaseUrl);
 
   const currentLicenseImageUrl = resolveUploadUrl(profileData.license_image, apiBaseUrl);
 

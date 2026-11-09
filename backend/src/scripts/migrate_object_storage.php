@@ -203,7 +203,8 @@ foreach ([
     try {
         migrateSimpleRows($db, "SELECT faculty_id,$column FROM faculty WHERE $column IS NOT NULL AND $column<>''", [
             'table'=>'faculty','pk'=>'faculty_id','column'=>$column,'owner_type'=>'faculty','owner_column'=>'faculty_id',
-            'resource_type'=>$resource,'access_scope'=>'owner_admin'
+            'resource_type'=>$resource,
+            'access_scope'=>$resource === 'faculty_profile_picture' ? 'faculty_profile_directory' : 'owner_admin'
         ], $apply, $stats);
     } catch (Throwable $e) { $stats['errors']++; }
 }

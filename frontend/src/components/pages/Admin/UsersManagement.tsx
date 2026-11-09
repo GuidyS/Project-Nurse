@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,7 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { SearchInput } from "@/components/shared/SearchInput";
 import { TableStateRow } from "@/components/shared/TableStateRow";
 import { AssignRoleDialog } from "@/components/pages/Admin/AssignRoleDialog";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { downloadUserImportTemplate } from "@/lib/userImportTemplate";
 
 interface User {
@@ -184,9 +185,21 @@ export default function UsersManagement() {
   const [academicSettings, setAcademicSettings] = useState<AcademicSettings | null>(null);
   const [licenseFirstEvidenceFile, setLicenseFirstEvidenceFile] = useState<File | null>(null);
   const [licenseWithinYearEvidenceFile, setLicenseWithinYearEvidenceFile] = useState<File | null>(null);
+  const [profilePictureFile, setProfilePictureFile] = useState<File | null>(null);
+  const [removeProfilePicture, setRemoveProfilePicture] = useState(false);
   const licenseFirstInputRef = useRef<HTMLInputElement>(null);
   const licenseWithinYearInputRef = useRef<HTMLInputElement>(null);
+  const profilePictureInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  const profilePicturePreviewUrl = useMemo(
+    () => profilePictureFile ? URL.createObjectURL(profilePictureFile) : "",
+    [profilePictureFile],
+  );
+
+  useEffect(() => () => {
+    if (profilePicturePreviewUrl) URL.revokeObjectURL(profilePicturePreviewUrl);
+  }, [profilePicturePreviewUrl]);
 
   // ใช้บอกในฟอร์มว่าระบบเลื่อนชั้นปีให้วันไหน
   const promotionLabel = academicSettings
@@ -236,6 +249,8 @@ export default function UsersManagement() {
       setSavedDocuments([]);
       setLicenseFirstEvidenceFile(null);
       setLicenseWithinYearEvidenceFile(null);
+      setProfilePictureFile(null);
+      setRemoveProfilePicture(false);
       const res = await api.get(`/index.php?page=manage-user&id=${userId}`);
       if (res.data.status === "success") {
         setEditingUserRole(res.data.data.role_id);
@@ -254,8 +269,10 @@ export default function UsersManagement() {
     try {
       setIsSaving(true);
 
-      const hasLicenseFiles = Boolean(licenseFirstEvidenceFile || licenseWithinYearEvidenceFile);
-      if (hasLicenseFiles) {
+      const hasMultipartFiles = Boolean(
+        licenseFirstEvidenceFile || licenseWithinYearEvidenceFile || profilePictureFile || removeProfilePicture,
+      );
+      if (hasMultipartFiles) {
         const formData = new FormData();
         formData.append("user_id", editingUserId || "");
         formData.append("details", JSON.stringify(detailForm));
@@ -265,6 +282,12 @@ export default function UsersManagement() {
         }
         if (licenseWithinYearEvidenceFile) {
           formData.append("license_within_one_year_evidence", licenseWithinYearEvidenceFile);
+        }
+        if (profilePictureFile) {
+          formData.append("profile_picture_file", profilePictureFile);
+        }
+        if (removeProfilePicture) {
+          formData.append("remove_profile_picture", "1");
         }
         await api.post("/index.php?page=manage-user", formData, {
           headers: { "Content-Type": "multipart/form-data" },
@@ -284,6 +307,8 @@ export default function UsersManagement() {
       setSavedDocuments([]);
       setLicenseFirstEvidenceFile(null);
       setLicenseWithinYearEvidenceFile(null);
+      setProfilePictureFile(null);
+      setRemoveProfilePicture(false);
       fetchUsers();
     } catch (error: any) {
       toast({
@@ -716,7 +741,69 @@ export default function UsersManagement() {
                 <div className="space-y-2"><Label>วันหมดอายุใบอนุญาต</Label><Input type="date" value={detailForm.license_expiry || ""} onChange={e => setDetailForm({...detailForm, license_expiry: e.target.value})} /></div>
                 <div className="space-y-2"><Label>วันที่เริ่มปฏิบัติงาน</Label><Input type="date" value={detailForm.start_work_date || ""} onChange={e => setDetailForm({...detailForm, start_work_date: e.target.value})} /></div>
                 <div className="space-y-2"><Label>วันที่รับตำแหน่งทางวิชาการ</Label><Input type="date" value={detailForm.academic_position_date || ""} onChange={e => setDetailForm({...detailForm, academic_position_date: e.target.value})} /></div>
-                <div className="space-y-2"><Label>ไฟล์รูปโปรไฟล์ (URL/ชื่อไฟล์)</Label><Input value={detailForm.profile_picture || ""} onChange={e => setDetailForm({...detailForm, profile_picture: e.target.value})} /></div>
+                <div className="col-span-2 space-y-3">
+                  <Label>รูปโปรไฟล์</Label>
+                  <div className="flex flex-wrap items-center gap-4 rounded-md border p-3">
+                    <Avatar className="h-20 w-20">
+                      {!removeProfilePicture && (
+                        <AvatarImage
+                          src={profilePicturePreviewUrl || (
+                            typeof detailForm.profile_picture === "string" &&
+                            (detailForm.profile_picture.startsWith("storage://") || detailForm.profile_picture.startsWith("index.php?"))
+                              ? resolveStoredFileUrl(detailForm.profile_picture, apiBaseUrl)
+                              : ""
+                          )}
+                          alt="ตัวอย่างรูปโปรไฟล์"
+                        />
+                      )}
+                      <AvatarFallback><UsersIcon className="h-8 w-8 text-muted-foreground" /></AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <div className="flex flex-wrap gap-2">
+                        <Button type="button" variant="outline" size="sm" onClick={() => profilePictureInputRef.current?.click()}>
+                          <Upload className="mr-2 h-4 w-4" /> เลือกรูป
+                        </Button>
+                        {(profilePictureFile || detailForm.profile_picture) && !removeProfilePicture && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setProfilePictureFile(null);
+                              setRemoveProfilePicture(true);
+                              if (profilePictureInputRef.current) profilePictureInputRef.current.value = "";
+                            }}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" /> ลบรูป
+                          </Button>
+                        )}
+                      </div>
+                      <Input
+                        ref={profilePictureInputRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        className="hidden"
+                        onChange={(event) => {
+                          const file = event.target.files?.[0] || null;
+                          if (!file) return;
+                          if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 5 * 1024 * 1024) {
+                            toast({ title: "ไฟล์รูปไม่ถูกต้อง", description: "รองรับ JPG, PNG, WebP ขนาดไม่เกิน 5 MB", variant: "destructive" });
+                            event.target.value = "";
+                            return;
+                          }
+                          setProfilePictureFile(file);
+                          setRemoveProfilePicture(false);
+                        }}
+                      />
+                      <p className="text-xs text-muted-foreground">รองรับ JPG, PNG และ WebP ขนาดไม่เกิน 5 MB</p>
+                      {profilePictureFile && <p className="truncate text-xs">ไฟล์ใหม่: {profilePictureFile.name}</p>}
+                      {removeProfilePicture && <p className="text-xs text-destructive">รูปเดิมจะถูกลบเมื่อกดบันทึก</p>}
+                      {!profilePictureFile && !removeProfilePicture && typeof detailForm.profile_picture === "string" && detailForm.profile_picture !== "" && !detailForm.profile_picture.startsWith("storage://") && (
+                        <p className="text-xs text-amber-700">รูปเดิมเป็นลิงก์หรือไฟล์ภายนอก โปรดอัปโหลดรูปใหม่</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
                 <div className="space-y-2">
                   <Label>สถานะการทำงาน</Label>
                   <Select

@@ -25,6 +25,14 @@ try {
 
     if (!isset($_SESSION['user_id'])) throw new Exception("Unauthorized: กรุณาล็อกอินใหม่");
 
+    $currentUserStmt = $db->prepare("SELECT role_id FROM users WHERE user_id = :user_id AND status = 'active' LIMIT 1");
+    $currentUserStmt->execute([':user_id' => $_SESSION['user_id']]);
+    if ((int)$currentUserStmt->fetchColumn() !== 1) {
+        http_response_code(403);
+        echo json_encode(['status' => 'error', 'message' => 'ไม่มีสิทธิ์จัดการข้อมูลผู้ใช้'], JSON_UNESCAPED_UNICODE);
+        exit();
+    }
+
     function hasUploadedFileInput(string $fieldName): bool {
         if (!isset($_FILES[$fieldName])) {
             return false;
@@ -41,6 +49,41 @@ try {
         }
 
         return ($fileInput['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE;
+    }
+
+    function saveFacultyProfilePicture(PDO $db, array $file, string $facultyId): array {
+        $error = (int)($file['error'] ?? UPLOAD_ERR_NO_FILE);
+        if ($error !== UPLOAD_ERR_OK) {
+            throw new InvalidArgumentException('อัปโหลดรูปโปรไฟล์ไม่สำเร็จ');
+        }
+
+        $tmpName = (string)($file['tmp_name'] ?? '');
+        $size = is_file($tmpName) ? (int)filesize($tmpName) : 0;
+        if ($size <= 0 || $size > 5 * 1024 * 1024) {
+            throw new InvalidArgumentException('รูปโปรไฟล์ต้องมีขนาดไม่เกิน 5 MB');
+        }
+
+        $finfo = new finfo(FILEINFO_MIME_TYPE);
+        $mime = strtolower((string)$finfo->file($tmpName));
+        $extensions = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'];
+        $imageInfo = @getimagesize($tmpName);
+        if (!isset($extensions[$mime]) || !is_array($imageInfo) || strtolower((string)($imageInfo['mime'] ?? '')) !== $mime) {
+            throw new InvalidArgumentException('รองรับเฉพาะรูป JPEG, PNG หรือ WebP ที่ตรวจสอบได้');
+        }
+        if ((int)$imageInfo[0] <= 0 || (int)$imageInfo[1] <= 0 || (int)$imageInfo[0] > 4096 || (int)$imageInfo[1] > 4096) {
+            throw new InvalidArgumentException('รูปโปรไฟล์ต้องมีขนาดไม่เกิน 4096 x 4096 พิกเซล');
+        }
+
+        $file['name'] = 'profile-picture.' . $extensions[$mime];
+        $file['size'] = $size;
+        return storagePutUploadedFile($db, $file, [
+            'owner_type' => 'faculty',
+            'owner_id' => $facultyId,
+            'resource_type' => 'faculty_profile_picture',
+            'resource_id' => $facultyId,
+            'access_scope' => 'faculty_profile_directory',
+            'mime_type' => $mime,
+        ]);
     }
 
     function savePdfUploads(PDO $db, string $fieldName, string $ownerCode): array {
@@ -477,6 +520,7 @@ try {
             $input = [
                 'user_id' => $_POST['user_id'] ?? null,
                 'action' => $_POST['action'] ?? null,
+                'remove_profile_picture' => $_POST['remove_profile_picture'] ?? null,
                 'details' => parseRequestDetails($_POST['details'] ?? []),
                 'pdfLinks' => parseRequestDetails($_POST['pdfLinks'] ?? [])
             ];
@@ -634,6 +678,9 @@ try {
         $uploadedDocuments = [];
         $newLicenseStorageReferences = [];
         $licenseEvidenceToDelete = [];
+        $newProfileStorageReference = null;
+        $profilePicturesToDelete = [];
+        $profilePictureChanged = false;
 
         $u_stmt = $db->prepare("SELECT username, role_id FROM users WHERE user_id = :id");
         $u_stmt->execute([':id' => $id]);
@@ -837,6 +884,28 @@ try {
             if (!$currentDetails) throw new Exception("ไม่พบข้อมูลอาจารย์/บุคลากร");
             $details = array_merge($currentDetails, $details);
 
+            $profilePicture = $currentDetails['profile_picture'] ?? null;
+            $removeProfilePicture = filter_var($input['remove_profile_picture'] ?? false, FILTER_VALIDATE_BOOL);
+            $hasProfilePictureUpload = hasUploadedFileInput('profile_picture_file');
+            if ($removeProfilePicture && $hasProfilePictureUpload) {
+                throw new InvalidArgumentException('ไม่สามารถอัปโหลดและลบรูปโปรไฟล์ในคำขอเดียวกัน');
+            }
+            if ($hasProfilePictureUpload) {
+                $savedProfile = saveFacultyProfilePicture($db, $_FILES['profile_picture_file'], (string)$u_info['username']);
+                $newProfileStorageReference = $savedProfile['reference'];
+                if (storageReferenceId((string)$profilePicture)) {
+                    $profilePicturesToDelete[] = (string)$profilePicture;
+                }
+                $profilePicture = $newProfileStorageReference;
+                $profilePictureChanged = true;
+            } elseif ($removeProfilePicture) {
+                if (storageReferenceId((string)$profilePicture)) {
+                    $profilePicturesToDelete[] = (string)$profilePicture;
+                }
+                $profilePicture = null;
+                $profilePictureChanged = true;
+            }
+
             foreach (facultyColumnPdfFields() as $fileField) {
                 $uploadedPaths = savePdfUploads($db, $fileField, $u_info['username']);
                 
@@ -896,13 +965,13 @@ try {
                 ':license_expiry' => !empty($details['license_expiry']) ? $details['license_expiry'] : null, 
                 ':start_work_date' => !empty($details['start_work_date']) ? $details['start_work_date'] : null, 
                 ':academic_position_date' => !empty($details['academic_position_date']) ? $details['academic_position_date'] : null, 
-                ':profile_picture' => $details['profile_picture'] ?? null, ':nursing_council_file' => $details['nursing_council_file'] ?? null,
+                ':profile_picture' => $profilePicture, ':nursing_council_file' => $details['nursing_council_file'] ?? null,
                 ':license_file' => $details['license_file'] ?? null, ':teaching_cert_file' => $details['teaching_cert_file'] ?? null,
                 ':status' => $facultyStatus['status'], ':fid' => $u_info['username']
             ]);
         }
 
-        if ($isMultipart && empty($uploadedDocuments) && empty($licenseEvidenceUploaded)) {
+        if ($isMultipart && empty($uploadedDocuments) && empty($licenseEvidenceUploaded) && !$profilePictureChanged) {
             $receivedFields = implode(', ', array_keys($_FILES));
             throw new Exception("ไม่พบไฟล์ในคำขออัปโหลด" . ($receivedFields ? " (received: {$receivedFields})" : ""));
         }
@@ -917,6 +986,16 @@ try {
                     studentLicenseDeleteEvidence($obsoleteEvidence, $db);
                 } catch (Throwable $deleteError) {
                     error_log('Deferred license evidence delete failed: ' . $deleteError->getMessage());
+                }
+            }
+        }
+
+        foreach (array_unique($profilePicturesToDelete) as $obsoleteProfilePicture) {
+            if ($obsoleteProfilePicture !== $newProfileStorageReference) {
+                try {
+                    storageDeleteReference($db, $obsoleteProfilePicture);
+                } catch (Throwable $deleteError) {
+                    error_log('Deferred profile picture delete failed: ' . $deleteError->getMessage());
                 }
             }
         }
@@ -954,6 +1033,7 @@ try {
             foreach ((array)$paths as $path) if (storageReferenceId((string)$path)) $rollbackReferences[] = (string)$path;
         }
         foreach (($newLicenseStorageReferences ?? []) as $path) if (storageReferenceId((string)$path)) $rollbackReferences[] = (string)$path;
+        if (storageReferenceId((string)($newProfileStorageReference ?? ''))) $rollbackReferences[] = (string)$newProfileStorageReference;
         $rollbackObjectKeys = [];
         foreach (array_unique($rollbackReferences) as $reference) {
             $object = storageObjectById($db, storageReferenceId($reference));

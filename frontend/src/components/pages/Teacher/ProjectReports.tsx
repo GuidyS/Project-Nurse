@@ -5,9 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FileText, Download, DollarSign, Filter } from 'lucide-react';
+import { DollarSign, Filter } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 // เรียกใช้โมดูลอินสแตนซ์ Axios ที่กำหนดค่าพอร์ตกลางไว้แล้ว
 import api from '@/lib/axios';
@@ -47,14 +46,6 @@ const normalizeProjectType = (value?: ProjectType | null): ProjectType => value 
 
 interface ProjectStats {
   totalBudget: number | null;
-  totalSpent: number | null;
-  remaining: number | null;
-}
-
-interface BudgetRow {
-  month: string;
-  budget: number;
-  spent: number;
 }
 
 export default function ProjectReports() {
@@ -64,9 +55,8 @@ export default function ProjectReports() {
   const [isProjectSearchOpen, setIsProjectSearchOpen] = useState(false);
   const [projectTypeFilter, setProjectTypeFilter] = useState<ProjectTypeFilter>('all');
   
-  const [stats, setStats] = useState<ProjectStats>({ totalBudget: null, totalSpent: null, remaining: null });
+  const [stats, setStats] = useState<ProjectStats>({ totalBudget: null });
   const [details, setDetails] = useState<ReportDetails | null>(null);
-  const [budgetData, setBudgetData] = useState<BudgetRow[]>([]);
   
   const [errorMessage, setErrorMessage] = useState('');
   const [periodStatus, setPeriodStatus] = useState('open');
@@ -88,12 +78,11 @@ export default function ProjectReports() {
         setStats(res.data.stats);
         setDetails(res.data.details);
         setPeriodStatus(res.data.periodStatus);
-        setBudgetData(res.data.budgetData);
       } else {
         console.error(res.message);
       }
     } catch (err: any) {
-      setDetails(null); setStats({ totalBudget: null, totalSpent: null, remaining: null }); setBudgetData([]);
+      setDetails(null); setStats({ totalBudget: null });
       setErrorMessage(err.response?.data?.message || "โหลดรายงานไม่สำเร็จ");
       console.error("เกิดข้อผิดพลาดในการโหลดรายงาน:", err);
     } finally {
@@ -163,7 +152,7 @@ export default function ProjectReports() {
         <div className="app-page-header">
           <div>
             <h1 className="app-page-title">รายงานสรุปโครงการ</h1>
-            <p className="app-page-description">รายงานงบเสนอและงบใช้จริงของโครงการที่ตรวจย้ายแล้ว</p>
+            <p className="app-page-description">รายงานงบรวมทั้งหมดของโครงการและกิจกรรมย่อย</p>
           </div>
         </div>
 
@@ -279,67 +268,19 @@ export default function ProjectReports() {
         </Card>
 
         {/* การ์ดแสดงตัวเลขสถิติสรุป */}
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">งบเสนอโครงการ</CardTitle>
+              <CardTitle className="text-sm font-medium">งบรวมทั้งหมดของโครงการ</CardTitle>
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">฿{formatCurrency(stats.totalBudget)}</div>
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">ใช้จ่ายไปแล้ว</CardTitle>
-              <DollarSign className="h-4 w-4 text-yellow-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-yellow-600">฿{formatCurrency(stats.totalSpent)}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">ส่วนต่างงบเสนอ − ใช้จริง</CardTitle>
-              <DollarSign className="h-4 w-4 text-green-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">฿{formatCurrency(stats.remaining)}</div>
-            </CardContent>
-          </Card>
         </div>
 
-        {details && <Card><CardHeader><CardTitle>รายละเอียดโครงการและกิจกรรม</CardTitle></CardHeader><CardContent className="space-y-4"><p className="text-sm">รหัส {selectedProject} · ปี {details.academic_year} · {details.plan_name || 'ยังไม่ระบุแผนงาน'}</p><p className="text-sm">วัตถุประสงค์: {details.objective || 'ยังไม่ระบุ'} · KPI: {details.kpi || 'ยังไม่ระบุ'}</p><div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b"><th className="p-2 text-left">แหล่งเงินของโครงการหลัก</th><th className="p-2 text-right">งบเสนอ</th><th className="p-2 text-right">งบใช้จริง</th></tr></thead><tbody><tr className="border-b align-top"><td className="p-2">ยอดโครงการ{Object.entries(details.budgets).map(([source]) => <div key={source} className="text-xs text-muted-foreground">{details.sources?.[source] || source}</div>)}</td>{(['proposed', 'actual'] as const).map(type => <td key={type} className="p-2 text-right">{Object.keys(details.budgets).length ? Object.entries(details.budgets).map(([source, budget]) => <div key={source}>{formatCurrency(budget[type] == null ? null : Number(budget[type]))}</div>) : 'ยังไม่ระบุ'}</td>)}</tr></tbody></table></div><div className="space-y-2"><h3 className="font-semibold">กิจกรรมย่อย</h3>{details.activities.length === 0 ? <p className="text-sm text-muted-foreground">ไม่มีกิจกรรมย่อย</p> : details.activities.map(activity => <div key={activity.id ?? activity.activity_name} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3"><span>{activity.activity_name}</span><a href={activity.google_drive_url} target="_blank" rel="noopener noreferrer" className="text-primary underline">เปิด Google Drive</a></div>)}</div><p className="text-xs text-muted-foreground">งบประมาณบันทึกเฉพาะระดับโครงการหลัก</p></CardContent></Card>}
-
-        {/* กราฟงบประมาณ */}
-        <div className="grid gap-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5" />
-                งบเสนอและงบใช้จริง (ปีงบประมาณตรงกับปีการศึกษา)
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {budgetData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={budgetData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip formatter={(value) => `฿${formatCurrency(Number(value))}`} />
-                    <Legend />
-                    <Bar dataKey="budget" name="งบเสนอ" fill="hsl(var(--primary))" />
-                    <Bar dataKey="spent" name="ใช้จริง" fill="#22c55e" />
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-[300px] flex items-center justify-center text-muted-foreground">ไม่มีข้อมูลแผนงบประมาณสำหรับโครงการนี้</div>
-              )}
-            </CardContent>
-          </Card>
-
-        </div>
+        {details && <Card><CardHeader><CardTitle>รายละเอียดโครงการและกิจกรรม</CardTitle></CardHeader><CardContent className="space-y-4"><p className="text-sm">รหัส {selectedProject} · ปี {details.academic_year} · {details.plan_name || 'ยังไม่ระบุแผนงาน'}</p><p className="text-sm">วัตถุประสงค์: {details.objective || 'ยังไม่ระบุ'} · KPI: {details.kpi || 'ยังไม่ระบุ'}</p><p className="rounded-md border p-3 text-sm">งบรวมทั้งหมด: <span className="font-semibold">฿{formatCurrency(details.total_budget == null ? null : Number(details.total_budget))}</span></p><div className="space-y-2"><h3 className="font-semibold">กิจกรรมย่อย</h3>{details.activities.length === 0 ? <p className="text-sm text-muted-foreground">ไม่มีกิจกรรมย่อย</p> : details.activities.map(activity => <div key={activity.id ?? activity.activity_name} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3"><span>{activity.activity_name}</span><a href={activity.google_drive_url} target="_blank" rel="noopener noreferrer" className="text-primary underline">เปิด Google Drive</a></div>)}</div><p className="text-xs text-muted-foreground">กิจกรรมย่อยไม่มีงบแยก</p></CardContent></Card>}
       </div>
     </>
   );

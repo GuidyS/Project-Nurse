@@ -20,6 +20,7 @@ import {
 import { toast } from 'sonner';
 import { useState, useEffect, useCallback } from 'react';
 import api from '@/lib/axios';
+import { resolveStoredFileUrl } from '@/lib/fileUrl';
 
 interface SidebarProps {
   onItemClick: (item: string) => void;
@@ -224,11 +225,8 @@ export function AppSidebar ({ onItemClick, activeItem }: SidebarProps) {
   };
 
   const userName = getDisplayName(sidebarUser);
-  const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8080").replace(/\/$/, "");
   const profilePictureRaw = typeof sidebarUser.profile_picture_url === 'string' ? sidebarUser.profile_picture_url.trim() : '';
-  const profilePictureUrl = profilePictureRaw
-    ? (/^https?:\/\//i.test(profilePictureRaw) ? profilePictureRaw : `${apiBaseUrl}/${profilePictureRaw.replace(/^\//, "")}`)
-    : "";
+  const profilePictureUrl = resolveStoredFileUrl(profilePictureRaw);
 
   // ดึงตัวอักษรตัวแรกจากชื่อ (เช่น 'สมชาย' จะได้ 'ส') 
   // หากไม่มีชื่อจะใช้ 'U' เป็นค่าเริ่มต้น

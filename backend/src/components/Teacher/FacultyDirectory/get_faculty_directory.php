@@ -83,6 +83,7 @@ try {
         $profile['profile_picture_url'] = !empty($profile['profile_picture'])
             ? resolveFacultyProfilePictureUrl((string)$profile['profile_picture'], $facultyId)
             : null;
+        unset($profile['profile_picture']);
 
         // ข้อมูลเสริมที่หน้าทำเนียบใช้ แต่ของ endpoint profile ไม่มี
         $profile['username']  = $facultyId;
@@ -106,7 +107,9 @@ try {
     $faculty = [];
     foreach ($rows as $row) {
         $facultyId = (string)$row['faculty_id'];
-        $picture = facultyDirectoryResolveFile($row['profile_picture'] ?? null);
+        $pictureUrl = !empty($row['profile_picture'])
+            ? resolveFacultyProfilePictureUrl((string)$row['profile_picture'], $facultyId)
+            : null;
 
         $faculty[] = [
             "faculty_id"      => $facultyId,
@@ -114,7 +117,7 @@ try {
             "positions"       => $positionsByFaculty[$facultyId] ?? [],
             "status"          => $row['status'] ?? null,
             "license_expiry"  => $row['license_expiry'] ?? null,
-            "profile_picture" => $picture['url'] ?? null,
+            "profile_picture" => $pictureUrl,
         ];
     }
 

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { ReportActivity, SourceBudgets } from '@/components/ui/ProjectReportDetailsDialog';
+import type { ReportActivity } from '@/components/ui/ProjectReportDetailsDialog';
 
 type MergeDocument = { id: number; url: string; created_at?: string };
 type MergeReport = {
@@ -12,7 +12,7 @@ type MergeReport = {
   objective?: string;
   kpi?: string;
   sort_order?: number;
-  budgets: SourceBudgets;
+  total_budget?: number | string | null;
   activities: ReportActivity[];
   documents: MergeDocument[];
 };
@@ -24,16 +24,12 @@ export type ProjectMergeQueue = {
   pending: { projects: number; report_items: number; legacy_budgets: number };
   periodStatus: 'open' | 'review' | 'closed';
   faculty: { faculty_id: number; name: string }[];
-  sources: Record<string, string>;
 };
 
 const text = z.string().nullish().transform(value => value ?? '');
 const id = z.union([z.number(), z.string().regex(/^\d+$/)]).pipe(z.coerce.number().int().positive().safe());
 const optionalId = id.nullish().transform(value => value ?? undefined);
 const amount = z.union([z.number().finite(), z.string()]).nullish();
-const budgetCells = z.record(z.object({ proposed: amount, actual: amount, note: text }));
-// PHP encodes an empty associative budget array as []; both mean no amounts.
-const budgets = z.union([budgetCells, z.array(z.never())]).transform(value => Array.isArray(value) ? {} : value);
 const document = z.object({ id, url: text, created_at: text });
 const metadata = { plan_name: text, objective: text, kpi: text };
 const activity = z.object({
@@ -45,7 +41,7 @@ const queueSchema = z.object({
   reports: z.array(z.object({
     id, project_code: text, project_name: text, responsible_person: text, strategy: text, ...metadata,
     sort_order: z.coerce.number().int().nonnegative().nullish().transform(value => value ?? 0),
-    budgets, activities: z.array(activity), documents: z.array(document),
+    total_budget: amount, activities: z.array(activity), documents: z.array(document),
   })),
   orphan_activities: z.array(activity.extend({ documents: z.array(document) })),
   legacy_budgets: z.array(z.object({
@@ -55,7 +51,6 @@ const queueSchema = z.object({
   pending: z.object({ projects: z.number().int().nonnegative().safe(), report_items: z.number().int().nonnegative().safe(), legacy_budgets: z.number().int().nonnegative().safe() }),
   periodStatus: z.enum(['open', 'review', 'closed']),
   faculty: z.array(z.object({ faculty_id: id, name: z.string() })),
-  sources: z.record(z.string()),
 });
 
 export function parseProjectMergeQueue(response: unknown): ProjectMergeQueue {

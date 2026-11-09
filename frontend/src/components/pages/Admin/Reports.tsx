@@ -15,23 +15,12 @@ import {
   FolderKanban,
   Landmark,
   Search,
-  TrendingDown,
-  WalletCards,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
 import { useAcademicYearSelection } from "@/hooks/use-academic-year";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { academicYearOptions } from "@/lib/academicYear";
-
-type BudgetSource = string;
-
-type BudgetCell = {
-  amount: number;
-  note?: string;
-};
-
-type BudgetBySource = Partial<Record<BudgetSource, BudgetCell>>;
 
 type ReportDocument = {
   id: number | string;
@@ -55,15 +44,12 @@ type AnnualProjectReportRow = {
   projectName: string;
   activityName?: string;
   responsiblePerson?: string;
-  proposedBudget?: BudgetBySource;
-  actualBudget?: BudgetBySource;
   budgetDocumentUrl?: string;
   summaryReportUrl?: string;
   documents?: ReportDocument[] | null;
   parentProjectCode?: string;
   rowType: "project" | "activity";
-  proposedTotal?: number | null;
-  actualTotal?: number | null;
+  totalBudget?: number | null;
   documentStatus?: {
     label: string;
     code: string;
@@ -134,9 +120,7 @@ const getSummaryGoogleDriveAttachment = (row: AnnualProjectReportRow) => {
 type SummaryStats = {
   totalProjects: number;
   totalActivities: number;
-  proposedTotal: number | null;
-  actualTotal: number | null;
-  balance: number | null;
+  totalBudget: number | null;
   completeDocuments: number;
 };
 
@@ -144,16 +128,8 @@ type StrategySummary = {
   strategy: string;
   projects: number;
   activities: number;
-  proposedTotal: number | null;
-  actualTotal: number | null;
+  totalBudget: number | null;
   documents: number;
-};
-
-type BudgetBreakdownItem = {
-  key: BudgetSource;
-  label: string;
-  proposedTotal: number | null;
-  actualTotal: number | null;
 };
 
 type AvailableFilters = {
@@ -166,24 +142,13 @@ type ReportsApiData = {
   periodStatus?: string;
   academicYear: string;
   availableFilters: AvailableFilters;
-  budgetSources: { key: BudgetSource; label: string }[];
   summary: SummaryStats;
   strategySummaries: StrategySummary[];
-  budgetBreakdown: BudgetBreakdownItem[];
   rows: AnnualProjectReportRow[];
   meta?: {
     nextEndpoints?: string[];
   };
 };
-
-
-const fallbackBudgetSources: { key: BudgetSource; label: string }[] = [
-  { key: "university", label: "มหาวิทยาลัยสยาม" },
-  { key: "thonburiHospital", label: "โรงพยาบาลธนบุรี" },
-  { key: "nursingFaculty", label: "คณะพยาบาลศาสตร์" },
-  { key: "external", label: "หน่วยงานภายนอก" },
-  { key: "unspecified", label: "ยังไม่ระบุแหล่งเงิน" },
-];
 
 
 const upcomingApiDesign = [
@@ -199,20 +164,7 @@ const formatCurrency = (value: number | null | undefined) => value === null || v
     maximumFractionDigits: 0,
   }).format(value);
 
-const sumBudget = (budget?: BudgetBySource) =>
-  fallbackBudgetSources.reduce((sum, source) => sum + (budget?.[source.key]?.amount ?? 0), 0);
-
-const sumBudgetSource = (rows: AnnualProjectReportRow[], budgetKey: "proposedBudget" | "actualBudget", source: BudgetSource) =>
-  rows.reduce((sum, row) => sum + (row[budgetKey]?.[source]?.amount ?? 0), 0);
-
-const getBudgetNotes = (row: AnnualProjectReportRow) =>
-  [...Object.values(row.proposedBudget ?? {}), ...Object.values(row.actualBudget ?? {})]
-    .map((item) => item.note)
-    .filter(Boolean);
-
 const getDocumentStatus = (row: AnnualProjectReportRow) => {
-  const notes = getBudgetNotes(row);
-  if (notes.some((note) => note?.includes("ไม่ใช้งบ"))) return { label: "ไม่ใช้งบ", variant: "secondary" as const };
   const hasBudgetDocument = Boolean(row.budgetDocumentUrl);
   if (hasBudgetDocument && row.summaryReportUrl) return { label: "เอกสารครบ", variant: "default" as const };
   if (hasBudgetDocument) return { label: "มีเอกสารงบประมาณ", variant: "outline" as const };
@@ -234,8 +186,7 @@ const downloadCsv = (rows: AnnualProjectReportRow[], academicYear: string) => {
     "รหัสโครงการ",
     "โครงการ/กิจกรรมย่อย",
     "ผู้รับผิดชอบ",
-    "งบเสนอรวม",
-    "งบใช้จริงรวม",
+    "งบรวมทั้งหมด",
     "สถานะเอกสาร",
     "ลิงก์สรุปโครงการ",
   ];
@@ -246,8 +197,7 @@ const downloadCsv = (rows: AnnualProjectReportRow[], academicYear: string) => {
     row.projectCode || row.parentProjectCode || "",
     row.projectName,
     row.responsiblePerson || "",
-    row.proposedTotal ?? "ยังไม่ระบุ",
-    row.actualTotal ?? "ยังไม่ระบุ",
+    row.totalBudget ?? "ยังไม่ระบุ",
     getDocumentStatus(row).label,
     row.summaryReportUrl || "",
   ]);
@@ -322,29 +272,17 @@ export default function Reports() {
 
   const resultsPending = loading || requestKey !== loadedKey;
 
-  const filteredRows = reportData?.rows ?? [];
-  const budgetSources = reportData?.budgetSources ?? fallbackBudgetSources;
+  const filteredRows = useMemo(() => reportData?.rows ?? [], [reportData?.rows]);
   const academicYears = academicYearOptions([...(reportData?.availableFilters.academicYears ?? []), academicYear], currentYear);
   const strategies = ["ทั้งหมด", ...(reportData?.availableFilters.strategies ?? [])];
   const responsiblePeople = ["ทั้งหมด", ...(reportData?.availableFilters.responsiblePeople ?? [])];
   const summaryStats: SummaryStats = reportData?.summary ?? {
     totalProjects: 0,
     totalActivities: 0,
-    proposedTotal: 0,
-    actualTotal: 0,
-    balance: 0,
+    totalBudget: 0,
     completeDocuments: 0,
   };
   const strategySummaries = reportData?.strategySummaries ?? [];
-  const budgetBreakdown = reportData?.budgetBreakdown ?? [];
-  const displayBudgetBreakdown = budgetBreakdown.length
-    ? budgetBreakdown
-    : budgetSources.map((source) => ({
-        key: source.key,
-        label: source.label,
-        proposedTotal: sumBudgetSource(filteredRows.filter(r => r.rowType === "project"), "proposedBudget", source.key),
-        actualTotal: sumBudgetSource(filteredRows.filter(r => r.rowType === "project"), "actualBudget", source.key),
-      }));
 
   const groupedRows = useMemo(() => {
     return Array.from(new Set(filteredRows.map((row) => row.strategy))).map((strategy) => ({
@@ -432,7 +370,7 @@ export default function Reports() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Card className="app-stat-card">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -453,23 +391,8 @@ export default function Reports() {
         </Card>
         <Card className="app-stat-card">
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">งบเสนอรวม</p>
-            <p className="mt-2 text-xl font-bold">{formatCurrency(summaryStats.proposedTotal)}</p>
-          </CardContent>
-        </Card>
-        <Card className="app-stat-card">
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">งบใช้จริงรวม</p>
-            <p className="mt-2 text-xl font-bold">{formatCurrency(summaryStats.actualTotal)}</p>
-          </CardContent>
-        </Card>
-        <Card className="app-stat-card">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">ส่วนต่างงบเสนอ − ใช้จริง</p>
-              <TrendingDown className="h-4 w-4 text-primary" />
-            </div>
-            <p className="mt-2 text-xl font-bold">{formatCurrency(summaryStats.balance)}</p>
+            <p className="text-sm text-muted-foreground">งบรวมทั้งหมด</p>
+            <p className="mt-2 text-xl font-bold">{formatCurrency(summaryStats.totalBudget)}</p>
           </CardContent>
         </Card>
         <Card className="app-stat-card">
@@ -483,8 +406,8 @@ export default function Reports() {
         </Card>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-3">
-        <Card className="app-section-card xl:col-span-2">
+      <div className="grid gap-4">
+        <Card className="app-section-card">
           <CardHeader>
             <CardTitle className="text-base">ภาพรวมตามยุทธศาสตร์</CardTitle>
             <CardDescription>จำนวนโครงการ กิจกรรมย่อย งบประมาณ และเอกสารในแต่ละยุทธศาสตร์</CardDescription>
@@ -499,41 +422,13 @@ export default function Reports() {
                       {item.projects} โครงการ / {item.activities} กิจกรรมย่อย / {item.documents} รายการมีเอกสาร
                     </p>
                   </div>
-                  <Badge variant="secondary">{formatCurrency(item.actualTotal ?? item.proposedTotal)}</Badge>
+                  <Badge variant="secondary">{formatCurrency(item.totalBudget)}</Badge>
                 </div>
               </div>
             ))}
           </CardContent>
         </Card>
 
-        <Card className="app-section-card">
-          <CardHeader>
-            <CardTitle className="text-base">แหล่งงบประมาณ</CardTitle>
-            <CardDescription>สรุปงบแยกตามแหล่งเงินจากไฟล์งบแผน</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {displayBudgetBreakdown.map((source) => {
-              return (
-                <div key={source.key} className="app-interactive-card p-3">
-                  <div className="flex items-center gap-2">
-                    <WalletCards className="h-4 w-4 text-primary" />
-                    <p className="font-medium">{source.label}</p>
-                  </div>
-                  <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
-                    <div>
-                      <p className="text-muted-foreground">งบเสนอ</p>
-                      <p className="font-semibold">{formatCurrency(source.proposedTotal)}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground">งบใช้จริง</p>
-                      <p className="font-semibold">{formatCurrency(source.actualTotal)}</p>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </CardContent>
-        </Card>
       </div>
 
       <Card className="app-section-card">
@@ -553,8 +448,7 @@ export default function Reports() {
                   <th className="py-3 pr-3 font-medium whitespace-nowrap">รหัส</th>
                   <th className="py-3 pr-3 font-medium">โครงการ/กิจกรรมย่อย</th>
                   <th className="py-3 pr-3 font-medium whitespace-nowrap">ผู้รับผิดชอบ</th>
-                  <th className="py-3 px-3 font-medium whitespace-nowrap text-right">งบเสนอ</th>
-                  <th className="py-3 px-3 font-medium whitespace-nowrap text-right">งบใช้จริง</th>
+                  <th className="py-3 px-3 font-medium whitespace-nowrap text-right">งบรวมทั้งหมด</th>
                   <th className="py-3 px-3 font-medium whitespace-nowrap text-center">สถานะเอกสาร</th>
                   <th className="py-3 pl-3 font-medium whitespace-nowrap text-center">จัดการ</th>
                 </tr>
@@ -563,7 +457,7 @@ export default function Reports() {
                 {groupedRows.map((group) => (
                   <Fragment key={group.strategy}>
                     <tr key={`${group.strategy}-header`} className="bg-primary/10 border-y border-primary/20">
-                      <td colSpan={7} className="px-4 py-3 text-base font-bold text-primary">{group.strategy}</td>
+                      <td colSpan={6} className="px-4 py-3 text-base font-bold text-primary">{group.strategy}</td>
                     </tr>
                     {group.rows.map((row) => {
                       const docStatus = row.documentStatus ?? getDocumentStatus(row);
@@ -586,8 +480,7 @@ export default function Reports() {
                             </div>
                           </td>
                           <td className="py-3 pr-3 whitespace-nowrap">{row.responsiblePerson || "-"}</td>
-                          <td className="py-3 px-3 text-right whitespace-nowrap">{formatCurrency(row.proposedTotal ?? null)}</td>
-                          <td className="py-3 px-3 text-right whitespace-nowrap">{formatCurrency(row.actualTotal ?? null)}</td>
+                          <td className="py-3 px-3 text-right whitespace-nowrap">{formatCurrency(row.totalBudget ?? null)}</td>
                           <td className="py-3 px-3 text-center whitespace-nowrap">
                             <Badge variant={"variant" in docStatus ? docStatus.variant : getDocumentVariant(docStatus.code)}>
                               {docStatus.label}

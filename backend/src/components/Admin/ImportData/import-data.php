@@ -516,12 +516,18 @@ try {
                 if ($importType === 'projects' && isset($importResult['counts']) && is_array($importResult['counts'])) {
                     $projectCount = (int) ($importResult['counts']['projects'] ?? 0);
                     $activityCount = (int) ($importResult['counts']['activities'] ?? 0);
-                    $budgetCount = (int) ($importResult['counts']['budgets'] ?? 0);
-                    $message = "นำเข้าข้อมูลสำเร็จ: โครงการ $projectCount รายการ, กิจกรรม $activityCount รายการ, งบประมาณ $budgetCount รายการ";
+                    $budgetCount = (int) ($importResult['counts']['total_budgets'] ?? 0);
+                    $message = "นำเข้าข้อมูลสำเร็จ: โครงการ $projectCount รายการ, กิจกรรม $activityCount รายการ, โครงการที่มีงบรวม $budgetCount รายการ";
+                    if (!empty($importResult['warnings']) && is_array($importResult['warnings'])) {
+                        $message .= ' · ' . implode(' · ', array_map('strval', $importResult['warnings']));
+                    }
                 }
                 if ($accountSummary !== null) {
                     $message .= " และ" . buildUserAccountCreationMessage($accountSummary);
                 }
+                $auditMessage = $importType === 'projects'
+                    ? "{$message} (ประเภท: projects)"
+                    : "{$message} (ประเภท: {$importType}, ไฟล์: {$file['name']})";
 
                 // บันทึกเป็น 'create' ลงฐานข้อมูล (เพื่อไม่ให้ฐานข้อมูลปฏิเสธ) และส่ง resource 'import_data'
                 logAudit(
@@ -529,7 +535,7 @@ try {
                     $adminUserId,
                     'create',
                     'import_data',
-                    "{$message} (ประเภท: {$importType}, ไฟล์: {$file['name']})"
+                    $auditMessage
                 );
 
                 echo json_encode([

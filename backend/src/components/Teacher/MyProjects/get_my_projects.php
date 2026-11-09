@@ -46,17 +46,11 @@ try {
             p.status,
             p.start_date,
             p.end_date,
+            p.total_budget,
             CASE
                 WHEN p.responsible_faculty_id IS NULL THEN COALESCE(pfm.members, 0)
                 ELSE COALESCE(pfm.members, 0) + 1
-            END AS members,
-            pb.budget AS budget,
-            pb.spent AS spent,
-            pb.budget AS budget_proposed,
-            pb.spent AS budget_spent,
-            pb.project_budget_years_id,
-            pb.fiscal_year,
-            pb.budget_note
+            END AS members
         FROM project p
         LEFT JOIN faculty f ON f.faculty_id = p.responsible_faculty_id
         LEFT JOIN (
@@ -64,17 +58,6 @@ try {
             FROM project_faculty_members
             GROUP BY project_id
         ) pfm ON pfm.project_id = p.project_id
-        LEFT JOIN (
-            SELECT
-                project_id,
-                MAX(project_budget_years_id) AS project_budget_years_id,
-                MAX(fiscal_year) AS fiscal_year,
-                SUM(budget_proposed) AS budget,
-                SUM(budget_spent) AS spent,
-                MAX(result) AS budget_note
-            FROM project_budget_years
-            GROUP BY project_id
-        ) pb ON pb.project_id = p.project_id
         WHERE p.responsible_faculty_id = :responsible_faculty_id
            OR EXISTS (
                 SELECT 1
@@ -250,13 +233,7 @@ try {
             "responsible_name" => trim((string) ($project['responsible_name'] ?? '')),
             "type" => my_project_type_label($projectType),
             "status" => strtolower((string) ($project['status'] ?? 'pending')),
-            "budget" => $project['budget'] !== null ? (float) $project['budget'] : null,
-            "spent" => $project['spent'] !== null ? (float) $project['spent'] : null,
-            "budget_proposed" => $project['budget_proposed'] !== null ? (float) $project['budget_proposed'] : null,
-            "budget_spent" => $project['budget_spent'] !== null ? (float) $project['budget_spent'] : null,
-            "project_budget_years_id" => $project['project_budget_years_id'] !== null ? (int) $project['project_budget_years_id'] : null,
-            "fiscal_year" => $project['fiscal_year'] !== null ? (int) $project['fiscal_year'] : null,
-            "budget_note" => $project['budget_note'] ?? '',
+            "total_budget" => $project['total_budget'] !== null ? (float) $project['total_budget'] : null,
             "members" => count($members),
             "deadline" => $project['end_date'] ?: "-",
             "academic_year" => $project['academic_year'] !== null ? (int) $project['academic_year'] : null,

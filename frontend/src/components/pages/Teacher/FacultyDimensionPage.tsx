@@ -12,6 +12,7 @@ import {
   Users,
 } from "lucide-react";
 import api from "@/lib/axios";
+import { resolveStoredFileUrl } from "@/lib/fileUrl";
 import FacultyDirectoryPage from "@/components/pages/Teacher/FacultyDirectoryPage";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -181,7 +182,7 @@ function FacultyIdentity({ faculty }: { faculty: FacultyWorkload }) {
   return (
     <div className="flex items-center gap-3">
       <Avatar className="h-9 w-9 border">
-        {faculty.profile_picture && <AvatarImage src={faculty.profile_picture} alt={faculty.name} />}
+        {faculty.profile_picture && <AvatarImage src={resolveStoredFileUrl(faculty.profile_picture)} alt={faculty.name} />}
         <AvatarFallback className="text-xs">{initials(faculty.name)}</AvatarFallback>
       </Avatar>
       <div className="min-w-0">
