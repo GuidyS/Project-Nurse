@@ -98,6 +98,7 @@ export default function ProfilePage({
 }: { facultyId?: string; readOnly?: boolean } = {}) {
   const [userRole, setUserRole] = useState<"student" | "teacher" | null>(null);
   const [profileData, setProfileData] = useState<any>(null);
+  const [profileError, setProfileError] = useState("");
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [formData, setFormData] = useState<any>({});
@@ -116,16 +117,52 @@ export default function ProfilePage({
   const fetchProfile = async () => {
     try {
       setLoading(true);
+      setProfileError("");
+      setProfileData(null);
       const endpoint = facultyId
         ? `/index.php?page=faculty-directory&faculty_id=${encodeURIComponent(facultyId)}`
         : "/index.php?page=profile";
       const res = await api.get(endpoint);
-      if (res.data.status === "success") {
+      if (
+        res.data?.status === "success" &&
+        (res.data.role === "student" || res.data.role === "teacher") &&
+        res.data.data &&
+        typeof res.data.data === "object" &&
+        !Array.isArray(res.data.data)
+      ) {
         setUserRole(res.data.role);
         setProfileData(res.data.data);
+        return;
       }
-    } catch (error) {
-      toast({ title: "โหลดข้อมูลโปรไฟล์ล้มเหลว", variant: "destructive" });
+
+      const responseMessage = typeof res.data?.message === "string" ? res.data.message : "";
+      setProfileError(responseMessage || "รูปแบบข้อมูลโปรไฟล์จากระบบไม่ถูกต้อง");
+      toast({
+        title: "โหลดข้อมูลโปรไฟล์ล้มเหลว",
+        description: responseMessage || "รูปแบบข้อมูลโปรไฟล์จากระบบไม่ถูกต้อง",
+        variant: "destructive",
+      });
+    } catch (error: any) {
+      const status = error?.response?.status;
+      const responseMessage = error?.response?.data?.message;
+      let message = "ไม่สามารถโหลดข้อมูลโปรไฟล์ได้";
+
+      if (status === 401) {
+        message = "เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่";
+      } else if (status === 403) {
+        message = "คุณไม่มีสิทธิ์เข้าถึงข้อมูลโปรไฟล์นี้";
+      } else if (status === 404) {
+        message = "ไม่พบข้อมูลผู้ใช้งาน";
+      } else if (typeof responseMessage === "string" && responseMessage.trim() !== "") {
+        message = responseMessage;
+      }
+
+      setProfileError(message);
+      toast({
+        title: "โหลดข้อมูลโปรไฟล์ล้มเหลว",
+        description: message,
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
@@ -307,7 +344,9 @@ export default function ProfilePage({
   };
 
   if (loading) return <div className="p-12 text-center text-muted-foreground animate-pulse">กำลังโหลดข้อมูลโปรไฟล์...</div>;
-  if (!profileData) return <div className="p-12 text-center text-destructive">ไม่พบข้อมูลผู้ใช้งาน</div>;
+  if (!profileData) {
+    return <div className="p-12 text-center text-destructive">{profileError || "ไม่สามารถโหลดข้อมูลโปรไฟล์ได้"}</div>;
+  }
 
   const studentId = profileData.student_id || profileData.username;
   const academicCalculated = calculateAcademicInfo(studentId);

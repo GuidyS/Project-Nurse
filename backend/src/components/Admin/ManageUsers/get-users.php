@@ -85,7 +85,11 @@ try {
     }
 
     echo json_encode($result);
-} catch (Exception $e) {
+} catch (Throwable $e) {
+    error_log('get-users failed: ' . $e->getMessage());
     http_response_code(500);
-    echo json_encode(["status" => "error", "message" => $e->getMessage()]);
+    echo json_encode([
+        "status" => "error",
+        "message" => "ไม่สามารถโหลดข้อมูลผู้ใช้ได้",
+    ], JSON_UNESCAPED_UNICODE);
 }

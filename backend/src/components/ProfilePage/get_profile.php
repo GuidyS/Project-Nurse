@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../config/audit_helper.php';
 require_once __DIR__ . '/../../config/academic_helper.php';
 require_once __DIR__ . '/../../config/name_validation.php';
 require_once __DIR__ . '/../../config/student_license_helper.php';
+require_once __DIR__ . '/faculty_profile_helpers.php';
 
 if (!isset($_SESSION['user_id'])) {
     http_response_code(401);
@@ -75,18 +76,6 @@ function buildCurrentAuthPayload(PDO $db, int $userId): array {
 
 // ใช้ Helper กลาง (backend/src/config/academic_helper.php) เพื่อให้วันตัดรอบเลื่อนชั้นปี
 // ที่แอดมินตั้งค่าไว้มีผลกับทุกหน้าเหมือนกัน
-
-/**
- * Expand stored faculty file values (plain path, Drive URL, or JSON array of paths).
- */
-const STUDENT_LICENSE_EVIDENCE_MAX_BYTES = 5 * 1024 * 1024;
-const STUDENT_LICENSE_EVIDENCE_MIME_EXTENSIONS = [
-    'application/pdf' => 'pdf',
-    'application/x-pdf' => 'pdf',
-    'application/octet-stream' => 'pdf',
-    'image/jpeg' => 'jpg',
-    'image/png' => 'png',
-];
 
 // Note: studentLicenseEnsureSchema and helpers are loaded from student_license_helper.php
 
@@ -481,7 +470,11 @@ try {
         exit;
     }
 
-} catch (Exception $e) {
+} catch (Throwable $e) {
+    error_log('profile endpoint failed: ' . $e->getMessage());
     http_response_code(500);
-    echo json_encode(["status" => "error", "message" => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    $message = ($_SERVER['REQUEST_METHOD'] ?? '') === 'GET'
+        ? 'ไม่สามารถโหลดข้อมูลโปรไฟล์ได้'
+        : 'ไม่สามารถบันทึกข้อมูลโปรไฟล์ได้';
+    echo json_encode(["status" => "error", "message" => $message], JSON_UNESCAPED_UNICODE);
 }
