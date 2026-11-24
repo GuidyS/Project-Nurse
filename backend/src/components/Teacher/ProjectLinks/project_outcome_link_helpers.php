@@ -86,3 +86,4 @@ function project_outcome_count_links(PDO $db, string $projectId, string $outcome
     ]);
     return (int)$stmt->fetchColumn();
 }
+

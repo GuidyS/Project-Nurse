@@ -3,6 +3,8 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+require_once __DIR__ . '/../../../config/config.php';
+
 header('Access-Control-Allow-Origin: ' . (in_array($_SERVER['HTTP_ORIGIN'] ?? '', ['http://localhost:5173', 'http://127.0.0.1:5173'], true) ? ($_SERVER['HTTP_ORIGIN'] ?? '') : 'http://localhost:5173'));
 header('Vary: Origin');
 header("Access-Control-Allow-Credentials: true");
@@ -15,8 +17,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit();
 }
 
-define('APP_DEBUG', true);
-
 if (!isset($_SESSION['user_id'])) {
     http_response_code(401);
     echo json_encode(["status" => "error", "message" => "Unauthorized"], JSON_UNESCAPED_UNICODE);
@@ -24,22 +24,14 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 try {
-    $pdo = new PDO(
-        "mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4",
-        "MYSQL_USER",
-        "MYSQL_PASSWORD",
-        [
-            PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-            PDO::ATTR_EMULATE_PREPARES   => false,
-        ]
-    );
+    $pdo = new Connect();
+    $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
     error_log("[Retention] DB Connection Error: " . $e->getMessage());
     http_response_code(500);
     echo json_encode([
         "status"  => "error",
-        "message" => APP_DEBUG ? ("เชื่อมต่อฐานข้อมูลไม่สำเร็จ: " . $e->getMessage()) : "เชื่อมต่อฐานข้อมูลไม่สำเร็จ",
+        "message" => "เชื่อมต่อฐานข้อมูลไม่สำเร็จ",
     ], JSON_UNESCAPED_UNICODE);
     exit();
 }
@@ -75,6 +67,26 @@ function statusLabelTh(string $bucket, ?string $rawStatus = null): string
 }
 
 try {
+    $accessStmt = $pdo->prepare(
+        'SELECT u.role_id,
+                EXISTS(
+                    SELECT 1 FROM user_position up
+                    WHERE up.user_id = u.user_id AND up.position_id = 1
+                ) AS is_dean
+         FROM users u
+         WHERE u.user_id = :user_id
+         LIMIT 1'
+    );
+    $accessStmt->execute([':user_id' => $_SESSION['user_id']]);
+    $access = $accessStmt->fetch();
+    $roleId = (int)($access['role_id'] ?? 0);
+    $isDean = (int)($access['is_dean'] ?? 0) === 1;
+    if ($roleId !== 1 && !($roleId === 2 && $isDean)) {
+        http_response_code(403);
+        echo json_encode(["status" => "error", "message" => "ไม่มีสิทธิ์เข้าถึงข้อมูลอัตราคงอยู่"], JSON_UNESCAPED_UNICODE);
+        exit();
+    }
+
     // 1) สัดส่วนสถานะ (pie chart)
     $stmtStatus = $pdo->query("
         SELECT IFNULL(NULLIF(TRIM(status), ''), 'Active') AS status, COUNT(*) AS count
@@ -209,13 +221,13 @@ try {
     http_response_code(500);
     echo json_encode([
         "status"  => "error",
-        "message" => APP_DEBUG ? $e->getMessage() : "เกิดข้อผิดพลาดในการดึงข้อมูล กรุณาลองใหม่อีกครั้ง",
+        "message" => "เกิดข้อผิดพลาดในการดึงข้อมูล กรุณาลองใหม่อีกครั้ง",
     ], JSON_UNESCAPED_UNICODE);
 } catch (Throwable $e) {
     error_log("[Retention] Unexpected Error: " . $e->getMessage());
     http_response_code(500);
     echo json_encode([
         "status"  => "error",
-        "message" => APP_DEBUG ? $e->getMessage() : "เกิดข้อผิดพลาดที่ไม่คาดคิด",
+        "message" => "เกิดข้อผิดพลาดที่ไม่คาดคิด",
     ], JSON_UNESCAPED_UNICODE);
 }

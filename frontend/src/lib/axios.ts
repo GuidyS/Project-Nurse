@@ -1,7 +1,8 @@
 import axios from 'axios';
 
 const api = axios.create({
-    baseURL: import.meta.env.VITE_API_BASE_URL,
+    // Vite may not load frontend/src/.env; keep local development pointed at Apache.
+    baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:8080",
     withCredentials: true,
     headers: {
         'Accept': 'application/json'

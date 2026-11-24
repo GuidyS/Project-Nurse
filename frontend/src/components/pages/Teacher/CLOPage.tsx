@@ -346,8 +346,7 @@ export default function CLOPage() {
 
   const [courses, setCourses] = useState<Course[]>([]);
   const [isLoadingCourses, setIsLoadingCourses] = useState(true);
-  const [coursesLoadError, setCoursesLoadError] = useState("");
-  const [coursesReloadKey, setCoursesReloadKey] = useState(0);
+  const [coursesError, setCoursesError] = useState('');
   // selectedCourse = รหัสวิชา (subject_code)
   const [selectedCourse, setSelectedCourse] = useState<string>("");
   // รายวิชาตามหลักสูตรที่ใช้งานในระบบ — null = ยังไม่มีหลักสูตร (แสดงรายวิชาทั้งหมดแบบเดิม)
@@ -389,7 +388,7 @@ export default function CLOPage() {
     let cancelled = false;
     const fetchCourses = async () => {
       setIsLoadingCourses(true);
-      setCoursesLoadError("");
+      setCoursesError('');
       try {
         // API คืนเฉพาะรายวิชาของหลักสูตรที่ใช้งานในระบบ (ยังไม่มีหลักสูตร = รายวิชาทั้งหมดแบบเดิม)
         const res = await api.get('/index.php?page=get-subjects');
@@ -403,11 +402,13 @@ export default function CLOPage() {
             list.some((course) => course.subject_code === prev) ? prev : list[0]?.subject_code ?? ""
           );
         } else {
-          setCoursesLoadError(res.data?.message || "ดึงข้อมูลรายวิชาไม่สำเร็จ");
+          setCoursesError('ดึงข้อมูลรายวิชาไม่สำเร็จ');
+          toast({ title: "ข้อผิดพลาด", description: res.data?.message || "ดึงข้อมูลรายวิชาไม่สำเร็จ", variant: "destructive" });
         }
       } catch {
         if (!cancelled) {
-          setCoursesLoadError("ดึงข้อมูลรายวิชาไม่สำเร็จ กรุณาลองอีกครั้ง");
+          setCoursesError('ดึงข้อมูลรายวิชาไม่สำเร็จ');
+          toast({ title: "ข้อผิดพลาด", description: "ดึงข้อมูลรายวิชาไม่สำเร็จ", variant: "destructive" });
         }
       } finally {
         if (!cancelled) setIsLoadingCourses(false);
@@ -417,7 +418,7 @@ export default function CLOPage() {
     return () => {
       cancelled = true;
     };
-  }, [coursesReloadKey]);
+  }, [toast]);
 
   const fetchCLOs = useCallback(async (withSpinner = true) => {
     if (!selectedCourse) return;
@@ -832,15 +833,8 @@ export default function CLOPage() {
             <div className="bg-card rounded-xl shadow-card p-12 text-center">
               {isLoadingCourses ? (
                 <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
-              ) : (
-              <>
-              {coursesLoadError ? (
-                <>
-                  <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
-                  <h3 className="font-semibold text-foreground mb-2">โหลดรายวิชาไม่สำเร็จ</h3>
-                  <p className="text-sm text-muted-foreground mb-4">{coursesLoadError}</p>
-                  <Button variant="outline" onClick={() => setCoursesReloadKey((key) => key + 1)}>ลองอีกครั้ง</Button>
-                </>
+              ) : coursesError ? (
+                <p className="text-sm text-destructive" role="alert">{coursesError}</p>
               ) : (
               <>
               <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -861,8 +855,6 @@ export default function CLOPage() {
                   <h3 className="font-semibold text-foreground mb-2">เลือกรายวิชา</h3>
                   <p className="text-sm text-muted-foreground">กรุณาเลือกรายวิชาด้านซ้ายมือเพื่อดูและแก้ไข CLO</p>
                 </>
-              )}
-              </>
               )}
               </>
               )}

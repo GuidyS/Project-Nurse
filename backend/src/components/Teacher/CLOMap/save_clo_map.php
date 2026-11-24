@@ -5,9 +5,9 @@ if (session_status() === PHP_SESSION_NONE) {
 
 require_once __DIR__ . '/../CLOPage/curriculum_repository.php';
 require_once __DIR__ . '/../../../config/audit_helper.php'; // นำเข้า Audit Helper
+require_once __DIR__ . '/../../../config/config.php';
 
-$pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
-$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+$pdo = new Connect();
 
 $inputCloMap = json_decode(file_get_contents("php://input"), true);
 
@@ -56,7 +56,8 @@ try {
     if ($pdo->inTransaction()) {
         $pdo->rollBack();
     }
+    error_log('[CLO Map] Save failed: ' . $e->getCode());
     http_response_code(500);
-    echo json_encode(["status" => "error", "message" => $e->getMessage()]);
+    echo json_encode(["status" => "error", "message" => "ไม่สามารถบันทึกข้อมูล CLO Map ได้"], JSON_UNESCAPED_UNICODE);
 }
 ?>

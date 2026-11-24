@@ -2,7 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { AlertCircle, FileText, Save, Edit, Loader2, Search } from 'lucide-react';
+import { FileText, Save, Edit, Loader2, Search } from 'lucide-react';
 import { useState, useEffect, useMemo } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
@@ -31,10 +31,10 @@ export default function CLOMap() {
   const [courses, setCourses] = useState<CourseData[]>([]);
   const [plos, setPlos] = useState<string[]>([]);
   const [cloMap, setCloMap] = useState<CLOMapData>({});
+  const [loadError, setLoadError] = useState('');
   
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState('');
   const [courseSearch, setCourseSearch] = useState('');
   const [yloFilter, setYloFilter] = useState<string>(YLO_FILTER_ALL);
 
@@ -49,10 +49,10 @@ export default function CLOMap() {
         setPlos(response.data.data.plos || []);
         setCloMap(response.data.data.cloMap || {});
       } else {
-        setLoadError(response.data?.message || 'ไม่สามารถดึงข้อมูล CLO Map ได้');
+        throw new Error(response.data?.message || 'ไม่สามารถดึงข้อมูล CLO Map ได้');
       }
-    } catch (error) {
-      setLoadError('ไม่สามารถดึงข้อมูล CLO Map ได้ กรุณาลองอีกครั้ง');
+    } catch {
+      setLoadError('ไม่สามารถดึงข้อมูล CLO Map ได้');
       toast({ title: "ข้อผิดพลาด", description: "ไม่สามารถดึงข้อมูล CLO Map ได้", variant: "destructive" });
     } finally {
       setIsLoading(false);
@@ -76,7 +76,6 @@ export default function CLOMap() {
       );
     });
   }, [courses, courseSearch, yloFilter]);
-
   const toggleMapping = (courseCode: string, plo: string) => {
     if (!isEditing) return;
     setCloMap(prev => {
@@ -114,11 +113,19 @@ export default function CLOMap() {
   }
 
   if (loadError) {
-    return <div className="flex min-h-64 flex-col items-center justify-center rounded-xl bg-card p-8 text-center">
-      <AlertCircle className="mb-3 h-10 w-10 text-destructive" />
-      <p className="mb-4 text-sm text-muted-foreground">{loadError}</p>
-      <Button variant="outline" onClick={fetchMapData}>ลองอีกครั้ง</Button>
-    </div>;
+    return (
+      <div className="space-y-6">
+        <div className="app-page-header">
+          <div>
+            <h1 className="app-page-title">CLO Map</h1>
+            <p className="app-page-description">แผนที่การเชื่อมโยงรายวิชากับผลลัพธ์การเรียนรู้ระดับหลักสูตร (PLO)</p>
+          </div>
+        </div>
+        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
+          {loadError}
+        </div>
+      </div>
+    );
   }
 
 return (

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { getAcademicBoundary, academicYearOptions, academicNow } from "@/lib/academicYear";
-import { buildResearchYearIndex, researchPublicationYear, type ResearchCounts } from "@/lib/researchSummaryAggregation";
+import { getAcademicYear, academicYearOptions, academicNow } from "@/lib/academicYear";
 import { useAcademicYear } from "@/hooks/use-academic-year";
 import {
   BarChart3,
@@ -29,7 +28,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
 
 type AuthorRole = "first_author" | "corresponding" | "co_author";
 type PublicationType = "research" | "academic" | "textbook";
@@ -117,9 +115,17 @@ const formatCurrency = (value: number) => new Intl.NumberFormat("th-TH", {
   maximumFractionDigits: 2,
 }).format(value);
 
-const EMPTY_COUNTS: ResearchCounts = { kpi: 0, coAuthor: 0, academic: 0 };
+const getBuddhistYear = (dateValue: string, mode: YearMode) => {
+  const date = new Date(`${dateValue}T00:00:00+07:00`);
+  if (Number.isNaN(date.getTime())) return 0;
+  const christianYear = Number(dateValue.slice(0, 4));
+  if (mode === "academic") {
+    return getAcademicYear(date);
+  }
+  return christianYear + 543;
+};
 
-const formatCell = (counts: ResearchCounts) => {
+const formatCell = (counts: { kpi: number; coAuthor: number; academic: number }) => {
   const parts = [];
   if (counts.kpi) parts.push({ value: counts.kpi, className: "font-semibold text-red-600" });
   if (counts.coAuthor) parts.push({ value: counts.coAuthor, className: "font-semibold text-black" });
@@ -129,7 +135,6 @@ const formatCell = (counts: ResearchCounts) => {
 
 export default function ResearchSummary() {
   const currentAcademicYear = useAcademicYear();
-  const academicBoundary = getAcademicBoundary();
   const [yearMode, setYearMode] = useState<YearMode>("calendar");
   const [availableYears, setYears] = useState<number[]>([]);
   const [faculty, setFaculty] = useState<Faculty[]>([]);
@@ -137,8 +142,8 @@ export default function ResearchSummary() {
   const currentYear = yearMode === "academic" ? currentAcademicYear : Number(new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Bangkok", year: "numeric" }).format(academicNow())) + 543;
   const years = useMemo(() => academicYearOptions([
     ...availableYears,
-    ...publications.map((publication) => researchPublicationYear(publication.publication_date, yearMode, academicBoundary)),
-  ], currentYear).map(Number).reverse(), [availableYears, publications, yearMode, currentYear, academicBoundary]);
+    ...publications.map((publication) => getBuddhistYear(publication.publication_date, yearMode)),
+  ], currentYear).map(Number).reverse(), [availableYears, publications, yearMode, currentYear]);
   const [search, setSearch] = useState("");
   const [workCategoryFilter, setWorkCategoryFilter] = useState<"all" | WorkCategory>("all");
   const [fundingTypeFilter, setFundingTypeFilter] = useState<"all" | FundingType>("all");
@@ -195,35 +200,11 @@ export default function ResearchSummary() {
     };
   }, []);
 
-  const publicationsMatchingResearchFilters = useMemo(() => publications.filter((publication) => {
-    if (workCategoryFilter !== "all" && publication.work_category !== workCategoryFilter) return false;
-    if (fundingTypeFilter !== "all" && publication.funding_type !== fundingTypeFilter) return false;
-    if (irbFilter === "approved" && !publication.irb_approved) return false;
-    if (irbFilter === "not_approved" && publication.irb_approved) return false;
-    if (intellectualPropertyFilter !== "all" && publication.intellectual_property_status !== intellectualPropertyFilter) return false;
-    return true;
-  }), [publications, workCategoryFilter, fundingTypeFilter, irbFilter, intellectualPropertyFilter]);
-
-  const filteredPublications = useMemo(() => publicationsMatchingResearchFilters.filter(
-    (publication) => yearFilter === "all" || researchPublicationYear(publication.publication_date, yearMode, academicBoundary) === Number(yearFilter)
-  ), [publicationsMatchingResearchFilters, yearFilter, yearMode, academicBoundary]);
-  const visibleYears = useMemo(() => yearFilter === "all" ? years : [Number(yearFilter)], [years, yearFilter]);
-  const filtersActive = workCategoryFilter !== "all" || fundingTypeFilter !== "all" || irbFilter !== "all"
-    || intellectualPropertyFilter !== "all" || yearFilter !== "all";
-  const quickAddMatchesFilters = workCategoryFilter !== "innovation"
-    && (fundingTypeFilter === "all" || fundingTypeFilter === "none")
-    && (irbFilter === "all" || irbFilter === "not_approved")
-    && (intellectualPropertyFilter === "all" || intellectualPropertyFilter === "none");
-
   const filteredFaculty = useMemo(() => {
     const query = search.trim().toLowerCase();
-    const matchingFaculty = filtersActive
-      ? new Set(filteredPublications.flatMap((publication) => publication.authors.map((author) => author.faculty_id)))
-      : null;
-    return faculty.filter((person) =>
-      (!query || person.name.toLowerCase().includes(query))
-      && (!matchingFaculty || matchingFaculty.has(person.faculty_id)));
-  }, [faculty, search, filteredPublications, filtersActive]);
+    if (!query) return faculty;
+    return faculty.filter((item) => item.name.toLowerCase().includes(query));
+  }, [faculty, search]);
 
   const summary = useMemo(() => {
     let kpi = 0;
@@ -231,7 +212,7 @@ export default function ResearchSummary() {
     let academic = 0;
     const facultyWithKpi = new Set<number>();
 
-    filteredPublications.forEach((publication) => {
+    publications.forEach((publication) => {
       publication.authors.forEach((author) => {
         if (publication.publication_type === "academic" || publication.publication_type === "textbook") {
           academic += 1;
@@ -245,28 +226,77 @@ export default function ResearchSummary() {
     });
 
     return { kpi, coAuthor, academic, facultyWithKpi: facultyWithKpi.size };
-  }, [filteredPublications]);
+  }, [publications]);
 
-  const yearIndex = useMemo(
-    () => buildResearchYearIndex(filteredPublications, yearMode, academicBoundary),
-    [filteredPublications, yearMode, academicBoundary],
-  );
+  const countsByFacultyYear = useMemo(() => {
+    const counts = new Map<string, { kpi: number; coAuthor: number; academic: number }>();
+    publications.forEach((publication) => {
+      const year = getBuddhistYear(publication.publication_date, yearMode);
+      publication.authors.forEach((author) => {
+        const key = `${author.faculty_id}:${year}`;
+        const value = counts.get(key) ?? { kpi: 0, coAuthor: 0, academic: 0 };
+        if (publication.publication_type === "academic" || publication.publication_type === "textbook") {
+          value.academic += 1;
+        } else if (author.role === "first_author" || author.role === "corresponding") {
+          value.kpi += 1;
+        } else {
+          value.coAuthor += 1;
+        }
+        counts.set(key, value);
+      });
+    });
+    return counts;
+  }, [publications, yearMode]);
+  const countsFor = (facultyId: number, year: number) =>
+    countsByFacultyYear.get(`${facultyId}:${year}`) ?? { kpi: 0, coAuthor: 0, academic: 0 };
 
-  const chartData = useMemo(() => visibleYears.map((year) => {
-    const totals = yearIndex.totalsByYear.get(year) ?? EMPTY_COUNTS;
-    return { year: String(year), "นับ KPI": totals.kpi, "ชื่อร่วม": totals.coAuthor, "วิชาการ/ตำรา": totals.academic };
-  }), [yearIndex, visibleYears]);
+  const chartData = useMemo(() => {
+    return years.map((year) => {
+      const totals = faculty.reduce(
+        (acc, person) => {
+          const counts = countsFor(person.faculty_id, year);
+          acc.kpi += counts.kpi;
+          acc.coAuthor += counts.coAuthor;
+          acc.academic += counts.academic;
+          return acc;
+        },
+        { kpi: 0, coAuthor: 0, academic: 0 }
+      );
+      return {
+        year: String(year),
+        "นับ KPI": totals.kpi,
+        "ชื่อร่วม": totals.coAuthor,
+        "วิชาการ/ตำรา": totals.academic,
+      };
+    });
+  }, [faculty, years, countsByFacultyYear]);
 
-  const fundingChartData = useMemo(() => visibleYears.map((year) => {
-    const funding = yearIndex.fundingByYear.get(year) ?? { internal: 0, external: 0 };
-    return {
-      year: String(year),
-      "ทุนภายใน": funding.internal,
-      "ทุนภายนอก": funding.external,
-    };
-  }), [yearIndex, visibleYears]);
+  const publicationsMatchingResearchFilters = useMemo(() => publications.filter((publication) => {
+    if (workCategoryFilter !== "all" && publication.work_category !== workCategoryFilter) return false;
+    if (fundingTypeFilter !== "all" && publication.funding_type !== fundingTypeFilter) return false;
+    if (irbFilter === "approved" && !publication.irb_approved) return false;
+    if (irbFilter === "not_approved" && publication.irb_approved) return false;
+    if (intellectualPropertyFilter !== "all" && publication.intellectual_property_status !== intellectualPropertyFilter) return false;
+    return true;
+  }), [publications, workCategoryFilter, fundingTypeFilter, irbFilter, intellectualPropertyFilter]);
 
-  const fundingSummary = useMemo(() => filteredPublications.reduce((summary, publication) => {
+  const fundingChartData = useMemo(() => {
+    const totalsByYear = new Map<number, { internal: number; external: number }>();
+    publicationsMatchingResearchFilters.forEach((publication) => {
+      const year = getBuddhistYear(publication.publication_date, yearMode);
+      const totals = totalsByYear.get(year) ?? { internal: 0, external: 0 };
+      if (publication.funding_type === "internal") totals.internal += publication.funding_amount;
+      if (publication.funding_type === "external") totals.external += publication.funding_amount;
+      totalsByYear.set(year, totals);
+    });
+    return years.map((year) => {
+      const totals = totalsByYear.get(year) ?? { internal: 0, external: 0 };
+      return { year: String(year), "ทุนภายใน": totals.internal, "ทุนภายนอก": totals.external };
+    });
+  }, [publicationsMatchingResearchFilters, years, yearMode]);
+
+  const fundingSummary = useMemo(() => publicationsMatchingResearchFilters.reduce((summary, publication) => {
+    if (yearFilter !== "all" && getBuddhistYear(publication.publication_date, yearMode) !== Number(yearFilter)) return summary;
     summary.total += publication.funding_amount;
     if (publication.funding_type === "internal") summary.internal += publication.funding_amount;
     if (publication.funding_type === "external") summary.external += publication.funding_amount;
@@ -274,18 +304,19 @@ export default function ResearchSummary() {
     if (publication.work_category === "research") summary.research += 1;
     if (publication.work_category === "innovation") summary.innovation += 1;
     return summary;
-  }, { total: 0, internal: 0, external: 0, irb: 0, research: 0, innovation: 0 }), [filteredPublications]);
+  }, { total: 0, internal: 0, external: 0, irb: 0, research: 0, innovation: 0 }), [publicationsMatchingResearchFilters, yearFilter, yearMode]);
 
   const visiblePublications = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return filteredPublications.filter(
+    return publicationsMatchingResearchFilters.filter(
       (publication) =>
+        (yearFilter === "all" || getBuddhistYear(publication.publication_date, yearMode) === Number(yearFilter)) &&
         (!query || publication.title.toLowerCase().includes(query) ||
           publication.journal.toLowerCase().includes(query) ||
           publication.funding_source.toLowerCase().includes(query) ||
           publication.authors.some((author) => author.name.toLowerCase().includes(query)))
     );
-  }, [filteredPublications, search]);
+  }, [publicationsMatchingResearchFilters, search, yearFilter, yearMode]);
 
   const saveChange = async (payload: Record<string, string | number | boolean | number[]>) => {
     if (savingRef.current || saveFailed || !canManageResearch) return false;
@@ -312,25 +343,22 @@ export default function ResearchSummary() {
         setSaveMessage('ยังไม่ได้บันทึกการแก้ไข');
         return false;
       }
-      // A failed response may follow a committed write. Read the server state before allowing another edit.
       try {
+        // Reconcile after a failed response: the server may have saved the change
+        // even when the response was lost, so never allow a blind repeat.
         const latest = await api.get<ResearchSummaryResponse>('/index.php?page=get-research-summary');
-        if (latest.data.status === 'success' && latest.data.data) {
-          setPublications(latest.data.data.publications);
-          setFaculty(latest.data.data.faculty);
-          setYears(latest.data.data.years);
-          setCanManageResearch(latest.data.data.can_manage);
-          if (payload.action === 'update') setEditingPublication(null);
-          setSaveMessage('โหลดข้อมูลล่าสุดแล้ว กรุณาตรวจสอบจำนวนก่อนทำรายการต่อ');
-          toast.error('ยืนยันการบันทึกไม่สำเร็จ ระบบโหลดข้อมูลล่าสุดให้แล้ว');
-          return false;
-        }
+        const data = latest.data.status === 'success' ? latest.data.data : undefined;
+        if (!data) throw new Error('Unable to refresh research summary');
+        setPublications(data.publications);
+        setFaculty(data.faculty);
+        setYears(data.years);
+        setCanManageResearch(data.can_manage);
+        setSaveFailed(false);
+        setSaveMessage('โหลดข้อมูลล่าสุดแล้ว กรุณาตรวจสอบยอดก่อนทำรายการต่อ');
       } catch {
-        // Keep edits locked until the latest server state can be loaded.
+        setSaveFailed(true);
+        setSaveMessage('ยังตรวจสอบผลการบันทึกไม่ได้ กรุณาโหลดข้อมูลใหม่ก่อนทำรายการต่อ');
       }
-      setSaveFailed(true);
-      setSaveMessage('ยืนยันการบันทึกไม่สำเร็จ กรุณาโหลดข้อมูลใหม่เพื่อตรวจสอบก่อนทำรายการต่อ');
-      toast.error('ยืนยันการบันทึกไม่สำเร็จ กรุณาโหลดข้อมูลใหม่');
       return false;
     } finally {
       savingRef.current = false;
@@ -343,8 +371,8 @@ export default function ResearchSummary() {
   };
 
   const removeQuickCellPublication = (person: Faculty, year: number, kind: 'kpi' | 'co_author' | 'academic') => {
-    const target = filteredPublications.find((publication) => {
-      if (researchPublicationYear(publication.publication_date, yearMode, academicBoundary) !== year) return false;
+    const target = publications.find((publication) => {
+      if (getBuddhistYear(publication.publication_date, yearMode) !== year) return false;
       const author = publication.authors.find((item) => item.faculty_id === person.faculty_id);
       if (!author) return false;
       const academic = publication.publication_type === 'academic' || publication.publication_type === 'textbook';
@@ -601,7 +629,7 @@ export default function ResearchSummary() {
         <CardHeader className="space-y-4">
           <div>
             <CardTitle>ตัวกรองงานวิจัยและนวัตกรรม</CardTitle>
-            <CardDescription>ตัวกรองมีผลกับตัวเลขสรุป กราฟ ตารางอาจารย์ และรายการผลงานด้านล่าง</CardDescription>
+            <CardDescription>ใช้กรองรายการผลงานและข้อมูลสรุปทุนวิจัยรายปี</CardDescription>
           </div>
           <Tabs value={workCategoryFilter} onValueChange={(value) => setWorkCategoryFilter(value as "all" | WorkCategory)}>
             <TabsList className="grid w-full max-w-md grid-cols-3">
@@ -652,10 +680,6 @@ export default function ResearchSummary() {
               }}>ล้างตัวกรอง</Button>
             </div>
           </div>
-          <p role="status" className="mt-3 text-xs text-muted-foreground">
-            {filtersActive ? `พบผลงาน ${filteredPublications.length} รายการตามตัวกรอง` : `แสดงผลงานทั้งหมด ${filteredPublications.length} รายการ`}
-            {!quickAddMatchesFilters && " · การเพิ่มด้วยปุ่ม + ใช้ได้เมื่อล้างตัวกรองที่ไม่ตรงกับข้อมูลใหม่"}
-          </p>
         </CardContent>
       </Card>
 
@@ -734,7 +758,7 @@ export default function ResearchSummary() {
             <Banknote className="h-5 w-5" />
             Dashboard สรุปทุนวิจัยรายปี
           </CardTitle>
-          <CardDescription>ตัวเลขและกราฟแสดงเฉพาะผลงานที่ตรงกับตัวกรอง รวมถึงปีที่เลือก</CardDescription>
+          <CardDescription>ตัวเลขสรุปใช้ทุกตัวกรองที่เลือก ส่วนกราฟคงการเปรียบเทียบรายปีและแยกทุนภายในกับทุนภายนอก</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
@@ -794,21 +818,21 @@ export default function ResearchSummary() {
                 <TableRow>
                   <TableHead className="w-12 text-center">ที่</TableHead>
                   <TableHead className="min-w-64">ชื่อ - นามสกุล</TableHead>
-                  {visibleYears.map((year) => <TableHead key={year} className="text-center">จำนวน<br />{year}</TableHead>)}
+                  {years.map((year) => <TableHead key={year} className="text-center">จำนวน<br />{year}</TableHead>)}
                   <TableHead className="text-center text-red-600">เฉพาะ KPI</TableHead>
                   <TableHead>คำนำหน้า / ตำแหน่งวิชาการ</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredFaculty.length === 0 && <TableRow><TableCell colSpan={visibleYears.length + 4} className="text-center text-muted-foreground">ไม่พบอาจารย์ตามตัวกรอง</TableCell></TableRow>}
+                {filteredFaculty.length === 0 && <TableRow><TableCell colSpan={years.length + 4} className="text-center text-muted-foreground">ไม่พบอาจารย์</TableCell></TableRow>}
                 {filteredFaculty.map((person, index) => {
-                  const totalKpi = visibleYears.reduce((acc, year) => acc + (yearIndex.countsByYear.get(year)?.get(person.faculty_id)?.kpi ?? 0), 0);
+                  const totalKpi = years.reduce((acc, year) => acc + countsFor(person.faculty_id, year).kpi, 0);
                   return (
                     <TableRow key={person.faculty_id} id={`research-faculty-${person.faculty_id}`}>
                       <TableCell className="text-center text-muted-foreground">{index + 1}</TableCell>
                       <TableCell className="font-medium">{person.name}</TableCell>
-                      {visibleYears.map((year) => {
-                        const counts = yearIndex.countsByYear.get(year)?.get(person.faculty_id) ?? EMPTY_COUNTS;
+                      {years.map((year) => {
+                        const counts = countsFor(person.faculty_id, year);
                         const parts = formatCell(counts);
                         return (
                           <TableCell key={year} className="text-center">
@@ -838,7 +862,6 @@ export default function ResearchSummary() {
                                       <p className="text-sm font-medium">{person.name}</p>
                                       <p className="text-xs text-muted-foreground">เพิ่มหรือลดจำนวนในปี {year}</p>
                                     </div>
-                                    {!quickAddMatchesFilters && <p className="text-xs text-muted-foreground">ล้างตัวกรองทุน, IRB, ทรัพย์สินทางปัญญา หรืองานนวัตกรรมก่อนเพิ่มผลงาน</p>}
                                     <div className="grid gap-2">
                                       <div className="grid grid-cols-[1fr_auto_auto] items-center gap-2">
                                         <span className="text-sm font-medium text-red-500">ผลงานนับ KPI</span>
@@ -858,7 +881,7 @@ export default function ResearchSummary() {
                                           variant="outline"
                                           size="icon"
                                           className="h-8 w-8 border-red-400/60 text-red-500 hover:bg-red-500/10 hover:text-red-400"
-                                          disabled={isSaving || saveFailed || !quickAddMatchesFilters}
+                                          disabled={isSaving || saveFailed}
                                           aria-label="เพิ่มผลงานและบันทึกอัตโนมัติ"
                                           onClick={() => addQuickCellPublication(person, year, "kpi")}
                                         >
@@ -883,7 +906,7 @@ export default function ResearchSummary() {
                                           variant="outline"
                                           size="icon"
                                           className="h-8 w-8"
-                                          disabled={isSaving || saveFailed || !quickAddMatchesFilters}
+                                          disabled={isSaving || saveFailed}
                                           aria-label="เพิ่มผลงานและบันทึกอัตโนมัติ"
                                           onClick={() => addQuickCellPublication(person, year, "co_author")}
                                         >
@@ -908,7 +931,7 @@ export default function ResearchSummary() {
                                           variant="outline"
                                           size="icon"
                                           className="h-8 w-8 border-sky-400/60 text-sky-500 hover:bg-sky-500/10 hover:text-sky-400"
-                                          disabled={isSaving || saveFailed || !quickAddMatchesFilters}
+                                          disabled={isSaving || saveFailed}
                                           aria-label="เพิ่มผลงานและบันทึกอัตโนมัติ"
                                           onClick={() => addQuickCellPublication(person, year, "academic")}
                                         >

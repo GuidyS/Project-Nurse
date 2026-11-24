@@ -7,9 +7,9 @@ require_once __DIR__ . '/clo_mapping_helpers.php';
 require_once __DIR__ . '/curriculum_repository.php';
 require_once __DIR__ . '/clo_access_helpers.php';
 require_once __DIR__ . '/../../../config/curriculum_outcomes.php';
+require_once __DIR__ . '/../../../config/config.php';
 
-$pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
-$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+$pdo = new Connect();
 
 try {
     if (!isset($_SESSION['user_id'])) {
@@ -103,7 +103,8 @@ try {
 
     echo json_encode(["status" => "success", "data" => ["clos" => [], "plos" => [], "subject_ylo" => null, "sub_plo_catalog" => []]], JSON_UNESCAPED_UNICODE);
 } catch (Exception $e) {
+    error_log('[CLO] Course outcomes failed: ' . $e->getCode());
     http_response_code(500);
-    echo json_encode(["status" => "error", "message" => $e->getMessage()]);
+    echo json_encode(["status" => "error", "message" => "ดึงข้อมูล CLO ไม่สำเร็จ"], JSON_UNESCAPED_UNICODE);
 }
 ?>

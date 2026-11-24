@@ -35,12 +35,13 @@ import DeanDashboard from "@/components/pages/Teacher/DeanDashboard";
 import Retention from "@/components/pages/Teacher/Retention";
 import PracticalPage from '@/components/pages/Teacher/PracticalPage';
 import FacultyDimensionPage from '@/components/pages/Teacher/FacultyDimensionPage';
+import FacultyProjectWorkloadPage from '@/components/pages/Teacher/FacultyProjectWorkloadPage';
 import StudentVaccinationPage from "@/components/pages/Student/StudentVaccinationPage";
 import StudentHealthRecordsPage from "@/components/pages/Student/StudentHealthRecordsPage";
 import AdvisorHealthRecordsView from "@/components/pages/Teacher/AdvisorHealthRecordsView";
 import CompetencyItemsManagement from "@/components/pages/Admin/CompetencyItemsManagement";
 import StudentCompetencyView from "@/components/pages/Student/StudentCompetencyView";
-import CourseRegistration from "@/components/pages/Student/CourseRegistration";
+import CourseRegistration from "@/components/pages/Student/CourseRegistration"; 
 import CurriculumCycles from "@/components/pages/Admin/CurriculumCycles";
 import PracticeLocationsManage from "@/components/pages/Admin/PracticeLocationsManage";
 import PracticeLocationsView from "@/components/pages/Teacher/PracticeLocationsView";
@@ -140,13 +141,13 @@ const Index = () => {
     // 2. หมวดทั่วไปที่ทุกคนเข้าถึงได้ (Public / All Roles)
     if (activeItem === "login") {
       return (
-        <LoginPage
+        <LoginPage 
           onLoginSuccess={(userData: unknown) => {
             if (!userData || typeof userData !== "object") return;
             const loginUser = userData as LoginUserPayload;
             const rId = Number(loginUser.role_id);
             const pId = Number(loginUser.position_id);
-
+            
             localStorage.setItem('user', JSON.stringify(loginUser));
 
             switch (rId) {
@@ -164,11 +165,11 @@ const Index = () => {
               default: setActiveItem("profile");
             }
           }}
-          onGoToRegister={() => setActiveItem("register")}
+          onGoToRegister={() => setActiveItem("register")} 
         />
       );
     }
-
+    
     if (activeItem === "register") return <RegisterPage onBackToLogin={() => setActiveItem("login")} />;
     if (activeItem === "profile") return <ProfilePage />;
     if (activeItem === "notifications") return <NotificationsPage />; //*
@@ -240,9 +241,9 @@ const Index = () => {
         case "retention": return <Retention />;
         case "dean-teaching-workload": return <FacultyDimensionPage dimension="teaching" />;
         case "dean-research-workload": return <FacultyDimensionPage dimension="research" />;
-        case "dean-project-workload":
-        case "dean-academic-service-workload":
-        case "dean-culture-workload": return <FacultyDimensionPage dimension="projects" />;
+        case "dean-project-workload": return <FacultyProjectWorkloadPage />;
+        case "dean-academic-service-workload": return <FacultyProjectWorkloadPage initialFilter="academic_service" />;
+        case "dean-culture-workload": return <FacultyProjectWorkloadPage initialFilter="culture" />;
       }
     }
 
@@ -255,7 +256,7 @@ const Index = () => {
       "students", "students-info", "my-research", "research-summary",
       "advisor-health-records-view"
     ];
-
+    
     if (teacherPages.includes(activeItem)) {
       if (activeItem === "research-summary" && !isResearchPreviewRoute && !canViewResearchSummary) return <UnauthorizedView />;
       if (!isResearchPreviewRoute && roleId !== 1 && roleId !== 2) return <UnauthorizedView />;
@@ -308,7 +309,7 @@ const Index = () => {
   }
 
   return (
-    <MainLayout
+    <MainLayout 
       onItemClick={handleItemClick}
       activeItem={activeItem}
     >

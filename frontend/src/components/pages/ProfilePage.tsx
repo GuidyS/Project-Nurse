@@ -58,7 +58,7 @@ export const calculateAcademicInfo = (studentIdOrEntryYear: string | number) => 
   // 1. ดึงกรณีเป็น พ.ศ. 4 หลัก
   if (val.length === 4 && parseInt(val, 10) >= 2500 && parseInt(val, 10) <= 2600) {
     entryYear = parseInt(val, 10);
-  }
+  } 
   // 2. ดึงจาก 2 ตัวแรกของรหัสนักศึกษา (เช่น "6603400001" -> 66 -> 2566)
   else if (val.length >= 2) {
     const prefix = parseInt(val.substring(0, 2), 10);
@@ -368,25 +368,25 @@ export default function ProfilePage({
           </p>
         </div>
       </div>
-
+      
       {/* 🎯 ส่วนหัว Card ข้อมูลส่วนตัว */}
       <div className="bg-card rounded-2xl shadow-lg p-8 relative">
         {/* โหมดดูอย่างเดียวไม่สร้างปุ่มแก้ไขเลย ไม่ใช่แค่ซ่อนด้วย CSS */}
         <div className="absolute top-6 right-6">
-          {!readOnly && <Button
-            size="sm"
-            className="gap-2"
-            onClick={() => {
+          {!readOnly && <Button 
+            size="sm" 
+            className="gap-2" 
+            onClick={() => { 
               setFormData({
                 ...profileData,
                 parent_address: parentAddress || "",
                 home_address: profileData.home_address || profileData.address || ""
               });
               setLicenseFile(null);
-              setLicenseFileError("");
+              setLicenseFileError(""); 
               setStudentLicenseEvidenceFiles({});
               setStudentLicenseEvidenceErrors({});
-              setEditing(true);
+              setEditing(true); 
             }}
           >
             <Edit className="h-4 w-4" />
@@ -460,7 +460,7 @@ export default function ProfilePage({
                 <div className="md:col-span-2 border-t border-border pt-6 mt-2">
                   <WorkloadsSection workloads={profileData.teaching_workloads || []} onUpdate={fetchProfile} readOnly={readOnly} />
                 </div>
-
+                
                 <div className="md:col-span-2 border-t border-border pt-6 mt-2">
                   <PersonnelDevelopmentsSection developments={profileData.personnel_developments || []} onUpdate={fetchProfile} readOnly={readOnly} />
                 </div>
@@ -528,7 +528,7 @@ export default function ProfilePage({
                   <div className="flex items-center gap-2 mb-4">
                     <h3 className="font-semibold text-foreground text-base">ข้อมูลครอบครัว (บิดา-มารดา)</h3>
                   </div>
-
+                  
                   <div className="bg-muted/20 p-4 rounded-xl border border-border space-y-4">
                     <div className="grid md:grid-cols-2 gap-6">
                       {/* ข้อมูลบิดา */}

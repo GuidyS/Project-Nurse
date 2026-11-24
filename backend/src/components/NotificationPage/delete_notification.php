@@ -3,6 +3,7 @@
 // ถ้าขาดบรรทัดนี้ $_SESSION['user_id'] จะว่างเปล่า และระบบจะคิดว่าไม่ได้ล็อกอิน
 session_start();
 require_once __DIR__ . '/../../config/audit_helper.php';
+require_once __DIR__ . '/../../config/config.php';
 // ตั้งค่า CORS ให้ Frontend (React) คุยกับ Backend ได้
 header('Access-Control-Allow-Origin: ' . (in_array($_SERVER['HTTP_ORIGIN'] ?? '', ['http://localhost:5173', 'http://127.0.0.1:5173'], true) ? ($_SERVER['HTTP_ORIGIN'] ?? '') : 'http://localhost:5173'));
 header('Vary: Origin');
@@ -13,7 +14,7 @@ header("Content-Type: application/json; charset=UTF-8");
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit(); }
 //  เชื่อมต่อฐานข้อมูล
-$pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
+$pdo = new Connect();
 $input = json_decode(file_get_contents("php://input"), true);
  //  SECURITY CHECK: ป้องกันคนนอกเข้าใช้งาน
 if (!isset($_SESSION['user_id'])) {
@@ -72,8 +73,9 @@ if (isset($input['id'])) {
 
         echo json_encode(["status" => "success"]);
     } catch (Exception $e) {
+        error_log('[Notifications] Delete failed: ' . $e->getCode());
         http_response_code(500);
-        echo json_encode(["status" => "error", "message" => $e->getMessage()]);
+        echo json_encode(["status" => "error", "message" => "ไม่สามารถลบการแจ้งเตือนได้"], JSON_UNESCAPED_UNICODE);
     }
 }
 ?>

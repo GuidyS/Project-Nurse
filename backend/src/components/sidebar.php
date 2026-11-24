@@ -77,12 +77,14 @@ $menu_items = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $sections = [];
 $projectWorkloadMenuAdded = false;
 foreach ($menu_items as $item) {
-    if (in_array($item['url'], ['dean-project-workload', 'dean-academic-service-workload', 'dean-culture-workload'], true)) {
-        if ($projectWorkloadMenuAdded) continue;
-        $projectWorkloadMenuAdded = true;
-        $item['url'] = 'dean-project-workload';
+    if (in_array($item['url'], ['dean-academic-service-workload', 'dean-culture-workload'], true)) {
+        if ($projectWorkloadMenuAdded) {
+            continue;
+        }
         $item['title'] = 'ภาระงานโครงการ';
+        $item['url'] = 'dean-project-workload';
         $item['icon'] = 'FolderKanban';
+        $projectWorkloadMenuAdded = true;
     }
     $sectionName = $item['section_title'] ?? 'เมนูหลัก';
     if ($sectionName === '' || $sectionName === null) {
@@ -100,6 +102,27 @@ foreach ($menu_items as $item) {
         'url'   => $item['url'],
         'icon'  => $item['icon']
     ];
+}
+
+// Admin จัดการคลังเอกสารได้ แต่บางฐานข้อมูลยังไม่มีเมนูนี้ผูกกับสิทธิ์ Admin
+if ($roleId === 1) {
+    $hasDocumentsMenu = false;
+    foreach ($sections as $section) {
+        foreach ($section['items'] as $menuItem) {
+            if ($menuItem['url'] === 'documents') {
+                $hasDocumentsMenu = true;
+                break 2;
+            }
+        }
+    }
+    if (!$hasDocumentsMenu) {
+        $sections['งานหลักสูตร'] ??= ['sectionTitle' => 'งานหลักสูตร', 'items' => []];
+        $sections['งานหลักสูตร']['items'][] = [
+            'title' => 'คลังเอกสาร มคอ.',
+            'url' => 'documents',
+            'icon' => 'Files',
+        ];
+    }
 }
 
 // 3. อ่านตำแหน่งของ user (primary ก่อน) เพื่อเรียง section

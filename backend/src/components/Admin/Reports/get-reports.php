@@ -1,7 +1,23 @@
 <?php
 require_once __DIR__ . '/../../Teacher/ProjectShared/project_helpers.php';
 require_once __DIR__ . '/../../../config/academic_calendar.php';
-$db=project_db();$auth=project_require_auth($db);project_require_admin_write($auth);
+if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+    project_json(['status' => 'error', 'message' => 'Method not allowed'], 405);
+    exit;
+}
+
+$db = project_db();
+$auth = project_require_auth($db);
+$isDean = false;
+if ((int)$auth['role_id'] === 2) {
+    $stmt = $db->prepare('SELECT 1 FROM user_position WHERE user_id = :user_id AND position_id = 1 LIMIT 1');
+    $stmt->execute([':user_id' => $auth['user_id']]);
+    $isDean = (bool)$stmt->fetchColumn();
+}
+if ((int)$auth['role_id'] !== 1 && !$isDean) {
+    project_json(['status' => 'error', 'message' => 'Forbidden'], 403);
+    exit;
+}
 try {
     $year=project_u_year($_GET['year'] ?? currentAcademicYear(null,$db));
     $bundle=project_u_bundle($db,$year);$all=$bundle['rows'];
@@ -18,4 +34,7 @@ try {
         'strategies'=>array_values(array_unique(array_column($all,'strategy'))),'responsiblePeople'=>array_values(array_filter(array_unique(array_column($all,'responsiblePerson'))))];
     $data['meta']=['source'=>'unified_projects','pending'=>project_u_pending($db,$year)];
     project_json(['status'=>'success','data'=>$data]);
-} catch (Throwable $e) {project_json(['status'=>'error','message'=>$e->getMessage()],project_error_status($e));}
+} catch (Throwable $e) {
+    error_log('[Reports] Read failed: ' . $e->getCode());
+    project_json(['status' => 'error', 'message' => 'ไม่สามารถโหลดรายงานได้'], project_error_status($e));
+}

@@ -1,11 +1,17 @@
 <?php
-// download_document.php
+require_once __DIR__ . '/tqf_document_access.php';
 
-$pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
+if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+    http_response_code(405);
+    echo json_encode(['status' => 'error', 'message' => 'Method not allowed']);
+    exit;
+}
+
+$pdo = tqfDocumentRequireDb();
 
 if (isset($_GET['id'])) {
     $id = $_GET['id'];
-
+    
     $sql = "SELECT file_name, file_path FROM tqf_documents WHERE id = :id";
     $stmt = $pdo->prepare($sql);
     $stmt->execute([':id' => $id]);
@@ -14,7 +20,7 @@ if (isset($_GET['id'])) {
     if ($doc && !empty($doc['file_path'])) {
         $path = $doc['file_path'];
         $fileName = !empty($doc['file_name']) ? basename($doc['file_name']) : 'document';
-
+        
         // If it's an external link, redirect to it
         if (preg_match('/^https?:\/\//', $path)) {
             // Check if it is a Google Drive link to convert to direct download
@@ -30,12 +36,15 @@ if (isset($_GET['id'])) {
         }
 
         // Local file processing
-        $absolutePath = __DIR__ . '/../../../' . ltrim($path, '/');
-        if (file_exists($absolutePath)) {
+        $uploadRoot = realpath(__DIR__ . '/../../../uploads');
+        $absolutePath = realpath(__DIR__ . '/../../../' . ltrim($path, '/'));
+        if ($uploadRoot !== false && $absolutePath !== false
+            && str_starts_with($absolutePath, $uploadRoot . DIRECTORY_SEPARATOR)
+            && is_file($absolutePath)) {
             // Force download
             header('Content-Description: File Transfer');
             header('Content-Type: application/octet-stream');
-            header('Content-Disposition: attachment; filename="' . $fileName . '"');
+            header("Content-Disposition: attachment; filename*=UTF-8''" . rawurlencode($fileName));
             header('Expires: 0');
             header('Cache-Control: must-revalidate');
             header('Pragma: public');

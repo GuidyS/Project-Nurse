@@ -53,24 +53,24 @@ try {
                 FROM advice_log a
                 JOIN student s ON a.student_id = s.student_id
                 WHERE a.student_id IN (
-                    SELECT student_id FROM student_advisor_mapping
+                    SELECT student_id FROM student_advisor_mapping 
                     WHERE faculty_id = ? AND status = 'active'
                 )
                 ORDER BY a.created_at DESC";
         $stmt = $pdo->prepare($sql);
         $stmt->execute([$facultyId]);
     }
-
+    
     $notes = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     $currentMonth = date('Y-m');
     $stats = ["total" => count($notes), "thisMonth" => 0, "warning" => 0, "critical" => 0];
-
+    
     foreach ($notes as &$note) {
         if (substr((string)$note['date'], 0, 7) === $currentMonth) $stats["thisMonth"]++;
         if ($note['type'] === 'warning') $stats["warning"]++;
         if ($note['type'] === 'critical') $stats["critical"]++;
-
+        
         // ถ้าระดับสิทธิ์เป็น Admin (1) ให้เซ็นเซอร์ข้อมูลส่วนตัว/วิกฤต
         if ($roleId === 1 && in_array($note['type'], ['critical', 'personal'])) {
             $note['topic'] = '*** ข้อมูลถูกปกปิด ***';

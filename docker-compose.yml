@@ -11,6 +11,8 @@ services:
       - ./frontend:/app
       - /app/node_modules
     environment:
+      # API ถูกเรียกจาก browser ของผู้ใช้ จึงใช้ host port ของ backend
+      - VITE_API_BASE_URL=http://localhost:8080
       # 🔧 vite.config.ts อ่านค่านี้จาก process.env — ถ้าไม่เปิด Hot Reload จะไม่ทำงาน
       # บน Windows/macOS ที่ใช้ bind mount เพราะ container ไม่ได้รับ event การแก้ไฟล์
       - VITE_USE_POLLING=true

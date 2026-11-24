@@ -7,9 +7,9 @@ require_once __DIR__ . '/../CLOPage/clo_mapping_helpers.php';
 require_once __DIR__ . '/../CLOPage/curriculum_repository.php';
 require_once __DIR__ . '/../../../config/active_curriculum.php';
 require_once __DIR__ . '/../../../config/curriculum_outcomes.php';
+require_once __DIR__ . '/../../../config/config.php';
 
-$pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
-$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+$pdo = new Connect();
 
 try {
     if (!isset($_SESSION['user_id'])) {
@@ -86,7 +86,8 @@ try {
         ],
     ], JSON_UNESCAPED_UNICODE);
 } catch (PDOException $e) {
+    error_log('[CLO Map] Read failed: ' . $e->getCode());
     http_response_code(500);
-    echo json_encode(["status" => "error", "message" => $e->getMessage()]);
+    echo json_encode(["status" => "error", "message" => "ไม่สามารถดึงข้อมูล CLO Map ได้"], JSON_UNESCAPED_UNICODE);
 }
 ?>

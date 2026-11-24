@@ -72,6 +72,22 @@ export default function Retention() {
     );
   }
 
+  if (error || !data) {
+    return (
+      <div className="p-6 space-y-6 animate-fade-in">
+        <div className="app-page-header">
+          <div>
+            <h1 className="app-page-title">อัตราการคงอยู่ของนักศึกษา</h1>
+            <p className="app-page-description">วิเคราะห์สัดส่วนนักศึกษาคงอยู่และสาเหตุการออกกลางคัน</p>
+          </div>
+        </div>
+        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
+          {error || "ไม่สามารถโหลดข้อมูลอัตราคงอยู่ได้"}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 space-y-6 animate-fade-in">
       <div className="app-page-header">
@@ -87,12 +103,6 @@ export default function Retention() {
           <ExportButton reportName="Retention-Report" />
         </div>
       </div>
-
-      {error && (
-        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          {error}
-        </div>
-      )}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard

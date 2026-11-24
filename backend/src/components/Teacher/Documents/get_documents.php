@@ -1,8 +1,9 @@
 <?php
 
 require_once __DIR__ . '/../../../config/active_curriculum.php';
+require_once __DIR__ . '/tqf_document_access.php';
 
-$pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
+$pdo = tqfDocumentRequireDb();
 
 try {
     // 1. รายวิชาทำ Dropdown — ตามหลักสูตรที่ใช้งานในระบบ (ยังไม่มีหลักสูตรใช้ตาราง subject แบบเดิม)
@@ -30,8 +31,6 @@ try {
         if (!empty($doc['file_path'])) {
             if (preg_match('/^https?:\/\//', $doc['file_path'])) {
                 $fileUrl = $doc['file_path'];
-            } else {
-                $fileUrl = 'http://localhost:8080/' . ltrim($doc['file_path'], '/');
             }
         }
 
@@ -43,7 +42,7 @@ try {
             'academic_year' => $doc['academic_year'],
             'uploadedAt' => substr($doc['created_at'], 0, 10),
             'fileUrl' => $fileUrl,
-            'downloadUrl' => 'http://localhost:8080/index.php?page=download-document&id=' . $doc['id']
+            'downloadUrl' => 'index.php?page=download-document&id=' . rawurlencode((string)$doc['id'])
         ];
     }
 
@@ -56,7 +55,8 @@ try {
     ]);
 
 } catch (PDOException $e) {
+    error_log('[TQF Documents] List failed: ' . $e->getCode());
     http_response_code(500);
-    echo json_encode(["status" => "error", "message" => $e->getMessage()]);
+    echo json_encode(["status" => "error", "message" => "ไม่สามารถดึงข้อมูลเอกสารได้"], JSON_UNESCAPED_UNICODE);
 }
 ?>

@@ -4,11 +4,11 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-require_once __DIR__ . '/../../../config/config.php';
+require_once __DIR__ . '/tqf_document_access.php';
 require_once __DIR__ . '/../../../config/academic_calendar.php';
 require_once __DIR__ . '/../../../config/audit_helper.php'; // นำเข้า Audit Helper
 
-$pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
+$pdo = tqfDocumentRequireDb(true);
 
 try {
     $input = json_decode(file_get_contents('php://input'), true);
@@ -84,5 +84,7 @@ try {
         echo json_encode(['status' => 'error', 'message' => 'ข้อมูลไม่ครบถ้วน']);
     }
 } catch (Exception $e) {
-    echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+    error_log('[TQF Documents] Save failed: ' . $e->getCode());
+    http_response_code(500);
+    echo json_encode(['status' => 'error', 'message' => 'ไม่สามารถบันทึกข้อมูลเอกสารได้'], JSON_UNESCAPED_UNICODE);
 }

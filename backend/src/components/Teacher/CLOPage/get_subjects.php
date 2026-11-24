@@ -6,9 +6,9 @@ if (session_status() === PHP_SESSION_NONE) {
 require_once __DIR__ . '/curriculum_repository.php';
 require_once __DIR__ . '/clo_access_helpers.php';
 require_once __DIR__ . '/../../../config/active_curriculum.php';
+require_once __DIR__ . '/../../../config/config.php';
 
-$pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
-$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+$pdo = new Connect();
 
 try {
     if (!isset($_SESSION['user_id'])) {
@@ -61,6 +61,7 @@ try {
     ], JSON_UNESCAPED_UNICODE);
 
 } catch (PDOException $e) {
+    error_log('[CLO] Subject list failed: ' . $e->getCode());
     http_response_code(500);
-    echo json_encode(["status" => "error", "message" => $e->getMessage()]);
+    echo json_encode(["status" => "error", "message" => "ดึงข้อมูลรายวิชาไม่สำเร็จ"], JSON_UNESCAPED_UNICODE);
 }

@@ -30,6 +30,14 @@ export default function Documents() {
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [courses, setCourses] = useState<{ subject_code: string, subject_name_th: string }[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const isAdmin = (() => {
+    try {
+      return Number(JSON.parse(localStorage.getItem('user') || '{}').role_id) === 1;
+    } catch {
+      return false;
+    }
+  })();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -50,6 +58,7 @@ export default function Documents() {
   const fetchDocuments = async () => {
     try {
       setIsLoading(true);
+      setLoadError('');
       const response = await api.get('/index.php?page=get-documents');
       if (response.data.status === 'success') {
         const payload = response.data.data;
@@ -63,10 +72,13 @@ export default function Documents() {
           setDocuments([]);
           setCourses([]);
         }
+      } else {
+        throw new Error(response.data?.message || 'ไม่สามารถดึงข้อมูลเอกสารได้');
       }
     } catch (error) {
       setDocuments([]);
       setCourses([]);
+      setLoadError('ไม่สามารถดึงข้อมูลเอกสารได้');
       toast({ title: "ข้อผิดพลาด", description: "ไม่สามารถดึงข้อมูลเอกสารได้", variant: "destructive" });
     } finally {
       setIsLoading(false);
@@ -145,15 +157,31 @@ export default function Documents() {
     return <div className="flex h-96 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
 
+  if (loadError) {
+    return (
+      <div className="space-y-6">
+        <div className="app-page-header">
+          <div>
+            <h1 className="app-page-title">คลังเอกสาร มคอ.</h1>
+            <p className="app-page-description">จัดการเอกสารรายวิชาต่างๆ</p>
+          </div>
+        </div>
+        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
+          {loadError}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <div className="space-y-6">
         <div className="app-page-header">
           <div>
-            <h1 className="app-page-title">อัปโหลดเอกสาร</h1>
+            <h1 className="app-page-title">คลังเอกสาร มคอ.</h1>
             <p className="app-page-description">จัดการเอกสารรายวิชาต่างๆ</p>
           </div>
-          <Dialog open={isDialogOpen} onOpenChange={(open) => {
+          {isAdmin && <Dialog open={isDialogOpen} onOpenChange={(open) => {
             if (open) setNewDocument((draft) => ({ ...draft, academic_year: draft.academic_year || String(currentAcademicYear) }));
             setIsDialogOpen(open);
           }}>
@@ -247,7 +275,7 @@ export default function Documents() {
                 <Button onClick={handleUpload}>อัปโหลด</Button>
               </DialogFooter>
             </DialogContent>
-          </Dialog>
+          </Dialog>}
         </div>
 
         {/* Table */}
@@ -309,15 +337,16 @@ export default function Documents() {
                               const url = doc.downloadUrl || doc.fileUrl;
                               if (url) {
                                 // use an invisible iframe or just window.location for downloads so we don't open blank tabs
-                                window.location.href = url;
+                                const baseUrl = `${(api.defaults.baseURL || window.location.origin).replace(/\/$/, '')}/`;
+                                window.location.href = new URL(url, baseUrl).href;
                               }
                             }}
                           >
                             <Download className="h-4 w-4" />
                           </Button>
-                          <Button variant="outline" size="icon" className="h-8 w-8 hover:bg-red-100 hover:text-red-600" onClick={() => { setDeleteId(doc.id); setIsDeleteOpen(true); }}>
+                          {isAdmin && <Button variant="outline" size="icon" className="h-8 w-8 hover:bg-red-100 hover:text-red-600" onClick={() => { setDeleteId(doc.id); setIsDeleteOpen(true); }}>
                             <Trash2 className="h-4 w-4" />
-                          </Button>
+                          </Button>}
                         </div>
                       </TableCell>
                     </TableRow>

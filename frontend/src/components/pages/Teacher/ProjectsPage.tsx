@@ -423,8 +423,6 @@ const parseBudgetNote = (raw?: string | null) => {
 const ProjectsPage = () => {
   const currentAcademicYear = useAcademicYear();
   const projectRequest = useRef<AbortController | null>(null);
-  const createDocumentFileInput = useRef<HTMLInputElement | null>(null);
-  const uploadDocumentFileInput = useRef<HTMLInputElement | null>(null);
   const { toast } = useToast();
   const [projects, setProjects] = useState<Project[]>([]);
   const [availableAcademicYears, setAvailableAcademicYears] = useState<number[]>([]);
@@ -1878,14 +1876,10 @@ const ProjectsPage = () => {
                   </div>
                 </div>
                 <div className="grid gap-2">
-                  <Button type="button" variant="outline" className="w-fit gap-2" onClick={() => createDocumentFileInput.current?.click()} disabled={isSubmitting}>
-                    <Upload className="h-4 w-4" /> เลือกไฟล์ PDF / Word / รูปภาพ
-                  </Button>
+                  <Label htmlFor="create-project-document-files">แนบไฟล์ PDF / Word / รูปภาพ</Label>
                   <Input
-                    ref={createDocumentFileInput}
                     id="create-project-document-files"
                     type="file"
-                    className="sr-only"
                     multiple
                     accept={PROJECT_DOCUMENT_FILE_ACCEPT}
                     onChange={(event) => setCreateDocumentFiles(Array.from(event.target.files || []))}
@@ -2189,14 +2183,10 @@ const ProjectsPage = () => {
             </div>
 
             <div className="space-y-2">
-              <Button type="button" variant="outline" className="w-fit gap-2" onClick={() => uploadDocumentFileInput.current?.click()} disabled={isUploadingDocuments}>
-                <Upload className="h-4 w-4" /> เลือกไฟล์ PDF / Word / รูปภาพ
-              </Button>
+              <Label htmlFor="project-document-files">แนบไฟล์ PDF / Word / รูปภาพ</Label>
               <Input
-                ref={uploadDocumentFileInput}
                 id="project-document-files"
                 type="file"
-                className="sr-only"
                 multiple
                 accept={PROJECT_DOCUMENT_FILE_ACCEPT}
                 onChange={(event) => setUploadFiles(Array.from(event.target.files || []))}

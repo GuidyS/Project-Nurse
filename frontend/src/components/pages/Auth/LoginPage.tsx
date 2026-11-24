@@ -106,11 +106,7 @@ const LoginForm = ({onLoginSuccess, onGoToRegister}: loginPageProps) => {
     } else if (showRoleUnassignedPopup(data)) {
       // card popup
     } else {
-      const message = !error.response
-        ? "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ Backend ได้ กรุณาตรวจสอบว่า Backend ทำงานอยู่"
-        : error.response.status === 404
-          ? "ไม่พบ API เข้าสู่ระบบ กรุณาตรวจสอบการตั้งค่า Backend"
-          : data?.message || "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง";
+      const message = data?.message || "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง";
       toast.error(message);
     }
     console.error("Login Error:", error);

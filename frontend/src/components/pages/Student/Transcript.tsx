@@ -57,7 +57,7 @@ const Transcript = () => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
 
-  // States เก็บข้อมูลโปรไฟล์และการลงทะเบียน/เกรด
+  // ข้อมูลโปรไฟล์ ใบลงทะเบียน และเอกสารผลการเรียนเดิมสำหรับดูย้อนหลัง
   const [studentInfo, setStudentInfo] = useState<StudentProfile | null>(null);
   const [registrations, setRegistrations] = useState<RegistrationRecord[]>([]);
   const [termGrades, setTermGrades] = useState<TermGradeRecord[]>([]);
@@ -68,13 +68,6 @@ const Transcript = () => {
   const [regCourseCount, setRegCourseCount] = useState<string>("6");
   const [regFile, setRegFile] = useState<File | null>(null);
   const [isUploadingReg, setIsUploadingReg] = useState(false);
-
-  // States สำหรับฟอร์มอัปโหลดใบเกรด
-  const [gradeYear, setGradeYear] = useState<string>(new Date().getFullYear() + 543 + "");
-  const [gradeSemester, setGradeSemester] = useState<string>("1");
-  const [gradeGpa, setGradeGpa] = useState<string>("");
-  const [gradeFile, setGradeFile] = useState<File | null>(null);
-  const [isUploadingGrade, setIsUploadingGrade] = useState(false);
 
   const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8080").replace(/\/$/, "");
 
@@ -158,61 +151,6 @@ const Transcript = () => {
     }
   };
 
-  // ฟังก์ชันอัปโหลดใบเกรดแต่ละเทอม
-  const handleUploadTermGrade = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!gradeYear || !gradeSemester || !gradeFile) {
-      toast({ title: "กรุณากรอกข้อมูลและเลือกไฟล์ใบเกรด", variant: "destructive" });
-      return;
-    }
-    try {
-      setIsUploadingGrade(true);
-      const formData = new FormData();
-      formData.append("action", "upload-term-grade");
-      formData.append("academic_year", gradeYear);
-      formData.append("semester", gradeSemester);
-      if (gradeGpa) formData.append("gpa", gradeGpa);
-      formData.append("file", gradeFile);
-
-      const res = await api.post("/index.php?page=transcript-api", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-
-      if (res.data.status === "success") {
-        toast({ title: "สำเร็จ", description: "อัปโหลดใบเกรดเรียบร้อยแล้ว" });
-        setGradeFile(null);
-        setGradeGpa("");
-        const fileInput = document.getElementById("grade-file-input") as HTMLInputElement;
-        if (fileInput) fileInput.value = "";
-        fetchData();
-      } else {
-        toast({ title: "ผิดพลาด", description: res.data.message || "ไม่สามารถอัปโหลดได้", variant: "destructive" });
-      }
-    } catch (err: any) {
-      toast({ title: "ผิดพลาด", description: err.response?.data?.message || "เกิดข้อผิดพลาดในการอัปโหลด", variant: "destructive" });
-    } finally {
-      setIsUploadingGrade(false);
-    }
-  };
-
-  // ฟังก์ชันลบใบเกรด
-  const handleDeleteTermGrade = async (id: number) => {
-    if (!confirm("คุณต้องการลบใบเกรดนี้ใช่หรือไม่?")) return;
-    try {
-      const formData = new FormData();
-      formData.append("action", "delete-term-grade");
-      formData.append("id", String(id));
-
-      const res = await api.post("/index.php?page=transcript-api", formData);
-      if (res.data.status === "success") {
-        toast({ title: "สำเร็จ", description: "ลบใบเกรดเรียบร้อยแล้ว" });
-        fetchData();
-      }
-    } catch (err: any) {
-      toast({ title: "ผิดพลาด", description: "ไม่สามารถลบรายการได้", variant: "destructive" });
-    }
-  };
-
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center h-[60vh] gap-2">
@@ -229,7 +167,7 @@ const Transcript = () => {
         <div>
           <h1 className="app-page-title">ข้อมูลนักศึกษาและการลงทะเบียน</h1>
           <p className="app-page-description">
-            จัดการและดูใบลงทะเบียนเรียน และเอกสารรายงานผลการเรียน (เกรด) แต่ละภาคเรียน
+            จัดการใบลงทะเบียนเรียน และดูเอกสารผลการเรียนเดิม
           </p>
         </div>
       </div>
@@ -293,7 +231,7 @@ const Transcript = () => {
                 </div>
                 <div>
                   <p className="text-3xl font-bold">{termGrades.length}</p>
-                  <p className="text-xs text-muted-foreground">ใบเกรดประจำเทอมที่อัปโหลด</p>
+                  <p className="text-xs text-muted-foreground">เอกสารผลการเรียนเดิม</p>
                 </div>
               </div>
             </CardContent>
@@ -487,88 +425,22 @@ const Transcript = () => {
       </Card>
 
       {/* ---------------------------------------------------- */}
-      {/* หมวดที่ 2: อัปโหลดเกรดของแต่ละเทอม */}
+      {/* เอกสารผลการเรียนเดิมสำหรับดูย้อนหลัง */}
       {/* ---------------------------------------------------- */}
       <Card className="shadow-sm">
         <CardHeader>
           <div className="flex flex-col gap-1">
             <CardTitle className="text-base flex items-center gap-2">
               <Award className="h-5 w-5 text-emerald-600" />
-              รายงานผลการเรียน (เกรดแต่ละเทอม)
+              เอกสารผลการเรียนเดิม
             </CardTitle>
             <CardDescription className="text-xs">
-              อัปโหลดเอกสารใบรายงานผลการเรียน หรือเกรดของแต่ละภาคเรียน
+              แสดงเอกสารที่บันทึกไว้ก่อนยกเลิกการกรอกเกรด
             </CardDescription>
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* ฟอร์มอัปโหลด */}
-          <form onSubmit={handleUploadTermGrade} className="p-4 rounded-xl border bg-muted/20 space-y-4">
-            <h4 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-              <Upload className="h-4 w-4 text-primary" />
-              เพิ่มผลการเรียนประจำเทอม
-            </h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-              <div className="space-y-1.5">
-                <Label htmlFor="grade-year">ปีการศึกษา (พ.ศ.)</Label>
-                <Input
-                  id="grade-year"
-                  placeholder="เช่น 2567"
-                  value={gradeYear}
-                  onChange={(e) => setGradeYear(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="grade-semester">ภาคเรียน</Label>
-                <Select value={gradeSemester} onValueChange={setGradeSemester}>
-                  <SelectTrigger id="grade-semester">
-                    <SelectValue placeholder="เลือกภาคเรียน" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1">ภาคเรียนที่ 1</SelectItem>
-                    <SelectItem value="2">ภาคเรียนที่ 2</SelectItem>
-                    <SelectItem value="3">ภาคฤดูร้อน</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="grade-gpa">เกรดเฉลี่ย (GPA เทอมนี้ - ถ้ามี)</Label>
-                <Input
-                  id="grade-gpa"
-                  type="number"
-                  step="0.01"
-                  min="0.00"
-                  max="4.00"
-                  placeholder="เช่น 3.50"
-                  value={gradeGpa}
-                  onChange={(e) => setGradeGpa(e.target.value)}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="grade-file-input">ไฟล์ใบเกรด (PDF/รูป)</Label>
-                <Input
-                  id="grade-file-input"
-                  type="file"
-                  accept=".pdf,.jpg,.jpeg,.png,.webp"
-                  onChange={(e) => setGradeFile(e.target.files?.[0] || null)}
-                  required
-                />
-              </div>
-            </div>
-            <div className="flex justify-end pt-1">
-              <Button type="submit" disabled={isUploadingGrade}>
-                {isUploadingGrade ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Upload className="mr-2 h-4 w-4" />
-                )}
-                บันทึกใบเกรด
-              </Button>
-            </div>
-          </form>
-
-          {/* ตารางรายการใบเกรดที่บันทึกแล้ว */}
+          {/* ตารางเอกสารเดิมแบบอ่านอย่างเดียว */}
           <div className="rounded-xl border overflow-hidden">
             <Table>
               <TableHeader>
@@ -578,7 +450,6 @@ const Transcript = () => {
                   <TableHead className="text-center w-[160px]">เกรดเฉลี่ย (GPA)</TableHead>
                   <TableHead>วันที่อัปโหลด</TableHead>
                   <TableHead className="text-center w-[140px]">เอกสาร</TableHead>
-                  <TableHead className="text-right w-[100px]">จัดการ</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -609,22 +480,11 @@ const Transcript = () => {
                           </a>
                         </Button>
                       </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive hover:bg-destructive/10 h-8 w-8 p-0"
-                          onClick={() => handleDeleteTermGrade(item.id)}
-                          title="ลบ"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
                     </TableRow>
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                       ยังไม่มีรายการใบรายงานผลการเรียน/เกรด
                     </TableCell>
                   </TableRow>

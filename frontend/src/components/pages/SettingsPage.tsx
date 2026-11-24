@@ -28,6 +28,8 @@ const SettingsPage = () => {
     projectNotifications: true,
   });
   const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const [settingsError, setSettingsError] = useState(false);
 
   useEffect(() => {
     document.documentElement.classList.remove("dark");
@@ -43,10 +45,13 @@ const SettingsPage = () => {
   useEffect(() => {
     const loadNotificationSettings = async () => {
       try {
+        setSettingsError(false);
         const response = await api.get("/index.php?page=get-notification-settings");
         const data = response.data?.data;
 
-        if (!data) return;
+        if (response.data?.status !== 'success' || !data) {
+          throw new Error('ไม่สามารถโหลดค่าการแจ้งเตือนล่าสุดได้');
+        }
 
         setSettings((current) => ({
           ...current,
@@ -54,7 +59,10 @@ const SettingsPage = () => {
           pushNotifications: Boolean(data.pushNotifications),
           projectNotifications: Boolean(data.projectNotifications),
         }));
+        setSettingsLoaded(true);
       } catch (error) {
+        setSettingsError(true);
+        setSettingsLoaded(false);
         toast({
           title: "โหลดการตั้งค่าไม่สำเร็จ",
           description: "ไม่สามารถโหลดค่าการแจ้งเตือนล่าสุดได้",
@@ -67,6 +75,7 @@ const SettingsPage = () => {
   }, [toast]);
 
   const handleSaveSettings = async () => {
+    if (!settingsLoaded) return;
     setIsSavingSettings(true);
 
     try {
@@ -136,6 +145,11 @@ const SettingsPage = () => {
             <CardDescription>จัดการการแจ้งเตือนที่คุณต้องการรับ</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
+            {settingsError && (
+              <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
+                ไม่สามารถโหลดค่าการแจ้งเตือนล่าสุดได้ กรุณาเปิดหน้านี้ใหม่อีกครั้ง
+              </div>
+            )}
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
                 <Label>การแจ้งเตือนทางอีเมล</Label>
@@ -277,7 +291,7 @@ const SettingsPage = () => {
 
         {/* Save Button */}
         <div className="flex justify-end">
-          <Button onClick={handleSaveSettings} size="lg" disabled={isSavingSettings}>
+          <Button onClick={handleSaveSettings} size="lg" disabled={isSavingSettings || !settingsLoaded}>
             <Save className="h-4 w-4 mr-2" />
             {isSavingSettings ? "กำลังบันทึก..." : "บันทึกการตั้งค่า"}
           </Button>

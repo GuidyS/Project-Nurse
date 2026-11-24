@@ -68,6 +68,7 @@ const NotificationsPage = () => {
   const canSendNotifications = Number(currentUser.role_id) !== 3;
   const roleId = Number(currentUser.role_id);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loadError, setLoadError] = useState(false);
   const [advisorInfo, setAdvisorInfo] = useState<{
     advisor_name?: string | null;
     practical_advisor_name?: string | null;
@@ -158,7 +159,11 @@ const NotificationsPage = () => {
 
   const loadNotifications = async () => {
     try {
+      setLoadError(false);
       const response = await api.get("/index.php?page=get-notifications");
+      if (response.data?.status === 'error') {
+        throw new Error('ไม่สามารถโหลดรายการแจ้งเตือนได้');
+      }
       const data = Array.isArray(response.data)
         ? response.data
         : response.data?.data;
@@ -174,6 +179,7 @@ const NotificationsPage = () => {
           : []
       );
     } catch (error) {
+      setLoadError(true);
       setNotifications([]);
       toast({
         title: "โหลดข้อมูลไม่สำเร็จ",
@@ -568,6 +574,12 @@ const NotificationsPage = () => {
         </div>
       </div>
 
+      {loadError && (
+        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
+          ไม่สามารถโหลดรายการแจ้งเตือนได้ กรุณาเปิดหน้านี้ใหม่อีกครั้ง
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <div className="app-stat-card p-4 text-center">
           <p className="text-2xl font-bold text-foreground">{notifications.length}</p>
@@ -738,10 +750,10 @@ const NotificationsPage = () => {
               <div className="app-section-card bg-card p-12 text-center">
                 <Bell className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                 <h3 className="font-semibold text-foreground mb-2">
-                  ไม่มีการแจ้งเตือน
+                  {loadError ? 'โหลดรายการแจ้งเตือนไม่สำเร็จ' : 'ไม่มีการแจ้งเตือน'}
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  ยังไม่มีการแจ้งเตือนในหมวดหมู่นี้
+                  {loadError ? 'ยังไม่สามารถยืนยันจำนวนรายการได้' : 'ยังไม่มีการแจ้งเตือนในหมวดหมู่นี้'}
                 </p>
               </div>
             )}

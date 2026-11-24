@@ -1,5 +1,6 @@
 <?php
 session_start();
+require_once __DIR__ . '/../../config/config.php';
 header('Access-Control-Allow-Origin: ' . (in_array($_SERVER['HTTP_ORIGIN'] ?? '', ['http://localhost:5173', 'http://127.0.0.1:5173'], true) ? ($_SERVER['HTTP_ORIGIN'] ?? '') : 'http://localhost:5173'));
 header('Vary: Origin');
 header("Access-Control-Allow-Credentials: true");
@@ -15,8 +16,7 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 try {
-    $pdo = new PDO("mysql:host=db;dbname=MYSQL_DATABASE;charset=utf8mb4", "MYSQL_USER", "MYSQL_PASSWORD");
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $pdo = new Connect();
 
     $current_user_id = $_SESSION['user_id'];
 
@@ -64,7 +64,8 @@ try {
 
     echo json_encode(["status" => "success", "data" => $recipients]);
 } catch (Exception $e) {
+    error_log('[Notifications] Recipient list failed: ' . $e->getCode());
     http_response_code(500);
-    echo json_encode(["status" => "error", "message" => $e->getMessage()]);
+    echo json_encode(["status" => "error", "message" => "ไม่สามารถโหลดรายชื่อผู้รับได้"], JSON_UNESCAPED_UNICODE);
 }
 ?>

@@ -265,6 +265,13 @@ const downloadCsv = (rows: AnnualProjectReportRow[], academicYear: string) => {
 };
 
 export default function Reports() {
+  const isAdmin = (() => {
+    try {
+      return Number(JSON.parse(localStorage.getItem('user') || '{}').role_id) === 1;
+    } catch {
+      return false;
+    }
+  })();
   const { currentYear, academicYear, setAcademicYear } = useAcademicYearSelection();
   const [refreshVersion, setRefreshVersion] = useState(0);
   const [selectedStrategy, setSelectedStrategy] = useState("ทั้งหมด");
@@ -368,7 +375,7 @@ export default function Reports() {
         </Button>
       </div>
 
-      <ProjectMergeWorkbench year={academicYear} onChanged={() => setRefreshVersion(v => v + 1)} />
+      {isAdmin && <ProjectMergeWorkbench year={academicYear} onChanged={() => setRefreshVersion(v => v + 1)} />}
 
       <Card className="app-section-card">
         <CardHeader>

@@ -50,6 +50,13 @@ try {
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $action = $_POST['action'] ?? '';
 
+        if ($action === 'upload-term-grade' || $action === 'delete-term-grade') {
+            ob_clean();
+            http_response_code(410);
+            echo json_encode(['status' => 'error', 'message' => 'ยกเลิกการบันทึกและลบข้อมูลเกรดแล้ว'], JSON_UNESCAPED_UNICODE);
+            exit();
+        }
+
         if ($action === 'upload-registration') {
             $academicYear = trim($_POST['academic_year'] ?? '');
             $semester = trim($_POST['semester'] ?? '');
@@ -106,65 +113,6 @@ try {
 
             ob_clean();
             echo json_encode(["status" => "success", "message" => "ลบใบลงทะเบียนเรียบร้อยแล้ว"], JSON_UNESCAPED_UNICODE);
-            exit();
-        }
-
-        if ($action === 'upload-term-grade') {
-            $academicYear = trim($_POST['academic_year'] ?? '');
-            $semester = trim($_POST['semester'] ?? '');
-            $gpa = !empty($_POST['gpa']) ? (float)$_POST['gpa'] : null;
-
-            if (!$academicYear || !$semester) {
-                throw new Exception("กรุณาระบุปีการศึกษาและภาคเรียน");
-            }
-            if (!isset($_FILES['file']) || $_FILES['file']['error'] !== 0) {
-                throw new Exception("กรุณาเลือกไฟล์ใบรายงานผลการเรียน/เกรด");
-            }
-
-            $file = $_FILES['file'];
-            $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-            if (!in_array($ext, ['pdf', 'jpg', 'jpeg', 'png', 'webp'])) {
-                throw new Exception("รองรับเฉพาะไฟล์ PDF, JPG, PNG หรือ WEBP เท่านั้น");
-            }
-
-            $uploadDir = __DIR__ . '/../../../uploads/student-documents/' . $student_session_id . '/';
-            if (!is_dir($uploadDir)) {
-                mkdir($uploadDir, 0777, true);
-            }
-
-            $filename = 'grade_' . uniqid() . '.' . $ext;
-            $dest = $uploadDir . $filename;
-            if (!move_uploaded_file($file['tmp_name'], $dest)) {
-                throw new Exception("ไม่สามารถบันทึกไฟล์ได้");
-            }
-
-            $dbPath = 'uploads/student-documents/' . $student_session_id . '/' . $filename;
-
-            $stmt = $db->prepare("INSERT INTO student_term_grades (student_id, academic_year, semester, gpa, file_path) VALUES (?, ?, ?, ?, ?)");
-            $stmt->execute([$student_session_id, $academicYear, $semester, $gpa, $dbPath]);
-
-            ob_clean();
-            echo json_encode(["status" => "success", "message" => "อัปโหลดใบเกรดเรียบร้อยแล้ว"], JSON_UNESCAPED_UNICODE);
-            exit();
-        }
-
-        if ($action === 'delete-term-grade') {
-            $id = (int)($_POST['id'] ?? 0);
-            if ($id <= 0) throw new Exception("Invalid ID");
-
-            $stmt = $db->prepare("SELECT file_path FROM student_term_grades WHERE id = ? AND student_id = ?");
-            $stmt->execute([$id, $student_session_id]);
-            $row = $stmt->fetch(PDO::FETCH_ASSOC);
-            if ($row) {
-                $fullPath = __DIR__ . '/../../../' . $row['file_path'];
-                if (file_exists($fullPath)) {
-                    @unlink($fullPath);
-                }
-                $db->prepare("DELETE FROM student_term_grades WHERE id = ? AND student_id = ?")->execute([$id, $student_session_id]);
-            }
-
-            ob_clean();
-            echo json_encode(["status" => "success", "message" => "ลบใบเกรดเรียบร้อยแล้ว"], JSON_UNESCAPED_UNICODE);
             exit();
         }
 
