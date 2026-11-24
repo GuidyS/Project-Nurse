@@ -68,7 +68,7 @@ npm run lint
 
 Frontend เรียก Backend ผ่าน `src/lib/axios.ts` โดยอ่านค่าจาก:
 
-```env
+```env (frontend/src)
 VITE_API_BASE_URL=http://localhost:8080
 ```
 
@@ -80,7 +80,7 @@ frontend/.env
 
 ตัวอย่าง:
 
-```env
+```env (ข้างนอกสุดของโฟลเดอร์โปรเจกต์)
 # Base URL สำหรับเชื่อมต่อ Backend API
 VITE_API_BASE_URL = http://localhost:8080
 
