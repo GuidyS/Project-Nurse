@@ -66,23 +66,16 @@ npm run lint
 
 ## Environment Variables
 
-Frontend เรียก Backend ผ่าน `src/lib/axios.ts` โดยอ่านค่าจาก:
+Frontend เรียก Backend ผ่าน `src/lib/axios.ts` โดยอ่านไฟล์ .env ทั้ง 2 ไฟล์จาก:
 
-```env (frontend/src)
+```env
+# 1. ใน frontend/src
+
 VITE_API_BASE_URL=http://localhost:8080
 ```
 
-แนะนำให้สร้างไฟล์ `.env` ไว้ที่โฟลเดอร์ `frontend/`:
-
-```bash
-frontend/.env
-```
-
-ตัวอย่าง:
-
 ```env (ข้างนอกสุดของโฟลเดอร์โปรเจกต์)
-# Base URL สำหรับเชื่อมต่อ Backend API
-VITE_API_BASE_URL = http://localhost:8080
+# 2. อยู่นอกสุดของโปรเจกต์
 
 # คัดลอกไฟล์นี้เป็น .env (วางข้าง docker-compose.yml) แล้วกรอกค่าจริง จากนั้นรัน: docker compose up -d backend
 # .env อยู่ใน .gitignore แล้ว — ห้าม commit รหัสผ่านขึ้น git
